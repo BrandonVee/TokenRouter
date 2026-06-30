@@ -990,6 +990,7 @@ affiliates: {
         antigravity: 'Antigravity',
         qoder: 'Qoder',
         grok: 'Grok',
+        composite: 'Composite',
       },
       saving: '保存中...',
       noGroups: '暂无分组',

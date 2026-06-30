@@ -31,6 +31,7 @@ const (
 	PlatformAntigravity = "antigravity"
 	PlatformGrok        = "grok"
 	PlatformQoder       = "qoder"
+	PlatformComposite   = "composite"
 	// 国产 OpenAI 兼容供应商统一经 OpenAI 网关转发。
 	PlatformKimi     = "kimi"
 	PlatformZhipu    = "zhipu"

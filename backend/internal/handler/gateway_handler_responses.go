@@ -77,6 +77,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	reqModel := modelResult.String()
+	ensureCompositeTargetPlatform(c, apiKey, reqModel)
 	reqStream, ok := parseOpenAICompatibleStream(body)
 	if !ok {
 		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", invalidStreamFieldTypeMessage)
@@ -89,7 +90,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	// 生图能力和模型级限流以渠道模型 C 及其请求体为准。
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
 	forwardBody, _, imageIntent := resolveOpenAIChannelMappedImageIntent(
-		"/v1/responses", reqModel, body, channelMapping, openAICompatibleRequestPlatform(apiKey), h.gatewayService.ReplaceModelInBody,
+		"/v1/responses", reqModel, body, channelMapping, openAICompatibleRequestPlatform(c.Request.Context(), apiKey), h.gatewayService.ReplaceModelInBody,
 	)
 	requestCtx := c.Request.Context()
 	if imageIntent {
@@ -186,7 +187,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 				}) {
 					return
 				}
-				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, service.PlatformAnthropic)
+				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, reqModel, reqModel, effectiveAPIKeyPlatform(c, apiKey))
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}

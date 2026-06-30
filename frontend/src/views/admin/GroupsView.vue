@@ -4471,6 +4471,7 @@ const platformOptions = computed(() => [
   { value: "kimi", label: "Kimi" },
   { value: "zhipu", label: "智谱 GLM" },
   { value: "deepseek", label: "DeepSeek" },
+  { value: "composite", label: "Composite" },
 ]);
 
 const schedulerTypeOptions = computed(() => [
@@ -4523,6 +4524,7 @@ const platformFilterOptions = computed(() => [
   { value: "antigravity", label: "Antigravity" },
   { value: "qoder", label: "Qoder" },
   { value: "grok", label: "Grok" },
+  { value: "composite", label: "Composite" },
 ]);
 
 const editStatusOptions = computed(() => [
@@ -4634,14 +4636,25 @@ const invalidRequestFallbackOptionsForEdit = computed(() => {
   return options;
 });
 
-// 复制账号的源分组选项（创建时）- 仅包含相同平台且有账号的分组
+const canCopyAccountsFromGroup = (targetPlatform: GroupPlatform, sourcePlatform: GroupPlatform) =>
+  targetPlatform === "composite" || sourcePlatform === targetPlatform;
+
+const copyAccountsGroupLabel = (g: AdminGroup) => {
+  const count = g.account_count || 0;
+  const platform = t("admin.groups.platforms." + g.platform);
+  return `${g.name} - ${platform} (${t("admin.groups.accountsCount", { count })})`;
+};
+
+// 复制账号的源分组选项（创建时）- 相同平台；composite 分组可汇总各平台账号
 const copyAccountsGroupOptions = computed(() => {
   const eligibleGroups = groups.value.filter(
-    (g) => g.platform === createForm.platform && (g.account_count || 0) > 0,
+    (g) =>
+      canCopyAccountsFromGroup(createForm.platform, g.platform) &&
+      (g.account_count || 0) > 0,
   );
   return eligibleGroups.map((g) => ({
     value: g.id,
-    label: `${g.name} (${g.account_count || 0} 个账号)`,
+    label: copyAccountsGroupLabel(g),
   }));
 });
 
@@ -4652,18 +4665,18 @@ const copyAccountsGroupSelectOptions = computed(() =>
   })),
 );
 
-// 复制账号的源分组选项（编辑时）- 仅包含相同平台且有账号的分组，排除自身
+// 复制账号的源分组选项（编辑时）- 相同平台；composite 分组可汇总各平台账号，排除自身
 const copyAccountsGroupOptionsForEdit = computed(() => {
   const currentId = editingGroup.value?.id;
   const eligibleGroups = groups.value.filter(
     (g) =>
-      g.platform === editForm.platform &&
+      canCopyAccountsFromGroup(editForm.platform, g.platform) &&
       (g.account_count || 0) > 0 &&
       g.id !== currentId,
   );
   return eligibleGroups.map((g) => ({
     value: g.id,
-    label: `${g.name} (${g.account_count || 0} 个账号)`,
+    label: copyAccountsGroupLabel(g),
   }));
 });
 

@@ -12,6 +12,9 @@ const (
 	// 由网关入口中间件写入，供认证阶段做默认分组回退判断。
 	InboundEndpoint Key = "ctx_inbound_endpoint"
 
+	// ResolvedTargetPlatform 是 composite 分组按请求模型解析出的真实目标平台。
+	ResolvedTargetPlatform Key = "ctx_resolved_target_platform"
+
 	// RequestID 为服务端生成/透传的请求 ID。
 	RequestID Key = "ctx_request_id"
 
