@@ -39,6 +39,9 @@ type BatchImageItem func(*sql.Selector)
 // BatchImageJob is the predicate function for batchimagejob builders.
 type BatchImageJob func(*sql.Selector)
 
+// CompositeModelRoute is the predicate function for compositemodelroute builders.
+type CompositeModelRoute func(*sql.Selector)
+
 // DataShareSession is the predicate function for datasharesession builders.
 type DataShareSession func(*sql.Selector)
 

@@ -2346,3 +2346,122 @@ func TestAdminService_UpdateGroup_InvalidRequestFallbackAllowsAntigravity(t *tes
 	require.NotNil(t, repo.updated)
 	require.Equal(t, fallbackID, *repo.updated.FallbackGroupIDOnInvalidRequest)
 }
+
+func TestAdminService_CreateCompositeRoute_RejectsNonCompositeGroup(t *testing.T) {
+	groupRepo := &groupRepoStubForAdmin{
+		getByID: &Group{ID: 7, Platform: PlatformOpenAI},
+	}
+	routeRepo := &compositeRouteRepoStubForAdmin{}
+	svc := &adminServiceImpl{groupRepo: groupRepo, compositeRouteRepo: routeRepo}
+
+	_, err := svc.CreateCompositeRoute(context.Background(), 7, CompositeRouteInput{
+		PublicModel:    "router/gpt-5",
+		TargetPlatform: PlatformOpenAI,
+		Enabled:        true,
+	})
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "not a composite group")
+	require.Nil(t, routeRepo.created)
+}
+
+func TestAdminService_CreateCompositeRoute_NormalizesAndPersists(t *testing.T) {
+	groupRepo := &groupRepoStubForAdmin{
+		getByID: &Group{ID: 7, Platform: PlatformComposite},
+	}
+	routeRepo := &compositeRouteRepoStubForAdmin{nextID: 99}
+	svc := &adminServiceImpl{groupRepo: groupRepo, compositeRouteRepo: routeRepo}
+
+	route, err := svc.CreateCompositeRoute(context.Background(), 7, CompositeRouteInput{
+		PublicModel:    " router/gpt- ",
+		MatchType:      CompositeRouteMatchPrefix,
+		TargetPlatform: PlatformOpenAI,
+		Endpoint:       CompositeRouteEndpointResponses,
+		Enabled:        true,
+		Notes:          " route note ",
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, route)
+	require.Equal(t, int64(99), route.ID)
+	require.Equal(t, "router/gpt-", route.PublicModel)
+	require.Equal(t, CompositeRouteMatchPrefix, route.MatchType)
+	require.Equal(t, PlatformOpenAI, route.TargetPlatform)
+	require.Equal(t, "router/gpt-", route.UpstreamModel)
+	require.Equal(t, CompositeRouteEndpointResponses, route.Endpoint)
+	require.Equal(t, 100, route.Priority)
+	require.True(t, route.Enabled)
+	require.Equal(t, "route note", route.Notes)
+	require.Equal(t, route, routeRepo.created)
+}
+
+func TestAdminService_UpdateAndDeleteCompositeRouteRequireRouteOwnership(t *testing.T) {
+	groupRepo := &groupRepoStubForAdmin{
+		getByID: &Group{ID: 7, Platform: PlatformComposite},
+	}
+	routeRepo := &compositeRouteRepoStubForAdmin{
+		routes: []CompositeModelRoute{
+			{ID: 11, GroupID: 7, PublicModel: "router/gpt-5", TargetPlatform: PlatformOpenAI, Enabled: true},
+			{ID: 12, GroupID: 8, PublicModel: "router/other", TargetPlatform: PlatformGemini, Enabled: true},
+		},
+	}
+	svc := &adminServiceImpl{groupRepo: groupRepo, compositeRouteRepo: routeRepo}
+
+	updated, err := svc.UpdateCompositeRoute(context.Background(), 7, 11, CompositeRouteInput{
+		PublicModel:    "router/gpt-5",
+		TargetPlatform: PlatformGemini,
+		UpstreamModel:  "gemini-2.5-pro",
+		Endpoint:       CompositeRouteEndpointChatCompletions,
+		Priority:       3,
+		Enabled:        true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, int64(11), updated.ID)
+	require.Equal(t, PlatformGemini, updated.TargetPlatform)
+	require.Equal(t, "gemini-2.5-pro", updated.UpstreamModel)
+	require.Equal(t, updated, routeRepo.updated)
+
+	err = svc.DeleteCompositeRoute(context.Background(), 7, 12)
+	require.ErrorIs(t, err, ErrCompositeRouteNotFound)
+	require.Empty(t, routeRepo.deleted)
+
+	err = svc.DeleteCompositeRoute(context.Background(), 7, 11)
+	require.NoError(t, err)
+	require.Equal(t, []int64{11}, routeRepo.deleted)
+}
+
+func TestAdminService_PreviewCompositeRouteUsesExplicitRoutes(t *testing.T) {
+	groupRepo := &groupRepoStubForAdmin{
+		getByID: &Group{ID: 7, Platform: PlatformComposite},
+	}
+	routeRepo := &compositeRouteRepoStubForAdmin{
+		routes: []CompositeModelRoute{
+			{
+				ID:             11,
+				GroupID:        7,
+				PublicModel:    "openrouter/claude",
+				MatchType:      CompositeRouteMatchExact,
+				TargetPlatform: PlatformAnthropic,
+				UpstreamModel:  "claude-sonnet-4-6",
+				Endpoint:       CompositeRouteEndpointMessages,
+				Priority:       100,
+				Enabled:        true,
+			},
+		},
+	}
+	svc := &adminServiceImpl{groupRepo: groupRepo, compositeRouteRepo: routeRepo}
+
+	decision, err := svc.PreviewCompositeRoute(context.Background(), 7, CompositeRoutePreviewRequest{
+		Model:    "openrouter/claude",
+		Endpoint: CompositeRouteEndpointMessages,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, decision)
+	require.True(t, decision.Matched)
+	require.Equal(t, CompositeRouteSourceExplicit, decision.Source)
+	require.Equal(t, PlatformAnthropic, decision.TargetPlatform)
+	require.Equal(t, "claude-sonnet-4-6", decision.UpstreamModel)
+	require.NotNil(t, decision.Route)
+	require.Equal(t, int64(11), decision.Route.ID)
+}

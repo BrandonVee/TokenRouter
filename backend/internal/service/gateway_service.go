@@ -748,12 +748,23 @@ type GatewayService struct {
 	debugClaudeMimic      atomic.Bool
 	channelService        *ChannelService
 	resolver              *ModelPricingResolver
+	compositeResolver     *CompositeRouteResolver
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
 	dataSharingService    *DataSharingService
 	advancedAccountStats  *advancedAccountRuntimeStats
+}
+
+// GatewayServiceOption 为网关服务注入可选能力，保持既有构造调用兼容。
+type GatewayServiceOption func(*GatewayService)
+
+// WithCompositeRouteResolver 启用复合分组的显式模型路由。
+func WithCompositeRouteResolver(resolver *CompositeRouteResolver) GatewayServiceOption {
+	return func(service *GatewayService) {
+		service.compositeResolver = resolver
+	}
 }
 
 // NewGatewayService creates a new GatewayService
@@ -786,6 +797,7 @@ func NewGatewayService(
 	balanceNotifyService *BalanceNotifyService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
 	dataSharingService *DataSharingService,
+	options ...GatewayServiceOption,
 ) *GatewayService {
 	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
@@ -824,6 +836,11 @@ func NewGatewayService(
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
 		dataSharingService:    dataSharingService,
 		advancedAccountStats:  newAdvancedAccountRuntimeStats(),
+	}
+	for _, option := range options {
+		if option != nil {
+			option(svc)
+		}
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
