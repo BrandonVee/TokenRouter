@@ -63,6 +63,8 @@ release:
   github:
     owner: "{{ .Env.GITHUB_REPO_OWNER }}"
     name: "{{ .Env.GITHUB_REPO_NAME }}"
+  # 保持重跑语义与标准发布一致，避免后续添加附件时产生同名冲突。
+  replace_existing_artifacts: true
   draft: false
   prerelease: auto
   name_template: "TokenRouter {{.Version}} (Simple)"

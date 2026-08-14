@@ -143,6 +143,8 @@ release:
   github:
     owner: "{{ .Env.GITHUB_REPO_OWNER }}"
     name: "{{ .Env.GITHUB_REPO_NAME }}"
+  # 发布重跑时替换部分失败后残留的同名附件，避免 GitHub 返回 422。
+  replace_existing_artifacts: true
   draft: false
   prerelease: auto
   name_template: "TokenRouter {{.Version}}"
