@@ -8,9 +8,9 @@ import (
 
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
-	"github.com/DATA-DOG/go-sqlmock"
 	dbent "github.com/BrandonVee/TokenRouter/ent"
 	"github.com/BrandonVee/TokenRouter/internal/service"
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
 )
 

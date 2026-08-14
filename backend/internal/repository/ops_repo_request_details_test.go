@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/BrandonVee/TokenRouter/internal/service"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestListRequestDetailsSLAOnlyUsesSLAErrorScope(t *testing.T) {
