@@ -19,7 +19,7 @@ OAuth 补全账号元数据时，ID token 中的个人 `chatgpt_plan_type` 是�
 
 OAuth 账号可受 Codex CLI-only、允许客户端、agent identity、privacy status 和 OAuth passthrough 策略限制。OAuth 出站的 `originator` 必须与最终 User-Agent 首段配对；客户端未提供可识别官方身份或身份修复失败时统一回退 `codex-tui`，PAT、模型/额度探测、Alpha Search、HTTP 与 WebSocket 走同一默认身份。客户端或 TLS 路由显式提供且可配对的官方身份继续保留，历史 `codex_cli_rs` 仍只作为兼容识别值。API Key 账号不应借用 OAuth-only 的内部端点或身份元数据。Header override、代理、base URL 和 TLS 配置属于出站安全边界，不能覆盖受保护认证头或绕过目标校验。
 
-OpenAI OAuth 账号的 `extra.codex_fingerprint_mode` 控制普通 Codex Responses 转换路径上的设备指纹收敛，未配置或值无效时默认 `session`：`off` 保留既有转发行为，`device` 只统一 installation ID，`session` 进一步统一 session ID 并按客户端原始 session 稳定派生 thread ID，`full` 再把所有客户端收敛到同一 thread。session/full 的 turn ID 每个请求重新生成，但同一次请求的 HTTP 头、`client_metadata` 和内嵌 turn metadata 必须共用同一组 ID；HTTP 内部重试也不得重新派生。管理员配置的真实 OpenAI device ID 优先于账号 ID 派生值。Spark 影子账号继承父账号模式、device ID 和稳定种子，不允许以影子 ID 分裂同一 OAuth 凭据的上游设备身份。旧版 `/responses/compact` 和 OAuth passthrough 保持各自既有协议，不应用这组额外收敛改写。
+OpenAI OAuth 账号的 `extra.codex_fingerprint_mode` 控制普通 Codex Responses 转换路径上的设备指纹收敛，未配置、空值或值无效时默认 `off`，只有管理员显式选择 `device`、`session` 或 `full` 才启用：`device` 只统一 installation ID，`session` 进一步统一 session ID 并按客户端原始 session 稳定派生 thread ID，`full` 再把所有客户端收敛到同一 thread。session/full 的 turn ID 每个请求重新生成，但同一次请求的 HTTP 头、`client_metadata` 和内嵌 turn metadata 必须共用同一组 ID；HTTP 内部重试也不得重新派生。管理员配置的真实 OpenAI device ID 优先于账号 ID 派生值。Spark 影子账号继承父账号模式、device ID 和稳定种子，不允许以影子 ID 分裂同一 OAuth 凭据的上游设备身份。旧版 `/responses/compact` 不应用这组改写；OAuth passthrough 使用对原始 JSON 的局部改写，与普通转换路径保持相同语义。
 
 <a id="openai_protocol_dispatch"></a>
 ## 协议与传输
@@ -52,6 +52,12 @@ TokenRouter 同时兼容原生 Remote Compaction V2 和旧版 Compact 端点。�
 | 上游传输 | 保持普通 Responses 流式链路，由上游直接返回包含 `compaction` item 的 SSE | 走独立 Compact 子路径；body-signal 流式客户端由网关把 unary JSON 结果合成为 Responses SSE，并在长时间等待时发送注释心跳 |
 | 模型处理 | 沿用普通 Responses 的模型处理，不应用 `compact_model_mapping`，也不会因此追加 `-openai-compact` | 仅此路径在常规模型处理基础上应用账号 `credentials.compact_model_mapping` |
 | 账号设置 | 不读取 `openai_compact_mode` 和旧端点探测结果来切换协议或筛选账号 | `extra.openai_compact_mode`、`openai_compact_supported`、能力探测和 Compact 专属模型映射都只控制此路径 |
+
+OAuth 的普通 Responses、原生 V2、旧版 Compact 和 WebSocket 握手共享会话级 `x-codex-beta-features` 语义：客户端提供非空能力集时原样保留；客户端未声明时，OAuth 出站默认补 `remote_compaction_v2`。请求体已出现 `compaction_trigger` 的原生 V2 请求属于确定信号，即使中间链路裁掉能力头，也会在出站前重新确保该功能标识存在；普通 API Key 请求不主动注入 Codex 专属能力头。
+
+账号页的“压缩测试”不再调用已经下线的旧版 `/responses/compact`，而是向普通 `/responses` 发送 `stream=true`、`compaction_trigger` 和 V2 能力头。HTTP 2xx 只有在 SSE 或 JSON 输出中实际观察到 compaction item 时才算支持，避免中间链路吞掉触发项后误报成功；旧端点的 `compact_model_mapping` 不参与该探测。
+
+上游 `x-codex-turn-state` 会从 HTTP 流式、非流式、SSE 转 JSON 和 passthrough 响应显式回传。服务按 API Key 与客户端原始 session 记录最近一次向下游提交该状态的铸造账号；后续 failover 换号时，已知由其它账号铸造的客户端回显会被剥离，同账号或没有溯源证据的值保持透传。首输出守卫只有在暂存响应头真正提交后才记录溯源，废弃 attempt 不得污染后续判断。
 
 账号设置页中的“旧版 Compact 端点”是能力覆盖而不是协议开关：`force_on` 只把账号视为可承接旧端点并提高其 Compact 支持等级，`force_off` 只将账号排除在旧端点调度之外；两者都不会把普通 Responses 或原生 V2 改写成 `/responses/compact`，也不会启用或禁用原生 V2。旧端点的 OpenAI OAuth GPT-5.6 请求还会把 `reasoning.effort=max` 降为 `xhigh`，原生 V2 则保留常规 Responses 推理强度语义。
 

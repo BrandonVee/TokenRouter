@@ -2,14 +2,19 @@
 package response
 
 import (
+	"context"
+	"errors"
 	"log"
 	"math"
 	"net/http"
+	"strings"
 
 	infraerrors "github.com/BrandonVee/TokenRouter/internal/pkg/errors"
 	"github.com/BrandonVee/TokenRouter/internal/util/logredact"
 	"github.com/gin-gonic/gin"
 )
+
+const statusClientClosedRequest = 499
 
 // Response 标准API响应格式
 type Response struct {
@@ -77,22 +82,41 @@ func ErrorWithDetails(c *gin.Context, statusCode int, message, reason string, me
 	})
 }
 
-// ErrorFrom converts an ApplicationError (or any error) into the envelope-compatible error response.
-// It returns true if an error was written.
+// ErrorFrom 将应用错误转换为统一响应；请求已取消时仅标记 499，不再写错误响应体或错误日志。
+// 返回值表示错误是否已处理，调用方收到 true 后应立即结束当前请求。
 func ErrorFrom(c *gin.Context, err error) bool {
 	if err == nil {
 		return false
 	}
+	if isRequestCanceled(c, err) {
+		if !c.Writer.Written() {
+			c.Status(statusClientClosedRequest)
+		}
+		return true
+	}
 
 	statusCode, status := infraerrors.ToHTTP(err)
 
-	// Log internal errors with full details for debugging
+	// 内部错误保留完整诊断信息，客户端取消则已在上方提前结束。
 	if statusCode >= 500 && c.Request != nil {
 		log.Printf("[ERROR] %s %s\n  Error: %s", c.Request.Method, c.Request.URL.Path, logredact.RedactText(err.Error()))
 	}
 
 	ErrorWithDetails(c, statusCode, status.Message, status.Reason, status.Metadata)
 	return true
+}
+
+// isRequestCanceled 兼容 lib/pq 未保留 context.Canceled 包装的取消错误。
+func isRequestCanceled(c *gin.Context, err error) bool {
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+	if c != nil && c.Request != nil {
+		if errors.Is(c.Request.Context().Err(), context.Canceled) {
+			return true
+		}
+	}
+	return strings.Contains(err.Error(), "canceling statement due to user request")
 }
 
 // BadRequest 返回400错误

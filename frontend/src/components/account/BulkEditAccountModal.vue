@@ -1789,7 +1789,7 @@ const autoPause5hDisabled = ref(false)
 const autoPause7dDisabled = ref(false)
 type CodexFingerprintMode = 'off' | 'device' | 'session' | 'full'
 const enableCodexFingerprintMode = ref(false)
-const codexFingerprintMode = ref<CodexFingerprintMode>('session')
+const codexFingerprintMode = ref<CodexFingerprintMode>('off')
 const codexFingerprintModeOptions = computed(() => [
   { value: 'off' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintOff') },
   { value: 'device' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintDevice') },
@@ -2297,7 +2297,7 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
 
   if (enableCodexFingerprintMode.value) {
     const extra = ensureExtra()
-    // 批量 extra 使用 JSONB merge；默认 session 也必须显式写入，才能覆盖已有的其它档位。
+    // 批量 extra 使用 JSONB merge；用户选中的档位必须显式写入，才能覆盖已有值。
     extra.codex_fingerprint_mode = codexFingerprintMode.value
   }
 
@@ -2583,7 +2583,7 @@ const resetBulkEditFormState = () => {
   autoPause7dThreshold.value = null
   autoPause5hDisabled.value = false
   autoPause7dDisabled.value = false
-  codexFingerprintMode.value = 'session'
+  codexFingerprintMode.value = 'off'
   openAICompactMode.value = 'auto'
   openAICompactModelMappings.value = []
   rpmLimitEnabled.value = false

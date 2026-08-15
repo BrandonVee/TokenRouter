@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -156,9 +157,15 @@ func runMainServer() {
 	}
 	defer app.Cleanup()
 
-	// 启动服务器
+	// 先同步绑定监听地址，确保启动日志只在端口真正可用时输出。
+	listener, err := net.Listen("tcp", app.Server.Addr)
+	if err != nil {
+		log.Fatalf("Failed to listen on %s: %v", app.Server.Addr, err)
+	}
+
+	// 监听成功后再异步处理请求，避免端口冲突被竞态隐藏。
 	go func() {
-		if err := app.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := app.Server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()

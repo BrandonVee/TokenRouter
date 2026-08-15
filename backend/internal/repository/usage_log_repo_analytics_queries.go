@@ -602,7 +602,7 @@ func (r *usageLogRepository) getUserBreakdownStatsFromAnalytics(ctx context.Cont
 	return results, true, nil
 }
 
-// getAllGroupUsageSummaryFromAnalytics 分别使用日表主体和小时表计算累计与今日分组用量。
+// getAllGroupUsageSummaryFromAnalytics 使用预聚合与实时尾部计算累计、今日和昨日分组用量。
 func (r *usageLogRepository) getAllGroupUsageSummaryFromAnalytics(ctx context.Context, todayStart time.Time) ([]usagestats.GroupUsageSummary, bool, error) {
 	var sourceOldest sql.NullTime
 	if err := scanSingleRow(ctx, r.sql, `
@@ -620,7 +620,7 @@ func (r *usageLogRepository) getAllGroupUsageSummaryFromAnalytics(ctx context.Co
 	if err != nil || !ok {
 		return nil, false, err
 	}
-	todayQuery, ok, err := r.buildUsageAnalyticsQuery(ctx, UsageLogFilters{}, todayStart, now, false)
+	recentQuery, ok, err := r.buildUsageAnalyticsQuery(ctx, UsageLogFilters{}, todayStart.AddDate(0, 0, -1), now, false)
 	if err != nil || !ok {
 		return nil, false, err
 	}
@@ -653,26 +653,31 @@ func (r *usageLogRepository) getAllGroupUsageSummaryFromAnalytics(ctx context.Co
 		return nil, false, err
 	}
 
-	todayRows, err := r.sql.QueryContext(ctx, todayQuery.cte+`
-		SELECT group_id, COALESCE(SUM(actual_cost), 0)
+	recentQuery.args = append(recentQuery.args, todayStart)
+	todayStartPosition := len(recentQuery.args)
+	recentRows, err := r.sql.QueryContext(ctx, recentQuery.cte+fmt.Sprintf(`
+		SELECT group_id,
+			COALESCE(SUM(actual_cost) FILTER (WHERE occurred_at >= $%d), 0),
+			COALESCE(SUM(actual_cost) FILTER (WHERE occurred_at < $%d), 0)
 		FROM combined
 		GROUP BY group_id
-	`, todayQuery.args...)
+	`, todayStartPosition, todayStartPosition), recentQuery.args...)
 	if err != nil {
 		return nil, false, err
 	}
-	defer func() { _ = todayRows.Close() }()
-	for todayRows.Next() {
+	defer func() { _ = recentRows.Close() }()
+	for recentRows.Next() {
 		var groupID int64
-		var todayCost float64
-		if err := todayRows.Scan(&groupID, &todayCost); err != nil {
+		var todayCost, yesterdayCost float64
+		if err := recentRows.Scan(&groupID, &todayCost, &yesterdayCost); err != nil {
 			return nil, false, err
 		}
 		if position, exists := byID[groupID]; exists {
 			results[position].TodayCost = todayCost
+			results[position].YesterdayCost = yesterdayCost
 		}
 	}
-	if err := todayRows.Err(); err != nil {
+	if err := recentRows.Err(); err != nil {
 		return nil, false, err
 	}
 	return results, true, nil

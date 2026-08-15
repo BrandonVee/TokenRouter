@@ -40,6 +40,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	tlsRouterMatch ...TLSFingerprintRouterMatchResult,
 ) (*OpenAIForwardResult, error) {
 	upstreamPassthroughModel := ""
+	var fingerprintIDs *codexFingerprintIDs
 	if isOpenAIResponsesCompactPath(c) {
 		compactMappedModel := resolveOpenAICompactForwardModel(account, reqModel)
 		if compactMappedModel != "" && compactMappedModel != reqModel {
@@ -83,6 +84,26 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			body = normalizedBody
 		}
 		reqStream = gjson.GetBytes(body, "stream").Bool()
+
+		// 旧版 compact 端点保持原协议；普通 Responses 透传与非透传共用指纹收敛语义。
+		if !isOpenAIResponsesCompactPath(c) {
+			credentialAccount, resolveErr := resolveCredentialAccount(ctx, s.accountRepo, account)
+			if resolveErr != nil {
+				return nil, fmt.Errorf("resolve Codex fingerprint account: %w", resolveErr)
+			}
+			var clientHeaders http.Header
+			if c != nil && c.Request != nil {
+				clientHeaders = c.Request.Header
+			}
+			fingerprintIDs = resolveCodexFingerprintIDsFromRequest(credentialAccount, clientHeaders)
+			fingerprintBody, changed, fingerprintErr := applyCodexFingerprintClientMetadataRaw(body, fingerprintIDs)
+			if fingerprintErr != nil {
+				return nil, fingerprintErr
+			}
+			if changed {
+				body = fingerprintBody
+			}
+		}
 	}
 
 	sanitizedBody, sanitized, err := sanitizeEmptyBase64InputImagesInOpenAIBody(body)
@@ -197,6 +218,8 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		if buildErr != nil {
 			return nil, buildErr
 		}
+		// 内部重试每次重建请求，必须重复应用与请求体同源的指纹标识。
+		applyCodexFingerprintHeaders(upstreamReq.Header, fingerprintIDs)
 
 		upstreamStart := time.Now()
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.resolveOpenAITLSProfile(account, tlsRouterMatch...))
@@ -232,6 +255,9 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	defer func() { _ = resp.Body.Close() }()
 
 	serviceTier := extractOpenAIServiceTierFromBody(body)
+	if extractOpenAICodexTurnState(resp.Header) != "" {
+		s.noteOpenAICodexTurnStateProvenance(c, account)
+	}
 
 	var usage *OpenAIUsage
 	var firstTokenMs *int
@@ -370,6 +396,8 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 			}
 		}
 	}
+	// 透传路径同样阻断已知跨账号的 turn-state 回显。
+	s.guardOpenAICodexTurnStateEcho(c, account, req.Header)
 
 	req.Header.Del("authorization")
 	req.Header.Del("x-api-key")
@@ -449,6 +477,8 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	}
 
 	account.ApplyHeaderOverrides(req.Header)
+	// 透传与非透传路径保持相同的 Codex 会话级 beta 头语义。
+	applyOpenAICodexBetaFeatures(c, account, req.Header)
 	setOpenAICodexRoutingHintFromBody(req.Header, account, body)
 	logOpenAIRoutingDiagnosticsFromBody(ctx, account, "http_passthrough", req.Header, body, "not_applicable")
 
@@ -1773,5 +1803,12 @@ func writeOpenAIPassthroughResponseHeaders(dst http.Header, src http.Header, fil
 		for _, v := range vals {
 			dst.Add(key, v)
 		}
+	}
+
+	// Codex 客户端会在同一回合后续请求中回带该状态头；上游缺失时清除旧 attempt 残留。
+	turnStateKey := http.CanonicalHeaderKey(openAICodexTurnStateHeader)
+	dst.Del(turnStateKey)
+	for _, value := range getCaseInsensitiveValues(src, openAICodexTurnStateHeader) {
+		dst.Add(turnStateKey, value)
 	}
 }

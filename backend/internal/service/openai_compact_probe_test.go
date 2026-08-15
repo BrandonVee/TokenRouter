@@ -3,8 +3,12 @@ package service
 import (
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNormalizeAccountTestMode(t *testing.T) {
@@ -26,9 +30,51 @@ func TestNormalizeAccountTestMode(t *testing.T) {
 	}
 }
 
+func TestCreateOpenAICompactProbePayloadUsesNativeV2(t *testing.T) {
+	payload := createOpenAICompactProbePayload("gpt-5.4", true)
+	require.Equal(t, true, payload["stream"])
+	require.Equal(t, false, payload["store"])
+	input := payload["input"].([]any)
+	require.Equal(t, "compaction_trigger", input[1].(map[string]any)["type"])
+}
+
+func TestOpenAICompactProbeFoundCompactionItem(t *testing.T) {
+	require.True(t, openAICompactProbeFoundCompactionItem([]byte("data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"compaction\"}}\n\n")))
+	require.True(t, openAICompactProbeFoundCompactionItem([]byte(`{"output":[{"type":"compaction"}]}`)))
+	require.False(t, openAICompactProbeFoundCompactionItem([]byte(`{"output":[{"type":"message"}]}`)))
+}
+
+func TestApplyOpenAICodexBetaFeatures(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	oauthAccount := &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	apiKeyAccount := &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+
+	headers := http.Header{}
+	applyOpenAICodexBetaFeatures(c, oauthAccount, headers)
+	require.Equal(t, openAIRemoteCompactionV2Feature, headers.Get("x-codex-beta-features"))
+
+	declared := http.Header{"X-Codex-Beta-Features": []string{"other_feature"}}
+	applyOpenAICodexBetaFeatures(c, oauthAccount, declared)
+	require.Equal(t, "other_feature", declared.Get("x-codex-beta-features"))
+
+	MarkOpenAINativeCompactionV2(c)
+	applyOpenAICodexBetaFeatures(c, apiKeyAccount, declared)
+	require.Contains(t, declared.Get("x-codex-beta-features"), openAIRemoteCompactionV2Feature)
+}
+
+func TestBuildOpenAICompactProbeExtraUpdates_2xxWithoutItemMarksUnsupported(t *testing.T) {
+	updates := buildOpenAICompactProbeExtraUpdates(
+		&http.Response{StatusCode: http.StatusOK}, []byte(`{"output":[]}`), nil, false, time.Now(),
+	)
+	require.Equal(t, false, updates["openai_compact_supported"])
+	require.Contains(t, updates["openai_compact_last_error"], "without a compaction output item")
+}
+
 func TestBuildOpenAICompactProbeExtraUpdates_SuccessMarksSupported(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
-	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusOK}, []byte(`{"id":"cmp_1"}`), nil, now)
+	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusOK}, []byte(`{"id":"cmp_1"}`), nil, true, now)
 
 	if got := updates["openai_compact_supported"]; got != true {
 		t.Fatalf("openai_compact_supported = %v, want true", got)
@@ -47,7 +93,7 @@ func TestBuildOpenAICompactProbeExtraUpdates_SuccessMarksSupported(t *testing.T)
 func TestBuildOpenAICompactProbeExtraUpdates_404MarksUnsupported(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
 	body := []byte(`404 page not found`)
-	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusNotFound}, body, nil, now)
+	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusNotFound}, body, nil, false, now)
 
 	if got := updates["openai_compact_supported"]; got != false {
 		t.Fatalf("openai_compact_supported = %v, want false", got)
@@ -59,7 +105,7 @@ func TestBuildOpenAICompactProbeExtraUpdates_404MarksUnsupported(t *testing.T) {
 
 func TestBuildOpenAICompactProbeExtraUpdates_502DoesNotMarkUnsupported(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
-	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusBadGateway}, []byte(`Upstream request failed`), nil, now)
+	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusBadGateway}, []byte(`Upstream request failed`), nil, false, now)
 
 	if _, exists := updates["openai_compact_supported"]; exists {
 		t.Fatalf("did not expect openai_compact_supported for 502 response")
@@ -71,7 +117,7 @@ func TestBuildOpenAICompactProbeExtraUpdates_502DoesNotMarkUnsupported(t *testin
 
 func TestBuildOpenAICompactProbeExtraUpdates_RequestErrorDoesNotMarkUnsupported(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
-	updates := buildOpenAICompactProbeExtraUpdates(nil, nil, errors.New("dial tcp timeout"), now)
+	updates := buildOpenAICompactProbeExtraUpdates(nil, nil, errors.New("dial tcp timeout"), false, now)
 
 	if _, exists := updates["openai_compact_supported"]; exists {
 		t.Fatalf("did not expect openai_compact_supported for request error")
@@ -86,7 +132,7 @@ func TestBuildOpenAICompactProbeExtraUpdates_RequestErrorDoesNotMarkUnsupported(
 
 func TestBuildOpenAICompactProbeExtraUpdates_NoResponseClearsLastStatus(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
-	updates := buildOpenAICompactProbeExtraUpdates(nil, nil, nil, now)
+	updates := buildOpenAICompactProbeExtraUpdates(nil, nil, nil, false, now)
 
 	if got, exists := updates["openai_compact_last_status"]; !exists || got != nil {
 		t.Fatalf("openai_compact_last_status = %v, want nil key", got)
@@ -99,7 +145,7 @@ func TestBuildOpenAICompactProbeExtraUpdates_NoResponseClearsLastStatus(t *testi
 func TestBuildOpenAICompactProbeExtraUpdates_UnknownModelDoesNotMarkUnsupported(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
 	body := []byte(`{"error":{"message":"unknown model gpt-5.4-openai-compact"}}`)
-	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusBadRequest}, body, nil, now)
+	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusBadRequest}, body, nil, false, now)
 
 	if _, exists := updates["openai_compact_supported"]; exists {
 		t.Fatalf("did not expect openai_compact_supported for unknown-model diagnostics")
@@ -111,7 +157,7 @@ func TestBuildOpenAICompactProbeExtraUpdates_UnknownModelDoesNotMarkUnsupported(
 
 func TestBuildOpenAICompactProbeExtraUpdates_EmptyFailureBodyFallsBackToHTTPStatus(t *testing.T) {
 	now := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
-	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusServiceUnavailable}, nil, nil, now)
+	updates := buildOpenAICompactProbeExtraUpdates(&http.Response{StatusCode: http.StatusServiceUnavailable}, nil, nil, false, now)
 
 	if got := updates["openai_compact_last_status"]; got != http.StatusServiceUnavailable {
 		t.Fatalf("openai_compact_last_status = %v, want %d", got, http.StatusServiceUnavailable)

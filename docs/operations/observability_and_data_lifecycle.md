@@ -44,6 +44,8 @@
 
 凭据、Authorization、Cookie、refresh token、支付密钥、对象存储 secret、完整上游 body 和用户提示不能直接写入日志。上游错误只透传允许的安全字段；系统日志 sink 在落库前再次整理字段并限制长度。新增日志字段时要同时检查：结构化 logger、Ops sink 的字段白名单/脱敏、管理端 DTO、导出和测试夹具。
 
+HTTP 请求上下文已经取消时，通用响应层不再写错误响应体，也不把 `context.Canceled` 或 PostgreSQL 的 `canceling statement due to user request` 记录成服务端 500；响应尚未提交时以 499 标记，供访问日志归类。客户端断开、页面切换和边缘超时仍可由访问日志观察，但不应污染内部错误统计；数据库自身的 statement timeout、deadline、死锁、连接失败和未伴随请求取消的查询错误继续按服务端错误处理。
+
 多实例中每条系统日志带 host，便于区分进程来源。关联 ID 不是授权凭据；管理端详情、实时流和 WebSocket 仍必须经过管理员鉴权与相应 step-up 门禁。
 
 ## 后台运行时

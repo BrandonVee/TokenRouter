@@ -3,6 +3,7 @@
 package response
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -206,6 +207,52 @@ func TestErrorFrom(t *testing.T) {
 			require.Equal(t, tt.wantBody, got)
 		})
 	}
+}
+
+func TestErrorFromSkipsCanceledRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name       string
+		requestCtx context.Context
+		err        error
+	}{
+		{
+			name:       "context canceled error",
+			requestCtx: context.Background(),
+			err:        context.Canceled,
+		},
+		{
+			name:       "request context canceled",
+			requestCtx: canceledContext(),
+			err:        errors.New("query failed"),
+		},
+		{
+			name:       "pq cancellation error",
+			requestCtx: context.Background(),
+			err:        errors.New("get read map: pq: canceling statement due to user request"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/announcements", nil).WithContext(tt.requestCtx)
+
+			require.True(t, ErrorFrom(c, tt.err))
+			require.Equal(t, statusClientClosedRequest, c.Writer.Status())
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Empty(t, w.Body.String())
+		})
+	}
+}
+
+// canceledContext 创建已取消的请求上下文，覆盖驱动错误未包装取消原因的场景。
+func canceledContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	return ctx
 }
 
 // ---------- 新增测试 ----------

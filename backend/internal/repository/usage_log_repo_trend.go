@@ -753,8 +753,8 @@ func (r *usageLogRepository) GetUserBreakdownStats(ctx context.Context, startTim
 	return results, nil
 }
 
-// GetAllGroupUsageSummary returns today's and cumulative actual_cost for every group.
-// todayStart is the start-of-day in the caller's timezone (UTC-based).
+// GetAllGroupUsageSummary 返回每个分组今日、昨日和累计的实际费用。
+// todayStart 是调用方时区中的当日零点。
 // TODO(perf): This query scans ALL usage_logs rows for total_cost aggregation.
 // When usage_logs exceeds ~1M rows, consider adding a short-lived cache (30s)
 // or a materialized view / pre-aggregation table for cumulative costs.
@@ -768,13 +768,14 @@ func (r *usageLogRepository) GetAllGroupUsageSummary(ctx context.Context, todayS
 		SELECT
 			g.id AS group_id,
 			COALESCE(SUM(ul.actual_cost), 0) AS total_cost,
-			COALESCE(SUM(CASE WHEN ul.created_at >= $1 THEN ul.actual_cost ELSE 0 END), 0) AS today_cost
+			COALESCE(SUM(CASE WHEN ul.created_at >= $1 THEN ul.actual_cost ELSE 0 END), 0) AS today_cost,
+			COALESCE(SUM(CASE WHEN ul.created_at >= $2 AND ul.created_at < $1 THEN ul.actual_cost ELSE 0 END), 0) AS yesterday_cost
 		FROM groups g
 		LEFT JOIN usage_logs ul ON ul.group_id = g.id
 		GROUP BY g.id
 	`
 
-	rows, err := r.sql.QueryContext(ctx, query, todayStart)
+	rows, err := r.sql.QueryContext(ctx, query, todayStart, todayStart.AddDate(0, 0, -1))
 	if err != nil {
 		return nil, err
 	}
@@ -782,7 +783,7 @@ func (r *usageLogRepository) GetAllGroupUsageSummary(ctx context.Context, todayS
 	var results []usagestats.GroupUsageSummary
 	for rows.Next() {
 		var row usagestats.GroupUsageSummary
-		if err := rows.Scan(&row.GroupID, &row.TotalCost, &row.TodayCost); err != nil {
+		if err := rows.Scan(&row.GroupID, &row.TotalCost, &row.TodayCost, &row.YesterdayCost); err != nil {
 			return nil, err
 		}
 		results = append(results, row)
