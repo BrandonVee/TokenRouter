@@ -365,7 +365,9 @@ func TestLoadReturnsErrorForMissingConfigFile(t *testing.T) {
 func TestLoadForBootstrapAllowsMissingJWTSecret(t *testing.T) {
 	viper.Reset()
 	t.Cleanup(viper.Reset)
-	t.Setenv("CONFIG_FILE", "")
+	configFile := filepath.Join(t.TempDir(), "bootstrap-config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("{}\n"), 0o600))
+	t.Setenv("CONFIG_FILE", configFile)
 	t.Setenv("DATA_DIR", "")
 	t.Setenv("JWT_SECRET", "")
 
@@ -853,6 +855,10 @@ func TestLoadJWTAccessTokenExpireMinutesFromEnv(t *testing.T) {
 
 func TestLoadDefaultDatabaseSSLMode(t *testing.T) {
 	resetViperWithJWTSecret(t)
+	configFile := filepath.Join(t.TempDir(), "default-config.yaml")
+	require.NoError(t, os.WriteFile(configFile, []byte("{}\n"), 0o600))
+	t.Setenv("CONFIG_FILE", configFile)
+	t.Setenv("DATABASE_SSL_MODE", "")
 
 	cfg, err := Load()
 	if err != nil {

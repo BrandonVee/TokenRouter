@@ -34,8 +34,12 @@ func TestCreateOpenAICompactProbePayloadUsesNativeV2(t *testing.T) {
 	payload := createOpenAICompactProbePayload("gpt-5.4", true)
 	require.Equal(t, true, payload["stream"])
 	require.Equal(t, false, payload["store"])
-	input := payload["input"].([]any)
-	require.Equal(t, "compaction_trigger", input[1].(map[string]any)["type"])
+	input, ok := payload["input"].([]any)
+	require.True(t, ok, "input must be an array")
+	require.Len(t, input, 2)
+	compactionItem, ok := input[1].(map[string]any)
+	require.True(t, ok, "second input item must be an object")
+	require.Equal(t, "compaction_trigger", compactionItem["type"])
 }
 
 func TestOpenAICompactProbeFoundCompactionItem(t *testing.T) {
