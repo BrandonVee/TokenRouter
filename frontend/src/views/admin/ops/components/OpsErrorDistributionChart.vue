@@ -100,8 +100,8 @@ const options = computed(() => ({
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: isDarkMode.value ? '#1F1F23' : '#ffffff',
-      titleColor: isDarkMode.value ? '#F4F4F5' : '#18181B',
+      backgroundColor: isDarkMode.value ? '#2A2E35' : '#ffffff',
+      titleColor: isDarkMode.value ? '#F2F3F5' : '#18181B',
       bodyColor: isDarkMode.value ? '#D4D4D8' : '#52525B'
     }
   }

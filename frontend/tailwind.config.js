@@ -61,20 +61,20 @@ export default {
           900: '#18181B',
           950: '#09090B'
         },
-        // 深色模式背景 - 成熟黑色系(zinc 中性色相),品牌蓝仅作强调色
-        // 注意:950 比 900 略亮,历史上作为"提升面"(elevated surface)使用,保持该关系
+        // 深色模式背景 - 石墨灰色阶，保留品牌青蓝仅用于操作与状态强调。
+        // 900 与 950 统一为列表和表格的基础表面，避免同页列表呈现近黑色块。
         dark: {
-          50: '#FAFAFA',
-          100: '#F0F0F1',
-          200: '#D9D9DE',
-          300: '#A6A6AF',
-          400: '#77777F',
-          500: '#55555C',
-          600: '#333338',
-          700: '#29292E',
-          800: '#1F1F23',
-          900: '#121215',
-          950: '#18181B'
+          50: '#F2F3F5',
+          100: '#DEE1E6',
+          200: '#C5C9D0',
+          300: '#A7ADB7',
+          400: '#848B97',
+          500: '#666E79',
+          600: '#4D535D',
+          700: '#393E46',
+          800: '#2A2E35',
+          900: '#252A2F',
+          950: '#252A2F'
         }
       },
       fontFamily: {
@@ -108,7 +108,7 @@ export default {
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-primary': 'linear-gradient(135deg, #00D2FF 0%, #0B8FD8 100%)',
-        'gradient-dark': 'linear-gradient(135deg, #1F1F23 0%, #0F0F11 100%)',
+        'gradient-dark': 'linear-gradient(135deg, #2A2E35 0%, #16181D 100%)',
         'gradient-glass':
           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
         'mesh-gradient':

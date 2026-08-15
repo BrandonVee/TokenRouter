@@ -76,7 +76,7 @@ onUnmounted(() => {
 }
 
 .table-scroll-container :deep(thead) {
-  @apply bg-gray-50/80 dark:bg-dark-950 backdrop-blur-sm;
+  @apply bg-gray-50/80 dark:bg-dark-900 backdrop-blur-sm;
 }
 
 .table-scroll-container :deep(tbody) {

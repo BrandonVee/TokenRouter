@@ -100,7 +100,7 @@
     }"
   >
     <table class="w-full min-w-max divide-y divide-gray-200 dark:divide-dark-700">
-      <thead class="table-header bg-gray-50 dark:bg-dark-950">
+      <thead class="table-header bg-gray-50 dark:bg-dark-900">
         <tr>
           <th
             v-if="selectable"

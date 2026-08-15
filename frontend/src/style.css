@@ -16,8 +16,8 @@
   }
 
   html.dark {
-    scrollbar-color: rgba(166, 166, 175, 0.45) #0A0A0C;
-    background: linear-gradient(180deg, #111113 0%, #0A0A0C 100%);
+    scrollbar-color: rgba(167, 173, 183, 0.46) #0E1013;
+    background: linear-gradient(180deg, #16181D 0%, #0E1013 100%);
     background-attachment: fixed;
   }
 
@@ -29,8 +29,8 @@
   }
 
   .dark body {
-    scrollbar-color: rgba(166, 166, 175, 0.45) #0A0A0C;
-    background: linear-gradient(180deg, #111113 0%, #0A0A0C 100%);
+    scrollbar-color: rgba(167, 173, 183, 0.46) #0E1013;
+    background: linear-gradient(180deg, #16181D 0%, #0E1013 100%);
     background-attachment: fixed;
   }
 
@@ -101,7 +101,7 @@
       .sidebar-nav,
       .code-block
     ):focus-within {
-      scrollbar-color: rgba(166, 166, 175, 0.35) transparent;
+      scrollbar-color: rgba(167, 173, 183, 0.36) transparent;
     }
   }
 
@@ -117,7 +117,7 @@
 
   html.dark::-webkit-scrollbar-track,
   html.dark body::-webkit-scrollbar-track {
-    background-color: #0A0A0C;
+    background-color: #0E1013;
   }
 
   html::-webkit-scrollbar-thumb,
@@ -131,7 +131,7 @@
 
   html.dark::-webkit-scrollbar-thumb,
   html.dark body::-webkit-scrollbar-thumb {
-    background-color: rgba(166, 166, 175, 0.45);
+    background-color: rgba(167, 173, 183, 0.46);
   }
 
   html::-webkit-scrollbar-thumb:hover,
@@ -141,7 +141,7 @@
 
   html.dark::-webkit-scrollbar-thumb:hover,
   html.dark body::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(166, 166, 175, 0.65);
+    background-color: rgba(222, 225, 230, 0.64);
   }
 
   :where(
@@ -227,7 +227,7 @@
     .sidebar-nav,
     .code-block
   ):focus-within::-webkit-scrollbar-thumb {
-    background-color: rgba(166, 166, 175, 0.3);
+    background-color: rgba(167, 173, 183, 0.3);
   }
 
   :where(
@@ -253,7 +253,7 @@
     .sidebar-nav,
     .code-block
   )::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(166, 166, 175, 0.5);
+    background-color: rgba(222, 225, 230, 0.5);
   }
 
   /* 选中文本样式 */
@@ -541,7 +541,7 @@
 
   /* ============ 表格样式 ============ */
   .table-container {
-    @apply overflow-x-auto rounded-xl border border-primary-900/10 dark:border-dark-600;
+    @apply overflow-x-auto rounded-xl border border-primary-900/10 bg-white dark:border-dark-600 dark:bg-dark-900;
   }
 
   .table {
@@ -551,7 +551,7 @@
   .table th {
     @apply px-4 py-3 text-left font-medium;
     @apply text-primary-900 dark:text-dark-100;
-    @apply bg-primary-100/70 dark:bg-dark-950;
+    @apply bg-primary-100/70 dark:bg-dark-900;
     @apply border-b border-primary-900/10 dark:border-dark-600;
   }
 
@@ -813,8 +813,8 @@
 
   /* 暗色悬浮滑块与激活项共享同一提升面，避免出现第三种深色。 */
   .dark .sidebar-hover-indicator {
-    --sidebar-hover-bg: #1f1f23;
-    --sidebar-hover-ring: rgba(85, 85, 92, 0.7);
+    --sidebar-hover-bg: #2A2E35;
+    --sidebar-hover-ring: rgba(102, 110, 121, 0.68);
   }
 
   .sidebar-section {
@@ -990,6 +990,7 @@
 
   /* 表格容器 - 默认仅支持水平滚动 */
   .table-wrapper {
+    @apply bg-white dark:bg-dark-900;
     overflow-x: auto;
   }
 
@@ -1000,6 +1001,23 @@
 }
 
 @layer utilities {
+  /* 暗色界面的明暗端点使用柔和灰阶，避免大面积纯黑或纯白刺眼。 */
+  .dark .dark\:text-white {
+    color: #F2F3F5;
+  }
+
+  .dark .dark\:bg-white {
+    background-color: #DEE1E6;
+  }
+
+  .dark .dark\:text-dark-950 {
+    color: #1B1E24;
+  }
+
+  .dark .dark\:bg-black {
+    background-color: #0E1013;
+  }
+
   .dark [class*="shadow-"] {
     --tw-shadow: 0 0 #0000 !important;
     --tw-shadow-colored: 0 0 #0000 !important;
@@ -1025,7 +1043,7 @@
   }
 
   .dark .ba-theme-shell {
-    background: linear-gradient(180deg, #111113 0%, #0A0A0C 100%);
+    background: linear-gradient(180deg, #16181D 0%, #0E1013 100%);
   }
 
   .ba-theme-backdrop {
@@ -1038,7 +1056,7 @@
   }
 
   .dark .ba-theme-backdrop {
-    background: linear-gradient(180deg, #111113 0%, #0A0A0C 100%);
+    background: linear-gradient(180deg, #16181D 0%, #0E1013 100%);
   }
 
   .dark .ba-theme-backdrop::before {
