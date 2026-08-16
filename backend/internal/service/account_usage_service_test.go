@@ -197,7 +197,7 @@ func TestAccountUsageService_QoderCNQuotaUsesSignedGatewayQueryAndParsesExtensio
 	}`}
 	credentials := qoderUsageCredentials("cosy-cn")
 	credentials["site"] = "cn"
-	credentials["quota_key"] = "monthly"
+	credentials["refresh_mode"] = qoder.RefreshModeQoderCN20
 	credentials["organization_id"] = "org-cn"
 	repo := &accountUsageCodexProbeRepo{
 		stubOpenAIAccountRepo: stubOpenAIAccountRepo{accounts: []Account{{
@@ -219,7 +219,7 @@ func TestAccountUsageService_QoderCNQuotaUsesSignedGatewayQueryAndParsesExtensio
 	if upstream.req.URL.Path != "/algo"+qoder.QuotaUsagePath {
 		t.Fatalf("quota path = %q", upstream.req.URL.Path)
 	}
-	if upstream.req.URL.Query().Get("orgId") != "org-cn" || upstream.req.URL.Query().Get("quotaKey") != "monthly" {
+	if upstream.req.URL.Query().Get("orgId") != "org-cn" || upstream.req.URL.Query().Has("quotaKey") {
 		t.Fatalf("quota query = %q", upstream.req.URL.RawQuery)
 	}
 	if upstream.req.Header.Get("Cosy-Version") != qoder.CNClientVersion {
@@ -233,6 +233,48 @@ func TestAccountUsageService_QoderCNQuotaUsesSignedGatewayQueryAndParsesExtensio
 	}
 	if usage.QoderQuota.AddCreditsURL != "https://qoder.com.cn/credits" || usage.QoderQuota.OrgResourcePackage.OrganizationID != "org-cn" {
 		t.Fatalf("unexpected CN quota extension fields: %#v", usage.QoderQuota)
+	}
+}
+
+func TestAccountUsageService_QoderCNLegacyQuotaUsesBearerToken(t *testing.T) {
+	upstream := &qoderUsageHTTPUpstreamStub{body: `{
+		"userType":"teams",
+		"usageType":"credits",
+		"isQuotaExceeded":false,
+		"expiresAt":1783875207000,
+		"userQuota":{"total":100,"used":20,"remaining":80,"percentage":20,"unit":"credits"}
+	}`}
+	credentials := qoderUsageCredentials("legacy-cn-token")
+	credentials["site"] = "cn"
+	repo := &accountUsageCodexProbeRepo{
+		stubOpenAIAccountRepo: stubOpenAIAccountRepo{accounts: []Account{{
+			ID:          20,
+			Platform:    PlatformQoder,
+			Type:        AccountTypeCosy,
+			Credentials: credentials,
+		}}},
+	}
+	svc := &AccountUsageService{accountRepo: repo, cache: NewUsageCache(), httpUpstream: upstream}
+
+	usage, err := svc.GetUsage(context.Background(), 20)
+
+	if err != nil {
+		t.Fatalf("GetUsage() error = %v", err)
+	}
+	if upstream.req == nil {
+		t.Fatal("expected bearer quota request")
+	}
+	if got := upstream.req.Header.Get("Authorization"); got != "Bearer legacy-cn-token" {
+		t.Fatalf("Authorization = %q, want legacy bearer token", got)
+	}
+	if upstream.req.Header.Get("Cosy-Key") != "" || upstream.req.Header.Get("Cosy-Date") != "" {
+		t.Fatalf("legacy bearer request unexpectedly contains COSY signature headers: %#v", upstream.req.Header)
+	}
+	if upstream.req.URL.Query().Get("orgId") != "org-usage" || upstream.req.URL.Query().Has("quotaKey") {
+		t.Fatalf("quota query = %q", upstream.req.URL.RawQuery)
+	}
+	if usage.QoderQuota == nil || usage.QoderQuota.UserQuota == nil || usage.QoderQuota.UserQuota.Remaining != 80 {
+		t.Fatalf("unexpected qoder quota: %#v", usage.QoderQuota)
 	}
 }
 

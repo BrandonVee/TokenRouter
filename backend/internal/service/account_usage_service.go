@@ -1400,9 +1400,6 @@ func (s *AccountUsageService) fetchQoderQuotaUsageWithProvider(ctx context.Conte
 		if organizationID := strings.TrimSpace(session.Identity.OrganizationID); organizationID != "" {
 			query.Set("orgId", organizationID)
 		}
-		if quotaKey := strings.TrimSpace(account.GetCredential("quota_key")); quotaKey != "" {
-			query.Set("quotaKey", quotaKey)
-		}
 		if encoded := query.Encode(); encoded != "" {
 			logicalPath += "?" + encoded
 		}
@@ -1410,10 +1407,25 @@ func (s *AccountUsageService) fetchQoderQuotaUsageWithProvider(ctx context.Conte
 	doer := newQoderRequestDoer(account, s.httpUpstream, s.tlsFPProfileService)
 	var usage qoderQuotaUsageResponse
 	client := qoder.NewClientForProfile(profile)
-	if err := client.JSONRequestContextWithDoer(ctx, http.MethodGet, session, logicalPath, nil, nil, doer, &usage); err != nil {
+	request := client.BearerJSONRequestContextWithDoer
+	if qoderQuotaUsesSignedAuth(account, profile.Site) {
+		request = client.JSONRequestContextWithDoer
+	}
+	if err := request(ctx, http.MethodGet, session, logicalPath, nil, nil, doer, &usage); err != nil {
 		return nil, fmt.Errorf("qoder: quota usage request: %w", err)
 	}
 	return &usage, nil
+}
+
+// qoderQuotaUsesSignedAuth 对齐 1.24.2 客户端：国际站和 QoderCN20 使用 COSY 签名，国内旧会话使用普通 Bearer。
+func qoderQuotaUsesSignedAuth(account *Account, site qoder.Site) bool {
+	if site != qoder.SiteCN {
+		return true
+	}
+	if strings.TrimSpace(account.GetCredential("pat")) != "" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(account.GetCredential("refresh_mode")), qoder.RefreshModeQoderCN20)
 }
 
 // isQoderAuthenticationError 只把明确的 401/403 视为可通过 PAT 重建 session 的认证失败。

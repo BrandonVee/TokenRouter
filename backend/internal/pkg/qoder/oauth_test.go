@@ -254,8 +254,8 @@ func TestQoderOAuthClientUsesSiteUserAgent(t *testing.T) {
 		site   Site
 		wantUA string
 	}{
-		{name: "国际站", site: SiteGlobal, wantUA: "Qoder/1.21.2"},
-		{name: "国内站", site: SiteCN, wantUA: "Qoder CN/1.10.0"},
+		{name: "国际站", site: SiteGlobal, wantUA: "Qoder/1.24.2"},
+		{name: "国内站", site: SiteCN, wantUA: "Qoder CN/1.24.2"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

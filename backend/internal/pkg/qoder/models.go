@@ -23,6 +23,7 @@ var globalModels = []Model{
 	// Kimi-K3 与 Kimi-K2.7-Code 是 Qoder 当前同时提供的两个独立模型。
 	{ID: "kimi-k3", Type: "model", DisplayName: "Kimi-K3", CreatedAt: ""},
 	{ID: "kimi-k2.7-code", Type: "model", DisplayName: "Kimi-K2.7-Code", CreatedAt: ""},
+	{ID: "glm-5.3", Type: "model", DisplayName: "GLM-5.3", CreatedAt: ""},
 	{ID: "glm-5.2", Type: "model", DisplayName: "GLM-5.2", CreatedAt: ""},
 	{ID: "deepseek-v4-pro", Type: "model", DisplayName: "DeepSeek-V4-Pro", CreatedAt: ""},
 	{ID: "deepseek-v4-flash", Type: "model", DisplayName: "DeepSeek-V4-Flash", CreatedAt: ""},
@@ -38,6 +39,7 @@ var cnModels = []Model{
 	{ID: "qwen3.6-flash", Type: "model", DisplayName: "Qwen3.6-Flash", CreatedAt: ""},
 	{ID: "deepseek-v4-pro", Type: "model", DisplayName: "DeepSeek-V4-Pro", CreatedAt: ""},
 	{ID: "deepseek-v4-flash", Type: "model", DisplayName: "DeepSeek-V4-Flash", CreatedAt: ""},
+	{ID: "glm-5.3", Type: "model", DisplayName: "GLM-5.3", CreatedAt: ""},
 	{ID: "glm-5.2", Type: "model", DisplayName: "GLM-5.2", CreatedAt: ""},
 	{ID: "kimi-k2.7-code", Type: "model", DisplayName: "Kimi-K2.7-Code", CreatedAt: ""},
 	{ID: "minimax-m2.7", Type: "model", DisplayName: "MiniMax-M2.7", CreatedAt: ""},
@@ -55,6 +57,7 @@ var globalAliases = map[string]string{
 	"qwen3.7-plus":      "qmodel",
 	"kimi-k3":           "kmodel_latest",
 	"kimi-k2.7-code":    "kmodel",
+	"glm-5.3":           "gmodel",
 	"glm-5.2":           "gm51model",
 	"deepseek-v4-pro":   "dmodel",
 	"deepseek-v4-flash": "dfmodel",
@@ -69,19 +72,21 @@ var cnAliases = map[string]string{
 	"qwen3.6-flash":     "q36fmodel",
 	"deepseek-v4-pro":   "dmodel",
 	"deepseek-v4-flash": "dfmodel",
+	"glm-5.3":           "gmodel",
 	"glm-5.2":           "gm51model",
 	"kimi-k2.7-code":    "kmodel",
 	"minimax-m2.7":      "mmodel",
 }
 
 // ThinkingCapability 描述 Qoder 模型可由客户端调整的思考能力。
-// 能力快照来自 Qoder 国际版 1.21.2 和国内版 1.10.0；更新模型列表时必须同步核对对应站点能力表。
+// 能力快照来自 Qoder 国际版和国内版 1.24.2；更新模型列表时必须同步核对对应站点能力表。
 type ThinkingCapability uint8
 
 const (
 	ThinkingUnsupported ThinkingCapability = iota
 	ThinkingToggleOnly
 	ThinkingHighMax
+	ThinkingLowHighMax
 )
 
 // globalThinkingCapabilities 显式记录每个国际站 route key 的可调思考能力。
@@ -97,6 +102,7 @@ var globalThinkingCapabilities = map[string]ThinkingCapability{
 	"qmodel":        ThinkingToggleOnly,
 	"kmodel_latest": ThinkingUnsupported,
 	"kmodel":        ThinkingUnsupported,
+	"gmodel":        ThinkingLowHighMax,
 	"gm51model":     ThinkingHighMax,
 	"dmodel":        ThinkingHighMax,
 	"dfmodel":       ThinkingHighMax,
@@ -112,6 +118,7 @@ var cnThinkingCapabilities = map[string]ThinkingCapability{
 	"q36fmodel":     ThinkingUnsupported,
 	"dmodel":        ThinkingHighMax,
 	"dfmodel":       ThinkingHighMax,
+	"gmodel":        ThinkingLowHighMax,
 	"gm51model":     ThinkingHighMax,
 	"kmodel":        ThinkingUnsupported,
 	"mmodel":        ThinkingUnsupported,
@@ -126,7 +133,7 @@ type ContextCapability struct {
 	RuntimeSelectable bool
 }
 
-// globalContextCapabilities 来自 Qoder 国际版 1.21.2 的 Assistant 运行时模型配置。
+// globalContextCapabilities 来自 Qoder 国际版 1.24.2 的 Assistant 运行时模型配置。
 var globalContextCapabilities = map[string]ContextCapability{
 	"ultimate":      {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"auto":          {MaxInputTokens: 180000},
@@ -138,13 +145,14 @@ var globalContextCapabilities = map[string]ContextCapability{
 	"qmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"kmodel_latest": {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"kmodel":        {MaxInputTokens: 256000, RuntimeSelectable: true},
+	"gmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"gm51model":     {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"dmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"dfmodel":       {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"mmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 }
 
-// cnContextCapabilities 来自 Qoder CN 1.10.0 的 Assistant 运行时模型配置。
+// cnContextCapabilities 来自 Qoder CN 1.24.2 的 Assistant 运行时模型配置。
 var cnContextCapabilities = map[string]ContextCapability{
 	"auto":          {MaxInputTokens: 180000},
 	"qmodel_38max":  {MaxInputTokens: 1000000, RuntimeSelectable: true},
@@ -153,6 +161,7 @@ var cnContextCapabilities = map[string]ContextCapability{
 	"q36fmodel":     {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"dmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"dfmodel":       {MaxInputTokens: 1000000, RuntimeSelectable: true},
+	"gmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"gm51model":     {MaxInputTokens: 1000000, RuntimeSelectable: true},
 	"kmodel":        {MaxInputTokens: 256000, RuntimeSelectable: true},
 	"mmodel":        {MaxInputTokens: 200000, RuntimeSelectable: true},

@@ -47,6 +47,7 @@ Qoder 分组支持 Anthropic Messages、OpenAI Responses 和 Chat Completions，
 - `qwen3.7-plus`
 - `kimi-k3`
 - `kimi-k2.7-code`
+- `glm-5.3`
 - `glm-5.2`
 - `deepseek-v4-pro`
 - `deepseek-v4-flash`
@@ -61,6 +62,7 @@ Qoder 分组支持 Anthropic Messages、OpenAI Responses 和 Chat Completions，
 - `qwen3.6-flash`
 - `deepseek-v4-pro`
 - `deepseek-v4-flash`
+- `glm-5.3`
 - `glm-5.2`
 - `kimi-k2.7-code`
 - `minimax-m2.7`
@@ -79,7 +81,7 @@ Qoder 账号的 `model_mapping` 与其他平台使用相同的重写规则：
 
 ## 站点思考控制
 
-站点能力快照已基于 Qoder 国际站 1.21.2 和 Qoder 中国站 1.10.0 验证。这些版本会通过 OpenAPI User-Agent、`Cosy-Version`、签名载荷中的 `cosyVersion` 和推理请求中的 `business.version` 传递。
+站点能力快照已基于 Qoder 国际站和中国站 1.24.2 验证。该版本会通过 OpenAPI User-Agent、`Cosy-Version`、签名载荷中的 `cosyVersion` 和推理请求中的 `business.version` 传递。
 
 能力查找发生在账号级模型映射和公共别名解析之后，因此直接映射到已知路由键的自定义请求模型会获得相同处理。国际站和中国站共用的路由键使用相同思考能力。未知路由键以及未经验证的国际站专属模型不会被修改。
 
@@ -90,6 +92,7 @@ Qoder 账号的 `model_mapping` 与其他平台使用相同的重写规则：
 | 国际站 | `qwen3.7-plus` | `qmodel` | 仅开关 | 与 Qwen3.8-Max 相同 |
 | 国际站 | `deepseek-v4-pro` | `dmodel` | High / Max | Minimal、Low、Medium 映射为 High；High、Very High、Max 映射为 Max；任何正数预算映射为 Max |
 | 国际站 | `deepseek-v4-flash` | `dfmodel` | High / Max | 与 DeepSeek-V4-Pro 相同 |
+| 国际站 | `glm-5.3` | `gmodel` | Low / High / Max | Minimal、Low 映射为 Low；Medium、High 映射为 High；Very High、Max 映射为 Max；任何正数预算映射为 Max |
 | 国际站 | `glm-5.2` | `gm51model` | High / Max | 与 DeepSeek-V4-Pro 相同 |
 | 中国站 | `auto` | `auto` | 用户不可编辑 | 不覆盖 |
 | 中国站 | `qwen3.8-max` | `qmodel_38max` | 仅开关 | 与国际站 Qwen3.8-Max 相同 |
@@ -98,6 +101,7 @@ Qoder 账号的 `model_mapping` 与其他平台使用相同的重写规则：
 | 中国站 | `qwen3.6-flash` | `q36fmodel` | 用户不可编辑 | 不覆盖 |
 | 中国站 | `deepseek-v4-pro` | `dmodel` | High / Max | Minimal、Low、Medium 映射为 High；High、Very High、Max 映射为 Max；任何正数预算映射为 Max |
 | 中国站 | `deepseek-v4-flash` | `dfmodel` | High / Max | 与 DeepSeek-V4-Pro 相同 |
+| 中国站 | `glm-5.3` | `gmodel` | Low / High / Max | 与国际站 GLM-5.3 相同 |
 | 中国站 | `glm-5.2` | `gm51model` | High / Max | 与 DeepSeek-V4-Pro 相同 |
 | 中国站 | `kimi-k2.7-code` | `kmodel` | 用户不可编辑 | 不覆盖 |
 | 中国站 | `minimax-m2.7` | `mmodel` | 用户不可编辑 | 不覆盖 |
@@ -116,10 +120,10 @@ Qoder 账号的 `model_mapping` 与其他平台使用相同的重写规则：
 
 | 站点 | 最大输入 Token | 路由键 |
 | --- | ---: | --- |
-| 国际站 | 1,000,000 | `ultimate`、`performance`、`qmodel_38max`、`qmodel_latest`、`qmodel`、`kmodel_latest`、`gm51model`、`dmodel`、`dfmodel`、`mmodel` |
+| 国际站 | 1,000,000 | `ultimate`、`performance`、`qmodel_38max`、`qmodel_latest`、`qmodel`、`kmodel_latest`、`gmodel`、`gm51model`、`dmodel`、`dfmodel`、`mmodel` |
 | 国际站 | 256,000 | `kmodel` |
 | 国际站 | 180,000 | `auto`、`efficient`、`lite` |
-| 中国站 | 1,000,000 | `qmodel_38max`、`qmodel_latest`、`qmodel`、`q36fmodel`、`dmodel`、`dfmodel`、`gm51model` |
+| 中国站 | 1,000,000 | `qmodel_38max`、`qmodel_latest`、`qmodel`、`q36fmodel`、`dmodel`、`dfmodel`、`gmodel`、`gm51model` |
 | 中国站 | 256,000 | `kmodel` |
 | 中国站 | 200,000 | `mmodel` |
 | 中国站 | 180,000 | `auto` |
@@ -151,7 +155,7 @@ Qoder 计费定价优先级：
 
 Qoder 有独立的上游月度 Credits 配额。TokenRouter 只把它作为账号用量和容量信息，它与 TokenRouter 用户余额、订阅以及用户与平台维度的美元配额相互独立。
 
-账号用量界面会查询所选站点经过 COSY 签名的 Gateway 配额端点，并把最近成功快照保存到 `account.extra.qoder_quota_snapshot`。中国站请求会包含缓存的 `orgId`，凭据存在时还会包含可选 `quota_key`。实时查询失败时，管理界面可以同时显示缓存快照和降级用量错误。完整上游月度 Credit 余额是 `userQuota`、`addOnQuota` 与 `orgResourcePackage` 或 `sharedQuota` 之和，与 qodercli 用量视图一致。对于非个人零配额账号，`isQuotaExceeded=true` 或已耗尽的正数合计配额会把正常账号 `rate_limited_until` 调度信号设置到 Qoder 的 `expiresAt`；仍有附加或组织 Credit 时会阻止或清除过期配额锁。观测到的 `personal_standard` 结构如果 `total=0`、`remaining=0` 且 `expiresAt` 极远，只用于展示，直到真实请求错误确认限制。请求时的错误码 `115`、`agentLimitResetTime` 或 HTTP 429 仍走正常账号限流冷却路径。
+账号用量界面会查询所选站点的 Gateway `/api/v2/quota/usage` 端点，并把最近成功快照保存到 `account.extra.qoder_quota_snapshot`。国际站请求始终使用 COSY 签名；中国站的 `qodercn20` 和 PAT 账号同样使用 COSY 签名，旧版或导入的 COSY 会话则按官方客户端行为使用 `security_oauth_token` Bearer 鉴权。中国站请求会在可用时携带缓存的 `orgId`，1.24.2 的常规配额查询不发送 `quota_key`。实时查询失败时，管理界面可以同时显示缓存快照和降级用量错误。完整上游月度 Credit 余额是 `userQuota`、`addOnQuota` 与 `orgResourcePackage` 或 `sharedQuota` 之和，与 qodercli 用量视图一致。对于非个人零配额账号，`isQuotaExceeded=true` 或已耗尽的正数合计配额会把正常账号 `rate_limited_until` 调度信号设置到 Qoder 的 `expiresAt`；仍有附加或组织 Credit 时会阻止或清除过期配额锁。观测到的 `personal_standard` 结构如果 `total=0`、`remaining=0` 且 `expiresAt` 极远，只用于展示，直到真实请求错误确认限制。请求时的错误码 `115`、`agentLimitResetTime` 或 HTTP 429 仍走正常账号限流冷却路径。
 
 ## 运维
 

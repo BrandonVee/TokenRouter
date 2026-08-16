@@ -73,6 +73,7 @@ describe('useModelWhitelist', () => {
       // 新旧 Kimi 模型应同时作为创建账号的快捷候选。
       'kimi-k3',
       'kimi-k2.7-code',
+      'glm-5.3',
       'glm-5.2',
       'deepseek-v4-pro',
       'deepseek-v4-flash',
@@ -112,6 +113,7 @@ describe('useModelWhitelist', () => {
       // Kimi-K3 使用新增的独立 latest 路由。
       ['kimi-k3', 'kmodel_latest'],
       ['kimi-k2.7-code', 'kmodel'],
+      ['glm-5.3', 'gmodel'],
       ['glm-5.2', 'gm51model'],
       ['deepseek-v4-pro', 'dmodel'],
       ['deepseek-v4-flash', 'dfmodel'],
@@ -136,6 +138,7 @@ describe('useModelWhitelist', () => {
       'qwen3.7-plus',
       'kimi-k3',
       'kimi-k2.7-code',
+      'glm-5.3',
       'glm-5.2',
       'deepseek-v4-pro',
       'deepseek-v4-flash',
@@ -149,6 +152,7 @@ describe('useModelWhitelist', () => {
       'qwen3.6-flash',
       'deepseek-v4-pro',
       'deepseek-v4-flash',
+      'glm-5.3',
       'glm-5.2',
       'kimi-k2.7-code',
       'minimax-m2.7'
@@ -162,6 +166,7 @@ describe('useModelWhitelist', () => {
 
   it('qoder 公开别名到上游 route key 仅用于创建账号快捷填充', () => {
     expect(qoderModelKeyByPublicAlias('claude-opus-4-6')).toBe('ultimate')
+    expect(qoderModelKeyByPublicAlias('glm-5.3')).toBe('gmodel')
     expect(qoderModelKeyByPublicAlias('glm-5.2')).toBe('gm51model')
     expect(qoderModelKeyByPublicAlias('kimi-k3')).toBe('kmodel_latest')
     expect(qoderModelKeyByPublicAlias('minimax-m3')).toBe('mmodel')

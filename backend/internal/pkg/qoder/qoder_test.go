@@ -309,6 +309,7 @@ func TestDefaultModels(t *testing.T) {
 		// 验证新增路由会通过默认模型接口对外展示。
 		"kimi-k3",
 		"kimi-k2.7-code",
+		"glm-5.3",
 		"glm-5.2",
 		"deepseek-v4-pro",
 		"deepseek-v4-flash",
@@ -396,10 +397,10 @@ func TestBuildPayloadB64(t *testing.T) {
 	}{
 		{name: "国际站默认版本", build: func() (string, error) {
 			return BuildPayloadB64("test_info", "request123")
-		}, want: "1.21.2"},
+		}, want: "1.24.2"},
 		{name: "国内站显式版本", build: func() (string, error) {
 			return BuildPayloadB64WithVersion("test_info", "request123", CNClientVersion)
-		}, want: "1.10.0"},
+		}, want: "1.24.2"},
 	}
 
 	for _, tt := range tests {

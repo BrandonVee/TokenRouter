@@ -33,10 +33,11 @@ func TestQoderAliasRequiresManualPricingIsCaseInsensitive(t *testing.T) {
 	require.True(t, QoderAliasRequiresManualPricing("QWEN3.8-MAX"))
 	require.True(t, QoderAliasRequiresManualPricing("QMODEL_38MAX"))
 	require.True(t, QoderAliasRequiresManualPricing("GM51MODEL"))
+	// GLM-5.3 已将 gmodel 纳入当前公开 alias 对应的 route key。
+	require.True(t, QoderAliasRequiresManualPricing("GMODEL"))
 	// 已移除兼容表中的历史 route key 不再按当前 Qoder alias 处理。
 	require.False(t, QoderAliasRequiresManualPricing("QWEN3.8-MAX-PREVIEW"))
 	require.False(t, QoderAliasRequiresManualPricing("QMODEL_PREVIEW"))
-	require.False(t, QoderAliasRequiresManualPricing("GMODEL"))
 	require.False(t, QoderAliasRequiresManualPricing("Q35MODEL"))
 }
 

@@ -20,16 +20,16 @@ func TestQoderThinkingDirectiveFromBody(t *testing.T) {
 		want        qoderThinkingDirective
 	}{
 		{name: "missing stays disabled", body: `{}`, effortPaths: []string{"reasoning.effort"}},
-		{name: "minimal maps high", body: `{"reasoning":{"effort":"minimal"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "high"}},
-		{name: "low maps high", body: `{"reasoning_effort":"LOW"}`, effortPaths: []string{"reasoning_effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "high"}},
-		{name: "medium maps high", body: `{"reasoning":{"effort":"medium"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "high"}},
-		{name: "high maps max", body: `{"reasoning":{"effort":"high"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "max"}},
+		{name: "minimal normalizes low", body: `{"reasoning":{"effort":"minimal"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "low"}},
+		{name: "low stays low", body: `{"reasoning_effort":"LOW"}`, effortPaths: []string{"reasoning_effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "low"}},
+		{name: "medium stays medium", body: `{"reasoning":{"effort":"medium"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "medium"}},
+		{name: "high stays high", body: `{"reasoning":{"effort":"high"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "high"}},
 		{name: "very high aliases map max", body: `{"reasoning":{"effort":"very_high"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "max"}},
 		{name: "positive budget maps max", body: `{"thinking":{"budget_tokens":1}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "max"}},
 		{name: "zero budget stays disabled", body: `{"thinking":{"budget_tokens":0}}`, effortPaths: []string{"reasoning.effort"}},
 		{name: "enabled without budget maps max", body: `{"thinking":{"type":"enabled"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "max"}},
 		{name: "adaptive without budget maps max", body: `{"thinking":{"type":"adaptive"}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "max"}},
-		{name: "explicit effort beats budget", body: `{"reasoning":{"effort":"low"},"thinking":{"budget_tokens":32768}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "high"}},
+		{name: "explicit effort beats budget", body: `{"reasoning":{"effort":"low"},"thinking":{"budget_tokens":32768}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "low"}},
 		{name: "disabled beats effort and budget", body: `{"reasoning":{"effort":"max"},"thinking":{"type":"disabled","budget_tokens":32768}}`, effortPaths: []string{"reasoning.effort"}},
 		{name: "none effort beats enabled", body: `{"reasoning":{"effort":"none"},"thinking":{"type":"enabled","budget_tokens":32768}}`, effortPaths: []string{"reasoning.effort"}},
 		{name: "invalid effort falls back to budget", body: `{"reasoning":{"effort":"banana"},"thinking":{"budget_tokens":8}}`, effortPaths: []string{"reasoning.effort"}, want: qoderThinkingDirective{Enabled: true, Effort: "max"}},
@@ -50,7 +50,7 @@ func TestQoderThinkingParsersUseProtocolNativeFields(t *testing.T) {
 		"messages":[{"role":"user","content":"hello"}]
 	}`))
 	require.NoError(t, err)
-	require.Equal(t, qoderThinkingDirective{Enabled: true, Effort: "high"}, chat.thinking)
+	require.Equal(t, qoderThinkingDirective{Enabled: true, Effort: "medium"}, chat.thinking)
 
 	responses, err := parseQoderResponsesPayload([]byte(`{
 		"model":"deepseek-v4-pro",
@@ -69,7 +69,7 @@ func TestQoderThinkingParsersUseProtocolNativeFields(t *testing.T) {
 		"messages":[{"role":"user","content":"hello"}]
 	}`))
 	require.NoError(t, err)
-	require.Equal(t, qoderThinkingDirective{Enabled: true, Effort: "high"}, messages.thinking)
+	require.Equal(t, qoderThinkingDirective{Enabled: true, Effort: "low"}, messages.thinking)
 
 	// Qoder 会忽略未知等级，不能被通用 Anthropic 转换层提前拒绝。
 	messages, err = parseQoderAnthropicMessagesPayload([]byte(`{
@@ -272,6 +272,8 @@ func TestBuildQoderThinkingPayloadBySiteAndModelCapability(t *testing.T) {
 		{name: "global deepseek pro low to high", site: qoder.SiteGlobal, model: "deepseek-v4-pro", extra: map[string]any{"reasoning_effort": "low"}, wantEnabled: true, wantEffort: "high", wantEffortPath: true},
 		{name: "global deepseek flash budget to max", site: qoder.SiteGlobal, model: "deepseek-v4-flash", extra: map[string]any{"thinking": map[string]any{"budget_tokens": 1}}, wantEnabled: true, wantEffort: "max", wantEffortPath: true},
 		{name: "global glm high to max", site: qoder.SiteGlobal, model: "glm-5.2", extra: map[string]any{"reasoning_effort": "high"}, wantEnabled: true, wantEffort: "max", wantEffortPath: true},
+		{name: "global glm 53 low stays low", site: qoder.SiteGlobal, model: "glm-5.3", extra: map[string]any{"reasoning_effort": "low"}, wantEnabled: true, wantEffort: "low", wantEffortPath: true},
+		{name: "global glm 53 high stays high", site: qoder.SiteGlobal, model: "glm-5.3", extra: map[string]any{"reasoning_effort": "high"}, wantEnabled: true, wantEffort: "high", wantEffortPath: true},
 		{name: "cn qwen 38 public alias on", site: qoder.SiteCN, model: "qwen3.8-max", extra: map[string]any{"reasoning_effort": "low"}, wantEnabled: true},
 		{name: "cn qwen 38 raw route on", site: qoder.SiteCN, model: "qmodel_38max", extra: map[string]any{"reasoning_effort": "max"}, wantEnabled: true},
 		{name: "cn qwen 37 max default off", site: qoder.SiteCN, model: "qwen3.7-max", wantEffort: "none", wantEffortPath: true},
@@ -279,6 +281,8 @@ func TestBuildQoderThinkingPayloadBySiteAndModelCapability(t *testing.T) {
 		{name: "cn deepseek pro low to high", site: qoder.SiteCN, model: "deepseek-v4-pro", extra: map[string]any{"reasoning_effort": "low"}, wantEnabled: true, wantEffort: "high", wantEffortPath: true},
 		{name: "cn deepseek flash budget to max", site: qoder.SiteCN, model: "deepseek-v4-flash", extra: map[string]any{"thinking": map[string]any{"budget_tokens": 1}}, wantEnabled: true, wantEffort: "max", wantEffortPath: true},
 		{name: "cn glm high to max", site: qoder.SiteCN, model: "glm-5.2", extra: map[string]any{"reasoning_effort": "high"}, wantEnabled: true, wantEffort: "max", wantEffortPath: true},
+		{name: "cn glm 53 medium maps high", site: qoder.SiteCN, model: "glm-5.3", extra: map[string]any{"reasoning_effort": "medium"}, wantEnabled: true, wantEffort: "high", wantEffortPath: true},
+		{name: "cn glm 53 max stays max", site: qoder.SiteCN, model: "gmodel", extra: map[string]any{"reasoning_effort": "max"}, wantEnabled: true, wantEffort: "max", wantEffortPath: true},
 		{name: "cn deepseek explicit disabled", site: qoder.SiteCN, model: "deepseek-v4-pro", extra: map[string]any{"thinking": map[string]any{"type": "disabled", "budget_tokens": 32768}}, wantEffort: "none", wantEffortPath: true},
 		{name: "cn auto ignored", site: qoder.SiteCN, model: "auto", extra: map[string]any{"reasoning_effort": "max"}},
 		{name: "cn qwen 36 ignored", site: qoder.SiteCN, model: "qwen3.6-flash", extra: map[string]any{"reasoning_effort": "max"}},

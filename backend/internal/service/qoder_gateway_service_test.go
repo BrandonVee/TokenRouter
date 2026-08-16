@@ -223,7 +223,7 @@ func TestBuildQoderPayloadFromChatCompletions(t *testing.T) {
 	require.Equal(t, "hello", chatText["text"])
 	business, ok := payload["business"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "1.21.2", business["version"])
+	require.Equal(t, "1.24.2", business["version"])
 
 	messagesRaw, ok := payload["messages"].([]any)
 	require.True(t, ok)
@@ -263,7 +263,7 @@ func TestBuildQoderPayloadUsesCNModelAndClientVersion(t *testing.T) {
 	require.Equal(t, "q36fmodel", modelKey)
 	business, ok := payload["business"].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "1.10.0", business["version"])
+	require.Equal(t, "1.24.2", business["version"])
 }
 
 func TestBuildQoderPayloadUserSystemReplacesBuiltInSystem(t *testing.T) {
@@ -651,6 +651,16 @@ func TestResolveQoderModelUsesGLM52RouteKey(t *testing.T) {
 	require.Equal(t, "gm51model", info.Key)
 	require.Equal(t, "system", info.Source)
 	require.Equal(t, "GLM-5.2", info.DisplayName)
+}
+
+func TestResolveQoderModelUsesGLM53RouteKey(t *testing.T) {
+	// Qoder 1.24.2 在两站都把 GLM-5.3 展示名绑定到 gmodel 路由。
+	for _, site := range []qoder.Site{qoder.SiteGlobal, qoder.SiteCN} {
+		info := resolveQoderModelForSite(site, "glm-5.3")
+		require.Equal(t, "gmodel", info.Key)
+		require.Equal(t, "system", info.Source)
+		require.Equal(t, "GLM-5.3", info.DisplayName)
+	}
 }
 
 func TestResolveQoderModelDoesNotTranslateRemovedCompatibilityAliases(t *testing.T) {

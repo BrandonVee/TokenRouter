@@ -40,9 +40,9 @@ const (
 	// CNGatewayBaseURL 是国内站推理地址。
 	CNGatewayBaseURL = "https://gateway.qoder.com.cn"
 	// GlobalClientVersion 是国际站当前 COSY 客户端版本。
-	GlobalClientVersion = "1.21.2"
+	GlobalClientVersion = "1.24.2"
 	// CNClientVersion 是国内站当前 COSY 客户端版本。
-	CNClientVersion = "1.10.0"
+	CNClientVersion = "1.24.2"
 	// GlobalOAuthClientID 是国际站公开 OAuth client ID。
 	GlobalOAuthClientID = "e883ade2-e6e3-4d6d-adf7-f92ceff5fdcb"
 	// CNOAuthClientID 是国内站公开 OAuth client ID。

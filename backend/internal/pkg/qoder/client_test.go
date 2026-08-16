@@ -56,7 +56,7 @@ func TestCNClientUsesGatewayEndpointVersionAndCanonicalSignaturePath(t *testing.
 	require.NotNil(t, resp)
 	require.Equal(t, "gateway.example", captured.URL.Host)
 	require.Equal(t, "/algo/api/v2/service/pro/sse/agent_chat_generation", captured.URL.Path)
-	require.Equal(t, "1.10.0", captured.Header.Get("Cosy-Version"))
+	require.Equal(t, "1.24.2", captured.Header.Get("Cosy-Version"))
 	require.Equal(t, "aarch64_darwin", captured.Header.Get("Cosy-Machineos"))
 	require.Equal(t, "mid-abc", captured.Header.Get("Cosy-Machineid"))
 	require.Equal(t, []string{""}, captured.Header.Values("Cosy-Machinetoken"))
@@ -170,6 +170,42 @@ func TestSignatureJSONRequestUsesAppcodeHeadersWithoutAuthorization(t *testing.T
 	require.NotContains(t, captured.Header, "Cosy-Organization-Tags")
 }
 
+func TestBearerJSONRequestUsesSecurityOAuthToken(t *testing.T) {
+	profile := MustProfileForSite(SiteCN)
+	profile.GatewayBaseURL = "https://gateway.example"
+	client := NewClientForProfile(profile)
+	session := testSession()
+	session.Site = SiteCN
+	session.Identity.SecurityOauthToken = "security-token"
+	var captured *http.Request
+	doer := func(req *http.Request) (*http.Response, error) {
+		captured = req
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{}`)),
+			Request:    req,
+		}, nil
+	}
+
+	err := client.BearerJSONRequestContextWithDoer(
+		context.Background(),
+		http.MethodGet,
+		session,
+		QuotaUsagePath,
+		nil,
+		nil,
+		doer,
+		&map[string]any{},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, "/algo"+QuotaUsagePath, captured.URL.Path)
+	require.Equal(t, "Bearer security-token", captured.Header.Get("Authorization"))
+	require.NotContains(t, captured.Header, "Cosy-Key")
+	require.NotContains(t, captured.Header, "Cosy-Date")
+}
+
 func getHeaders(t *testing.T) http.Header {
 	t.Helper()
 	c := NewClient("https://test.qoder.sh")
@@ -208,8 +244,8 @@ func TestHeadersDataPolicyIsDisagree(t *testing.T) {
 
 func TestHeadersUseGlobalSiteVersion(t *testing.T) {
 	h := getHeaders(t)
-	if h.Get("cosy-version") != "1.21.2" {
-		t.Errorf("cosy-version = %q, want 1.21.2", h.Get("cosy-version"))
+	if h.Get("cosy-version") != "1.24.2" {
+		t.Errorf("cosy-version = %q, want 1.24.2", h.Get("cosy-version"))
 	}
 }
 
