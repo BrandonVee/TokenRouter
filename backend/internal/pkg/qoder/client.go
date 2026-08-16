@@ -144,7 +144,7 @@ func (c *Client) JSONRequestContextWithDoer(
 	doer RequestDoer,
 	out any,
 ) error {
-	return c.jsonRequestContextWithDoer(ctx, method, session, logicalPath, bodyJSON, extraHeaders, doer, out, false)
+	return c.jsonRequestContextWithDoer(ctx, method, session, logicalPath, bodyJSON, extraHeaders, doer, out, qoderJSONAuthCOSY)
 }
 
 // SignatureJSONRequestContextWithDoer 使用登录前的 Appcode 签名模式发送 Gateway JSON 请求。
@@ -158,8 +158,30 @@ func (c *Client) SignatureJSONRequestContextWithDoer(
 	doer RequestDoer,
 	out any,
 ) error {
-	return c.jsonRequestContextWithDoer(ctx, method, session, logicalPath, bodyJSON, extraHeaders, doer, out, true)
+	return c.jsonRequestContextWithDoer(ctx, method, session, logicalPath, bodyJSON, extraHeaders, doer, out, qoderJSONAuthSignature)
 }
+
+// BearerJSONRequestContextWithDoer 使用账号 security OAuth token 发送 Gateway JSON 请求。
+func (c *Client) BearerJSONRequestContextWithDoer(
+	ctx context.Context,
+	method string,
+	session *SessionContext,
+	logicalPath string,
+	bodyJSON []byte,
+	extraHeaders map[string]string,
+	doer RequestDoer,
+	out any,
+) error {
+	return c.jsonRequestContextWithDoer(ctx, method, session, logicalPath, bodyJSON, extraHeaders, doer, out, qoderJSONAuthBearer)
+}
+
+type qoderJSONAuthMode uint8
+
+const (
+	qoderJSONAuthCOSY qoderJSONAuthMode = iota
+	qoderJSONAuthSignature
+	qoderJSONAuthBearer
+)
 
 func (c *Client) jsonRequestContextWithDoer(
 	ctx context.Context,
@@ -170,13 +192,16 @@ func (c *Client) jsonRequestContextWithDoer(
 	extraHeaders map[string]string,
 	doer RequestDoer,
 	out any,
-	signatureOnly bool,
+	authMode qoderJSONAuthMode,
 ) error {
 	if c == nil {
 		return fmt.Errorf("qoder: client is nil")
 	}
-	if session == nil || session.Machine == nil || (!signatureOnly && session.Identity == nil) {
+	if session == nil || session.Machine == nil || (authMode != qoderJSONAuthSignature && session.Identity == nil) {
 		return fmt.Errorf("qoder: COSY session is incomplete")
+	}
+	if authMode == qoderJSONAuthBearer && strings.TrimSpace(session.Identity.SecurityOauthToken) == "" {
+		return fmt.Errorf("qoder: security OAuth token is missing")
 	}
 	logicalPath = strings.TrimSpace(logicalPath)
 	if logicalPath == "" {
@@ -213,9 +238,12 @@ func (c *Client) jsonRequestContextWithDoer(
 	if err != nil {
 		return fmt.Errorf("qoder: create gateway request: %w", err)
 	}
-	if signatureOnly {
+	switch authMode {
+	case qoderJSONAuthSignature:
 		c.setSignatureHeaders(req, session)
-	} else {
+	case qoderJSONAuthBearer:
+		c.setBearerHeaders(req, session)
+	default:
 		c.setHeaders(req, session, logicalPath, encodedBody)
 	}
 	req.Header.Set("Accept", "application/json")
@@ -501,6 +529,11 @@ func (c *Client) setSignatureHeaders(req *http.Request, session *SessionContext)
 	req.Header.Set("Date", httpDate)
 	req.Header.Set("Signature", SignCenterRequest(httpDate))
 	req.Header.Set("Appcode", AppCode)
+}
+
+func (c *Client) setBearerHeaders(req *http.Request, session *SessionContext) {
+	c.setBasicHeaders(req, session)
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(session.Identity.SecurityOauthToken))
 }
 
 func (c *Client) setBasicHeaders(req *http.Request, session *SessionContext) Site {

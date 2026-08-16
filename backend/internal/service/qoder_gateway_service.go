@@ -76,6 +76,7 @@ var defaultQoderModelAliases = map[string]qoderModelInfo{
 	"qwen3.6-flash":     {Key: "q36fmodel", Source: "system", Provider: "Qwen", Notes: "Qoder CN UI model name Qwen3.6-Flash.", DisplayName: "Qwen3.6-Flash"},
 	"deepseek-v4-pro":   {Key: "dmodel", Source: "system", Provider: "DeepSeek", Notes: "Qoder UI model name DeepSeek-V4-Pro.", DisplayName: "DeepSeek-V4-Pro"},
 	"deepseek-v4-flash": {Key: "dfmodel", Source: "system", Provider: "DeepSeek", Notes: "Qoder UI model name DeepSeek-V4-Flash.", DisplayName: "DeepSeek-V4-Flash"},
+	"glm-5.3":           {Key: "gmodel", Source: "system", Provider: "GLM", Notes: "Qoder UI model name GLM-5.3.", DisplayName: "GLM-5.3"},
 	"glm-5.2":           {Key: "gm51model", Source: "system", Provider: "GLM", Notes: "Qoder UI model name GLM-5.2.", DisplayName: "GLM-5.2"},
 	// Qoder 1.15.0 起同时展示 Kimi-K3 与 Kimi-K2.7-Code，两者使用不同路由 key。
 	"kimi-k3":        {Key: "kmodel_latest", Source: "system", Provider: "Kimi", Notes: "Qoder UI model name Kimi-K3.", DisplayName: "Kimi-K3"},
@@ -882,7 +883,7 @@ func parseQoderAnthropicMessagesPayload(body []byte) (qoderPayloadRequest, error
 	}, nil
 }
 
-// qoderThinkingDirectiveFromBody 将不同下游协议的思考字段归一为 Qoder 开关和两档等级。
+// qoderThinkingDirectiveFromBody 将不同下游协议的思考字段归一为 Qoder 开关和通用等级。
 // 明确关闭的优先级最高；非法等级不会阻断请求，仍可由预算或显式开关启用。
 func qoderThinkingDirectiveFromBody(body []byte, effortPaths ...string) qoderThinkingDirective {
 	thinkingType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "thinking.type").String()))
@@ -917,16 +918,20 @@ func qoderThinkingDirectiveFromBody(body []byte, effortPaths ...string) qoderThi
 	return qoderThinkingDirective{}
 }
 
-// normalizeQoderThinkingEffort 将常见下游等级折叠为 Qoder CN 支持的 High 和 Max。
+// normalizeQoderThinkingEffort 将常见下游等级归一化，最终档位由所选模型能力决定。
 func normalizeQoderThinkingEffort(raw string) (effort string, disabled bool) {
 	value := strings.ToLower(strings.TrimSpace(raw))
 	value = strings.NewReplacer("-", "", "_", "", " ", "").Replace(value)
 	switch value {
 	case "none", "disabled", "off":
 		return "", true
-	case "minimal", "low", "medium":
+	case "minimal", "low":
+		return "low", false
+	case "medium":
+		return "medium", false
+	case "high":
 		return "high", false
-	case "high", "xhigh", "veryhigh", "extrahigh", "max":
+	case "xhigh", "veryhigh", "extrahigh", "max":
 		return "max", false
 	default:
 		return "", false
@@ -1821,10 +1826,7 @@ func applyQoderThinkingDirective(payload map[string]any, site qoder.Site, modelK
 
 	effort := "none"
 	if directive.Enabled {
-		effort = directive.Effort
-		if effort == "" {
-			effort = "max"
-		}
+		effort = qoderThinkingEffortForCapability(capability, directive.Effort)
 	}
 	parameters["reasoning_effort"] = effort
 	modelConfig["reasoning_effort"] = effort
@@ -1835,6 +1837,28 @@ func applyQoderThinkingDirective(payload map[string]any, site qoder.Site, modelK
 		extra["ideModelConfigOverride"] = runtimeOverride
 	}
 	runtimeOverride["reasoning_effort"] = effort
+}
+
+// qoderThinkingEffortForCapability 把通用请求等级投影到官方模型实际提供的档位。
+func qoderThinkingEffortForCapability(capability qoder.ThinkingCapability, requested string) string {
+	switch capability {
+	case qoder.ThinkingHighMax:
+		if requested == "low" || requested == "medium" {
+			return "high"
+		}
+		return "max"
+	case qoder.ThinkingLowHighMax:
+		switch requested {
+		case "low":
+			return "low"
+		case "medium", "high":
+			return "high"
+		default:
+			return "max"
+		}
+	default:
+		return requested
+	}
 }
 
 func addQoderEphemeralCacheControl(messages []any) {

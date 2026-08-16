@@ -47,10 +47,10 @@ func TestProfileForSiteUsesFrozenProductionValues(t *testing.T) {
 	require.Equal(t, GlobalOpenAPIBaseURL, global.OpenAPIBaseURL)
 	require.Equal(t, GlobalCenterBaseURL, global.CenterBaseURL)
 	require.Equal(t, GlobalGatewayBaseURL, global.GatewayBaseURL)
-	require.Equal(t, "1.21.2", GlobalClientVersion)
-	require.Equal(t, "1.21.2", global.ClientVersion)
+	require.Equal(t, "1.24.2", GlobalClientVersion)
+	require.Equal(t, "1.24.2", global.ClientVersion)
 	require.Equal(t, GlobalOAuthClientID, global.OAuthClientID)
-	require.Equal(t, "Qoder/1.21.2", global.OpenAPIUserAgent())
+	require.Equal(t, "Qoder/1.24.2", global.OpenAPIUserAgent())
 
 	cn, err := ProfileForSite(SiteCN)
 	require.NoError(t, err)
@@ -58,10 +58,10 @@ func TestProfileForSiteUsesFrozenProductionValues(t *testing.T) {
 	require.Equal(t, CNOpenAPIBaseURL, cn.OpenAPIBaseURL)
 	require.Empty(t, cn.CenterBaseURL)
 	require.Equal(t, CNGatewayBaseURL, cn.GatewayBaseURL)
-	require.Equal(t, "1.10.0", CNClientVersion)
-	require.Equal(t, "1.10.0", cn.ClientVersion)
+	require.Equal(t, "1.24.2", CNClientVersion)
+	require.Equal(t, "1.24.2", cn.ClientVersion)
 	require.Equal(t, CNOAuthClientID, cn.OAuthClientID)
-	require.Equal(t, "Qoder CN/1.10.0", cn.OpenAPIUserAgent())
+	require.Equal(t, "Qoder CN/1.24.2", cn.OpenAPIUserAgent())
 }
 
 func TestNormalizeProfileAllowsTestEndpointInjection(t *testing.T) {
@@ -95,6 +95,7 @@ func TestModelsAndAliasesAreSiteAware(t *testing.T) {
 		"qwen3.7-plus",
 		"kimi-k3",
 		"kimi-k2.7-code",
+		"glm-5.3",
 		"glm-5.2",
 		"deepseek-v4-pro",
 		"deepseek-v4-flash",
@@ -108,6 +109,7 @@ func TestModelsAndAliasesAreSiteAware(t *testing.T) {
 		"qwen3.6-flash",
 		"deepseek-v4-pro",
 		"deepseek-v4-flash",
+		"glm-5.3",
 		"glm-5.2",
 		"kimi-k2.7-code",
 		"minimax-m2.7",
@@ -116,6 +118,9 @@ func TestModelsAndAliasesAreSiteAware(t *testing.T) {
 	route, ok := AliasForSite(SiteGlobal, "qwen3.8-max")
 	require.True(t, ok)
 	require.Equal(t, "qmodel_38max", route)
+	route, ok = AliasForSite(SiteCN, "glm-5.3")
+	require.True(t, ok)
+	require.Equal(t, "gmodel", route)
 	route, ok = AliasForSite(SiteCN, "qwen3.8-max")
 	require.True(t, ok)
 	require.Equal(t, "qmodel_38max", route)
@@ -150,6 +155,7 @@ func TestThinkingCapabilityForSiteUsesSiteSnapshot(t *testing.T) {
 		{site: SiteGlobal, model: "qwen3.7-plus", want: ThinkingToggleOnly},
 		{site: SiteGlobal, model: "deepseek-v4-pro", want: ThinkingHighMax},
 		{site: SiteGlobal, model: "deepseek-v4-flash", want: ThinkingHighMax},
+		{site: SiteGlobal, model: "glm-5.3", want: ThinkingLowHighMax},
 		{site: SiteGlobal, model: "glm-5.2", want: ThinkingHighMax},
 		{site: SiteGlobal, model: "kimi-k3", want: ThinkingUnsupported},
 		// 空站点与 ParseSite 的旧账号兼容语义一致，按国际站查询能力。
@@ -162,6 +168,7 @@ func TestThinkingCapabilityForSiteUsesSiteSnapshot(t *testing.T) {
 		{site: SiteCN, model: "qwen3.6-flash", want: ThinkingUnsupported},
 		{site: SiteCN, model: "deepseek-v4-pro", want: ThinkingHighMax},
 		{site: SiteCN, model: "deepseek-v4-flash", want: ThinkingHighMax},
+		{site: SiteCN, model: "glm-5.3", want: ThinkingLowHighMax},
 		{site: SiteCN, model: "glm-5.2", want: ThinkingHighMax},
 		{site: SiteCN, model: "kimi-k2.7-code", want: ThinkingUnsupported},
 		{site: SiteCN, model: "minimax-m2.7", want: ThinkingUnsupported},
@@ -238,6 +245,7 @@ func TestContextCapabilitySnapshotCoversEveryPublishedRoute(t *testing.T) {
 		"qmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"kmodel_latest": {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"kmodel":        {MaxInputTokens: 256000, RuntimeSelectable: true},
+		"gmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"gm51model":     {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"dmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"dfmodel":       {MaxInputTokens: 1000000, RuntimeSelectable: true},
@@ -251,6 +259,7 @@ func TestContextCapabilitySnapshotCoversEveryPublishedRoute(t *testing.T) {
 		"q36fmodel":     {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"dmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"dfmodel":       {MaxInputTokens: 1000000, RuntimeSelectable: true},
+		"gmodel":        {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"gm51model":     {MaxInputTokens: 1000000, RuntimeSelectable: true},
 		"kmodel":        {MaxInputTokens: 256000, RuntimeSelectable: true},
 		"mmodel":        {MaxInputTokens: 200000, RuntimeSelectable: true},
@@ -290,7 +299,9 @@ func TestContextCapabilityForSiteUsesHighestVerifiedTier(t *testing.T) {
 		{name: "国际站 Performance", site: SiteGlobal, model: "performance", want: ContextCapability{MaxInputTokens: 1000000, RuntimeSelectable: true}},
 		{name: "国际站 Auto", site: SiteGlobal, model: "auto", want: ContextCapability{MaxInputTokens: 180000}},
 		{name: "国际站 Kimi K2.7", site: SiteGlobal, model: "kimi-k2.7-code", want: ContextCapability{MaxInputTokens: 256000, RuntimeSelectable: true}},
+		{name: "国际站 GLM 5.3", site: SiteGlobal, model: "glm-5.3", want: ContextCapability{MaxInputTokens: 1000000, RuntimeSelectable: true}},
 		{name: "国内站 Qwen3.6", site: SiteCN, model: "qwen3.6-flash", want: ContextCapability{MaxInputTokens: 1000000, RuntimeSelectable: true}},
+		{name: "国内站 GLM 5.3", site: SiteCN, model: "gmodel", want: ContextCapability{MaxInputTokens: 1000000, RuntimeSelectable: true}},
 		{name: "国内站 Kimi K2.7", site: SiteCN, model: "kmodel", want: ContextCapability{MaxInputTokens: 256000, RuntimeSelectable: true}},
 		{name: "国内站 MiniMax", site: SiteCN, model: "minimax-m2.7", want: ContextCapability{MaxInputTokens: 200000, RuntimeSelectable: true}},
 		{name: "空站点按国际站", site: "", model: "qwen3.8-max", want: ContextCapability{MaxInputTokens: 1000000, RuntimeSelectable: true}},

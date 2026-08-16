@@ -578,6 +578,7 @@ func TestSyncPricingModels_QoderUsesDefaultAliases(t *testing.T) {
 		// 定价同步接口需要包含 Qoder 新增的 Kimi-K3 alias。
 		"kimi-k3",
 		"kimi-k2.7-code",
+		"glm-5.3",
 		"glm-5.2",
 		"deepseek-v4-pro",
 		"deepseek-v4-flash",

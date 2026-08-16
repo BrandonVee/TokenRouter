@@ -600,6 +600,13 @@ function buildQoderOpenCodeModels() {
         output: 128000
       }
     },
+    'glm-5.3': {
+      name: 'GLM-5.3',
+      limit: {
+        context: 400000,
+        output: 128000
+      }
+    },
     'glm-5.2': {
       name: 'GLM-5.2',
       limit: {
