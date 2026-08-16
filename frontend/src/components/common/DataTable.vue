@@ -980,7 +980,7 @@ defineExpose({
 }
 
 .dark .table-wrapper .table-header {
-  background-color: rgb(31 31 35);
+  background-color: rgb(37 42 47);
 }
 
 /* 表体保持在表头下方 */
@@ -998,7 +998,7 @@ defineExpose({
 }
 
 .dark .sticky-header-cell {
-  background-color: rgb(31 31 35);
+  background-color: rgb(37 42 47);
 }
 
 /* Sticky 列基础样式 */
@@ -1038,7 +1038,7 @@ tbody .sticky-col {
 }
 
 .dark tbody .sticky-col {
-  background-color: rgb(18 18 21);
+  background-color: rgb(37 42 47);
 }
 
 /* hover 状态保持 */
@@ -1047,7 +1047,7 @@ tbody tr:hover .sticky-col {
 }
 
 .dark tbody tr:hover .sticky-col {
-  background-color: rgb(31 31 35);
+  background-color: rgb(42 46 53);
 }
 
 /* 所有固定列统一使用细线边界，避免滚动时出现渐变阴影带。 */
