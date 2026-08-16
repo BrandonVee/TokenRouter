@@ -7,7 +7,7 @@
 
       <template v-else-if="stats">
         <!-- 第一组：业务核心指标 -->
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div class="dashboard-metrics grid grid-cols-2 gap-4 lg:grid-cols-4">
           <!-- Total API Keys -->
           <div class="dashboard-metric dashboard-metric-primary">
             <div class="flex items-center gap-3">
@@ -95,7 +95,7 @@
         </div>
 
         <!-- 第二组：用量与性能指标 -->
-        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div class="dashboard-metrics grid grid-cols-2 gap-4 lg:grid-cols-4">
           <!-- Today Tokens -->
           <div class="dashboard-metric dashboard-metric-warning">
             <div class="flex items-center gap-3">

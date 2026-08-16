@@ -526,7 +526,8 @@
     background: var(--metric-accent);
   }
 
-  .admin-dashboard .dashboard-metric::before {
+  /* 顶部指标区共用管理端的简洁卡片样式，不显示单独的强调色条。 */
+  .dashboard-metrics .dashboard-metric::before {
     content: none;
   }
 

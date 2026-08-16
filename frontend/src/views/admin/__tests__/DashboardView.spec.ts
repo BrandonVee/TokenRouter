@@ -146,6 +146,7 @@ describe('admin DashboardView', () => {
       end_date: formatLocalDate(now),
       granularity: 'hour'
     }))
+    expect(wrapper.findAll('.dashboard-metrics')).toHaveLength(2)
     expect(wrapper.find('.card date-range-picker-stub').exists()).toBe(true)
   })
 })

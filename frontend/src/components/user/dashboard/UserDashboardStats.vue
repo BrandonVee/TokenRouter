@@ -1,6 +1,6 @@
 <template>
   <!-- 第一组：核心指标 -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="dashboard-metrics grid grid-cols-2 gap-4 lg:grid-cols-4">
     <!-- 余额是用户最关心的指标，使用成功色建立首要视觉锚点。 -->
     <div v-if="!isSimple" class="dashboard-metric dashboard-metric-success">
       <div class="flex items-center gap-3">
@@ -64,7 +64,7 @@
   </div>
 
   <!-- 第二组：用量与性能指标 -->
-  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="dashboard-metrics grid grid-cols-2 gap-4 lg:grid-cols-4">
     <!-- Today Tokens -->
     <div class="dashboard-metric dashboard-metric-warning">
       <div class="flex items-center gap-3">

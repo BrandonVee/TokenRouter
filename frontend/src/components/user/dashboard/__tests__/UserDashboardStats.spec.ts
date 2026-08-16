@@ -43,6 +43,24 @@ const stats: UserDashboardStatsType = {
 }
 
 describe('UserDashboardStats', () => {
+  it('uses the shared dashboard metrics container', () => {
+    const wrapper = mount(UserDashboardStats, {
+      props: {
+        stats,
+        balance: 8215.03,
+        isSimple: false,
+      },
+      global: {
+        stubs: {
+          BalanceIcon: true,
+          Icon: true,
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.dashboard-metrics')).toHaveLength(2)
+  })
+
   it('only shows the final billed amount in the user cost card', () => {
     const wrapper = mount(UserDashboardStats, {
       props: {
