@@ -261,6 +261,25 @@
     @apply bg-primary-500/20 text-primary-900 dark:bg-primary-500/30 dark:text-white;
   }
 
+  /* Chrome 自动填充默认使用浅色表面；深色主题下改为与输入框一致的色阶。 */
+  .dark :is(input, textarea, select):-webkit-autofill,
+  .dark :is(input, textarea, select):-webkit-autofill:hover,
+  .dark :is(input, textarea, select):-webkit-autofill:focus {
+    color-scheme: dark;
+    -webkit-text-fill-color: #F2F3F5 !important;
+    caret-color: #F2F3F5;
+    -webkit-box-shadow:
+      0 0 0 1000px #252A2F inset,
+      var(--tw-ring-offset-shadow, 0 0 #0000),
+      var(--tw-ring-shadow, 0 0 #0000),
+      var(--tw-shadow, 0 0 #0000) !important;
+    box-shadow:
+      0 0 0 1000px #252A2F inset,
+      var(--tw-ring-offset-shadow, 0 0 #0000),
+      var(--tw-ring-shadow, 0 0 #0000),
+      var(--tw-shadow, 0 0 #0000) !important;
+  }
+
 
 }
 
