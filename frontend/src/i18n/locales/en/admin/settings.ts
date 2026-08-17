@@ -652,6 +652,10 @@ dataSharing: {
         tableDefaultPageSizeRangeError: 'Default rows per page must be between {min} and {max}',
         tablePageSizeOptionsFormatError: 'Invalid options format. Enter comma-separated integers between {min} and {max}',
         usageRankingLimitRangeError: 'Usage ranking count must be between {min} and {max}',
+        usageRankingEnabled: 'Show usage ranking page',
+        usageRankingEnabledHint: 'Hide the user menu entry and page when disabled.',
+        usageRankingDataVisible: 'Show ranking data',
+        usageRankingDataVisibleHint: 'Keep the page available but return no ranking details when disabled.',
         customEndpoints: {
           title: 'Custom Endpoints',
           description: 'Add additional API endpoint URLs for users to quickly copy on the API Keys page',

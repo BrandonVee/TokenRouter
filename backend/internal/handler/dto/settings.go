@@ -165,6 +165,8 @@ type SystemSettings struct {
 	TableDefaultPageSize        int               `json:"table_default_page_size"`
 	TablePageSizeOptions        []int             `json:"table_page_size_options"`
 	UsageRankingLimit           int               `json:"usage_ranking_limit"`
+	UsageRankingEnabled         bool              `json:"usage_ranking_enabled"`
+	UsageRankingDataVisible     bool              `json:"usage_ranking_data_visible"`
 	CustomMenuItems             []CustomMenuItem  `json:"custom_menu_items"`
 	CustomEndpoints             []CustomEndpoint  `json:"custom_endpoints"`
 	FooterLinks                 []FooterLinkGroup `json:"footer_links"`
@@ -374,6 +376,8 @@ type PublicSettings struct {
 	TableDefaultPageSize                int                      `json:"table_default_page_size"`
 	TablePageSizeOptions                []int                    `json:"table_page_size_options"`
 	UsageRankingLimit                   int                      `json:"usage_ranking_limit"`
+	UsageRankingEnabled                 bool                     `json:"usage_ranking_enabled"`
+	UsageRankingDataVisible             bool                     `json:"usage_ranking_data_visible"`
 	CustomMenuItems                     []CustomMenuItem         `json:"custom_menu_items"`
 	CustomEndpoints                     []CustomEndpoint         `json:"custom_endpoints"`
 	FooterLinks                         []FooterLinkGroup        `json:"footer_links"`

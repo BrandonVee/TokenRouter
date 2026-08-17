@@ -265,6 +265,8 @@ export interface PublicSettings {
   table_default_page_size: number
   table_page_size_options: number[]
   usage_ranking_limit: number
+  usage_ranking_enabled?: boolean
+  usage_ranking_data_visible?: boolean
   custom_menu_items: CustomMenuItem[]
   custom_endpoints: CustomEndpoint[]
   footer_links?: FooterLinkGroup[]

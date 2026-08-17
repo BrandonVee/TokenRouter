@@ -78,6 +78,7 @@ declare module 'vue-router' {
      * @default false
      */
     requiresDataSharing?: boolean
+    requiresUsageRanking?: boolean
 
     /**
      * 是否要求邀请返利功能开关已启用

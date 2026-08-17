@@ -382,6 +382,8 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 	updates[SettingKeyTablePageSizeOptions] = string(tablePageSizeOptionsJSON)
 	updates[SettingKeyUsageRankingLimit] = strconv.Itoa(normalizeUsageRankingLimit(settings.UsageRankingLimit))
+	updates[SettingKeyUsageRankingEnabled] = strconv.FormatBool(settings.UsageRankingEnabled)
+	updates[SettingKeyUsageRankingDataVisible] = strconv.FormatBool(settings.UsageRankingDataVisible)
 	updates[SettingKeyCustomMenuItems] = settings.CustomMenuItems
 	updates[SettingKeyCustomEndpoints] = settings.CustomEndpoints
 	updates[SettingKeyFooterLinks] = settings.FooterLinks

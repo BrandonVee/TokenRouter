@@ -86,6 +86,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyTableDefaultPageSize:                      "20",
 		SettingKeyTablePageSizeOptions:                      "[10,20,50,100]",
 		SettingKeyUsageRankingLimit:                         strconv.Itoa(DefaultUsageRankingLimit),
+		SettingKeyUsageRankingEnabled:                       "true",
+		SettingKeyUsageRankingDataVisible:                   "true",
 		SettingKeyCustomMenuItems:                           "[]",
 		SettingKeyCustomEndpoints:                           "[]",
 		SettingKeyFooterLinks:                               "[]",
@@ -385,6 +387,8 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		settings[SettingKeyTablePageSizeOptions],
 	)
 	result.UsageRankingLimit = normalizeUsageRankingLimitString(settings[SettingKeyUsageRankingLimit])
+	result.UsageRankingEnabled = settings[SettingKeyUsageRankingEnabled] != "false"
+	result.UsageRankingDataVisible = settings[SettingKeyUsageRankingDataVisible] != "false"
 
 	// 解析整数类型
 	if port, err := strconv.Atoi(settings[SettingKeySMTPPort]); err == nil {

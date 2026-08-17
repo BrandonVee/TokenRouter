@@ -174,6 +174,8 @@ type UpdateSettingsRequest struct {
 	TableDefaultPageSize        int                    `json:"table_default_page_size"`
 	TablePageSizeOptions        []int                  `json:"table_page_size_options"`
 	UsageRankingLimit           int                    `json:"usage_ranking_limit"`
+	UsageRankingEnabled         bool                   `json:"usage_ranking_enabled"`
+	UsageRankingDataVisible     bool                   `json:"usage_ranking_data_visible"`
 	CustomMenuItems             *[]dto.CustomMenuItem  `json:"custom_menu_items"`
 	CustomEndpoints             *[]dto.CustomEndpoint  `json:"custom_endpoints"`
 	FooterLinks                 *[]dto.FooterLinkGroup `json:"footer_links"`
@@ -1731,6 +1733,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   req.TableDefaultPageSize,
 		TablePageSizeOptions:                   req.TablePageSizeOptions,
 		UsageRankingLimit:                      req.UsageRankingLimit,
+		UsageRankingEnabled:                    req.UsageRankingEnabled,
+		UsageRankingDataVisible:                req.UsageRankingDataVisible,
 		CustomMenuItems:                        customMenuJSON,
 		CustomEndpoints:                        customEndpointsJSON,
 		FooterLinks:                            footerLinksJSON,
@@ -2282,6 +2286,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                             updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                             updatedSettings.TablePageSizeOptions,
 		UsageRankingLimit:                                updatedSettings.UsageRankingLimit,
+		UsageRankingEnabled:                              updatedSettings.UsageRankingEnabled,
+		UsageRankingDataVisible:                          updatedSettings.UsageRankingDataVisible,
 		CustomMenuItems:                                  dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
 		CustomEndpoints:                                  dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		FooterLinks:                                      dto.ParseFooterLinks(updatedSettings.FooterLinks),

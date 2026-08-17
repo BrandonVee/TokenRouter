@@ -199,6 +199,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyTableDefaultPageSize,
 		SettingKeyTablePageSizeOptions,
 		SettingKeyUsageRankingLimit,
+		SettingKeyUsageRankingEnabled,
+		SettingKeyUsageRankingDataVisible,
 		SettingKeyCustomMenuItems,
 		SettingKeyCustomEndpoints,
 		SettingKeyFooterLinks,
@@ -368,6 +370,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		TableDefaultPageSize:                tableDefaultPageSize,
 		TablePageSizeOptions:                tablePageSizeOptions,
 		UsageRankingLimit:                   usageRankingLimit,
+		UsageRankingEnabled:                 settings[SettingKeyUsageRankingEnabled] != "false",
+		UsageRankingDataVisible:             settings[SettingKeyUsageRankingDataVisible] != "false",
 		CustomMenuItems:                     settings[SettingKeyCustomMenuItems],
 		CustomEndpoints:                     settings[SettingKeyCustomEndpoints],
 		FooterLinks:                         settings[SettingKeyFooterLinks],
@@ -462,6 +466,8 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		TableDefaultPageSize                int                      `json:"table_default_page_size"`
 		TablePageSizeOptions                []int                    `json:"table_page_size_options"`
 		UsageRankingLimit                   int                      `json:"usage_ranking_limit"`
+		UsageRankingEnabled                 bool                     `json:"usage_ranking_enabled"`
+		UsageRankingDataVisible             bool                     `json:"usage_ranking_data_visible"`
 		CustomMenuItems                     json.RawMessage          `json:"custom_menu_items"`
 		CustomEndpoints                     json.RawMessage          `json:"custom_endpoints"`
 		FooterLinks                         json.RawMessage          `json:"footer_links"`

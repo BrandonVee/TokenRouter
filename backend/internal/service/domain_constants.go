@@ -332,6 +332,8 @@ const (
 	SettingKeyTableDefaultPageSize        = "table_default_page_size"       // 表格默认每页条数
 	SettingKeyTablePageSizeOptions        = "table_page_size_options"       // 表格可选每页条数（JSON 数组）
 	SettingKeyUsageRankingLimit           = "usage_ranking_limit"           // 用户侧用量排行显示名次上限
+	SettingKeyUsageRankingEnabled         = "usage_ranking_enabled"         // 用户侧用量排行页面开关
+	SettingKeyUsageRankingDataVisible     = "usage_ranking_data_visible"    // 用户侧用量排行数据开关
 	SettingKeyCustomMenuItems             = "custom_menu_items"             // 自定义菜单项（JSON 数组）
 	SettingKeyCustomEndpoints             = "custom_endpoints"              // 自定义端点列表（JSON 数组）
 	SettingKeyFooterLinks                 = "footer_links"                  // 首页底栏链接分组（JSON 数组）

@@ -643,6 +643,10 @@ dataSharing: {
         tableDefaultPageSizeRangeError: '默认每页条数必须在 {min}-{max} 之间',
         tablePageSizeOptionsFormatError: '可选每页条数格式无效，请输入 {min}-{max} 之间的整数并用英文逗号分隔',
         usageRankingLimitRangeError: '用量排行显示数量必须在 {min}-{max} 之间',
+        usageRankingEnabled: '显示排行榜页面',
+        usageRankingEnabledHint: '关闭后用户侧菜单和排行榜页面不可见。',
+        usageRankingDataVisible: '显示排行榜数据',
+        usageRankingDataVisibleHint: '关闭后保留页面入口，但不返回用户排行明细。',
         customEndpoints: {
           title: '自定义端点',
           description: '添加额外的 API 端点地址，用户可在「API Keys」页面快速复制',

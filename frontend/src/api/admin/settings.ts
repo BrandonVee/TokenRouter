@@ -527,6 +527,8 @@ export interface SystemSettings {
   table_default_page_size: number;
   table_page_size_options: number[];
   usage_ranking_limit: number;
+  usage_ranking_enabled: boolean;
+  usage_ranking_data_visible: boolean;
   backend_mode_enabled: boolean;
   custom_menu_items: CustomMenuItem[];
   custom_endpoints: CustomEndpoint[];
@@ -852,6 +854,8 @@ export interface UpdateSettingsRequest {
   table_default_page_size?: number;
   table_page_size_options?: number[];
   usage_ranking_limit?: number;
+  usage_ranking_enabled?: boolean;
+  usage_ranking_data_visible?: boolean;
   backend_mode_enabled?: boolean;
   custom_menu_items?: CustomMenuItem[];
   custom_endpoints?: CustomEndpoint[];

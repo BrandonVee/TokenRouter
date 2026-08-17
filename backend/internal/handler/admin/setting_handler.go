@@ -270,6 +270,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		TableDefaultPageSize:                             settings.TableDefaultPageSize,
 		TablePageSizeOptions:                             settings.TablePageSizeOptions,
 		UsageRankingLimit:                                settings.UsageRankingLimit,
+		UsageRankingEnabled:                              settings.UsageRankingEnabled,
+		UsageRankingDataVisible:                          settings.UsageRankingDataVisible,
 		CustomMenuItems:                                  dto.ParseCustomMenuItems(settings.CustomMenuItems),
 		CustomEndpoints:                                  dto.ParseCustomEndpoints(settings.CustomEndpoints),
 		FooterLinks:                                      dto.ParseFooterLinks(settings.FooterLinks),

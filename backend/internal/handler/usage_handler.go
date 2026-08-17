@@ -402,6 +402,10 @@ func (h *UsageHandler) Ranking(c *gin.Context) {
 		response.Unauthorized(c, "User not authenticated")
 		return
 	}
+	if h.settingService != nil && !h.settingService.IsUsageRankingEnabled(c.Request.Context()) {
+		response.NotFound(c, "Usage ranking is disabled")
+		return
+	}
 
 	userTZ := c.Query("timezone")
 	now := timezone.NowInUserLocation(userTZ)
@@ -415,6 +419,10 @@ func (h *UsageHandler) Ranking(c *gin.Context) {
 		limit = h.settingService.GetUsageRankingLimit(c.Request.Context())
 	}
 
+	if h.settingService != nil && !h.settingService.IsUsageRankingDataVisible(c.Request.Context()) {
+		response.Success(c, gin.H{"ranking": []any{}, "total_requests": 0, "total_tokens": 0, "total_actual_cost": 0, "start_date": startTime.Format("2006-01-02"), "end_date": usageRankingDisplayEndDate(endTime), "limit": limit})
+		return
+	}
 	ranking, err := h.usageService.GetUsageRanking(c.Request.Context(), startTime, endTime, limit)
 	if err != nil {
 		response.ErrorFrom(c, err)

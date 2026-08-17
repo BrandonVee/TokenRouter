@@ -459,6 +459,18 @@ func (s *SettingService) GetUsageRankingLimit(ctx context.Context) int {
 	return normalizeUsageRankingLimitString(value)
 }
 
+// IsUsageRankingEnabled 控制用户侧排行榜页面入口与访问。
+func (s *SettingService) IsUsageRankingEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageRankingEnabled)
+	return err != nil || value != "false"
+}
+
+// IsUsageRankingDataVisible 控制用户侧排行榜是否返回明细数据。
+func (s *SettingService) IsUsageRankingDataVisible(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageRankingDataVisible)
+	return err != nil || value != "false"
+}
+
 // IsOpenAIAllowClaudeCodeCodexPluginEnabled 全局开关：是否额外放行 Claude Code 的 Codex 插件（默认关闭）。
 // 仅在调用方已确认账号 codex_cli_only 开启时读取，避免对非受限账号产生无谓查询。
 // 使用进程内 atomic.Value 缓存（60s TTL），避免在每个网关请求热路径上访问 DB。

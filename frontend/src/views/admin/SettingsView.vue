@@ -184,6 +184,20 @@
                       {{ adminApiKeyMasked }}
                     </code>
                   </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingEnabled") }}</label>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingEnabledHint") }}</p>
+                    </div>
+                    <Toggle v-model="form.usage_ranking_enabled" />
+                  </div>
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingDataVisible") }}</label>
+                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingDataVisibleHint") }}</p>
+                    </div>
+                    <Toggle v-model="form.usage_ranking_data_visible" />
+                  </div>
                   <div class="flex gap-2">
                     <button
                       type="button"
@@ -9201,6 +9215,8 @@ const form = reactive<SettingsForm>({
   table_default_page_size: tablePageSizeDefault,
   table_page_size_options: [10, 20, 50, 100],
   usage_ranking_limit: usageRankingLimitDefault,
+  usage_ranking_enabled: true,
+  usage_ranking_data_visible: true,
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
@@ -11021,6 +11037,8 @@ async function saveSettings() {
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
       usage_ranking_limit: form.usage_ranking_limit,
+      usage_ranking_enabled: form.usage_ranking_enabled,
+      usage_ranking_data_visible: form.usage_ranking_data_visible,
       custom_menu_items: form.custom_menu_items,
       custom_endpoints: form.custom_endpoints,
       footer_links: normalizeFooterLinksForSave(),

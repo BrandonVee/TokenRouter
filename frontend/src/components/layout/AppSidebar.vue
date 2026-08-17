@@ -629,13 +629,14 @@ const ChevronDownIcon = {
 const flagBatchImageAccess = () => canUseBatchImage.value
 const flagTeamAccess = () => appStore.cachedPublicSettings?.team_enabled !== false
 const flagDataSharingAccess = () => appStore.cachedPublicSettings?.data_sharing_enabled !== false
+const flagUsageRankingAccess = () => appStore.cachedPublicSettings?.usage_ranking_enabled !== false
 
 // 普通用户导航项。
 const userNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/models', label: t('nav.modelMarketplace'), icon: ModelMarketplaceIcon },
-    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true },
+    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true, featureFlag: flagUsageRankingAccess },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/team', label: t('nav.team'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
@@ -690,7 +691,7 @@ const personalNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/models', label: t('nav.modelMarketplace'), icon: ModelMarketplaceIcon },
-    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true },
+    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true, featureFlag: flagUsageRankingAccess },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/team', label: t('nav.team'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },

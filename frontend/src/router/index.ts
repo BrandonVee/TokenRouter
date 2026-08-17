@@ -292,7 +292,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Usage Ranking',
       titleKey: 'usageRanking.title',
-      descriptionKey: 'usageRanking.description'
+      descriptionKey: 'usageRanking.description',
+      requiresUsageRanking: true
     }
   },
   {
@@ -935,6 +936,11 @@ router.beforeEach(async (to, _from, next) => {
     appStore.publicSettingsLoaded &&
     appStore.cachedPublicSettings?.data_sharing_enabled === false
   ) {
+    next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
+    return
+  }
+
+  if (to.meta.requiresUsageRanking && appStore.publicSettingsLoaded && appStore.cachedPublicSettings?.usage_ranking_enabled === false) {
     next(authStore.isAdmin ? '/admin/settings' : '/dashboard')
     return
   }

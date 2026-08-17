@@ -169,6 +169,8 @@ type SystemSettings struct {
 	TableDefaultPageSize        int
 	TablePageSizeOptions        []int
 	UsageRankingLimit           int
+	UsageRankingEnabled         bool
+	UsageRankingDataVisible     bool
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 	FooterLinks                 string // JSON array of footer link groups
@@ -354,6 +356,8 @@ type PublicSettings struct {
 	TableDefaultPageSize        int
 	TablePageSizeOptions        []int
 	UsageRankingLimit           int
+	UsageRankingEnabled         bool
+	UsageRankingDataVisible     bool
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 	FooterLinks                 string // JSON array of footer link groups
