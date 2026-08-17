@@ -220,7 +220,7 @@ const AppLayoutStub = {
 
 const BaseDialogStub = {
   name: 'BaseDialog',
-  props: ['show', 'title', 'width'],
+  props: ['show', 'title', 'width', 'bodyClass'],
   template: '<div v-if="show"><slot /><slot name="footer" /></div>',
 }
 
@@ -645,6 +645,7 @@ describe('user KeysView column settings', () => {
     const form = wrapper.get('form#key-form')
 
     expect(dialog.props('width')).toBe('normal')
+    expect(dialog.props('bodyClass')).toBe('modal-body-scrollbar-hidden')
     expect(form.classes()).toEqual(expect.arrayContaining(['min-w-0', 'max-w-full']))
   })
 

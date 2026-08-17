@@ -673,6 +673,16 @@
     @apply flex-1 overflow-y-auto;
   }
 
+  /* 密钥表单仍可滚动，但隐藏滚动条避免长卡片出现额外视觉噪声。 */
+  .modal-body-scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .modal-body-scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
   .modal-footer {
     @apply border-t border-primary-900/10 px-4 py-3 dark:border-dark-600;
     @apply sm:px-6 sm:py-4;

@@ -475,6 +475,7 @@
       :show="showCreateModal || showEditModal"
       :title="showEditModal ? t('keys.editKey') : t('keys.createKey')"
       width="normal"
+      body-class="modal-body-scrollbar-hidden"
       @close="closeModals"
     >
       <form id="key-form" @submit.prevent="handleSubmit" class="min-w-0 max-w-full space-y-5">

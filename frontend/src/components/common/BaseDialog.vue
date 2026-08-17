@@ -31,7 +31,7 @@
           </div>
 
           <!-- 内容区 -->
-          <div class="modal-body min-h-0 min-w-0 max-w-full">
+          <div :class="['modal-body min-h-0 min-w-0 max-w-full', props.bodyClass]">
             <slot></slot>
           </div>
 
@@ -72,6 +72,8 @@ interface Props {
   closeOnEscape?: boolean
   closeOnClickOutside?: boolean
   zIndex?: number
+  /** 内容区附加样式，用于个别弹窗调整滚动条等展示细节。 */
+  bodyClass?: string
 }
 
 interface Emits {
@@ -82,7 +84,8 @@ const props = withDefaults(defineProps<Props>(), {
   width: 'normal',
   closeOnEscape: true,
   closeOnClickOutside: false,
-  zIndex: 50
+  zIndex: 50,
+  bodyClass: ''
 })
 
 const emit = defineEmits<Emits>()
