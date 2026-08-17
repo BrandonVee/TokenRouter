@@ -431,16 +431,17 @@
 
   /* ============ 卡片样式 ============ */
   .card {
-    @apply bg-white dark:bg-dark-900/95;
-    @apply rounded-2xl;
-    @apply border border-primary-900/10 dark:border-dark-600/80;
+    /* 暗色卡片采用 Atom One Dark 的提升面与描边，和底层工作区形成克制的明度差。 */
+    @apply bg-white dark:bg-[#282c34];
+    @apply rounded-xl;
+    @apply border border-primary-900/10 dark:border-[#3e4451];
     @apply shadow-none;
-    @apply transition-all duration-300;
+    @apply transition-all duration-200;
   }
 
   .card-hover {
     @apply hover:-translate-y-0.5 hover:shadow-none;
-    @apply hover:border-black/20 dark:hover:border-dark-500;
+    @apply hover:border-black/20 dark:hover:border-[#4b5263];
   }
 
   .card-glass {
@@ -451,7 +452,7 @@
   }
 
   .card-header {
-    @apply border-b border-primary-900/10 dark:border-dark-600/80;
+    @apply border-b border-primary-900/10 dark:border-[#3e4451];
     @apply px-6 py-4;
   }
 
@@ -460,7 +461,7 @@
   }
 
   .card-footer {
-    @apply border-t border-primary-900/10 dark:border-dark-600/80;
+    @apply border-t border-primary-900/10 dark:border-[#3e4451];
     @apply px-6 py-4;
   }
 
@@ -1057,26 +1058,18 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.3) !important;
   }
 
-  /* 全局背景：浅色工作区使用冷灰底色，让内容表面形成稳定层级。 */
+  /* 全局布局使用统一画布色，暗色下作为 Atom One Dark 卡片的底层工作区。 */
   .ba-theme-shell {
-    background: #F6F7F9;
-  }
-
-  .dark .ba-theme-shell {
-    background: linear-gradient(180deg, #16181D 0%, #0E1013 100%);
+    @apply bg-white dark:bg-[#1b1d1ff2];
   }
 
   .ba-theme-backdrop {
+    @apply bg-white dark:bg-[#1b1d1ff2];
     overflow: hidden;
-    background: #F6F7F9;
   }
 
   .ba-theme-backdrop::before {
     content: none;
-  }
-
-  .dark .ba-theme-backdrop {
-    background: linear-gradient(180deg, #16181D 0%, #0E1013 100%);
   }
 
   .dark .ba-theme-backdrop::before {

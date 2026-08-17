@@ -422,6 +422,15 @@ func (s *ModelMarketplaceService) getRequestableModelDisplayPricing(ctx context.
 	if pricingModel == "" {
 		pricingModel = model.ID
 	}
+	// 分组开启生图后，GPT 图片模型沿用网关的分组按次价格，不能被渠道 token 价覆盖展示。
+	if group != nil && group.Platform == PlatformOpenAI && group.AllowImageGeneration && IsGPTImageGenerationModel(model.ID) {
+		imageRateMultiplier := marketplaceImageRateMultiplier(group)
+		return buildImageDisplayPricing(
+			s.billingService.getImageUnitPrice(pricingModel, ImageBillingSize1K, imageConfig)*imageRateMultiplier,
+			s.billingService.getImageUnitPrice(pricingModel, ImageBillingSize2K, imageConfig)*imageRateMultiplier,
+			s.billingService.getImageUnitPrice(pricingModel, ImageBillingSize4K, imageConfig)*imageRateMultiplier,
+		)
+	}
 	if group == nil || group.Platform != PlatformQoder {
 		return s.getPublicModelDisplayPricing(ctx, group, pricingModel, imageConfig)
 	}

@@ -221,6 +221,59 @@ func TestModelMarketplaceChannelImageInputPricingIsDisplayed(t *testing.T) {
 	}
 }
 
+func TestModelMarketplaceGPTImageEnabledGroupUsesPerRequestPricing(t *testing.T) {
+	groupID := int64(905)
+	inputPrice := 0.01
+	outputPrice := 0.02
+	imagePrice1K := 0.2
+	imagePrice2K := 0.3
+	imagePrice4K := 0.4
+	cache := newEmptyChannelCache()
+	cache.pricingByGroupModel[channelModelKey{groupID: groupID, platform: PlatformOpenAI, model: "gpt-image-2"}] = &ChannelModelPricing{
+		BillingMode: BillingModeToken,
+		InputPrice:  &inputPrice,
+		OutputPrice: &outputPrice,
+	}
+	cache.channelByGroupID[groupID] = &Channel{ID: groupID, Status: StatusActive}
+	cache.groupPlatform[groupID] = PlatformOpenAI
+	cache.loadedAt = time.Now()
+	channelService := &ChannelService{}
+	channelService.cache.Store(cache)
+
+	billingService := NewBillingService(nil, nil)
+	svc := NewModelMarketplaceService(nil, nil, &GatewayService{
+		resolver: NewModelPricingResolver(channelService, billingService),
+	}, billingService, nil, nil, nil)
+	group := &Group{
+		ID:                   groupID,
+		Platform:             PlatformOpenAI,
+		RateMultiplier:       1.5,
+		AllowImageGeneration: true,
+		ImageRateIndependent: true,
+		ImageRateMultiplier:  0.5,
+		ImagePrice1K:         &imagePrice1K,
+		ImagePrice2K:         &imagePrice2K,
+		ImagePrice4K:         &imagePrice4K,
+	}
+
+	pricing := svc.getRequestableModelDisplayPricing(context.Background(), group, marketplaceModelDef{
+		ID:           "gpt-image-2",
+		PricingModel: "gpt-image-2",
+	}, &ImagePriceConfig{
+		Price1K: group.ImagePrice1K,
+		Price2K: group.ImagePrice2K,
+		Price4K: group.ImagePrice4K,
+	})
+
+	if pricing.PricingMode != "image" || pricing.PriceStatus != "priced" {
+		t.Fatalf("GPT image pricing = (%q, %q), want image/priced", pricing.PricingMode, pricing.PriceStatus)
+	}
+	if pricing.ImagePrice1K != 0.1 || pricing.ImagePrice2K != 0.15 || pricing.ImagePrice4K != 0.2 {
+		t.Fatalf("GPT image tier prices = (%g, %g, %g), want (0.1, 0.15, 0.2)",
+			pricing.ImagePrice1K, pricing.ImagePrice2K, pricing.ImagePrice4K)
+	}
+}
+
 func TestModelDisplayPricingImageInputFastRates(t *testing.T) {
 	// 此测试不带 unit 构建标签，因此使用局部值，避免依赖标签专用测试 helper。
 	fastModeMultiplier := 3.0
