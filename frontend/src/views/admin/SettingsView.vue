@@ -184,20 +184,6 @@
                       {{ adminApiKeyMasked }}
                     </code>
                   </div>
-                  <div class="flex items-center justify-between gap-4">
-                    <div>
-                      <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingEnabled") }}</label>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingEnabledHint") }}</p>
-                    </div>
-                    <Toggle v-model="form.usage_ranking_enabled" />
-                  </div>
-                  <div class="flex items-center justify-between gap-4">
-                    <div>
-                      <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingDataVisible") }}</label>
-                      <p class="text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingDataVisibleHint") }}</p>
-                    </div>
-                    <Toggle v-model="form.usage_ranking_data_visible" />
-                  </div>
                   <div class="flex gap-2">
                     <button
                       type="button"
@@ -6349,6 +6335,22 @@
                     <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                       {{ t("admin.settings.site.usageRankingLimitHint") }}
                     </p>
+                  </div>
+                  <div class="space-y-3 md:col-span-3">
+                    <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingEnabled") }}</label>
+                        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingEnabledHint") }}</p>
+                      </div>
+                      <Toggle v-model="form.usage_ranking_enabled" />
+                    </div>
+                    <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingDataVisible") }}</label>
+                        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingDataVisibleHint") }}</p>
+                      </div>
+                      <Toggle v-model="form.usage_ranking_data_visible" />
+                    </div>
                   </div>
                 </div>
               </div>
