@@ -115,7 +115,7 @@ func reserveBatchImageBalanceHold(ctx context.Context, repo UsageBillingReposito
 		if errors.Is(err, ErrPreferredSubscriptionInvalid) || errors.Is(err, ErrPreferredSubscriptionGroup) || errors.Is(err, ErrPreferredSubscriptionInsufficient) {
 			return err
 		}
-		if errors.Is(err, ErrAPIKeyQuotaExhausted) || errors.Is(err, ErrAPIKeyRateLimit5hExceeded) || errors.Is(err, ErrAPIKeyRateLimit1dExceeded) || errors.Is(err, ErrAPIKeyRateLimit7dExceeded) ||
+		if errors.Is(err, ErrAPIKeyQuotaExhausted) || errors.Is(err, ErrAPIKeyRateLimit5hExceeded) || errors.Is(err, ErrAPIKeyRateLimit1dExceeded) || errors.Is(err, ErrAPIKeyRateLimit7dExceeded) || errors.Is(err, ErrAPIKeyRateLimit30dExceeded) ||
 			errors.Is(err, ErrTeamMemberDailyExceeded) || errors.Is(err, ErrTeamMemberWeeklyExceeded) || errors.Is(err, ErrTeamMemberMonthlyExceeded) {
 			return err
 		}

@@ -77,6 +77,47 @@ func TestValidateUpdateAPIKeyRequestNumericLimits(t *testing.T) {
 	}
 }
 
+func TestNormalizeAPIKeySpendingLimits(t *testing.T) {
+	t.Parallel()
+
+	total, daily, weekly, monthly := 100.0, 10.0, 40.0, 150.0
+	create := CreateAPIKeyRequest{
+		Quota:        1,
+		RateLimit1d:  2,
+		RateLimit7d:  3,
+		RateLimit30d: 4,
+		TotalLimit:   &total,
+		DailyLimit:   &daily,
+		WeeklyLimit:  &weekly,
+		MonthlyLimit: &monthly,
+	}
+	normalizeCreateAPIKeyLimits(&create)
+	require.Equal(t, total, create.Quota)
+	require.Equal(t, daily, create.RateLimit1d)
+	require.Equal(t, weekly, create.RateLimit7d)
+	require.Equal(t, monthly, create.RateLimit30d)
+
+	update := UpdateAPIKeyRequest{
+		Quota:        apiKeyLimitPtr(1),
+		RateLimit1d:  apiKeyLimitPtr(2),
+		RateLimit7d:  apiKeyLimitPtr(3),
+		RateLimit30d: apiKeyLimitPtr(4),
+		TotalLimit:   &total,
+		DailyLimit:   &daily,
+		WeeklyLimit:  &weekly,
+		MonthlyLimit: &monthly,
+	}
+	normalizeUpdateAPIKeyLimits(&update)
+	require.Same(t, update.TotalLimit, update.Quota)
+	require.Same(t, update.DailyLimit, update.RateLimit1d)
+	require.Same(t, update.WeeklyLimit, update.RateLimit7d)
+	require.Same(t, update.MonthlyLimit, update.RateLimit30d)
+}
+
+func apiKeyLimitPtr(value float64) *float64 {
+	return &value
+}
+
 func TestAPIKeyServiceRejectsInvalidLimitsBeforeRepositoryAccess(t *testing.T) {
 	t.Parallel()
 

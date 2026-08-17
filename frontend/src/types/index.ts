@@ -842,6 +842,7 @@ export interface ApiKey {
   last_used_ip: string | null // 最近一条带 IP 的用量日志。
   quota: number // Quota limit in USD (0 = unlimited)
   quota_used: number // Used quota amount in USD
+  total_limit?: number // 总 USD 消费限额；保留 quota 兼容旧客户端。
   expires_at: string | null // Expiration time (null = never expires)
   created_at: string
   updated_at: string
@@ -850,15 +851,22 @@ export interface ApiKey {
   rate_limit_5h: number
   rate_limit_1d: number
   rate_limit_7d: number
+  rate_limit_30d: number
+  daily_limit?: number // 日 USD 消费限额；保留 rate_limit_1d 兼容旧客户端。
+  weekly_limit?: number // 周 USD 消费限额；保留 rate_limit_7d 兼容旧客户端。
+  monthly_limit?: number // 月 USD 消费限额；保留 rate_limit_30d 兼容旧客户端。
   usage_5h: number
   usage_1d: number
   usage_7d: number
+  usage_30d: number
   window_5h_start: string | null
   window_1d_start: string | null
   window_7d_start: string | null
+  window_30d_start: string | null
   reset_5h_at: string | null
   reset_1d_at: string | null
   reset_7d_at: string | null
+  reset_30d_at: string | null
   data_sharing_notice_version?: number
   data_sharing_confirmed_group_id?: number | null
   data_sharing_confirmed_at?: string | null
@@ -879,10 +887,15 @@ export interface CreateApiKeyRequest {
   ip_whitelist?: string[]
   ip_blacklist?: string[]
   quota?: number // Quota limit in USD (0 = unlimited)
+  total_limit?: number // 总 USD 消费限额；优先于 quota。
   expires_in_days?: number // Days until expiry (null = never expires)
   rate_limit_5h?: number
   rate_limit_1d?: number
   rate_limit_7d?: number
+  rate_limit_30d?: number
+  daily_limit?: number // 日 USD 消费限额；优先于 rate_limit_1d。
+  weekly_limit?: number // 周 USD 消费限额；优先于 rate_limit_7d。
+  monthly_limit?: number // 月 USD 消费限额；优先于 rate_limit_30d。
   fallback_to_default_group_when_unavailable?: boolean
   data_sharing_confirmed?: boolean
   data_sharing_notice_version?: number
@@ -901,11 +914,16 @@ export interface UpdateApiKeyRequest {
   ip_whitelist?: string[]
   ip_blacklist?: string[]
   quota?: number // Quota limit in USD (null = no change, 0 = unlimited)
+  total_limit?: number // 总 USD 消费限额；优先于 quota。
   expires_at?: string | null // Expiration time (null = no change)
   reset_quota?: boolean // Reset quota_used to 0
   rate_limit_5h?: number
   rate_limit_1d?: number
   rate_limit_7d?: number
+  rate_limit_30d?: number
+  daily_limit?: number // 日 USD 消费限额；优先于 rate_limit_1d。
+  weekly_limit?: number // 周 USD 消费限额；优先于 rate_limit_7d。
+  monthly_limit?: number // 月 USD 消费限额；优先于 rate_limit_30d。
   reset_rate_limit_usage?: boolean
   fallback_to_default_group_when_unavailable?: boolean
   data_sharing_confirmed?: boolean

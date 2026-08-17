@@ -77,9 +77,15 @@ type APIKey struct {
 	LastUsedIP              *string                `json:"last_used_ip"` // 最近一条带 IP 的用量日志。
 	Quota                   float64                `json:"quota"`        // Quota limit in USD (0 = unlimited)
 	QuotaUsed               float64                `json:"quota_used"`   // Used quota amount in USD
-	ExpiresAt               *time.Time             `json:"expires_at"`   // Expiration time (nil = never expires)
-	CreatedAt               time.Time              `json:"created_at"`
-	UpdatedAt               time.Time              `json:"updated_at"`
+	// TotalLimit/DailyLimit/WeeklyLimit/MonthlyLimit 是面向新客户端的余额消费金额限额字段。
+	// 旧的 quota/rate_limit_* 字段继续返回，保证存量客户端兼容。
+	TotalLimit   float64    `json:"total_limit,omitempty"`
+	DailyLimit   float64    `json:"daily_limit,omitempty"`
+	WeeklyLimit  float64    `json:"weekly_limit,omitempty"`
+	MonthlyLimit float64    `json:"monthly_limit,omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at"` // Expiration time (nil = never expires)
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 	// 数据共享确认记录，用于前端判断切换分组时是否需要重新弹窗。
 	DataSharingNoticeVersion    int        `json:"data_sharing_notice_version"`
 	DataSharingConfirmedGroupID *int64     `json:"data_sharing_confirmed_group_id"`
@@ -90,18 +96,22 @@ type APIKey struct {
 	CurrentConcurrency int `json:"current_concurrency"`
 
 	// Rate limit fields
-	RateLimit5h   float64    `json:"rate_limit_5h"`
-	RateLimit1d   float64    `json:"rate_limit_1d"`
-	RateLimit7d   float64    `json:"rate_limit_7d"`
-	Usage5h       float64    `json:"usage_5h"`
-	Usage1d       float64    `json:"usage_1d"`
-	Usage7d       float64    `json:"usage_7d"`
-	Window5hStart *time.Time `json:"window_5h_start"`
-	Window1dStart *time.Time `json:"window_1d_start"`
-	Window7dStart *time.Time `json:"window_7d_start"`
-	Reset5hAt     *time.Time `json:"reset_5h_at,omitempty"`
-	Reset1dAt     *time.Time `json:"reset_1d_at,omitempty"`
-	Reset7dAt     *time.Time `json:"reset_7d_at,omitempty"`
+	RateLimit5h    float64    `json:"rate_limit_5h"`
+	RateLimit1d    float64    `json:"rate_limit_1d"`
+	RateLimit7d    float64    `json:"rate_limit_7d"`
+	RateLimit30d   float64    `json:"rate_limit_30d"`
+	Usage5h        float64    `json:"usage_5h"`
+	Usage1d        float64    `json:"usage_1d"`
+	Usage7d        float64    `json:"usage_7d"`
+	Usage30d       float64    `json:"usage_30d"`
+	Window5hStart  *time.Time `json:"window_5h_start"`
+	Window1dStart  *time.Time `json:"window_1d_start"`
+	Window7dStart  *time.Time `json:"window_7d_start"`
+	Window30dStart *time.Time `json:"window_30d_start"`
+	Reset5hAt      *time.Time `json:"reset_5h_at,omitempty"`
+	Reset1dAt      *time.Time `json:"reset_1d_at,omitempty"`
+	Reset7dAt      *time.Time `json:"reset_7d_at,omitempty"`
+	Reset30dAt     *time.Time `json:"reset_30d_at,omitempty"`
 
 	// API Key 响应不能携带用户对象，避免团队 Key 暴露付款 Owner 的资产信息。
 	Group *Group `json:"group,omitempty"`

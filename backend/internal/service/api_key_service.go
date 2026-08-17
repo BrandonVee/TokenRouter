@@ -60,11 +60,12 @@ var (
 	ErrAPIKeyQuotaExhausted = infraerrors.TooManyRequests("API_KEY_QUOTA_EXHAUSTED", "api key 额度已用完")
 
 	// Rate limit errors
-	ErrAPIKeyRateLimit5hExceeded = infraerrors.TooManyRequests("API_KEY_RATE_5H_EXCEEDED", "api key 5小时限额已用完")
-	ErrAPIKeyRateLimit1dExceeded = infraerrors.TooManyRequests("API_KEY_RATE_1D_EXCEEDED", "api key 日限额已用完")
-	ErrAPIKeyRateLimit7dExceeded = infraerrors.TooManyRequests("API_KEY_RATE_7D_EXCEEDED", "api key 7天限额已用完")
-	ErrTeamActorInactive         = infraerrors.Forbidden("TEAM_ACTOR_INACTIVE", "团队密钥所属成员已停用")
-	ErrTeamBillingOwnerInactive  = infraerrors.Forbidden("TEAM_BILLING_OWNER_INACTIVE", "团队付款所有者已停用")
+	ErrAPIKeyRateLimit5hExceeded  = infraerrors.TooManyRequests("API_KEY_RATE_5H_EXCEEDED", "api key 5小时限额已用完")
+	ErrAPIKeyRateLimit1dExceeded  = infraerrors.TooManyRequests("API_KEY_RATE_1D_EXCEEDED", "api key 日限额已用完")
+	ErrAPIKeyRateLimit7dExceeded  = infraerrors.TooManyRequests("API_KEY_RATE_7D_EXCEEDED", "api key 7天限额已用完")
+	ErrAPIKeyRateLimit30dExceeded = infraerrors.TooManyRequests("API_KEY_RATE_30D_EXCEEDED", "api key 月限额已用完")
+	ErrTeamActorInactive          = infraerrors.Forbidden("TEAM_ACTOR_INACTIVE", "团队密钥所属成员已停用")
+	ErrTeamBillingOwnerInactive   = infraerrors.Forbidden("TEAM_BILLING_OWNER_INACTIVE", "团队付款所有者已停用")
 )
 
 // NewAPIKeyLimitReachedError 返回包含当前数量和上限的结构化冲突错误。
@@ -91,7 +92,7 @@ const (
 // APIKeyUpdateFields 声明 APIKeyRepository.Update 允许写回的列。
 //
 // 与 UserUpdateFields 同理：api_keys 的用量列由计费热路径原子递增
-// （IncrementQuotaUsed / IncrementRateLimitUsage 的 quota_used、usage_5h/1d/7d），
+// （IncrementQuotaUsed / IncrementRateLimitUsage 的 quota_used、usage_5h/1d/7d/30d），
 // 若编辑 Key 时无条件整行回写，并发累计的配额与限流计数就会被旧快照覆盖。
 // 因此调用方必须显式声明要改的列。
 type APIKeyUpdateFields struct {
@@ -114,9 +115,9 @@ type APIKeyUpdateFields struct {
 	DataSharingConfirmation bool
 	// QuotaUsed 仅供"重置配额用量"路径声明；常规计费走 IncrementQuotaUsed。
 	QuotaUsed bool
-	// RateLimits 覆盖 rate_limit_5h / _1d / _7d 三个阈值。
+	// RateLimits 覆盖 rate_limit_5h / _1d / _7d / _30d 四个阈值。
 	RateLimits bool
-	// RateLimitUsage 覆盖 usage_5h/_1d/_7d 与三个窗口起点，
+	// RateLimitUsage 覆盖 usage_5h/_1d/_7d/_30d 与四个窗口起点，
 	// 仅供"重置限流用量"路径声明；常规计费走 IncrementRateLimitUsage。
 	RateLimitUsage bool
 	// IPRules 覆盖 ip_whitelist 与 ip_blacklist。
@@ -172,12 +173,14 @@ type apiKeyAllByUserIDLister interface {
 
 // APIKeyRateLimitData holds rate limit usage and window state for an API key.
 type APIKeyRateLimitData struct {
-	Usage5h       float64
-	Usage1d       float64
-	Usage7d       float64
-	Window5hStart *time.Time
-	Window1dStart *time.Time
-	Window7dStart *time.Time
+	Usage5h        float64
+	Usage1d        float64
+	Usage7d        float64
+	Usage30d       float64
+	Window5hStart  *time.Time
+	Window1dStart  *time.Time
+	Window7dStart  *time.Time
+	Window30dStart *time.Time
 }
 
 // EffectiveUsage5h returns the 5h window usage, or 0 if the window has expired.
@@ -202,6 +205,14 @@ func (d *APIKeyRateLimitData) EffectiveUsage7d() float64 {
 		return 0
 	}
 	return d.Usage7d
+}
+
+// EffectiveUsage30d 返回当前 30 天窗口内的用量；过期窗口按零处理。
+func (d *APIKeyRateLimitData) EffectiveUsage30d() float64 {
+	if IsWindowExpired(d.Window30dStart, RateLimitWindow30d) {
+		return 0
+	}
+	return d.Usage30d
 }
 
 // APIKeyQuotaUsageState captures the latest quota fields after an atomic quota update.
@@ -272,13 +283,20 @@ type CreateAPIKeyRequest struct {
 	ModelMapping map[string]string `json:"model_mapping"`
 
 	// Quota fields
-	Quota         float64 `json:"quota"`           // Quota limit in USD (0 = unlimited)
-	ExpiresInDays *int    `json:"expires_in_days"` // Days until expiry (nil = never expires)
+	Quota float64 `json:"quota"` // Quota limit in USD (0 = unlimited)
+	// TotalLimit 是 quota 的明确金额限额别名，非 nil 时优先使用。
+	TotalLimit    *float64 `json:"total_limit"`
+	ExpiresInDays *int     `json:"expires_in_days"` // Days until expiry (nil = never expires)
 
 	// Rate limit fields (0 = unlimited)
-	RateLimit5h float64 `json:"rate_limit_5h"`
-	RateLimit1d float64 `json:"rate_limit_1d"`
-	RateLimit7d float64 `json:"rate_limit_7d"`
+	RateLimit5h  float64 `json:"rate_limit_5h"`
+	RateLimit1d  float64 `json:"rate_limit_1d"`
+	RateLimit7d  float64 `json:"rate_limit_7d"`
+	RateLimit30d float64 `json:"rate_limit_30d"`
+	// DailyLimit/WeeklyLimit/MonthlyLimit 是余额消费金额限额别名，非 nil 时优先使用。
+	DailyLimit   *float64 `json:"daily_limit"`
+	WeeklyLimit  *float64 `json:"weekly_limit"`
+	MonthlyLimit *float64 `json:"monthly_limit"`
 
 	// FallbackToDefaultGroupWhenUnavailable 表示绑定分组停用时是否允许回退到同平台默认分组，nil 时默认开启。
 	FallbackToDefaultGroupWhenUnavailable *bool `json:"fallback_to_default_group_when_unavailable"`
@@ -318,15 +336,22 @@ type UpdateAPIKeyRequest struct {
 	ModelMapping *map[string]string `json:"model_mapping"`
 
 	// Quota fields
-	Quota           *float64   `json:"quota"`       // Quota limit in USD (nil = no change, 0 = unlimited)
+	Quota *float64 `json:"quota"` // Quota limit in USD (nil = no change, 0 = unlimited)
+	// TotalLimit 是 quota 的明确金额限额别名，非 nil 时优先使用。
+	TotalLimit      *float64   `json:"total_limit"`
 	ExpiresAt       *time.Time `json:"expires_at"`  // Expiration time (nil = no change)
 	ClearExpiration bool       `json:"-"`           // Clear expiration (internal use)
 	ResetQuota      *bool      `json:"reset_quota"` // Reset quota_used to 0
 
 	// Rate limit fields (nil = no change, 0 = unlimited)
-	RateLimit5h         *float64 `json:"rate_limit_5h"`
-	RateLimit1d         *float64 `json:"rate_limit_1d"`
-	RateLimit7d         *float64 `json:"rate_limit_7d"`
+	RateLimit5h  *float64 `json:"rate_limit_5h"`
+	RateLimit1d  *float64 `json:"rate_limit_1d"`
+	RateLimit7d  *float64 `json:"rate_limit_7d"`
+	RateLimit30d *float64 `json:"rate_limit_30d"`
+	// DailyLimit/WeeklyLimit/MonthlyLimit 是余额消费金额限额别名，非 nil 时优先使用。
+	DailyLimit          *float64 `json:"daily_limit"`
+	WeeklyLimit         *float64 `json:"weekly_limit"`
+	MonthlyLimit        *float64 `json:"monthly_limit"`
 	ResetRateLimitUsage *bool    `json:"reset_rate_limit_usage"` // Reset all usage counters to 0
 
 	// FallbackToDefaultGroupWhenUnavailable 为 nil 时保持原值。
@@ -356,6 +381,38 @@ func ValidateAPIKeyExpiresInDays(days int) error {
 	return nil
 }
 
+// normalizeCreateAPIKeyLimits 将新金额限额字段映射到存量内部字段。
+func normalizeCreateAPIKeyLimits(req *CreateAPIKeyRequest) {
+	if req.TotalLimit != nil {
+		req.Quota = *req.TotalLimit
+	}
+	if req.DailyLimit != nil {
+		req.RateLimit1d = *req.DailyLimit
+	}
+	if req.WeeklyLimit != nil {
+		req.RateLimit7d = *req.WeeklyLimit
+	}
+	if req.MonthlyLimit != nil {
+		req.RateLimit30d = *req.MonthlyLimit
+	}
+}
+
+// normalizeUpdateAPIKeyLimits 将新金额限额字段映射到存量内部字段，canonical 字段优先。
+func normalizeUpdateAPIKeyLimits(req *UpdateAPIKeyRequest) {
+	if req.TotalLimit != nil {
+		req.Quota = req.TotalLimit
+	}
+	if req.DailyLimit != nil {
+		req.RateLimit1d = req.DailyLimit
+	}
+	if req.WeeklyLimit != nil {
+		req.RateLimit7d = req.WeeklyLimit
+	}
+	if req.MonthlyLimit != nil {
+		req.RateLimit30d = req.MonthlyLimit
+	}
+}
+
 func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
 	limits := []struct {
 		field string
@@ -365,6 +422,7 @@ func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
 		{field: "rate_limit_5h", value: req.RateLimit5h},
 		{field: "rate_limit_1d", value: req.RateLimit1d},
 		{field: "rate_limit_7d", value: req.RateLimit7d},
+		{field: "rate_limit_30d", value: req.RateLimit30d},
 	}
 	for _, limit := range limits {
 		if err := ValidateAPIKeyLimit(limit.field, limit.value); err != nil {
@@ -386,6 +444,7 @@ func validateUpdateAPIKeyRequest(req UpdateAPIKeyRequest) error {
 		{field: "rate_limit_5h", value: req.RateLimit5h},
 		{field: "rate_limit_1d", value: req.RateLimit1d},
 		{field: "rate_limit_7d", value: req.RateLimit7d},
+		{field: "rate_limit_30d", value: req.RateLimit30d},
 	}
 	for _, limit := range limits {
 		if limit.value == nil {
@@ -709,6 +768,7 @@ func (s *APIKeyService) canUserUseBoundGroup(ctx context.Context, apiKey *APIKey
 
 // Create 创建API Key
 func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIKeyRequest) (*APIKey, error) {
+	normalizeCreateAPIKeyLimits(&req)
 	if err := validateCreateAPIKeyRequest(req); err != nil {
 		return nil, err
 	}
@@ -898,6 +958,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		RateLimit5h:                           req.RateLimit5h,
 		RateLimit1d:                           req.RateLimit1d,
 		RateLimit7d:                           req.RateLimit7d,
+		RateLimit30d:                          req.RateLimit30d,
 		FallbackToDefaultGroupWhenUnavailable: fallbackToDefaultGroupWhenUnavailable,
 		DataSharingNoticeVersion:              dataSharingNoticeVersion,
 		DataSharingConfirmedGroupID:           dataSharingConfirmedGroupID,
@@ -1304,6 +1365,7 @@ func resolveAPIKeyFallbackPlatform(ctx context.Context) (string, bool) {
 
 // Update 更新API Key
 func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req UpdateAPIKeyRequest) (*APIKey, error) {
+	normalizeUpdateAPIKeyLimits(&req)
 	if err := validateUpdateAPIKeyRequest(req); err != nil {
 		return nil, err
 	}
@@ -1610,6 +1672,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.RateLimit7d = *req.RateLimit7d
 		fields.RateLimits = true
 	}
+	if req.RateLimit30d != nil {
+		apiKey.RateLimit30d = *req.RateLimit30d
+		fields.RateLimits = true
+	}
 	if req.FallbackToDefaultGroupWhenUnavailable != nil {
 		apiKey.FallbackToDefaultGroupWhenUnavailable = *req.FallbackToDefaultGroupWhenUnavailable
 		fields.FallbackToDefaultGroupWhenUnavailable = true
@@ -1619,9 +1685,11 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.Usage5h = 0
 		apiKey.Usage1d = 0
 		apiKey.Usage7d = 0
+		apiKey.Usage30d = 0
 		apiKey.Window5hStart = nil
 		apiKey.Window1dStart = nil
 		apiKey.Window7dStart = nil
+		apiKey.Window30dStart = nil
 		fields.RateLimitUsage = true
 	}
 

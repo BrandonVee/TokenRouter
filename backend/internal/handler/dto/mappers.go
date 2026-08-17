@@ -102,18 +102,25 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		LastUsedIP:                            k.LastUsedIP,
 		Quota:                                 k.Quota,
 		QuotaUsed:                             k.QuotaUsed,
+		TotalLimit:                            k.Quota,
+		DailyLimit:                            k.RateLimit1d,
+		WeeklyLimit:                           k.RateLimit7d,
+		MonthlyLimit:                          k.RateLimit30d,
 		ExpiresAt:                             k.ExpiresAt,
 		CreatedAt:                             k.CreatedAt,
 		UpdatedAt:                             k.UpdatedAt,
 		RateLimit5h:                           k.RateLimit5h,
 		RateLimit1d:                           k.RateLimit1d,
 		RateLimit7d:                           k.RateLimit7d,
+		RateLimit30d:                          k.RateLimit30d,
 		Usage5h:                               k.EffectiveUsage5h(),
 		Usage1d:                               k.EffectiveUsage1d(),
 		Usage7d:                               k.EffectiveUsage7d(),
+		Usage30d:                              k.EffectiveUsage30d(),
 		Window5hStart:                         k.Window5hStart,
 		Window1dStart:                         k.Window1dStart,
 		Window7dStart:                         k.Window7dStart,
+		Window30dStart:                        k.Window30dStart,
 		DataSharingNoticeVersion:              k.DataSharingNoticeVersion,
 		DataSharingConfirmedGroupID:           k.DataSharingConfirmedGroupID,
 		DataSharingConfirmedAt:                k.DataSharingConfirmedAt,
@@ -145,6 +152,10 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 	if k.Window7dStart != nil && !service.IsWindowExpired(k.Window7dStart, service.RateLimitWindow7d) {
 		t := k.Window7dStart.Add(service.RateLimitWindow7d)
 		out.Reset7dAt = &t
+	}
+	if k.Window30dStart != nil && !service.IsWindowExpired(k.Window30dStart, service.RateLimitWindow30d) {
+		t := k.Window30dStart.Add(service.RateLimitWindow30d)
+		out.Reset30dAt = &t
 	}
 	return out
 }

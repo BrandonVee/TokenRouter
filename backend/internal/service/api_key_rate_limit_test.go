@@ -171,6 +171,18 @@ func TestAPIKey_EffectiveUsage(t *testing.T) {
 	}
 }
 
+func TestAPIKey_EffectiveUsage30d(t *testing.T) {
+	now := time.Now()
+	active := APIKey{Usage30d: 12, Window30dStart: rateLimitTimePtr(now.Add(-29 * 24 * time.Hour))}
+	if got := active.EffectiveUsage30d(); got != 12 {
+		t.Fatalf("EffectiveUsage30d() = %v, want 12", got)
+	}
+	expired := APIKey{Usage30d: 12, Window30dStart: rateLimitTimePtr(now.Add(-31 * 24 * time.Hour))}
+	if got := expired.EffectiveUsage30d(); got != 0 {
+		t.Fatalf("expired EffectiveUsage30d() = %v, want 0", got)
+	}
+}
+
 func TestAPIKeyRateLimitData_EffectiveUsage(t *testing.T) {
 	now := time.Now()
 

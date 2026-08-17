@@ -34,6 +34,7 @@ func TestBillingErrorDetails_APIKeyRateLimitStillMaps(t *testing.T) {
 		service.ErrAPIKeyRateLimit5hExceeded,
 		service.ErrAPIKeyRateLimit1dExceeded,
 		service.ErrAPIKeyRateLimit7dExceeded,
+		service.ErrAPIKeyRateLimit30dExceeded,
 	} {
 		status, code, _, _ := billingErrorDetails(err)
 		require.Equal(t, http.StatusTooManyRequests, status, "status for %v", err)

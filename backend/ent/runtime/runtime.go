@@ -161,24 +161,32 @@ func init() {
 	apikeyDescRateLimit7d := apikeyFields[20].Descriptor()
 	// apikey.DefaultRateLimit7d holds the default value on creation for the rate_limit_7d field.
 	apikey.DefaultRateLimit7d = apikeyDescRateLimit7d.Default.(float64)
+	// apikeyDescRateLimit30d is the schema descriptor for rate_limit_30d field.
+	apikeyDescRateLimit30d := apikeyFields[21].Descriptor()
+	// apikey.DefaultRateLimit30d holds the default value on creation for the rate_limit_30d field.
+	apikey.DefaultRateLimit30d = apikeyDescRateLimit30d.Default.(float64)
 	// apikeyDescUsage5h is the schema descriptor for usage_5h field.
-	apikeyDescUsage5h := apikeyFields[21].Descriptor()
+	apikeyDescUsage5h := apikeyFields[22].Descriptor()
 	// apikey.DefaultUsage5h holds the default value on creation for the usage_5h field.
 	apikey.DefaultUsage5h = apikeyDescUsage5h.Default.(float64)
 	// apikeyDescUsage1d is the schema descriptor for usage_1d field.
-	apikeyDescUsage1d := apikeyFields[22].Descriptor()
+	apikeyDescUsage1d := apikeyFields[23].Descriptor()
 	// apikey.DefaultUsage1d holds the default value on creation for the usage_1d field.
 	apikey.DefaultUsage1d = apikeyDescUsage1d.Default.(float64)
 	// apikeyDescUsage7d is the schema descriptor for usage_7d field.
-	apikeyDescUsage7d := apikeyFields[23].Descriptor()
+	apikeyDescUsage7d := apikeyFields[24].Descriptor()
 	// apikey.DefaultUsage7d holds the default value on creation for the usage_7d field.
 	apikey.DefaultUsage7d = apikeyDescUsage7d.Default.(float64)
+	// apikeyDescUsage30d is the schema descriptor for usage_30d field.
+	apikeyDescUsage30d := apikeyFields[25].Descriptor()
+	// apikey.DefaultUsage30d holds the default value on creation for the usage_30d field.
+	apikey.DefaultUsage30d = apikeyDescUsage30d.Default.(float64)
 	// apikeyDescDataSharingNoticeVersion is the schema descriptor for data_sharing_notice_version field.
-	apikeyDescDataSharingNoticeVersion := apikeyFields[27].Descriptor()
+	apikeyDescDataSharingNoticeVersion := apikeyFields[30].Descriptor()
 	// apikey.DefaultDataSharingNoticeVersion holds the default value on creation for the data_sharing_notice_version field.
 	apikey.DefaultDataSharingNoticeVersion = apikeyDescDataSharingNoticeVersion.Default.(int)
 	// apikeyDescFallbackToDefaultGroupWhenUnavailable is the schema descriptor for fallback_to_default_group_when_unavailable field.
-	apikeyDescFallbackToDefaultGroupWhenUnavailable := apikeyFields[30].Descriptor()
+	apikeyDescFallbackToDefaultGroupWhenUnavailable := apikeyFields[33].Descriptor()
 	// apikey.DefaultFallbackToDefaultGroupWhenUnavailable holds the default value on creation for the fallback_to_default_group_when_unavailable field.
 	apikey.DefaultFallbackToDefaultGroupWhenUnavailable = apikeyDescFallbackToDefaultGroupWhenUnavailable.Default.(bool)
 	apikeycompositegroupMixin := schema.APIKeyCompositeGroup{}.Mixin()

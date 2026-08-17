@@ -426,6 +426,27 @@ func (_u *APIKeyUpdate) AddRateLimit7d(v float64) *APIKeyUpdate {
 	return _u
 }
 
+// SetRateLimit30d sets the "rate_limit_30d" field.
+func (_u *APIKeyUpdate) SetRateLimit30d(v float64) *APIKeyUpdate {
+	_u.mutation.ResetRateLimit30d()
+	_u.mutation.SetRateLimit30d(v)
+	return _u
+}
+
+// SetNillableRateLimit30d sets the "rate_limit_30d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRateLimit30d(v *float64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRateLimit30d(*v)
+	}
+	return _u
+}
+
+// AddRateLimit30d adds value to the "rate_limit_30d" field.
+func (_u *APIKeyUpdate) AddRateLimit30d(v float64) *APIKeyUpdate {
+	_u.mutation.AddRateLimit30d(v)
+	return _u
+}
+
 // SetUsage5h sets the "usage_5h" field.
 func (_u *APIKeyUpdate) SetUsage5h(v float64) *APIKeyUpdate {
 	_u.mutation.ResetUsage5h()
@@ -489,6 +510,27 @@ func (_u *APIKeyUpdate) AddUsage7d(v float64) *APIKeyUpdate {
 	return _u
 }
 
+// SetUsage30d sets the "usage_30d" field.
+func (_u *APIKeyUpdate) SetUsage30d(v float64) *APIKeyUpdate {
+	_u.mutation.ResetUsage30d()
+	_u.mutation.SetUsage30d(v)
+	return _u
+}
+
+// SetNillableUsage30d sets the "usage_30d" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableUsage30d(v *float64) *APIKeyUpdate {
+	if v != nil {
+		_u.SetUsage30d(*v)
+	}
+	return _u
+}
+
+// AddUsage30d adds value to the "usage_30d" field.
+func (_u *APIKeyUpdate) AddUsage30d(v float64) *APIKeyUpdate {
+	_u.mutation.AddUsage30d(v)
+	return _u
+}
+
 // SetWindow5hStart sets the "window_5h_start" field.
 func (_u *APIKeyUpdate) SetWindow5hStart(v time.Time) *APIKeyUpdate {
 	_u.mutation.SetWindow5hStart(v)
@@ -546,6 +588,26 @@ func (_u *APIKeyUpdate) SetNillableWindow7dStart(v *time.Time) *APIKeyUpdate {
 // ClearWindow7dStart clears the value of the "window_7d_start" field.
 func (_u *APIKeyUpdate) ClearWindow7dStart() *APIKeyUpdate {
 	_u.mutation.ClearWindow7dStart()
+	return _u
+}
+
+// SetWindow30dStart sets the "window_30d_start" field.
+func (_u *APIKeyUpdate) SetWindow30dStart(v time.Time) *APIKeyUpdate {
+	_u.mutation.SetWindow30dStart(v)
+	return _u
+}
+
+// SetNillableWindow30dStart sets the "window_30d_start" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableWindow30dStart(v *time.Time) *APIKeyUpdate {
+	if v != nil {
+		_u.SetWindow30dStart(*v)
+	}
+	return _u
+}
+
+// ClearWindow30dStart clears the value of the "window_30d_start" field.
+func (_u *APIKeyUpdate) ClearWindow30dStart() *APIKeyUpdate {
+	_u.mutation.ClearWindow30dStart()
 	return _u
 }
 
@@ -934,6 +996,12 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedRateLimit7d(); ok {
 		_spec.AddField(apikey.FieldRateLimit7d, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.RateLimit30d(); ok {
+		_spec.SetField(apikey.FieldRateLimit30d, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit30d(); ok {
+		_spec.AddField(apikey.FieldRateLimit30d, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.Usage5h(); ok {
 		_spec.SetField(apikey.FieldUsage5h, field.TypeFloat64, value)
 	}
@@ -952,6 +1020,12 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedUsage7d(); ok {
 		_spec.AddField(apikey.FieldUsage7d, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.Usage30d(); ok {
+		_spec.SetField(apikey.FieldUsage30d, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage30d(); ok {
+		_spec.AddField(apikey.FieldUsage30d, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.Window5hStart(); ok {
 		_spec.SetField(apikey.FieldWindow5hStart, field.TypeTime, value)
 	}
@@ -969,6 +1043,12 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.Window7dStartCleared() {
 		_spec.ClearField(apikey.FieldWindow7dStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Window30dStart(); ok {
+		_spec.SetField(apikey.FieldWindow30dStart, field.TypeTime, value)
+	}
+	if _u.mutation.Window30dStartCleared() {
+		_spec.ClearField(apikey.FieldWindow30dStart, field.TypeTime)
 	}
 	if value, ok := _u.mutation.DataSharingNoticeVersion(); ok {
 		_spec.SetField(apikey.FieldDataSharingNoticeVersion, field.TypeInt, value)
@@ -1583,6 +1663,27 @@ func (_u *APIKeyUpdateOne) AddRateLimit7d(v float64) *APIKeyUpdateOne {
 	return _u
 }
 
+// SetRateLimit30d sets the "rate_limit_30d" field.
+func (_u *APIKeyUpdateOne) SetRateLimit30d(v float64) *APIKeyUpdateOne {
+	_u.mutation.ResetRateLimit30d()
+	_u.mutation.SetRateLimit30d(v)
+	return _u
+}
+
+// SetNillableRateLimit30d sets the "rate_limit_30d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRateLimit30d(v *float64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRateLimit30d(*v)
+	}
+	return _u
+}
+
+// AddRateLimit30d adds value to the "rate_limit_30d" field.
+func (_u *APIKeyUpdateOne) AddRateLimit30d(v float64) *APIKeyUpdateOne {
+	_u.mutation.AddRateLimit30d(v)
+	return _u
+}
+
 // SetUsage5h sets the "usage_5h" field.
 func (_u *APIKeyUpdateOne) SetUsage5h(v float64) *APIKeyUpdateOne {
 	_u.mutation.ResetUsage5h()
@@ -1646,6 +1747,27 @@ func (_u *APIKeyUpdateOne) AddUsage7d(v float64) *APIKeyUpdateOne {
 	return _u
 }
 
+// SetUsage30d sets the "usage_30d" field.
+func (_u *APIKeyUpdateOne) SetUsage30d(v float64) *APIKeyUpdateOne {
+	_u.mutation.ResetUsage30d()
+	_u.mutation.SetUsage30d(v)
+	return _u
+}
+
+// SetNillableUsage30d sets the "usage_30d" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableUsage30d(v *float64) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetUsage30d(*v)
+	}
+	return _u
+}
+
+// AddUsage30d adds value to the "usage_30d" field.
+func (_u *APIKeyUpdateOne) AddUsage30d(v float64) *APIKeyUpdateOne {
+	_u.mutation.AddUsage30d(v)
+	return _u
+}
+
 // SetWindow5hStart sets the "window_5h_start" field.
 func (_u *APIKeyUpdateOne) SetWindow5hStart(v time.Time) *APIKeyUpdateOne {
 	_u.mutation.SetWindow5hStart(v)
@@ -1703,6 +1825,26 @@ func (_u *APIKeyUpdateOne) SetNillableWindow7dStart(v *time.Time) *APIKeyUpdateO
 // ClearWindow7dStart clears the value of the "window_7d_start" field.
 func (_u *APIKeyUpdateOne) ClearWindow7dStart() *APIKeyUpdateOne {
 	_u.mutation.ClearWindow7dStart()
+	return _u
+}
+
+// SetWindow30dStart sets the "window_30d_start" field.
+func (_u *APIKeyUpdateOne) SetWindow30dStart(v time.Time) *APIKeyUpdateOne {
+	_u.mutation.SetWindow30dStart(v)
+	return _u
+}
+
+// SetNillableWindow30dStart sets the "window_30d_start" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableWindow30dStart(v *time.Time) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetWindow30dStart(*v)
+	}
+	return _u
+}
+
+// ClearWindow30dStart clears the value of the "window_30d_start" field.
+func (_u *APIKeyUpdateOne) ClearWindow30dStart() *APIKeyUpdateOne {
+	_u.mutation.ClearWindow30dStart()
 	return _u
 }
 
@@ -2121,6 +2263,12 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	if value, ok := _u.mutation.AddedRateLimit7d(); ok {
 		_spec.AddField(apikey.FieldRateLimit7d, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.RateLimit30d(); ok {
+		_spec.SetField(apikey.FieldRateLimit30d, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedRateLimit30d(); ok {
+		_spec.AddField(apikey.FieldRateLimit30d, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.Usage5h(); ok {
 		_spec.SetField(apikey.FieldUsage5h, field.TypeFloat64, value)
 	}
@@ -2139,6 +2287,12 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	if value, ok := _u.mutation.AddedUsage7d(); ok {
 		_spec.AddField(apikey.FieldUsage7d, field.TypeFloat64, value)
 	}
+	if value, ok := _u.mutation.Usage30d(); ok {
+		_spec.SetField(apikey.FieldUsage30d, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedUsage30d(); ok {
+		_spec.AddField(apikey.FieldUsage30d, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.Window5hStart(); ok {
 		_spec.SetField(apikey.FieldWindow5hStart, field.TypeTime, value)
 	}
@@ -2156,6 +2310,12 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if _u.mutation.Window7dStartCleared() {
 		_spec.ClearField(apikey.FieldWindow7dStart, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Window30dStart(); ok {
+		_spec.SetField(apikey.FieldWindow30dStart, field.TypeTime, value)
+	}
+	if _u.mutation.Window30dStartCleared() {
+		_spec.ClearField(apikey.FieldWindow30dStart, field.TypeTime)
 	}
 	if value, ok := _u.mutation.DataSharingNoticeVersion(); ok {
 		_spec.SetField(apikey.FieldDataSharingNoticeVersion, field.TypeInt, value)

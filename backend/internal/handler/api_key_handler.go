@@ -48,14 +48,21 @@ type CreateAPIKeyRequest struct {
 	FastModePolicy          string                              `json:"fast_mode_policy"` // Fast 模式策略，空值表示跟随请求
 	BillingMode             string                              `json:"billing_mode"`     // 结算模式，空值表示自动选择
 	PreferredSubscriptionID *int64                              `json:"preferred_subscription_id"`
-	ModelMapping            map[string]string                   `json:"model_mapping"`   // 当前 Key 的完整模型重定向规则
-	Quota                   *float64                            `json:"quota"`           // 配额限制 (USD)
-	ExpiresInDays           *int                                `json:"expires_in_days"` // 过期天数
+	ModelMapping            map[string]string                   `json:"model_mapping"` // 当前 Key 的完整模型重定向规则
+	Quota                   *float64                            `json:"quota"`         // 配额限制 (USD)
+	// TotalLimit 是 quota 的明确金额限额别名，优先于旧字段。
+	TotalLimit    *float64 `json:"total_limit"`
+	ExpiresInDays *int     `json:"expires_in_days"` // 过期天数
 
 	// Rate limit fields (0 = unlimited)
-	RateLimit5h *float64 `json:"rate_limit_5h"`
-	RateLimit1d *float64 `json:"rate_limit_1d"`
-	RateLimit7d *float64 `json:"rate_limit_7d"`
+	RateLimit5h  *float64 `json:"rate_limit_5h"`
+	RateLimit1d  *float64 `json:"rate_limit_1d"`
+	RateLimit7d  *float64 `json:"rate_limit_7d"`
+	RateLimit30d *float64 `json:"rate_limit_30d"`
+	// DailyLimit/WeeklyLimit/MonthlyLimit 是余额消费金额限额的首选字段。
+	DailyLimit   *float64 `json:"daily_limit"`
+	WeeklyLimit  *float64 `json:"weekly_limit"`
+	MonthlyLimit *float64 `json:"monthly_limit"`
 	// 绑定分组不可用时是否自动回退到同平台默认分组，nil 表示使用服务层默认值。
 	FallbackToDefaultGroupWhenUnavailable *bool `json:"fallback_to_default_group_when_unavailable"`
 	// 创建时直接选择数据共享分组也必须由弹窗确认。
@@ -78,13 +85,20 @@ type UpdateAPIKeyRequest struct {
 	PreferredSubscriptionID *int64                               `json:"preferred_subscription_id"`
 	ModelMapping            *map[string]string                   `json:"model_mapping"` // nil 不修改，空对象清空
 	Quota                   *float64                             `json:"quota"`         // 配额限制 (USD), 0=无限制
-	ExpiresAt               *string                              `json:"expires_at"`    // 过期时间 (ISO 8601)
-	ResetQuota              *bool                                `json:"reset_quota"`   // 重置已用配额
+	// TotalLimit 是 quota 的明确金额限额别名，优先于旧字段。
+	TotalLimit *float64 `json:"total_limit"`
+	ExpiresAt  *string  `json:"expires_at"`  // 过期时间 (ISO 8601)
+	ResetQuota *bool    `json:"reset_quota"` // 重置已用配额
 
 	// Rate limit fields (nil = no change, 0 = unlimited)
-	RateLimit5h         *float64 `json:"rate_limit_5h"`
-	RateLimit1d         *float64 `json:"rate_limit_1d"`
-	RateLimit7d         *float64 `json:"rate_limit_7d"`
+	RateLimit5h  *float64 `json:"rate_limit_5h"`
+	RateLimit1d  *float64 `json:"rate_limit_1d"`
+	RateLimit7d  *float64 `json:"rate_limit_7d"`
+	RateLimit30d *float64 `json:"rate_limit_30d"`
+	// DailyLimit/WeeklyLimit/MonthlyLimit 是余额消费金额限额的首选字段。
+	DailyLimit          *float64 `json:"daily_limit"`
+	WeeklyLimit         *float64 `json:"weekly_limit"`
+	MonthlyLimit        *float64 `json:"monthly_limit"`
 	ResetRateLimitUsage *bool    `json:"reset_rate_limit_usage"` // 重置限速用量
 	// nil 表示保持原配置不变。
 	FallbackToDefaultGroupWhenUnavailable *bool `json:"fallback_to_default_group_when_unavailable"`
@@ -96,6 +110,14 @@ type UpdateAPIKeyRequest struct {
 type apiKeyLimitInput struct {
 	field string
 	value *float64
+}
+
+// preferAPIKeyLimit 使用新金额限额字段，并兼容旧 rate_limit/quota 字段。
+func preferAPIKeyLimit(canonical, legacy *float64) *float64 {
+	if canonical != nil {
+		return canonical
+	}
+	return legacy
 }
 
 // validateAPIKeyLimitFields 对 HTTP 请求中显式提供的限额执行服务层统一校验。
@@ -114,10 +136,11 @@ func validateAPIKeyLimitFields(limits ...apiKeyLimitInput) error {
 // validateAPIKeyCreateRequest 校验创建请求中的限额与相对有效期。
 func validateAPIKeyCreateRequest(req CreateAPIKeyRequest) error {
 	if err := validateAPIKeyLimitFields(
-		apiKeyLimitInput{field: "quota", value: req.Quota},
+		apiKeyLimitInput{field: "total_limit", value: preferAPIKeyLimit(req.TotalLimit, req.Quota)},
 		apiKeyLimitInput{field: "rate_limit_5h", value: req.RateLimit5h},
-		apiKeyLimitInput{field: "rate_limit_1d", value: req.RateLimit1d},
-		apiKeyLimitInput{field: "rate_limit_7d", value: req.RateLimit7d},
+		apiKeyLimitInput{field: "daily_limit", value: preferAPIKeyLimit(req.DailyLimit, req.RateLimit1d)},
+		apiKeyLimitInput{field: "weekly_limit", value: preferAPIKeyLimit(req.WeeklyLimit, req.RateLimit7d)},
+		apiKeyLimitInput{field: "monthly_limit", value: preferAPIKeyLimit(req.MonthlyLimit, req.RateLimit30d)},
 	); err != nil {
 		return err
 	}
@@ -130,10 +153,11 @@ func validateAPIKeyCreateRequest(req CreateAPIKeyRequest) error {
 // validateAPIKeyUpdateRequest 只校验更新请求中实际出现的限额字段。
 func validateAPIKeyUpdateRequest(req UpdateAPIKeyRequest) error {
 	return validateAPIKeyLimitFields(
-		apiKeyLimitInput{field: "quota", value: req.Quota},
+		apiKeyLimitInput{field: "total_limit", value: preferAPIKeyLimit(req.TotalLimit, req.Quota)},
 		apiKeyLimitInput{field: "rate_limit_5h", value: req.RateLimit5h},
-		apiKeyLimitInput{field: "rate_limit_1d", value: req.RateLimit1d},
-		apiKeyLimitInput{field: "rate_limit_7d", value: req.RateLimit7d},
+		apiKeyLimitInput{field: "daily_limit", value: preferAPIKeyLimit(req.DailyLimit, req.RateLimit1d)},
+		apiKeyLimitInput{field: "weekly_limit", value: preferAPIKeyLimit(req.WeeklyLimit, req.RateLimit7d)},
+		apiKeyLimitInput{field: "monthly_limit", value: preferAPIKeyLimit(req.MonthlyLimit, req.RateLimit30d)},
 	)
 }
 
@@ -264,6 +288,9 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 	if req.Quota != nil {
 		svcReq.Quota = *req.Quota
 	}
+	if req.TotalLimit != nil {
+		svcReq.TotalLimit = req.TotalLimit
+	}
 	if req.RateLimit5h != nil {
 		svcReq.RateLimit5h = *req.RateLimit5h
 	}
@@ -273,6 +300,12 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 	if req.RateLimit7d != nil {
 		svcReq.RateLimit7d = *req.RateLimit7d
 	}
+	if req.RateLimit30d != nil {
+		svcReq.RateLimit30d = *req.RateLimit30d
+	}
+	svcReq.DailyLimit = req.DailyLimit
+	svcReq.WeeklyLimit = req.WeeklyLimit
+	svcReq.MonthlyLimit = req.MonthlyLimit
 
 	executeUserIdempotentJSON(c, "user.api_keys.create", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		key, err := h.apiKeyService.Create(ctx, subject.UserID, svcReq)
@@ -318,10 +351,15 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 		PreferredSubscriptionID:               req.PreferredSubscriptionID,
 		ModelMapping:                          req.ModelMapping,
 		Quota:                                 req.Quota,
+		TotalLimit:                            req.TotalLimit,
 		ResetQuota:                            req.ResetQuota,
 		RateLimit5h:                           req.RateLimit5h,
 		RateLimit1d:                           req.RateLimit1d,
 		RateLimit7d:                           req.RateLimit7d,
+		RateLimit30d:                          req.RateLimit30d,
+		DailyLimit:                            req.DailyLimit,
+		WeeklyLimit:                           req.WeeklyLimit,
+		MonthlyLimit:                          req.MonthlyLimit,
 		ResetRateLimitUsage:                   req.ResetRateLimitUsage,
 		FallbackToDefaultGroupWhenUnavailable: req.FallbackToDefaultGroupWhenUnavailable,
 		DataSharingConfirmed:                  req.DataSharingConfirmed,

@@ -71,9 +71,9 @@ export async function getBillingOptions(
  * @param customKey - Optional custom key value
  * @param ipWhitelist - Optional IP whitelist
  * @param ipBlacklist - Optional IP blacklist
- * @param quota - Optional quota limit in USD (0 = unlimited)
+ * @param quota - 可选总 USD 消费限额（0 = 不限额）
  * @param expiresInDays - Optional days until expiry (undefined = never expires)
- * @param rateLimitData - Optional rate limit fields
+ * @param rateLimitData - 可选 USD 消费限额字段
  * @param fallbackToDefaultGroupWhenUnavailable - 绑定分组不可用时是否回退到平台默认分组
  * @returns Created API key
  */
@@ -85,7 +85,15 @@ export async function create(
   ipBlacklist?: string[],
   quota?: number,
   expiresInDays?: number,
-  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
+  rateLimitData?: {
+    rate_limit_5h?: number
+    daily_limit?: number
+    weekly_limit?: number
+    monthly_limit?: number
+    rate_limit_1d?: number
+    rate_limit_7d?: number
+    rate_limit_30d?: number
+  },
   fallbackToDefaultGroupWhenUnavailable?: boolean
 ): Promise<ApiKey> {
   const payload: CreateApiKeyRequest = { name }
@@ -102,7 +110,7 @@ export async function create(
     payload.ip_blacklist = ipBlacklist
   }
   if (quota !== undefined && quota > 0) {
-    payload.quota = quota
+    payload.total_limit = quota
   }
   if (expiresInDays !== undefined && expiresInDays > 0) {
     payload.expires_in_days = expiresInDays
@@ -110,11 +118,20 @@ export async function create(
   if (rateLimitData?.rate_limit_5h && rateLimitData.rate_limit_5h > 0) {
     payload.rate_limit_5h = rateLimitData.rate_limit_5h
   }
-  if (rateLimitData?.rate_limit_1d && rateLimitData.rate_limit_1d > 0) {
+  if (rateLimitData?.daily_limit && rateLimitData.daily_limit > 0) {
+    payload.daily_limit = rateLimitData.daily_limit
+  } else if (rateLimitData?.rate_limit_1d && rateLimitData.rate_limit_1d > 0) {
     payload.rate_limit_1d = rateLimitData.rate_limit_1d
   }
-  if (rateLimitData?.rate_limit_7d && rateLimitData.rate_limit_7d > 0) {
+  if (rateLimitData?.weekly_limit && rateLimitData.weekly_limit > 0) {
+    payload.weekly_limit = rateLimitData.weekly_limit
+  } else if (rateLimitData?.rate_limit_7d && rateLimitData.rate_limit_7d > 0) {
     payload.rate_limit_7d = rateLimitData.rate_limit_7d
+  }
+  if (rateLimitData?.monthly_limit && rateLimitData.monthly_limit > 0) {
+    payload.monthly_limit = rateLimitData.monthly_limit
+  } else if (rateLimitData?.rate_limit_30d && rateLimitData.rate_limit_30d > 0) {
+    payload.rate_limit_30d = rateLimitData.rate_limit_30d
   }
   if (fallbackToDefaultGroupWhenUnavailable !== undefined) {
     payload.fallback_to_default_group_when_unavailable = fallbackToDefaultGroupWhenUnavailable

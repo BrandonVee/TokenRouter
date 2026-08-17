@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 33 // v33：认证快照包含分组逐模型定价和长上下文开关
+const apiKeyAuthSnapshotVersion = 34 // v34：认证快照包含 API Key 30 天月限额
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -405,6 +405,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		RateLimit5h:                           apiKey.RateLimit5h,
 		RateLimit1d:                           apiKey.RateLimit1d,
 		RateLimit7d:                           apiKey.RateLimit7d,
+		RateLimit30d:                          apiKey.RateLimit30d,
 		FallbackToDefaultGroupWhenUnavailable: apiKey.FallbackToDefaultGroupWhenUnavailable,
 		User: APIKeyAuthUserSnapshot{
 			ID:                         apiKey.User.ID,
@@ -546,6 +547,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		RateLimit5h:                           snapshot.RateLimit5h,
 		RateLimit1d:                           snapshot.RateLimit1d,
 		RateLimit7d:                           snapshot.RateLimit7d,
+		RateLimit30d:                          snapshot.RateLimit30d,
 		FallbackToDefaultGroupWhenUnavailable: snapshot.FallbackToDefaultGroupWhenUnavailable,
 		User: &User{
 			ID:                         snapshot.User.ID,
