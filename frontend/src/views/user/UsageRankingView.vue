@@ -35,6 +35,7 @@
             :item="item"
             :class="[topCardOrderClass(item.rank), topCards.length === 1 && item.rank === 1 ? 'md:col-start-2' : '']"
             :featured="item.rank === 1"
+            :show-data="showRankingData"
           />
         </section>
 
@@ -49,7 +50,7 @@
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ dateRangeLabel }}</span>
           </div>
           <div class="divide-y divide-gray-100 dark:divide-dark-700">
-            <RankingRow v-for="item in ranking" :key="item.rank" :item="item" />
+            <RankingRow v-for="item in ranking" :key="item.rank" :item="item" :show-data="showRankingData" />
           </div>
         </section>
 
@@ -74,10 +75,13 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useBalanceDisplay } from '@/composables/useBalanceDisplay'
+import { useAppStore } from '@/stores/app'
 import { formatCompactNumber, formatNumber } from '@/utils/format'
 
 const { t } = useI18n()
 const { balanceUnitName, formatBalanceAmount } = useBalanceDisplay()
+const appStore = useAppStore()
+const showRankingData = computed(() => appStore.cachedPublicSettings?.usage_ranking_data_visible !== false)
 
 const loading = ref(false)
 const response = ref<UsageRankingResponse | null>(null)
@@ -208,6 +212,7 @@ const TopRankCard = defineComponent({
   props: {
     item: { type: Object as PropType<UsageRankingItem>, required: true },
     featured: { type: Boolean, default: false },
+    showData: { type: Boolean, default: true },
   },
   setup(props) {
     return () => {
@@ -232,12 +237,12 @@ const TopRankCard = defineComponent({
           h('div', { class: 'relative mt-7 flex flex-col items-center text-center' }, [
             h(UserAvatar, { item: props.item, size: 'lg' }),
             h('h3', { class: 'mt-4 max-w-full truncate text-lg font-semibold text-gray-900 dark:text-white' }, props.item.display_name),
-            h('p', { class: 'mt-2 text-3xl font-semibold text-gray-900 dark:text-white' }, formatBalanceAmount(props.item.actual_cost, { fractionDigits: 4 })),
-            h('p', { class: 'mt-1 text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.reasoningCost', { unit: balanceUnitName.value })),
+            props.showData ? h('p', { class: 'mt-2 text-3xl font-semibold text-gray-900 dark:text-white' }, formatBalanceAmount(props.item.actual_cost, { fractionDigits: 4 })) : null,
+            props.showData ? h('p', { class: 'mt-1 text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.reasoningCost', { unit: balanceUnitName.value })) : null,
           ]),
           h('div', { class: 'relative mt-6 grid grid-cols-2 gap-2 text-center text-xs text-gray-500 dark:text-gray-400' }, [
-            h('div', [h('p', { class: 'font-medium text-gray-900 dark:text-white' }, formatCompactNumber(props.item.total_tokens)), h('p', t('usageRanking.tokens'))]),
-            h('div', [h('p', { class: 'font-medium text-gray-900 dark:text-white' }, formatNumber(props.item.requests)), h('p', t('usageRanking.requests'))]),
+            props.showData ? h('div', [h('p', { class: 'font-medium text-gray-900 dark:text-white' }, formatCompactNumber(props.item.total_tokens)), h('p', t('usageRanking.tokens'))]) : null,
+            props.showData ? h('div', [h('p', { class: 'font-medium text-gray-900 dark:text-white' }, formatNumber(props.item.requests)), h('p', t('usageRanking.requests'))]) : null,
           ]),
         ],
       )
@@ -249,6 +254,7 @@ const RankingRow = defineComponent({
   name: 'RankingRow',
   props: {
     item: { type: Object as PropType<UsageRankingItem>, required: true },
+    showData: { type: Boolean, default: true },
   },
   setup(props) {
     return () => {
@@ -267,7 +273,7 @@ const RankingRow = defineComponent({
               h('p', { class: 'truncate text-sm font-medium text-gray-900 dark:text-white' }, props.item.display_name),
             ]),
           ]),
-          h('div', { class: 'col-span-2 grid grid-cols-3 gap-3 text-sm sm:col-span-1 sm:grid-cols-[140px_130px_110px] sm:text-right' }, [
+          props.showData ? h('div', { class: 'col-span-2 grid grid-cols-3 gap-3 text-sm sm:col-span-1 sm:grid-cols-[140px_130px_110px] sm:text-right' }, [
             h('div', [
               h('p', { class: 'font-semibold text-gray-900 dark:text-white' }, formatBalanceAmount(props.item.actual_cost, { fractionDigits: 4 })),
               h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.reasoningCost', { unit: balanceUnitName.value })),
@@ -280,7 +286,7 @@ const RankingRow = defineComponent({
               h('p', { class: 'font-semibold text-gray-900 dark:text-white' }, formatNumber(props.item.requests)),
               h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.requests')),
             ]),
-          ]),
+          ]) : null,
         ],
       )
     }

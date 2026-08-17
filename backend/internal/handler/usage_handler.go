@@ -419,14 +419,23 @@ func (h *UsageHandler) Ranking(c *gin.Context) {
 		limit = h.settingService.GetUsageRankingLimit(c.Request.Context())
 	}
 
-	if h.settingService != nil && !h.settingService.IsUsageRankingDataVisible(c.Request.Context()) {
-		response.Success(c, gin.H{"ranking": []any{}, "total_requests": 0, "total_tokens": 0, "total_actual_cost": 0, "start_date": startTime.Format("2006-01-02"), "end_date": usageRankingDisplayEndDate(endTime), "limit": limit})
-		return
-	}
 	ranking, err := h.usageService.GetUsageRanking(c.Request.Context(), startTime, endTime, limit)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
+	}
+	if h.settingService != nil && !h.settingService.IsUsageRankingDataVisible(c.Request.Context()) {
+		// 保留排名与用户标识，仅隐藏消费、请求数和 Token 明细。
+		for i := range ranking.Ranking {
+			ranking.Ranking[i].Requests = 0
+			ranking.Ranking[i].InputTokens = 0
+			ranking.Ranking[i].OutputTokens = 0
+			ranking.Ranking[i].CacheCreationTokens = 0
+			ranking.Ranking[i].CacheReadTokens = 0
+			ranking.Ranking[i].TotalTokens = 0
+			ranking.Ranking[i].ActualCost = 0
+		}
+		ranking.TotalRequests, ranking.TotalTokens, ranking.TotalActualCost = 0, 0, 0
 	}
 
 	// 返回本次排行使用的时间范围，日期按用户时区格式化，便于前端展示。
