@@ -12,12 +12,15 @@ type APIKeyAuthSnapshot struct {
 	TeamOwnerDisabled bool                               `json:"team_owner_disabled"`
 	CreatedAt         time.Time                          `json:"created_at"`
 	GroupID           *int64                             `json:"group_id,omitempty"`
+	GroupIDs          []int64                            `json:"group_ids,omitempty"`
 	IsComposite       bool                               `json:"is_composite"`
 	CompositeGroups   []APIKeyAuthCompositeGroupSnapshot `json:"composite_groups,omitempty"`
 	Name              string                             `json:"name"`
 	Status            string                             `json:"status"`
 	// FastModePolicy 随鉴权快照下发，供网关热路径读取。
 	FastModePolicy string `json:"fast_mode_policy"`
+	// RoutingStrategy 随鉴权快照下发，供请求级调度读取。
+	RoutingStrategy string `json:"routing_strategy"`
 	// BillingMode 与指定订阅必须随鉴权快照下发，避免请求期回读 API Key。
 	BillingMode             string `json:"billing_mode"`
 	PreferredSubscriptionID *int64 `json:"preferred_subscription_id,omitempty"`

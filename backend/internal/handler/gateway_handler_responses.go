@@ -151,6 +151,9 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	if parsedReq == nil {
 		parsedReq = &service.ParsedRequest{Model: reqModel, Stream: reqStream, Body: bodyRef}
 	}
+	if parsedReq.RoutingStrategy != "" {
+		c.Request = c.Request.WithContext(service.WithAPIKeyRoutingStrategy(c.Request.Context(), parsedReq.RoutingStrategy))
+	}
 	parsedReq.SessionContext = &service.SessionContext{
 		ClientIP:  ip.GetClientIP(c),
 		UserAgent: c.GetHeader("User-Agent"),

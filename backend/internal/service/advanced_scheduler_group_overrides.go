@@ -271,12 +271,22 @@ func (s *OpenAIGatewayService) advancedSchedulerEffectiveSettingsForGroup(
 	if group != nil && group.UsesAdvancedScheduler() {
 		overrides = group.AdvancedSchedulerOverrides
 	}
-	return resolveAdvancedSchedulerEffectiveSettings(
+	effective := resolveAdvancedSchedulerEffectiveSettings(
 		s.openAIWSLBTopK(),
 		s.openAIWSSchedulerWeights(),
 		s.advancedSchedulerRuntimeSettings(ctx),
 		overrides,
 	)
+	// Key 级策略只调整本次请求的基础评分权重，不修改管理员的全局配置。
+	switch APIKeyRoutingStrategyFromContext(ctx) {
+	case APIKeyRoutingStrategySpeed:
+		effective.weights.TTFT = 10
+		effective.weights.ErrorRate = 3
+	case APIKeyRoutingStrategySuccessRate:
+		effective.weights.ErrorRate = 10
+		effective.weights.TTFT = 2
+	}
+	return effective
 }
 
 // advancedSchedulerEffectiveSettingsForRequest 读取最终目标分组并生成请求级有效配置。

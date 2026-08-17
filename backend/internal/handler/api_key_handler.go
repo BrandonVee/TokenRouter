@@ -36,16 +36,18 @@ func (h *APIKeyHandler) SetGroupCapacityService(groupCapacityService *service.Gr
 
 // CreateAPIKeyRequest represents the create API key request payload
 type CreateAPIKeyRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Scope       string `json:"scope" binding:"omitempty,oneof=personal team"`
-	GroupID     *int64 `json:"group_id"` // nullable
-	IsComposite bool   `json:"is_composite"`
+	Name        string  `json:"name" binding:"required"`
+	Scope       string  `json:"scope" binding:"omitempty,oneof=personal team"`
+	GroupID     *int64  `json:"group_id"` // nullable
+	GroupIDs    []int64 `json:"group_ids"`
+	IsComposite bool    `json:"is_composite"`
 	// CompositeGroups 是复合 Key 的完整分组前缀映射。
 	CompositeGroups         []service.APIKeyCompositeGroupInput `json:"composite_groups"`
 	CustomKey               *string                             `json:"custom_key"`       // 可选的自定义key
 	IPWhitelist             []string                            `json:"ip_whitelist"`     // IP 白名单
 	IPBlacklist             []string                            `json:"ip_blacklist"`     // IP 黑名单
 	FastModePolicy          string                              `json:"fast_mode_policy"` // Fast 模式策略，空值表示跟随请求
+	RoutingStrategy         string                              `json:"routing_strategy"` // 路由策略，空值表示手动有序分组
 	BillingMode             string                              `json:"billing_mode"`     // 结算模式，空值表示自动选择
 	PreferredSubscriptionID *int64                              `json:"preferred_subscription_id"`
 	ModelMapping            map[string]string                   `json:"model_mapping"` // 当前 Key 的完整模型重定向规则
@@ -72,15 +74,17 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
-	Name        string `json:"name"`
-	GroupID     *int64 `json:"group_id"`
-	IsComposite *bool  `json:"is_composite"`
+	Name        string   `json:"name"`
+	GroupID     *int64   `json:"group_id"`
+	GroupIDs    *[]int64 `json:"group_ids"`
+	IsComposite *bool    `json:"is_composite"`
 	// CompositeGroups 非 nil 时完整替换复合映射。
 	CompositeGroups         *[]service.APIKeyCompositeGroupInput `json:"composite_groups"`
 	Status                  string                               `json:"status" binding:"omitempty,oneof=active inactive"`
 	IPWhitelist             *[]string                            `json:"ip_whitelist"`     // IP 白名单（nil 不修改，空数组清空）
 	IPBlacklist             *[]string                            `json:"ip_blacklist"`     // IP 黑名单（nil 不修改，空数组清空）
 	FastModePolicy          *string                              `json:"fast_mode_policy"` // nil 表示保持原配置
+	RoutingStrategy         *string                              `json:"routing_strategy"` // nil 表示保持原配置
 	BillingMode             *string                              `json:"billing_mode"`     // nil 表示保持原配置
 	PreferredSubscriptionID *int64                               `json:"preferred_subscription_id"`
 	ModelMapping            *map[string]string                   `json:"model_mapping"` // nil 不修改，空对象清空
@@ -271,12 +275,14 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		Name:                                  req.Name,
 		Scope:                                 req.Scope,
 		GroupID:                               req.GroupID,
+		GroupIDs:                              req.GroupIDs,
 		IsComposite:                           req.IsComposite,
 		CompositeGroups:                       req.CompositeGroups,
 		CustomKey:                             req.CustomKey,
 		IPWhitelist:                           req.IPWhitelist,
 		IPBlacklist:                           req.IPBlacklist,
 		FastModePolicy:                        req.FastModePolicy,
+		RoutingStrategy:                       req.RoutingStrategy,
 		BillingMode:                           req.BillingMode,
 		PreferredSubscriptionID:               req.PreferredSubscriptionID,
 		ModelMapping:                          req.ModelMapping,
@@ -343,10 +349,12 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 
 	svcReq := service.UpdateAPIKeyRequest{
 		IsComposite:                           req.IsComposite,
+		GroupIDs:                              req.GroupIDs,
 		CompositeGroups:                       req.CompositeGroups,
 		IPWhitelist:                           req.IPWhitelist,
 		IPBlacklist:                           req.IPBlacklist,
 		FastModePolicy:                        req.FastModePolicy,
+		RoutingStrategy:                       req.RoutingStrategy,
 		BillingMode:                           req.BillingMode,
 		PreferredSubscriptionID:               req.PreferredSubscriptionID,
 		ModelMapping:                          req.ModelMapping,

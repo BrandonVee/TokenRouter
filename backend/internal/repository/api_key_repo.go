@@ -15,6 +15,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/apikey"
 	"github.com/BrandonVee/TokenRouter/ent/apikeycompositegroup"
 	"github.com/BrandonVee/TokenRouter/ent/group"
+	"github.com/BrandonVee/TokenRouter/ent/predicate"
 	"github.com/BrandonVee/TokenRouter/ent/schema/mixins"
 	"github.com/BrandonVee/TokenRouter/ent/user"
 	"github.com/BrandonVee/TokenRouter/internal/service"
@@ -23,6 +24,7 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/lib/pq"
 )
 
@@ -30,6 +32,13 @@ type apiKeyRepository struct {
 	client         *dbent.Client
 	sql            sqlExecutor
 	preAggregation *service.PreAggregationSettingsService
+}
+
+// apiKeyGroupIDsContain 使用 Ent 的方言适配 JSON 谓词匹配普通 Key 的候选分组。
+func apiKeyGroupIDsContain(groupID int64) predicate.APIKey {
+	return func(selector *entsql.Selector) {
+		selector.Where(sqljson.ValueContains(apikey.FieldGroupIds, groupID))
+	}
 }
 
 // ProvideAPIKeyRepository 注入统一预聚合配置，供用量排序复用多维聚合表。
@@ -68,6 +77,15 @@ func apiKeyBillingModeForPersistence(value string) string {
 		return mode
 	}
 	return value
+}
+
+// apiKeyRoutingStrategyForPersistence 兼容绕过服务层的旧夹具和内部调用。
+func apiKeyRoutingStrategyForPersistence(value string) string {
+	strategy, ok := service.NormalizeAPIKeyRoutingStrategy(value)
+	if ok {
+		return strategy
+	}
+	return service.APIKeyRoutingStrategyManual
 }
 
 func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) error {
@@ -161,10 +179,12 @@ func createAPIKeyRecord(ctx context.Context, client *dbent.Client, key *service.
 		SetStatus(key.Status).
 		SetIsComposite(key.IsComposite).
 		SetFastModePolicy(apiKeyFastModePolicyForPersistence(key.FastModePolicy)).
+		SetRoutingStrategy(apiKeyRoutingStrategyForPersistence(key.RoutingStrategy)).
 		SetBillingMode(apiKeyBillingModeForPersistence(key.BillingMode)).
 		SetNillablePreferredSubscriptionID(key.PreferredSubscriptionID).
 		SetModelMapping(service.CloneModelMapping(key.ModelMapping)).
 		SetNillableGroupID(key.GroupID).
+		SetGroupIds(append([]int64(nil), key.GroupIDs...)).
 		SetNillableLastUsedAt(key.LastUsedAt).
 		SetQuota(key.Quota).
 		SetQuotaUsed(key.QuotaUsed).
@@ -291,6 +311,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 			apikey.FieldTeamOwnerDisabled,
 			apikey.FieldCreatedAt,
 			apikey.FieldGroupID,
+			apikey.FieldGroupIds,
 			apikey.FieldIsComposite,
 			apikey.FieldName,
 			apikey.FieldStatus,
@@ -442,6 +463,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 	if fields.FastModePolicy {
 		builder.SetFastModePolicy(apiKeyFastModePolicyForPersistence(key.FastModePolicy))
 	}
+	if fields.RoutingStrategy {
+		builder.SetRoutingStrategy(apiKeyRoutingStrategyForPersistence(key.RoutingStrategy))
+	}
 	if fields.BillingConfiguration {
 		builder.SetBillingMode(apiKeyBillingModeForPersistence(key.BillingMode))
 		if key.PreferredSubscriptionID == nil {
@@ -504,6 +528,9 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fiel
 		} else {
 			builder.ClearGroupID()
 		}
+	}
+	if fields.GroupIDs {
+		builder.SetGroupIds(append([]int64(nil), key.GroupIDs...))
 	}
 
 	if fields.DataSharingConfirmation {
@@ -668,6 +695,7 @@ func (r *apiKeyRepository) apiKeyListByUserIDQuery(userID int64, filters service
 		} else {
 			q = q.Where(apikey.Or(
 				apikey.GroupIDEQ(*filters.GroupID),
+				apiKeyGroupIDsContain(*filters.GroupID),
 				apikey.HasCompositeGroupsWith(apikeycompositegroup.GroupIDEQ(*filters.GroupID)),
 			))
 		}
@@ -958,6 +986,7 @@ func (r *apiKeyRepository) ExistsByKey(ctx context.Context, key string) (bool, e
 func (r *apiKeyRepository) ListByGroupID(ctx context.Context, groupID int64, params pagination.PaginationParams) ([]service.APIKey, *pagination.PaginationResult, error) {
 	q := r.activeQuery().Where(apikey.Or(
 		apikey.GroupIDEQ(groupID),
+		apiKeyGroupIDsContain(groupID),
 		apikey.HasCompositeGroupsWith(apikeycompositegroup.GroupIDEQ(groupID)),
 	))
 
@@ -1049,31 +1078,78 @@ func (r *apiKeyRepository) SearchAPIKeys(ctx context.Context, userID int64, keyw
 	return outKeys, nil
 }
 
-// ClearGroupIDByGroupID 将指定分组的所有 API Key 的 group_id 设为 nil
+// ClearGroupIDByGroupID 从普通 Key 候选列表和复合映射中移除指定分组。
 func (r *apiKeyRepository) ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error) {
 	client := clientFromContext(ctx, r.client)
-	n, err := client.APIKey.Update().
-		Where(apikey.GroupIDEQ(groupID), apikey.DeletedAtIsNil()).
-		ClearGroupID().
-		Save(ctx)
+	keys, err := client.APIKey.Query().Where(
+		apikey.DeletedAtIsNil(),
+		apikey.IsCompositeEQ(false),
+		apikey.Or(apikey.GroupIDEQ(groupID), apiKeyGroupIDsContain(groupID)),
+	).All(ctx)
 	if err != nil {
 		return 0, err
+	}
+	for _, key := range keys {
+		remaining := make([]int64, 0, len(key.GroupIds))
+		for _, candidateID := range key.GroupIds {
+			if candidateID != groupID {
+				remaining = append(remaining, candidateID)
+			}
+		}
+		update := client.APIKey.UpdateOneID(key.ID).SetGroupIds(remaining)
+		if len(remaining) > 0 {
+			update.SetGroupID(remaining[0])
+		} else {
+			update.ClearGroupID()
+		}
+		if _, err := update.Save(ctx); err != nil {
+			return 0, err
+		}
 	}
 	deleted, err := client.APIKeyCompositeGroup.Delete().
 		Where(apikeycompositegroup.GroupIDEQ(groupID)).
 		Exec(ctx)
-	return int64(n + deleted), err
+	return int64(len(keys) + deleted), err
 }
 
 // UpdateGroupIDByUserAndGroup 将用户下绑定 oldGroupID 的所有 Key 迁移到 newGroupID
 func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, userID, oldGroupID, newGroupID int64) (int64, error) {
 	client := clientFromContext(ctx, r.client)
-	n, err := client.APIKey.Update().
-		Where(apikey.UserIDEQ(userID), apikey.GroupIDEQ(oldGroupID), apikey.DeletedAtIsNil()).
-		SetGroupID(newGroupID).
-		Save(ctx)
+	keys, err := client.APIKey.Query().Where(
+		apikey.UserIDEQ(userID),
+		apikey.DeletedAtIsNil(),
+		apikey.IsCompositeEQ(false),
+		apikey.Or(apikey.GroupIDEQ(oldGroupID), apiKeyGroupIDsContain(oldGroupID)),
+	).All(ctx)
 	if err != nil {
 		return 0, err
+	}
+	for _, key := range keys {
+		priorities := key.GroupIds
+		if len(priorities) == 0 && key.GroupID != nil {
+			priorities = []int64{*key.GroupID}
+		}
+		updated := make([]int64, 0, len(priorities))
+		seen := make(map[int64]struct{}, len(priorities))
+		for _, candidateID := range priorities {
+			if candidateID == oldGroupID {
+				candidateID = newGroupID
+			}
+			if _, exists := seen[candidateID]; exists {
+				continue
+			}
+			seen[candidateID] = struct{}{}
+			updated = append(updated, candidateID)
+		}
+		update := client.APIKey.UpdateOneID(key.ID).SetGroupIds(updated)
+		if len(updated) > 0 {
+			update.SetGroupID(updated[0])
+		} else {
+			update.ClearGroupID()
+		}
+		if _, err := update.Save(ctx); err != nil {
+			return 0, err
+		}
 	}
 	// 目标分组已存在时保留其原前缀，并删除旧分组映射避免唯一约束冲突。
 	bindings, err := client.APIKeyCompositeGroup.Query().
@@ -1099,13 +1175,14 @@ func (r *apiKeyRepository) UpdateGroupIDByUserAndGroup(ctx context.Context, user
 			return 0, err
 		}
 	}
-	return int64(n + len(bindings)), nil
+	return int64(len(keys) + len(bindings)), nil
 }
 
 // CountByGroupID 获取分组的 API Key 数量
 func (r *apiKeyRepository) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
 	count, err := r.activeQuery().Where(apikey.Or(
 		apikey.GroupIDEQ(groupID),
+		apiKeyGroupIDsContain(groupID),
 		apikey.HasCompositeGroupsWith(apikeycompositegroup.GroupIDEQ(groupID)),
 	)).Count(ctx)
 	return int64(count), err
@@ -1126,6 +1203,7 @@ func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64)
 	keys, err := r.activeQuery().
 		Where(apikey.Or(
 			apikey.GroupIDEQ(groupID),
+			apiKeyGroupIDsContain(groupID),
 			apikey.HasCompositeGroupsWith(apikeycompositegroup.GroupIDEQ(groupID)),
 		)).
 		Select(apikey.FieldKey).
@@ -1267,6 +1345,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		Name:                                  m.Name,
 		Status:                                m.Status,
 		FastModePolicy:                        m.FastModePolicy,
+		RoutingStrategy:                       m.RoutingStrategy,
 		BillingMode:                           m.BillingMode,
 		PreferredSubscriptionID:               m.PreferredSubscriptionID,
 		ModelMapping:                          service.CloneModelMapping(m.ModelMapping),
@@ -1276,6 +1355,7 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 		CreatedAt:                             m.CreatedAt,
 		UpdatedAt:                             m.UpdatedAt,
 		GroupID:                               m.GroupID,
+		GroupIDs:                              append([]int64(nil), m.GroupIds...),
 		IsComposite:                           m.IsComposite,
 		Quota:                                 m.Quota,
 		QuotaUsed:                             m.QuotaUsed,

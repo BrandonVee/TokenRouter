@@ -1,9 +1,11 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
+	"github.com/BrandonVee/TokenRouter/internal/pkg/ctxkey"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/ip"
 )
 
@@ -28,6 +30,65 @@ const (
 	APIKeyBillingModeSubscription = "subscription"
 	APIKeyBillingModeBalance      = "balance"
 )
+
+// API Key 路由策略常量。manual 保持有序分组的历史行为。
+const (
+	APIKeyRoutingStrategyManual      = "manual"
+	APIKeyRoutingStrategyAuto        = "auto"
+	APIKeyRoutingStrategySpeed       = "speed"
+	APIKeyRoutingStrategyPrice       = "price"
+	APIKeyRoutingStrategySuccessRate = "success_rate"
+)
+
+// NormalizeAPIKeyRoutingStrategy 校验并规范化 API Key 路由策略。
+func NormalizeAPIKeyRoutingStrategy(value string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "", APIKeyRoutingStrategyManual:
+		return APIKeyRoutingStrategyManual, true
+	case APIKeyRoutingStrategyAuto, APIKeyRoutingStrategySpeed, APIKeyRoutingStrategyPrice, APIKeyRoutingStrategySuccessRate:
+		return normalized, true
+	default:
+		return "", false
+	}
+}
+
+// APIKeyEffectiveRoutingStrategy 返回 Key 的有效路由策略。
+func APIKeyEffectiveRoutingStrategy(key *APIKey) string {
+	if key == nil {
+		return APIKeyRoutingStrategyManual
+	}
+	strategy, ok := NormalizeAPIKeyRoutingStrategy(key.RoutingStrategy)
+	if !ok {
+		return APIKeyRoutingStrategyManual
+	}
+	return strategy
+}
+
+// APIKeyRoutingStrategyFromContext 返回请求上下文中的有效策略。
+func APIKeyRoutingStrategyFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return APIKeyRoutingStrategyManual
+	}
+	value, _ := ctx.Value(ctxkey.APIKeyRoutingStrategy).(string)
+	strategy, _ := NormalizeAPIKeyRoutingStrategy(value)
+	if strategy == "" {
+		return APIKeyRoutingStrategyManual
+	}
+	return strategy
+}
+
+// WithAPIKeyRoutingStrategy 覆盖当前请求的 Key 路由策略，供请求解析层使用。
+func WithAPIKeyRoutingStrategy(ctx context.Context, strategy string) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	normalized, ok := NormalizeAPIKeyRoutingStrategy(strategy)
+	if !ok || normalized == APIKeyRoutingStrategyManual {
+		return ctx
+	}
+	return context.WithValue(ctx, ctxkey.APIKeyRoutingStrategy, normalized)
+}
 
 // NormalizeAPIKeyFastModePolicy 校验并规范化 API Key Fast 模式策略。
 // 空值用于兼容旧客户端，按跟随下游请求处理。
@@ -92,6 +153,8 @@ type APIKey struct {
 	Key               string
 	Name              string
 	GroupID           *int64
+	// GroupIDs 按优先级保存普通 Key 的候选分组；空列表继续使用默认分组逻辑。
+	GroupIDs []int64
 	// IsComposite 表示该 Key 通过模型前缀选择多个分组。
 	IsComposite bool
 	// CompositeGroups 按用户配置顺序保存复合 Key 的分组映射。
@@ -99,6 +162,8 @@ type APIKey struct {
 	Status          string
 	// FastModePolicy 控制该 Key 的请求级 Fast 模式，系统策略仍拥有更高优先级。
 	FastModePolicy string
+	// RoutingStrategy 控制最终分组内的账号排序；manual 保持基础调度行为。
+	RoutingStrategy string
 	// BillingMode 控制该 Key 的资金来源；subscription 模式必须携带 PreferredSubscriptionID。
 	BillingMode             string
 	PreferredSubscriptionID *int64

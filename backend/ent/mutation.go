@@ -126,9 +126,12 @@ type APIKeyMutation struct {
 	team_owner_disabled                        *bool
 	key                                        *string
 	name                                       *string
+	group_ids                                  *[]int64
+	appendgroup_ids                            []int64
 	is_composite                               *bool
 	status                                     *string
 	fast_mode_policy                           *string
+	routing_strategy                           *string
 	billing_mode                               *string
 	preferred_subscription_id                  *int64
 	addpreferred_subscription_id               *int64
@@ -648,6 +651,57 @@ func (m *APIKeyMutation) ResetGroupID() {
 	delete(m.clearedFields, apikey.FieldGroupID)
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (m *APIKeyMutation) SetGroupIds(i []int64) {
+	m.group_ids = &i
+	m.appendgroup_ids = nil
+}
+
+// GroupIds returns the value of the "group_ids" field in the mutation.
+func (m *APIKeyMutation) GroupIds() (r []int64, exists bool) {
+	v := m.group_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGroupIds returns the old "group_ids" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldGroupIds(ctx context.Context) (v []int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGroupIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGroupIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGroupIds: %w", err)
+	}
+	return oldValue.GroupIds, nil
+}
+
+// AppendGroupIds adds i to the "group_ids" field.
+func (m *APIKeyMutation) AppendGroupIds(i []int64) {
+	m.appendgroup_ids = append(m.appendgroup_ids, i...)
+}
+
+// AppendedGroupIds returns the list of values that were appended to the "group_ids" field in this mutation.
+func (m *APIKeyMutation) AppendedGroupIds() ([]int64, bool) {
+	if len(m.appendgroup_ids) == 0 {
+		return nil, false
+	}
+	return m.appendgroup_ids, true
+}
+
+// ResetGroupIds resets all changes to the "group_ids" field.
+func (m *APIKeyMutation) ResetGroupIds() {
+	m.group_ids = nil
+	m.appendgroup_ids = nil
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (m *APIKeyMutation) SetIsComposite(b bool) {
 	m.is_composite = &b
@@ -754,6 +808,42 @@ func (m *APIKeyMutation) OldFastModePolicy(ctx context.Context) (v string, err e
 // ResetFastModePolicy resets all changes to the "fast_mode_policy" field.
 func (m *APIKeyMutation) ResetFastModePolicy() {
 	m.fast_mode_policy = nil
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (m *APIKeyMutation) SetRoutingStrategy(s string) {
+	m.routing_strategy = &s
+}
+
+// RoutingStrategy returns the value of the "routing_strategy" field in the mutation.
+func (m *APIKeyMutation) RoutingStrategy() (r string, exists bool) {
+	v := m.routing_strategy
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRoutingStrategy returns the old "routing_strategy" field's value of the APIKey entity.
+// If the APIKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *APIKeyMutation) OldRoutingStrategy(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRoutingStrategy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRoutingStrategy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRoutingStrategy: %w", err)
+	}
+	return oldValue.RoutingStrategy, nil
+}
+
+// ResetRoutingStrategy resets all changes to the "routing_strategy" field.
+func (m *APIKeyMutation) ResetRoutingStrategy() {
+	m.routing_strategy = nil
 }
 
 // SetBillingMode sets the "billing_mode" field.
@@ -2316,7 +2406,7 @@ func (m *APIKeyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *APIKeyMutation) Fields() []string {
-	fields := make([]string, 0, 37)
+	fields := make([]string, 0, 39)
 	if m.created_at != nil {
 		fields = append(fields, apikey.FieldCreatedAt)
 	}
@@ -2344,6 +2434,9 @@ func (m *APIKeyMutation) Fields() []string {
 	if m.group != nil {
 		fields = append(fields, apikey.FieldGroupID)
 	}
+	if m.group_ids != nil {
+		fields = append(fields, apikey.FieldGroupIds)
+	}
 	if m.is_composite != nil {
 		fields = append(fields, apikey.FieldIsComposite)
 	}
@@ -2352,6 +2445,9 @@ func (m *APIKeyMutation) Fields() []string {
 	}
 	if m.fast_mode_policy != nil {
 		fields = append(fields, apikey.FieldFastModePolicy)
+	}
+	if m.routing_strategy != nil {
+		fields = append(fields, apikey.FieldRoutingStrategy)
 	}
 	if m.billing_mode != nil {
 		fields = append(fields, apikey.FieldBillingMode)
@@ -2454,12 +2550,16 @@ func (m *APIKeyMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case apikey.FieldGroupID:
 		return m.GroupID()
+	case apikey.FieldGroupIds:
+		return m.GroupIds()
 	case apikey.FieldIsComposite:
 		return m.IsComposite()
 	case apikey.FieldStatus:
 		return m.Status()
 	case apikey.FieldFastModePolicy:
 		return m.FastModePolicy()
+	case apikey.FieldRoutingStrategy:
+		return m.RoutingStrategy()
 	case apikey.FieldBillingMode:
 		return m.BillingMode()
 	case apikey.FieldPreferredSubscriptionID:
@@ -2537,12 +2637,16 @@ func (m *APIKeyMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldName(ctx)
 	case apikey.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case apikey.FieldGroupIds:
+		return m.OldGroupIds(ctx)
 	case apikey.FieldIsComposite:
 		return m.OldIsComposite(ctx)
 	case apikey.FieldStatus:
 		return m.OldStatus(ctx)
 	case apikey.FieldFastModePolicy:
 		return m.OldFastModePolicy(ctx)
+	case apikey.FieldRoutingStrategy:
+		return m.OldRoutingStrategy(ctx)
 	case apikey.FieldBillingMode:
 		return m.OldBillingMode(ctx)
 	case apikey.FieldPreferredSubscriptionID:
@@ -2665,6 +2769,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetGroupID(v)
 		return nil
+	case apikey.FieldGroupIds:
+		v, ok := value.([]int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGroupIds(v)
+		return nil
 	case apikey.FieldIsComposite:
 		v, ok := value.(bool)
 		if !ok {
@@ -2685,6 +2796,13 @@ func (m *APIKeyMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFastModePolicy(v)
+		return nil
+	case apikey.FieldRoutingStrategy:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRoutingStrategy(v)
 		return nil
 	case apikey.FieldBillingMode:
 		v, ok := value.(string)
@@ -3183,6 +3301,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 	case apikey.FieldGroupID:
 		m.ResetGroupID()
 		return nil
+	case apikey.FieldGroupIds:
+		m.ResetGroupIds()
+		return nil
 	case apikey.FieldIsComposite:
 		m.ResetIsComposite()
 		return nil
@@ -3191,6 +3312,9 @@ func (m *APIKeyMutation) ResetField(name string) error {
 		return nil
 	case apikey.FieldFastModePolicy:
 		m.ResetFastModePolicy()
+		return nil
+	case apikey.FieldRoutingStrategy:
+		m.ResetRoutingStrategy()
 		return nil
 	case apikey.FieldBillingMode:
 		m.ResetBillingMode()

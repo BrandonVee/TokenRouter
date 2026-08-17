@@ -168,6 +168,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
 		return
 	}
+	if parsedReq.RoutingStrategy != "" {
+		c.Request = c.Request.WithContext(service.WithAPIKeyRoutingStrategy(c.Request.Context(), parsedReq.RoutingStrategy))
+	}
 	body = parsedReq.Body.Bytes()
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream

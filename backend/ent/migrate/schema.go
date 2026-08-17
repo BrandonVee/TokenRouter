@@ -18,9 +18,11 @@ var (
 		{Name: "team_owner_disabled", Type: field.TypeBool, Default: false},
 		{Name: "key", Type: field.TypeString, Unique: true, Size: 128},
 		{Name: "name", Type: field.TypeString, Size: 100},
+		{Name: "group_ids", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
 		{Name: "is_composite", Type: field.TypeBool, Default: false},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
 		{Name: "fast_mode_policy", Type: field.TypeString, Size: 32, Default: "follow_request"},
+		{Name: "routing_strategy", Type: field.TypeString, Size: 32, Default: "manual"},
 		{Name: "billing_mode", Type: field.TypeString, Size: 32, Default: "auto"},
 		{Name: "preferred_subscription_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "model_mapping", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
@@ -58,19 +60,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "api_keys_groups_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[35]},
+				Columns:    []*schema.Column{APIKeysColumns[37]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_teams_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[36]},
+				Columns:    []*schema.Column{APIKeysColumns[38]},
 				RefColumns: []*schema.Column{TeamsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "api_keys_users_api_keys",
-				Columns:    []*schema.Column{APIKeysColumns[37]},
+				Columns:    []*schema.Column{APIKeysColumns[39]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -79,22 +81,22 @@ var (
 			{
 				Name:    "apikey_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[37]},
+				Columns: []*schema.Column{APIKeysColumns[39]},
 			},
 			{
 				Name:    "apikey_team_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[36]},
+				Columns: []*schema.Column{APIKeysColumns[38]},
 			},
 			{
 				Name:    "apikey_group_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[35]},
+				Columns: []*schema.Column{APIKeysColumns[37]},
 			},
 			{
 				Name:    "apikey_status",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[8]},
+				Columns: []*schema.Column{APIKeysColumns[9]},
 			},
 			{
 				Name:    "apikey_deleted_at",
@@ -104,22 +106,22 @@ var (
 			{
 				Name:    "apikey_last_used_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[13]},
+				Columns: []*schema.Column{APIKeysColumns[15]},
 			},
 			{
 				Name:    "apikey_quota_quota_used",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[16], APIKeysColumns[17]},
+				Columns: []*schema.Column{APIKeysColumns[18], APIKeysColumns[19]},
 			},
 			{
 				Name:    "apikey_expires_at",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[18]},
+				Columns: []*schema.Column{APIKeysColumns[20]},
 			},
 			{
 				Name:    "apikey_data_sharing_confirmed_group_id",
 				Unique:  false,
-				Columns: []*schema.Column{APIKeysColumns[32]},
+				Columns: []*schema.Column{APIKeysColumns[34]},
 			},
 		},
 	}

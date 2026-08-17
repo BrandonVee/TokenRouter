@@ -179,6 +179,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				}
 			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
+			c.Request = c.Request.WithContext(service.WithAPIKeyRoutingStrategy(c.Request.Context(), service.APIKeyEffectiveRoutingStrategy(apiKey)))
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,
 				Concurrency: apiKey.User.Concurrency,
@@ -262,6 +263,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		}
 
 		c.Set(string(ContextKeyAPIKey), apiKey)
+		c.Request = c.Request.WithContext(service.WithAPIKeyRoutingStrategy(c.Request.Context(), service.APIKeyEffectiveRoutingStrategy(apiKey)))
 		c.Set(string(ContextKeyUser), AuthSubject{
 			UserID:      apiKey.User.ID,
 			Concurrency: apiKey.User.Concurrency,

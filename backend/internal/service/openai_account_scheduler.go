@@ -625,6 +625,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		},
 		time.Now(),
 	)
+	applyAPIKeyPriceRoutingScores(ctx, plan.candidates)
 
 	plan.topK = effectiveSettings.topK
 	if plan.topK > len(plan.candidates) {
@@ -1443,13 +1444,13 @@ func (s *OpenAIGatewayService) groupUsesAdvancedScheduler(ctx context.Context, g
 		return false
 	}
 	if group, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(group) && group.ID == *groupID {
-		return group.UsesAdvancedScheduler()
+		return group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual
 	}
 	if s.schedulerSnapshot == nil {
 		return false
 	}
 	group, err := s.schedulerSnapshot.GetGroupByID(ctx, *groupID)
-	return err == nil && group != nil && group.UsesAdvancedScheduler()
+	return err == nil && group != nil && (group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual)
 }
 
 func (s *OpenAIGatewayService) getOpenAIAccountScheduler(ctx context.Context, groupID *int64) OpenAIAccountScheduler {

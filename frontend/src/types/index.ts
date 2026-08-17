@@ -802,6 +802,7 @@ export type ApiKeyFastModePolicy = 'follow_request' | 'force_on' | 'force_off'
 
 // API Key 的资金来源策略；auto 保持订阅优先、余额兜底的历史行为。
 export type ApiKeyBillingMode = 'auto' | 'subscription' | 'balance'
+export type ApiKeyRoutingStrategy = 'manual' | 'auto' | 'speed' | 'price' | 'success_rate'
 
 // 供 API Key 配置页选择指定订阅的安全摘要。
 export interface ApiKeyBillingSubscriptionOption {
@@ -829,10 +830,12 @@ export interface ApiKey {
   key: string
   name: string
   group_id: number | null
+  group_ids?: number[]
   is_composite?: boolean
   composite_groups?: ApiKeyCompositeGroup[]
   status: 'active' | 'inactive' | 'disabled' | 'quota_exhausted' | 'expired'
   fast_mode_policy: ApiKeyFastModePolicy
+  routing_strategy?: ApiKeyRoutingStrategy
   billing_mode?: ApiKeyBillingMode
   preferred_subscription_id?: number | null
   model_mapping: Record<string, string>
@@ -877,9 +880,11 @@ export interface CreateApiKeyRequest {
   name: string
   scope?: 'personal' | 'team'
   group_id?: number | null
+  group_ids?: number[]
   is_composite?: boolean
   composite_groups?: Array<{ group_id: number; prefix: string }>
   fast_mode_policy?: ApiKeyFastModePolicy
+  routing_strategy?: ApiKeyRoutingStrategy
   billing_mode?: ApiKeyBillingMode
   preferred_subscription_id?: number | null
   model_mapping?: Record<string, string>
@@ -904,10 +909,12 @@ export interface CreateApiKeyRequest {
 export interface UpdateApiKeyRequest {
   name?: string
   group_id?: number | null
+  group_ids?: number[]
   is_composite?: boolean
   composite_groups?: Array<{ group_id: number; prefix: string }>
   status?: 'active' | 'inactive'
   fast_mode_policy?: ApiKeyFastModePolicy
+  routing_strategy?: ApiKeyRoutingStrategy
   billing_mode?: ApiKeyBillingMode
   preferred_subscription_id?: number | null
   model_mapping?: Record<string, string>

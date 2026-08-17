@@ -39,12 +39,16 @@ type APIKey struct {
 	Name string `json:"name,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID *int64 `json:"group_id,omitempty"`
+	// 普通 API Key 的有序候选分组 ID
+	GroupIds []int64 `json:"group_ids,omitempty"`
 	// 是否通过模型前缀在多个分组之间路由
 	IsComposite bool `json:"is_composite,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// API Key 的 Fast 模式策略：follow_request、force_on 或 force_off
 	FastModePolicy string `json:"fast_mode_policy,omitempty"`
+	// API Key 路由策略：manual、auto、speed、price 或 success_rate
+	RoutingStrategy string `json:"routing_strategy,omitempty"`
 	// API Key 结算模式：auto、subscription 或 balance
 	BillingMode string `json:"billing_mode,omitempty"`
 	// billing_mode 为 subscription 时锁定使用的用户订阅 ID
@@ -174,7 +178,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case apikey.FieldModelMapping, apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
+		case apikey.FieldGroupIds, apikey.FieldModelMapping, apikey.FieldIPWhitelist, apikey.FieldIPBlacklist:
 			values[i] = new([]byte)
 		case apikey.FieldTeamOwnerDisabled, apikey.FieldIsComposite, apikey.FieldFallbackToDefaultGroupWhenUnavailable:
 			values[i] = new(sql.NullBool)
@@ -182,7 +186,7 @@ func (*APIKey) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullFloat64)
 		case apikey.FieldID, apikey.FieldUserID, apikey.FieldTeamID, apikey.FieldGroupID, apikey.FieldPreferredSubscriptionID, apikey.FieldDataSharingNoticeVersion, apikey.FieldDataSharingConfirmedGroupID:
 			values[i] = new(sql.NullInt64)
-		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus, apikey.FieldFastModePolicy, apikey.FieldBillingMode:
+		case apikey.FieldKey, apikey.FieldName, apikey.FieldStatus, apikey.FieldFastModePolicy, apikey.FieldRoutingStrategy, apikey.FieldBillingMode:
 			values[i] = new(sql.NullString)
 		case apikey.FieldCreatedAt, apikey.FieldUpdatedAt, apikey.FieldDeletedAt, apikey.FieldLastUsedAt, apikey.FieldExpiresAt, apikey.FieldWindow5hStart, apikey.FieldWindow1dStart, apikey.FieldWindow7dStart, apikey.FieldWindow30dStart, apikey.FieldDataSharingConfirmedAt:
 			values[i] = new(sql.NullTime)
@@ -264,6 +268,14 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				_m.GroupID = new(int64)
 				*_m.GroupID = value.Int64
 			}
+		case apikey.FieldGroupIds:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field group_ids", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.GroupIds); err != nil {
+					return fmt.Errorf("unmarshal field group_ids: %w", err)
+				}
+			}
 		case apikey.FieldIsComposite:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field is_composite", values[i])
@@ -281,6 +293,12 @@ func (_m *APIKey) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field fast_mode_policy", values[i])
 			} else if value.Valid {
 				_m.FastModePolicy = value.String
+			}
+		case apikey.FieldRoutingStrategy:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field routing_strategy", values[i])
+			} else if value.Valid {
+				_m.RoutingStrategy = value.String
 			}
 		case apikey.FieldBillingMode:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -541,6 +559,9 @@ func (_m *APIKey) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
+	builder.WriteString("group_ids=")
+	builder.WriteString(fmt.Sprintf("%v", _m.GroupIds))
+	builder.WriteString(", ")
 	builder.WriteString("is_composite=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsComposite))
 	builder.WriteString(", ")
@@ -549,6 +570,9 @@ func (_m *APIKey) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("fast_mode_policy=")
 	builder.WriteString(_m.FastModePolicy)
+	builder.WriteString(", ")
+	builder.WriteString("routing_strategy=")
+	builder.WriteString(_m.RoutingStrategy)
 	builder.WriteString(", ")
 	builder.WriteString("billing_mode=")
 	builder.WriteString(_m.BillingMode)

@@ -186,6 +186,7 @@ func TestAPIKeyUpdateConvertsBetweenOrdinaryAndComposite(t *testing.T) {
 	require.Len(t, converted.CompositeGroups, 2)
 	require.Equal(t, APIKeyUpdateFields{
 		GroupID:                 true,
+		GroupIDs:                true,
 		CompositeConfiguration:  true,
 		DataSharingConfirmation: true,
 	}, repo.updatedFields[0])
@@ -202,7 +203,7 @@ func TestAPIKeyUpdateConvertsBetweenOrdinaryAndComposite(t *testing.T) {
 	require.False(t, converted.IsComposite)
 	require.Equal(t, targetGroupID, *converted.GroupID)
 	require.Empty(t, converted.CompositeGroups)
-	require.Equal(t, APIKeyUpdateFields{GroupID: true, CompositeConfiguration: true}, repo.updatedFields[1])
+	require.Equal(t, APIKeyUpdateFields{GroupID: true, GroupIDs: true, CompositeConfiguration: true}, repo.updatedFields[1])
 }
 
 func TestCompositeAPIKeyDataSharingConsentCoversNewMappings(t *testing.T) {
@@ -234,6 +235,7 @@ func TestCompositeAPIKeyDataSharingConsentCoversNewMappings(t *testing.T) {
 	}
 	require.Equal(t, APIKeyUpdateFields{
 		GroupID:                 true,
+		GroupIDs:                true,
 		CompositeConfiguration:  true,
 		DataSharingConfirmation: true,
 	}, repo.updatedFields[0])

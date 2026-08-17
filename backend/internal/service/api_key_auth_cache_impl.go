@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 34 // v34：认证快照包含 API Key 30 天月限额
+const apiKeyAuthSnapshotVersion = 35 // v35：认证快照包含 API Key 路由策略
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -390,10 +390,12 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		TeamOwnerDisabled:                     apiKey.TeamOwnerDisabled,
 		CreatedAt:                             apiKey.CreatedAt,
 		GroupID:                               apiKey.GroupID,
+		GroupIDs:                              append([]int64(nil), apiKey.GroupIDs...),
 		IsComposite:                           apiKey.IsComposite,
 		Name:                                  apiKey.Name,
 		Status:                                apiKey.Status,
 		FastModePolicy:                        apiKey.FastModePolicy,
+		RoutingStrategy:                       apiKey.RoutingStrategy,
 		BillingMode:                           apiKey.BillingMode,
 		PreferredSubscriptionID:               apiKey.PreferredSubscriptionID,
 		ModelMapping:                          CloneModelMapping(apiKey.ModelMapping),
@@ -531,11 +533,13 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		TeamOwnerDisabled:                     snapshot.TeamOwnerDisabled,
 		CreatedAt:                             snapshot.CreatedAt,
 		GroupID:                               snapshot.GroupID,
+		GroupIDs:                              append([]int64(nil), snapshot.GroupIDs...),
 		IsComposite:                           snapshot.IsComposite,
 		Key:                                   key,
 		Name:                                  snapshot.Name,
 		Status:                                snapshot.Status,
 		FastModePolicy:                        snapshot.FastModePolicy,
+		RoutingStrategy:                       snapshot.RoutingStrategy,
 		BillingMode:                           snapshot.BillingMode,
 		PreferredSubscriptionID:               snapshot.PreferredSubscriptionID,
 		ModelMapping:                          CloneModelMapping(snapshot.ModelMapping),

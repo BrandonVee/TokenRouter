@@ -156,6 +156,18 @@ func (_u *APIKeyUpdate) ClearGroupID() *APIKeyUpdate {
 	return _u
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (_u *APIKeyUpdate) SetGroupIds(v []int64) *APIKeyUpdate {
+	_u.mutation.SetGroupIds(v)
+	return _u
+}
+
+// AppendGroupIds appends value to the "group_ids" field.
+func (_u *APIKeyUpdate) AppendGroupIds(v []int64) *APIKeyUpdate {
+	_u.mutation.AppendGroupIds(v)
+	return _u
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (_u *APIKeyUpdate) SetIsComposite(v bool) *APIKeyUpdate {
 	_u.mutation.SetIsComposite(v)
@@ -194,6 +206,20 @@ func (_u *APIKeyUpdate) SetFastModePolicy(v string) *APIKeyUpdate {
 func (_u *APIKeyUpdate) SetNillableFastModePolicy(v *string) *APIKeyUpdate {
 	if v != nil {
 		_u.SetFastModePolicy(*v)
+	}
+	return _u
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (_u *APIKeyUpdate) SetRoutingStrategy(v string) *APIKeyUpdate {
+	_u.mutation.SetRoutingStrategy(v)
+	return _u
+}
+
+// SetNillableRoutingStrategy sets the "routing_strategy" field if the given value is not nil.
+func (_u *APIKeyUpdate) SetNillableRoutingStrategy(v *string) *APIKeyUpdate {
+	if v != nil {
+		_u.SetRoutingStrategy(*v)
 	}
 	return _u
 }
@@ -867,6 +893,11 @@ func (_u *APIKeyUpdate) check() error {
 			return &ValidationError{Name: "fast_mode_policy", err: fmt.Errorf(`ent: validator failed for field "APIKey.fast_mode_policy": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RoutingStrategy(); ok {
+		if err := apikey.RoutingStrategyValidator(v); err != nil {
+			return &ValidationError{Name: "routing_strategy", err: fmt.Errorf(`ent: validator failed for field "APIKey.routing_strategy": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.BillingMode(); ok {
 		if err := apikey.BillingModeValidator(v); err != nil {
 			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "APIKey.billing_mode": %w`, err)}
@@ -908,6 +939,14 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.GroupIds(); ok {
+		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedGroupIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldGroupIds, value)
+		})
+	}
 	if value, ok := _u.mutation.IsComposite(); ok {
 		_spec.SetField(apikey.FieldIsComposite, field.TypeBool, value)
 	}
@@ -916,6 +955,9 @@ func (_u *APIKeyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.FastModePolicy(); ok {
 		_spec.SetField(apikey.FieldFastModePolicy, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RoutingStrategy(); ok {
+		_spec.SetField(apikey.FieldRoutingStrategy, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.BillingMode(); ok {
 		_spec.SetField(apikey.FieldBillingMode, field.TypeString, value)
@@ -1393,6 +1435,18 @@ func (_u *APIKeyUpdateOne) ClearGroupID() *APIKeyUpdateOne {
 	return _u
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (_u *APIKeyUpdateOne) SetGroupIds(v []int64) *APIKeyUpdateOne {
+	_u.mutation.SetGroupIds(v)
+	return _u
+}
+
+// AppendGroupIds appends value to the "group_ids" field.
+func (_u *APIKeyUpdateOne) AppendGroupIds(v []int64) *APIKeyUpdateOne {
+	_u.mutation.AppendGroupIds(v)
+	return _u
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (_u *APIKeyUpdateOne) SetIsComposite(v bool) *APIKeyUpdateOne {
 	_u.mutation.SetIsComposite(v)
@@ -1431,6 +1485,20 @@ func (_u *APIKeyUpdateOne) SetFastModePolicy(v string) *APIKeyUpdateOne {
 func (_u *APIKeyUpdateOne) SetNillableFastModePolicy(v *string) *APIKeyUpdateOne {
 	if v != nil {
 		_u.SetFastModePolicy(*v)
+	}
+	return _u
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (_u *APIKeyUpdateOne) SetRoutingStrategy(v string) *APIKeyUpdateOne {
+	_u.mutation.SetRoutingStrategy(v)
+	return _u
+}
+
+// SetNillableRoutingStrategy sets the "routing_strategy" field if the given value is not nil.
+func (_u *APIKeyUpdateOne) SetNillableRoutingStrategy(v *string) *APIKeyUpdateOne {
+	if v != nil {
+		_u.SetRoutingStrategy(*v)
 	}
 	return _u
 }
@@ -2117,6 +2185,11 @@ func (_u *APIKeyUpdateOne) check() error {
 			return &ValidationError{Name: "fast_mode_policy", err: fmt.Errorf(`ent: validator failed for field "APIKey.fast_mode_policy": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RoutingStrategy(); ok {
+		if err := apikey.RoutingStrategyValidator(v); err != nil {
+			return &ValidationError{Name: "routing_strategy", err: fmt.Errorf(`ent: validator failed for field "APIKey.routing_strategy": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.BillingMode(); ok {
 		if err := apikey.BillingModeValidator(v); err != nil {
 			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "APIKey.billing_mode": %w`, err)}
@@ -2175,6 +2248,14 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	if value, ok := _u.mutation.Name(); ok {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.GroupIds(); ok {
+		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedGroupIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, apikey.FieldGroupIds, value)
+		})
+	}
 	if value, ok := _u.mutation.IsComposite(); ok {
 		_spec.SetField(apikey.FieldIsComposite, field.TypeBool, value)
 	}
@@ -2183,6 +2264,9 @@ func (_u *APIKeyUpdateOne) sqlSave(ctx context.Context) (_node *APIKey, err erro
 	}
 	if value, ok := _u.mutation.FastModePolicy(); ok {
 		_spec.SetField(apikey.FieldFastModePolicy, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RoutingStrategy(); ok {
+		_spec.SetField(apikey.FieldRoutingStrategy, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.BillingMode(); ok {
 		_spec.SetField(apikey.FieldBillingMode, field.TypeString, value)

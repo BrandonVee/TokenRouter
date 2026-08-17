@@ -273,6 +273,20 @@ type advancedSchedulerScoreRanges struct {
 
 type advancedSchedulerCandidateHeap []advancedSchedulerCandidateScore
 
+// applyAPIKeyPriceRoutingScores 使用账号成本倍率覆盖最终分数，并保留统一 Top-K 选择流程。
+func applyAPIKeyPriceRoutingScores(ctx context.Context, candidates []advancedSchedulerCandidateScore) {
+	if APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyPrice {
+		return
+	}
+	for index := range candidates {
+		if candidates[index].account == nil {
+			continue
+		}
+		candidates[index].baseScore = -candidates[index].account.BillingRateMultiplier()
+		candidates[index].score = candidates[index].baseScore
+	}
+}
+
 func (h advancedSchedulerCandidateHeap) Len() int {
 	return len(h)
 }

@@ -33,12 +33,16 @@ const (
 	FieldName = "name"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_id"
+	// FieldGroupIds holds the string denoting the group_ids field in the database.
+	FieldGroupIds = "group_ids"
 	// FieldIsComposite holds the string denoting the is_composite field in the database.
 	FieldIsComposite = "is_composite"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldFastModePolicy holds the string denoting the fast_mode_policy field in the database.
 	FieldFastModePolicy = "fast_mode_policy"
+	// FieldRoutingStrategy holds the string denoting the routing_strategy field in the database.
+	FieldRoutingStrategy = "routing_strategy"
 	// FieldBillingMode holds the string denoting the billing_mode field in the database.
 	FieldBillingMode = "billing_mode"
 	// FieldPreferredSubscriptionID holds the string denoting the preferred_subscription_id field in the database.
@@ -150,9 +154,11 @@ var Columns = []string{
 	FieldKey,
 	FieldName,
 	FieldGroupID,
+	FieldGroupIds,
 	FieldIsComposite,
 	FieldStatus,
 	FieldFastModePolicy,
+	FieldRoutingStrategy,
 	FieldBillingMode,
 	FieldPreferredSubscriptionID,
 	FieldModelMapping,
@@ -210,6 +216,8 @@ var (
 	KeyValidator func(string) error
 	// NameValidator is a validator for the "name" field. It is called by the builders before save.
 	NameValidator func(string) error
+	// DefaultGroupIds holds the default value on creation for the "group_ids" field.
+	DefaultGroupIds func() []int64
 	// DefaultIsComposite holds the default value on creation for the "is_composite" field.
 	DefaultIsComposite bool
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -220,6 +228,10 @@ var (
 	DefaultFastModePolicy string
 	// FastModePolicyValidator is a validator for the "fast_mode_policy" field. It is called by the builders before save.
 	FastModePolicyValidator func(string) error
+	// DefaultRoutingStrategy holds the default value on creation for the "routing_strategy" field.
+	DefaultRoutingStrategy string
+	// RoutingStrategyValidator is a validator for the "routing_strategy" field. It is called by the builders before save.
+	RoutingStrategyValidator func(string) error
 	// DefaultBillingMode holds the default value on creation for the "billing_mode" field.
 	DefaultBillingMode string
 	// BillingModeValidator is a validator for the "billing_mode" field. It is called by the builders before save.
@@ -318,6 +330,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByFastModePolicy orders the results by the fast_mode_policy field.
 func ByFastModePolicy(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFastModePolicy, opts...).ToFunc()
+}
+
+// ByRoutingStrategy orders the results by the routing_strategy field.
+func ByRoutingStrategy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRoutingStrategy, opts...).ToFunc()
 }
 
 // ByBillingMode orders the results by the billing_mode field.

@@ -113,6 +113,7 @@ func clearGatewayRequestDerivedState(parsed *ParsedRequest) {
 		return
 	}
 	parsed.Model = ""
+	parsed.RoutingStrategy = ""
 	parsed.Stream = false
 	parsed.MetadataUserID = ""
 	parsed.HasSystem = false
@@ -196,6 +197,16 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 			return fmt.Errorf("invalid model field type")
 		}
 		parsed.Model = modelResult.String()
+		parsed.Model, parsed.RoutingStrategy = normalizeProviderRoutingOverride(parsed.Model)
+		if parsed.RoutingStrategy != "" {
+			normalizedBody, err := sjson.SetBytes(bodyBytes, "model", parsed.Model)
+			if err != nil {
+				return fmt.Errorf("normalize provider model suffix: %w", err)
+			}
+			parsed.Body.Replace(normalizedBody)
+			bodyBytes = normalizedBody
+			jsonStr = *(*string)(unsafe.Pointer(&bodyBytes))
+		}
 		if protocol == domain.PlatformAnthropic {
 			normalizedModel := normalizeClaudeCodeLongContextModel(parsed.Model)
 			if normalizedModel != parsed.Model {
@@ -209,6 +220,17 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 				parsed.Model = normalizedModel
 			}
 		}
+	}
+	if strategy := normalizeProviderSort(strings.ToLower(strings.TrimSpace(gjson.Get(jsonStr, "provider.sort").String()))); strategy != "" {
+		parsed.RoutingStrategy = strategy
+		// provider 是路由器扩展字段，消费后不得继续发给上游协议。
+		normalizedBody, err := sjson.DeleteBytes(bodyBytes, "provider")
+		if err != nil {
+			return fmt.Errorf("remove provider routing field: %w", err)
+		}
+		parsed.Body.Replace(normalizedBody)
+		bodyBytes = normalizedBody
+		jsonStr = *(*string)(unsafe.Pointer(&bodyBytes))
 	}
 
 	streamResult := gjson.Get(jsonStr, "stream")
@@ -237,6 +259,36 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 
 	setGatewayRequestRanges(parsed, protocol, jsonStr)
 	return nil
+}
+
+// normalizeProviderRoutingOverride 支持 OpenRouter 风格的 :nitro/:floor 模型后缀。
+func normalizeProviderRoutingOverride(model string) (string, string) {
+	model = strings.TrimSpace(model)
+	for _, suffix := range []struct{ value, strategy string }{
+		{":nitro", APIKeyRoutingStrategySpeed},
+		{":floor", APIKeyRoutingStrategyPrice},
+	} {
+		if len(model) > len(suffix.value) && strings.HasSuffix(strings.ToLower(model), suffix.value) {
+			return strings.TrimSpace(model[:len(model)-len(suffix.value)]), suffix.strategy
+		}
+	}
+	return model, ""
+}
+
+// normalizeProviderSort 将请求级 provider.sort 归一化为 Key 路由策略。
+func normalizeProviderSort(value string) string {
+	switch value {
+	case "price", "cost", "floor":
+		return APIKeyRoutingStrategyPrice
+	case "latency", "speed", "throughput", "nitro":
+		return APIKeyRoutingStrategySpeed
+	case "success", "success_rate", "reliability":
+		return APIKeyRoutingStrategySuccessRate
+	case "auto", "balanced":
+		return APIKeyRoutingStrategyAuto
+	default:
+		return ""
+	}
 }
 
 func refreshGatewayRequestRanges(parsed *ParsedRequest, protocol string) error {
@@ -272,8 +324,10 @@ func DescribeInvalidJSON(body []byte) error {
 // 2. 将解析结果 ParsedRequest 传递给 Service 层
 // 3. 避免重复 json.Unmarshal，减少 CPU 和内存开销
 type ParsedRequest struct {
-	Body            *RequestBodyRef // 原始请求体引用（保留用于转发）；替换内容请走 ReplaceBody
-	Model           string          // 请求的模型名称
+	Body  *RequestBodyRef // 原始请求体引用（保留用于转发）；替换内容请走 ReplaceBody
+	Model string          // 请求的模型名称
+	// RoutingStrategy 请求级 provider.sort 或模型后缀解析出的覆盖策略。
+	RoutingStrategy string
 	Stream          bool            // 是否为流式请求
 	MetadataUserID  string          // metadata.user_id（用于会话亲和）
 	HasSystem       bool            // 是否包含 system 字段（包含 null 也视为显式传入）

@@ -685,6 +685,35 @@ describe('user KeysView column settings', () => {
     expect(groupSelect?.props('options')[0]).not.toHaveProperty('capacity')
   })
 
+  it('快捷分组编辑器可同时保存候选分组优先级和智能策略', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [{ ...createApiKey(), group_id: 42, group_ids: [42], routing_strategy: 'manual' }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+    getAvailableGroups.mockResolvedValueOnce([
+      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
+      { id: 43, name: 'Claude', platform: 'anthropic', rate_multiplier: 1, data_sharing_enabled: false },
+    ])
+    const wrapper = await mountView()
+
+    await wrapper.get('[title="keys.clickToChangeGroup"]').trigger('click')
+    await nextTick()
+    const claudeButton = wrapper.findAll('button').find((button) => button.text().includes('Claude'))
+    expect(claudeButton).toBeDefined()
+    await claudeButton!.trigger('click')
+    await wrapper.get('[data-test="quick-routing-price"]').trigger('click')
+    await wrapper.get('[data-test="quick-routing-save"]').trigger('click')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
+      group_ids: [42, 43],
+      routing_strategy: 'price',
+    }))
+  })
+
   it('指定订阅后仅保留套餐允许的表单分组', async () => {
     listKeys.mockResolvedValueOnce({
       items: [{ ...createApiKey(), group_id: 43 }],
@@ -808,8 +837,62 @@ describe('user KeysView column settings', () => {
 
     expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
       name: 'fast-key',
-      group_id: 42,
+      group_ids: [42],
       fast_mode_policy: 'force_on',
+    }))
+  })
+
+  it('submits smart routing while keeping candidate groups selectable', async () => {
+    getAvailableGroups.mockResolvedValueOnce([
+      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
+    ])
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await wrapper.get('[data-tour="key-form-name"]').setValue('smart-key')
+    const groupSelect = wrapper.findAllComponents({ name: 'Select' }).find(
+      (select) => select.attributes('data-tour') === 'key-form-group'
+    )
+    await groupSelect!.vm.$emit('update:modelValue', 42)
+    await wrapper.get('[data-test="smart-routing-toggle"]').trigger('click')
+    await wrapper.get('[data-test="routing-strategy-speed"]').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('[data-test="priority-group-editor"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test="priority-group-row"]')).toHaveLength(1)
+    await wrapper.get('form#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'smart-key',
+      group_ids: [42],
+      routing_strategy: 'speed',
+    }))
+  })
+
+  it('submits candidate groups in the displayed priority order', async () => {
+    getAvailableGroups.mockResolvedValueOnce([
+      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
+      { id: 43, name: 'Claude', platform: 'anthropic', rate_multiplier: 1, data_sharing_enabled: false },
+    ])
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await wrapper.get('[data-tour="key-form-name"]').setValue('priority-key')
+    const groupSelect = wrapper.findAllComponents({ name: 'Select' }).find(
+      (select) => select.attributes('data-tour') === 'key-form-group'
+    )
+    await groupSelect!.vm.$emit('update:modelValue', 42)
+    await groupSelect!.vm.$emit('update:modelValue', 43)
+    await nextTick()
+
+    expect(wrapper.findAll('[data-test="priority-group-row"]')).toHaveLength(2)
+    await wrapper.get('form#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'priority-key',
+      group_ids: [42, 43],
     }))
   })
 
@@ -872,7 +955,7 @@ describe('user KeysView column settings', () => {
 
     expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
       name: 'composite-key',
-      group_id: undefined,
+      group_ids: undefined,
       is_composite: true,
       composite_groups: [
         { group_id: 42, prefix: 'GPT' },
@@ -1007,7 +1090,7 @@ describe('user KeysView column settings', () => {
     }
   })
 
-  it('requires an explicit target group when converting composite to ordinary', async () => {
+  it('uses the account default group when converting composite to an empty ordinary route', async () => {
     getAvailableGroups.mockResolvedValueOnce([
       { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
     ])
@@ -1030,20 +1113,10 @@ describe('user KeysView column settings', () => {
     await getButtonByText(wrapper, 'Edit').trigger('click')
     await wrapper.get('[data-test="composite-key-toggle"]').trigger('click')
     await wrapper.get('form#key-form').trigger('submit')
-    await nextTick()
-    expect(showError).toHaveBeenCalledWith('Group required')
-    expect(updateKey).not.toHaveBeenCalled()
-
-    const groupSelect = wrapper.findAllComponents({ name: 'Select' }).find(
-      (select) => select.attributes('data-tour') === 'key-form-group'
-    )
-    expect(groupSelect).toBeDefined()
-    await groupSelect!.vm.$emit('update:modelValue', 42)
-    await wrapper.get('form#key-form').trigger('submit')
     await flushPromises()
 
     expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
-      group_id: 42,
+      group_ids: [],
       is_composite: false,
       composite_groups: undefined,
     }))

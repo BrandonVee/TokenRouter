@@ -129,6 +129,12 @@ func (_c *APIKeyCreate) SetNillableGroupID(v *int64) *APIKeyCreate {
 	return _c
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (_c *APIKeyCreate) SetGroupIds(v []int64) *APIKeyCreate {
+	_c.mutation.SetGroupIds(v)
+	return _c
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (_c *APIKeyCreate) SetIsComposite(v bool) *APIKeyCreate {
 	_c.mutation.SetIsComposite(v)
@@ -167,6 +173,20 @@ func (_c *APIKeyCreate) SetFastModePolicy(v string) *APIKeyCreate {
 func (_c *APIKeyCreate) SetNillableFastModePolicy(v *string) *APIKeyCreate {
 	if v != nil {
 		_c.SetFastModePolicy(*v)
+	}
+	return _c
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (_c *APIKeyCreate) SetRoutingStrategy(v string) *APIKeyCreate {
+	_c.mutation.SetRoutingStrategy(v)
+	return _c
+}
+
+// SetNillableRoutingStrategy sets the "routing_strategy" field if the given value is not nil.
+func (_c *APIKeyCreate) SetNillableRoutingStrategy(v *string) *APIKeyCreate {
+	if v != nil {
+		_c.SetRoutingStrategy(*v)
 	}
 	return _c
 }
@@ -597,6 +617,13 @@ func (_c *APIKeyCreate) defaults() error {
 		v := apikey.DefaultTeamOwnerDisabled
 		_c.mutation.SetTeamOwnerDisabled(v)
 	}
+	if _, ok := _c.mutation.GroupIds(); !ok {
+		if apikey.DefaultGroupIds == nil {
+			return fmt.Errorf("ent: uninitialized apikey.DefaultGroupIds (forgotten import ent/runtime?)")
+		}
+		v := apikey.DefaultGroupIds()
+		_c.mutation.SetGroupIds(v)
+	}
 	if _, ok := _c.mutation.IsComposite(); !ok {
 		v := apikey.DefaultIsComposite
 		_c.mutation.SetIsComposite(v)
@@ -608,6 +635,10 @@ func (_c *APIKeyCreate) defaults() error {
 	if _, ok := _c.mutation.FastModePolicy(); !ok {
 		v := apikey.DefaultFastModePolicy
 		_c.mutation.SetFastModePolicy(v)
+	}
+	if _, ok := _c.mutation.RoutingStrategy(); !ok {
+		v := apikey.DefaultRoutingStrategy
+		_c.mutation.SetRoutingStrategy(v)
 	}
 	if _, ok := _c.mutation.BillingMode(); !ok {
 		v := apikey.DefaultBillingMode
@@ -701,6 +732,9 @@ func (_c *APIKeyCreate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "APIKey.name": %w`, err)}
 		}
 	}
+	if _, ok := _c.mutation.GroupIds(); !ok {
+		return &ValidationError{Name: "group_ids", err: errors.New(`ent: missing required field "APIKey.group_ids"`)}
+	}
 	if _, ok := _c.mutation.IsComposite(); !ok {
 		return &ValidationError{Name: "is_composite", err: errors.New(`ent: missing required field "APIKey.is_composite"`)}
 	}
@@ -718,6 +752,14 @@ func (_c *APIKeyCreate) check() error {
 	if v, ok := _c.mutation.FastModePolicy(); ok {
 		if err := apikey.FastModePolicyValidator(v); err != nil {
 			return &ValidationError{Name: "fast_mode_policy", err: fmt.Errorf(`ent: validator failed for field "APIKey.fast_mode_policy": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.RoutingStrategy(); !ok {
+		return &ValidationError{Name: "routing_strategy", err: errors.New(`ent: missing required field "APIKey.routing_strategy"`)}
+	}
+	if v, ok := _c.mutation.RoutingStrategy(); ok {
+		if err := apikey.RoutingStrategyValidator(v); err != nil {
+			return &ValidationError{Name: "routing_strategy", err: fmt.Errorf(`ent: validator failed for field "APIKey.routing_strategy": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.BillingMode(); !ok {
@@ -821,6 +863,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 		_spec.SetField(apikey.FieldName, field.TypeString, value)
 		_node.Name = value
 	}
+	if value, ok := _c.mutation.GroupIds(); ok {
+		_spec.SetField(apikey.FieldGroupIds, field.TypeJSON, value)
+		_node.GroupIds = value
+	}
 	if value, ok := _c.mutation.IsComposite(); ok {
 		_spec.SetField(apikey.FieldIsComposite, field.TypeBool, value)
 		_node.IsComposite = value
@@ -832,6 +878,10 @@ func (_c *APIKeyCreate) createSpec() (*APIKey, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.FastModePolicy(); ok {
 		_spec.SetField(apikey.FieldFastModePolicy, field.TypeString, value)
 		_node.FastModePolicy = value
+	}
+	if value, ok := _c.mutation.RoutingStrategy(); ok {
+		_spec.SetField(apikey.FieldRoutingStrategy, field.TypeString, value)
+		_node.RoutingStrategy = value
 	}
 	if value, ok := _c.mutation.BillingMode(); ok {
 		_spec.SetField(apikey.FieldBillingMode, field.TypeString, value)
@@ -1182,6 +1232,18 @@ func (u *APIKeyUpsert) ClearGroupID() *APIKeyUpsert {
 	return u
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (u *APIKeyUpsert) SetGroupIds(v []int64) *APIKeyUpsert {
+	u.Set(apikey.FieldGroupIds, v)
+	return u
+}
+
+// UpdateGroupIds sets the "group_ids" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateGroupIds() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldGroupIds)
+	return u
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (u *APIKeyUpsert) SetIsComposite(v bool) *APIKeyUpsert {
 	u.Set(apikey.FieldIsComposite, v)
@@ -1215,6 +1277,18 @@ func (u *APIKeyUpsert) SetFastModePolicy(v string) *APIKeyUpsert {
 // UpdateFastModePolicy sets the "fast_mode_policy" field to the value that was provided on create.
 func (u *APIKeyUpsert) UpdateFastModePolicy() *APIKeyUpsert {
 	u.SetExcluded(apikey.FieldFastModePolicy)
+	return u
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (u *APIKeyUpsert) SetRoutingStrategy(v string) *APIKeyUpsert {
+	u.Set(apikey.FieldRoutingStrategy, v)
+	return u
+}
+
+// UpdateRoutingStrategy sets the "routing_strategy" field to the value that was provided on create.
+func (u *APIKeyUpsert) UpdateRoutingStrategy() *APIKeyUpsert {
+	u.SetExcluded(apikey.FieldRoutingStrategy)
 	return u
 }
 
@@ -1840,6 +1914,20 @@ func (u *APIKeyUpsertOne) ClearGroupID() *APIKeyUpsertOne {
 	})
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (u *APIKeyUpsertOne) SetGroupIds(v []int64) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetGroupIds(v)
+	})
+}
+
+// UpdateGroupIds sets the "group_ids" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateGroupIds() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateGroupIds()
+	})
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (u *APIKeyUpsertOne) SetIsComposite(v bool) *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
@@ -1879,6 +1967,20 @@ func (u *APIKeyUpsertOne) SetFastModePolicy(v string) *APIKeyUpsertOne {
 func (u *APIKeyUpsertOne) UpdateFastModePolicy() *APIKeyUpsertOne {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateFastModePolicy()
+	})
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (u *APIKeyUpsertOne) SetRoutingStrategy(v string) *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRoutingStrategy(v)
+	})
+}
+
+// UpdateRoutingStrategy sets the "routing_strategy" field to the value that was provided on create.
+func (u *APIKeyUpsertOne) UpdateRoutingStrategy() *APIKeyUpsertOne {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRoutingStrategy()
 	})
 }
 
@@ -2744,6 +2846,20 @@ func (u *APIKeyUpsertBulk) ClearGroupID() *APIKeyUpsertBulk {
 	})
 }
 
+// SetGroupIds sets the "group_ids" field.
+func (u *APIKeyUpsertBulk) SetGroupIds(v []int64) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetGroupIds(v)
+	})
+}
+
+// UpdateGroupIds sets the "group_ids" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateGroupIds() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateGroupIds()
+	})
+}
+
 // SetIsComposite sets the "is_composite" field.
 func (u *APIKeyUpsertBulk) SetIsComposite(v bool) *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
@@ -2783,6 +2899,20 @@ func (u *APIKeyUpsertBulk) SetFastModePolicy(v string) *APIKeyUpsertBulk {
 func (u *APIKeyUpsertBulk) UpdateFastModePolicy() *APIKeyUpsertBulk {
 	return u.Update(func(s *APIKeyUpsert) {
 		s.UpdateFastModePolicy()
+	})
+}
+
+// SetRoutingStrategy sets the "routing_strategy" field.
+func (u *APIKeyUpsertBulk) SetRoutingStrategy(v string) *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.SetRoutingStrategy(v)
+	})
+}
+
+// UpdateRoutingStrategy sets the "routing_strategy" field to the value that was provided on create.
+func (u *APIKeyUpsertBulk) UpdateRoutingStrategy() *APIKeyUpsertBulk {
+	return u.Update(func(s *APIKeyUpsert) {
+		s.UpdateRoutingStrategy()
 	})
 }
 

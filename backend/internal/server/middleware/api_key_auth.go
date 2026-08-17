@@ -215,6 +215,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			}
 			c.Set(string(ContextKeyAPIKey), apiKey)
+			c.Request = c.Request.WithContext(service.WithAPIKeyRoutingStrategy(c.Request.Context(), service.APIKeyEffectiveRoutingStrategy(apiKey)))
 			c.Set(string(ContextKeyUser), AuthSubject{
 				UserID:      apiKey.User.ID,
 				Concurrency: apiKey.User.Concurrency,
@@ -313,6 +314,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			c.Set(string(ContextKeySubscription), subscription)
 		}
 		c.Set(string(ContextKeyAPIKey), apiKey)
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), ctxkey.APIKeyRoutingStrategy, service.APIKeyEffectiveRoutingStrategy(apiKey)))
 		c.Set(string(ContextKeyUser), AuthSubject{
 			UserID:      apiKey.User.ID,
 			Concurrency: apiKey.User.Concurrency,

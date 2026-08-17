@@ -47,6 +47,11 @@ func (APIKey) Fields() []ent.Field {
 		field.Int64("group_id").
 			Optional().
 			Nillable(),
+		// 按优先级保存普通 Key 的候选分组；group_id 保留首选分组以兼容旧链路。
+		field.JSON("group_ids", []int64{}).
+			Default(func() []int64 { return []int64{} }).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("普通 API Key 的有序候选分组 ID"),
 		// 复合 Key 不使用单一 group_id，而是通过前缀映射选择请求分组。
 		field.Bool("is_composite").
 			Default(false).
@@ -59,6 +64,11 @@ func (APIKey) Fields() []ent.Field {
 			MaxLen(32).
 			Default("follow_request").
 			Comment("API Key 的 Fast 模式策略：follow_request、force_on 或 force_off"),
+		// 手动模式沿用有序分组；其它模式在最终分组内启用请求级智能账号排序。
+		field.String("routing_strategy").
+			MaxLen(32).
+			Default("manual").
+			Comment("API Key 路由策略：manual、auto、speed、price 或 success_rate"),
 		// API Key 可显式锁定订阅或余额；auto 保持历史的订阅优先行为。
 		field.String("billing_mode").
 			MaxLen(32).

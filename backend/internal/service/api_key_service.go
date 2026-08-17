@@ -38,12 +38,14 @@ var (
 	ErrAPIKeyAuthOverloaded              = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
 	ErrInvalidIPPattern                  = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
 	ErrInvalidAPIKeyFastModePolicy       = infraerrors.BadRequest("INVALID_API_KEY_FAST_MODE_POLICY", "invalid API key fast mode policy")
+	ErrInvalidAPIKeyRoutingStrategy      = infraerrors.BadRequest("INVALID_API_KEY_ROUTING_STRATEGY", "invalid API key routing strategy")
 	ErrInvalidAPIKeyBillingMode          = infraerrors.BadRequest("INVALID_API_KEY_BILLING_MODE", "invalid API key billing mode")
 	ErrPreferredSubscriptionRequired     = infraerrors.BadRequest("PREFERRED_SUBSCRIPTION_REQUIRED", "subscription billing mode requires a subscription")
 	ErrPreferredSubscriptionInvalid      = infraerrors.Forbidden("PREFERRED_SUBSCRIPTION_INVALID", "preferred subscription is unavailable")
 	ErrPreferredSubscriptionGroup        = infraerrors.Forbidden("PREFERRED_SUBSCRIPTION_GROUP_NOT_ALLOWED", "preferred subscription does not allow this group")
 	ErrPreferredSubscriptionInsufficient = infraerrors.TooManyRequests("PREFERRED_SUBSCRIPTION_EXHAUSTED", "preferred subscription has insufficient remaining quota")
 	ErrDataSharingConsentRequired        = infraerrors.Forbidden("DATA_SHARING_CONSENT_REQUIRED", "switching to a data sharing group requires confirmation")
+	ErrAPIKeyGroupPrioritiesInvalid      = infraerrors.BadRequest("API_KEY_GROUP_PRIORITIES_INVALID", "api key group priorities must contain at most 20 unique positive group ids")
 	ErrCompositeKeyGroupsRequired        = infraerrors.BadRequest("COMPOSITE_KEY_GROUPS_REQUIRED", "composite api key requires at least one group")
 	ErrCompositeKeyTooManyGroups         = infraerrors.BadRequest("COMPOSITE_KEY_TOO_MANY_GROUPS", "composite api key supports at most 20 groups")
 	ErrCompositeKeyPrefixInvalid         = infraerrors.BadRequest("COMPOSITE_KEY_PREFIX_INVALID", "composite api key prefix is invalid")
@@ -100,11 +102,14 @@ type APIKeyUpdateFields struct {
 	Status    bool
 	Quota     bool
 	GroupID   bool
+	GroupIDs  bool
 	ExpiresAt bool
 	// CompositeConfiguration 覆盖 is_composite 与复合分组映射表，二者必须同事务更新。
 	CompositeConfiguration bool
 	// FastModePolicy 覆盖 fork 的快速模式策略。
 	FastModePolicy bool
+	// RoutingStrategy 覆盖单 Key 的路由排序策略。
+	RoutingStrategy bool
 	// BillingConfiguration 覆盖结算模式和指定订阅，二者必须一起写入。
 	BillingConfiguration bool
 	// ModelMapping 覆盖当前 API Key 的整份模型重定向规则。
@@ -264,10 +269,11 @@ type APIKeyAuthCacheInvalidator interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name        string `json:"name"`
-	Scope       string `json:"scope"`
-	GroupID     *int64 `json:"group_id"`
-	IsComposite bool   `json:"is_composite"`
+	Name        string  `json:"name"`
+	Scope       string  `json:"scope"`
+	GroupID     *int64  `json:"group_id"`
+	GroupIDs    []int64 `json:"group_ids"`
+	IsComposite bool    `json:"is_composite"`
 	// CompositeGroups 是复合 Key 的完整分组映射列表。
 	CompositeGroups []APIKeyCompositeGroupInput `json:"composite_groups"`
 	CustomKey       *string                     `json:"custom_key"`   // 可选的自定义key
@@ -275,6 +281,8 @@ type CreateAPIKeyRequest struct {
 	IPBlacklist     []string                    `json:"ip_blacklist"` // IP 黑名单
 	// FastModePolicy 为空时默认跟随下游请求。
 	FastModePolicy string `json:"fast_mode_policy"`
+	// RoutingStrategy 为空时使用手动有序分组模式。
+	RoutingStrategy string `json:"routing_strategy"`
 	// BillingMode 为空时兼容存量行为，按自动选择处理。
 	BillingMode string `json:"billing_mode"`
 	// PreferredSubscriptionID 仅在 BillingMode 为 subscription 时生效。
@@ -319,9 +327,10 @@ type APIKeyBillingSubscriptionOption struct {
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name        *string `json:"name"`
-	GroupID     *int64  `json:"group_id"`
-	IsComposite *bool   `json:"is_composite"`
+	Name        *string  `json:"name"`
+	GroupID     *int64   `json:"group_id"`
+	GroupIDs    *[]int64 `json:"group_ids"`
+	IsComposite *bool    `json:"is_composite"`
 	// CompositeGroups 非 nil 时完整替换当前复合映射。
 	CompositeGroups *[]APIKeyCompositeGroupInput `json:"composite_groups"`
 	Status          *string                      `json:"status"`
@@ -329,6 +338,8 @@ type UpdateAPIKeyRequest struct {
 	IPBlacklist     *[]string                    `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 	// FastModePolicy 为 nil 时保持原值。
 	FastModePolicy *string `json:"fast_mode_policy"`
+	// RoutingStrategy 为 nil 时保持原值。
+	RoutingStrategy *string `json:"routing_strategy"`
 	// BillingMode 为 nil 时保持原值；指定订阅模式必须同时传入订阅 ID。
 	BillingMode             *string `json:"billing_mode"`
 	PreferredSubscriptionID *int64  `json:"preferred_subscription_id"`
@@ -695,6 +706,47 @@ func validatePreferredSubscriptionGroups(subscription *UserSubscription, group *
 	return nil
 }
 
+// prepareAPIKeyPriorityGroups 校验普通 Key 的有序候选分组，并保留调用方给出的优先级。
+func (s *APIKeyService) prepareAPIKeyPriorityGroups(ctx context.Context, user *User, groupIDs []int64) ([]int64, []*Group, error) {
+	if len(groupIDs) > MaxCompositeAPIKeyGroups {
+		return nil, nil, ErrAPIKeyGroupPrioritiesInvalid
+	}
+	ids := make([]int64, 0, len(groupIDs))
+	groups := make([]*Group, 0, len(groupIDs))
+	seen := make(map[int64]struct{}, len(groupIDs))
+	for _, groupID := range groupIDs {
+		if groupID <= 0 {
+			return nil, nil, ErrAPIKeyGroupPrioritiesInvalid
+		}
+		if _, exists := seen[groupID]; exists {
+			return nil, nil, ErrAPIKeyGroupPrioritiesInvalid
+		}
+		seen[groupID] = struct{}{}
+	}
+	for _, groupID := range groupIDs {
+		group, err := s.groupRepo.GetByID(ctx, groupID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("get group: %w", err)
+		}
+		if !s.canUserBindGroup(ctx, user, group) {
+			return nil, nil, ErrGroupNotAllowed
+		}
+		ids = append(ids, groupID)
+		groups = append(groups, group)
+	}
+	return ids, groups, nil
+}
+
+// validatePreferredSubscriptionGroupIDs 确保智能路由的每个候选分组都在指定订阅范围内。
+func validatePreferredSubscriptionGroupIDs(subscription *UserSubscription, groupIDs []int64) error {
+	for _, groupID := range groupIDs {
+		if groupID > 0 && !subscriptionPlanIncludesGroup(subscription.Plan, groupID) {
+			return ErrPreferredSubscriptionGroup
+		}
+	}
+	return nil
+}
+
 // billingUserIDForScope 返回 API Key 的实际付款主体。
 func (s *APIKeyService) billingUserIDForScope(ctx context.Context, userID int64, scope string) (int64, error) {
 	if !strings.EqualFold(strings.TrimSpace(scope), "team") {
@@ -776,6 +828,10 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if !ok {
 		return nil, ErrInvalidAPIKeyFastModePolicy
 	}
+	routingStrategy, ok := NormalizeAPIKeyRoutingStrategy(req.RoutingStrategy)
+	if !ok {
+		return nil, ErrInvalidAPIKeyRoutingStrategy
+	}
 	modelMapping, err := NormalizeAPIKeyModelMapping(req.ModelMapping)
 	if err != nil {
 		return nil, err
@@ -842,7 +898,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 验证普通分组或复合分组权限。
+	// 验证普通分组、智能路由候选分组或复合分组权限。
 	var dataSharingNoticeVersion int
 	var dataSharingConfirmedGroupID *int64
 	var dataSharingConfirmedAt *time.Time
@@ -863,7 +919,30 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 			return nil, err
 		}
 		dataSharingNoticeVersion, dataSharingConfirmedGroupID, dataSharingConfirmedAt = compositeConsentSnapshot(compositeGroups)
+	} else if len(req.GroupIDs) > 0 {
+		if req.GroupID != nil {
+			return nil, ErrAPIKeyGroupPrioritiesInvalid
+		}
+		var priorityGroups []*Group
+		req.GroupIDs, priorityGroups, err = s.prepareAPIKeyPriorityGroups(ctx, user, req.GroupIDs)
+		if err != nil {
+			return nil, err
+		}
+		req.GroupID = &req.GroupIDs[0]
+		for _, group := range priorityGroups {
+			if !group.DataSharingEnabled {
+				continue
+			}
+			version, confirmedAt, consentErr := s.validateCurrentDataSharingConsent(ctx, group, req.DataSharingConfirmed, req.DataSharingNoticeVersion)
+			if consentErr != nil {
+				return nil, consentErr
+			}
+			dataSharingNoticeVersion = version
+			dataSharingConfirmedGroupID = &group.ID
+			dataSharingConfirmedAt = &confirmedAt
+		}
 	} else if req.GroupID != nil {
+		req.GroupIDs = []int64{*req.GroupID}
 		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
 		if err != nil {
 			return nil, fmt.Errorf("get group: %w", err)
@@ -892,6 +971,9 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 			}
 		}
 		if err := validatePreferredSubscriptionGroups(preferredSubscription, group, compositeGroups); err != nil {
+			return nil, err
+		}
+		if err := validatePreferredSubscriptionGroupIDs(preferredSubscription, req.GroupIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -944,10 +1026,12 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		Key:                                   key,
 		Name:                                  html.EscapeString(req.Name),
 		GroupID:                               req.GroupID,
+		GroupIDs:                              append([]int64(nil), req.GroupIDs...),
 		IsComposite:                           req.IsComposite,
 		CompositeGroups:                       compositeGroups,
 		Status:                                StatusActive,
 		FastModePolicy:                        fastModePolicy,
+		RoutingStrategy:                       routingStrategy,
 		BillingMode:                           billingMode,
 		PreferredSubscriptionID:               preferredSubscriptionID,
 		ModelMapping:                          modelMapping,
@@ -1134,6 +1218,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
 			if !apiKey.IsComposite {
+				apiKey = s.applyPriorityGroup(ctx, apiKey)
 				apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 				if !s.canUserUseBoundGroup(ctx, apiKey) {
 					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1157,6 +1242,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
 			if !apiKey.IsComposite {
+				apiKey = s.applyPriorityGroup(ctx, apiKey)
 				apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 				if !s.canUserUseBoundGroup(ctx, apiKey) {
 					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1175,6 +1261,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
 			if !apiKey.IsComposite {
+				apiKey = s.applyPriorityGroup(ctx, apiKey)
 				apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 				if !s.canUserUseBoundGroup(ctx, apiKey) {
 					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1191,6 +1278,7 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	}
 	apiKey.Key = key
 	if !apiKey.IsComposite {
+		apiKey = s.applyPriorityGroup(ctx, apiKey)
 		apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 		if !s.canUserUseBoundGroup(ctx, apiKey) {
 			return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1198,6 +1286,36 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey, nil
+}
+
+// applyPriorityGroup 按 Key 配置顺序选择首个仍启用且用户可访问的分组。
+// 组内账号与渠道排序继续由最终分组的基础或高级调度器负责。
+func (s *APIKeyService) applyPriorityGroup(ctx context.Context, apiKey *APIKey) *APIKey {
+	if apiKey == nil || s.groupRepo == nil || len(apiKey.GroupIDs) == 0 {
+		return apiKey
+	}
+	for _, groupID := range apiKey.GroupIDs {
+		group := apiKey.Group
+		if group == nil || group.ID != groupID {
+			var err error
+			group, err = s.groupRepo.GetByIDLite(ctx, groupID)
+			if err != nil {
+				continue
+			}
+		}
+		if group == nil || !group.IsActive() {
+			continue
+		}
+		if apiKey.User != nil && !s.canUserBindGroup(ctx, apiKey.User, group) {
+			continue
+		}
+		selectedID := group.ID
+		apiKey.GroupID = &selectedID
+		apiKey.Group = group
+		s.refreshFallbackUserGroupRPMOverride(ctx, apiKey, selectedID)
+		return apiKey
+	}
+	return apiKey
 }
 
 // SelectCompositeGroupForRequest 为复合 Key 创建请求级分组视图，缓存对象不会被修改。
@@ -1472,6 +1590,14 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.FastModePolicy = fastModePolicy
 		fields.FastModePolicy = true
 	}
+	if req.RoutingStrategy != nil {
+		routingStrategy, ok := NormalizeAPIKeyRoutingStrategy(*req.RoutingStrategy)
+		if !ok {
+			return nil, ErrInvalidAPIKeyRoutingStrategy
+		}
+		apiKey.RoutingStrategy = routingStrategy
+		fields.RoutingStrategy = true
+	}
 	if req.ModelMapping != nil {
 		fields.ModelMapping = true
 	}
@@ -1479,6 +1605,40 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	targetComposite := apiKey.IsComposite
 	if req.IsComposite != nil {
 		targetComposite = *req.IsComposite
+	}
+
+	// 有序候选分组是普通 Key 的完整替换字段；首项同步到 group_id 兼容现有网关链路。
+	if req.GroupIDs != nil {
+		if targetComposite && len(*req.GroupIDs) > 0 {
+			return nil, ErrCompositeKeyGroupConflict
+		}
+		billingUser, err = s.billingUserForAPIKey(ctx, apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("get billing user: %w", err)
+		}
+		apiKey.User = billingUser
+		ids, groups, prepareErr := s.prepareAPIKeyPriorityGroups(ctx, billingUser, *req.GroupIDs)
+		if prepareErr != nil {
+			return nil, prepareErr
+		}
+		apiKey.GroupIDs = ids
+		fields.GroupIDs = true
+		if len(ids) == 0 {
+			apiKey.GroupID = nil
+			apiKey.Group = nil
+			fields.GroupID = true
+		} else {
+			primaryID := ids[0]
+			req.GroupID = &primaryID
+			for _, group := range groups {
+				if !group.DataSharingEnabled || (apiKey.DataSharingConfirmedGroupID != nil && *apiKey.DataSharingConfirmedGroupID == group.ID) {
+					continue
+				}
+				if _, _, consentErr := s.validateCurrentDataSharingConsent(ctx, group, req.DataSharingConfirmed, req.DataSharingNoticeVersion); consentErr != nil {
+					return nil, consentErr
+				}
+			}
+		}
 	}
 
 	// 类型切换和复合映射更新必须在写库前一次性完成校验。
@@ -1524,9 +1684,11 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		}
 		apiKey.IsComposite = true
 		apiKey.GroupID = nil
+		apiKey.GroupIDs = nil
 		apiKey.Group = nil
+		fields.GroupIDs = true
 	} else if apiKey.IsComposite {
-		if req.GroupID == nil || *req.GroupID <= 0 {
+		if req.GroupIDs == nil && (req.GroupID == nil || *req.GroupID <= 0) {
 			return nil, ErrCompositeKeyTargetRequired
 		}
 		apiKey.IsComposite = false
@@ -1569,6 +1731,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			return nil, err
 		}
 		apiKey.GroupID = req.GroupID
+		if req.GroupIDs == nil {
+			apiKey.GroupIDs = []int64{group.ID}
+			fields.GroupIDs = true
+		}
 		apiKey.Group = group
 		apiKey.User = user
 		fields.GroupID = true
@@ -1580,7 +1746,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		return nil, ErrGroupDisabledForUser
 	}
 	// 切换套餐、普通分组或复合映射时，必须验证最终所有分组都在指定套餐范围内。
-	if targetBillingMode == APIKeyBillingModeSubscription && (billingConfigurationRequested || req.GroupID != nil || req.CompositeGroups != nil || req.IsComposite != nil) {
+	if targetBillingMode == APIKeyBillingModeSubscription && (billingConfigurationRequested || req.GroupID != nil || req.GroupIDs != nil || req.CompositeGroups != nil || req.IsComposite != nil) {
 		if billingUser == nil {
 			billingUser, err = s.billingUserForAPIKey(ctx, apiKey)
 			if err != nil {
@@ -1600,6 +1766,9 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			}
 		}
 		if err := validatePreferredSubscriptionGroups(preferredSubscription, apiKey.Group, apiKey.CompositeGroups); err != nil {
+			return nil, err
+		}
+		if err := validatePreferredSubscriptionGroupIDs(preferredSubscription, apiKey.GroupIDs); err != nil {
 			return nil, err
 		}
 	}

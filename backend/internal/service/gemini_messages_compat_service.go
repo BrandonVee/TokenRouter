@@ -119,7 +119,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 	}
 
 	cacheKey := "gemini:" + sessionHash
-	usesAdvancedScheduler := group != nil && group.UsesAdvancedScheduler()
+	usesAdvancedScheduler := group != nil && (group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual)
 	advancedSettings := s.advancedSchedulerEffectiveSettingsForRequest(ctx, groupID)
 
 	// 2. 尝试粘性会话命中
@@ -387,18 +387,18 @@ func (s *GeminiMessagesCompatService) groupUsesAdvancedScheduler(ctx context.Con
 		return false
 	}
 	if group, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(group) && group.ID == *groupID {
-		return group.UsesAdvancedScheduler()
+		return group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual
 	}
 	if s.schedulerSnapshot != nil {
 		if group, err := s.schedulerSnapshot.GetGroupByID(ctx, *groupID); err == nil && group != nil {
-			return group.UsesAdvancedScheduler()
+			return group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual
 		}
 	}
 	if s.groupRepo == nil {
 		return false
 	}
 	group, err := s.groupRepo.GetByIDLite(ctx, *groupID)
-	return err == nil && group != nil && group.UsesAdvancedScheduler()
+	return err == nil && group != nil && (group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual)
 }
 
 func (s *GeminiMessagesCompatService) advancedSchedulerStats() *advancedAccountRuntimeStats {
@@ -453,6 +453,7 @@ func (s *GeminiMessagesCompatService) selectAdvancedGeminiAccount(
 		input,
 		time.Now(),
 	)
+	applyAPIKeyPriceRoutingScores(ctx, candidates)
 	selectionOrder := buildAdvancedSchedulerSelectionOrder(candidates, input)
 	if len(selectionOrder) == 0 {
 		return nil

@@ -55,19 +55,21 @@ type AdminUser struct {
 }
 
 type APIKey struct {
-	ID                int64  `json:"id"`
-	UserID            int64  `json:"user_id"`
-	TeamID            *int64 `json:"team_id"`
-	Scope             string `json:"scope"`
-	TeamOwnerDisabled bool   `json:"team_owner_disabled"` // 告知成员该团队 Key 只能由 Owner 恢复。
-	Key               string `json:"key"`
-	Name              string `json:"name"`
-	GroupID           *int64 `json:"group_id"`
-	IsComposite       bool   `json:"is_composite"`
+	ID                int64   `json:"id"`
+	UserID            int64   `json:"user_id"`
+	TeamID            *int64  `json:"team_id"`
+	Scope             string  `json:"scope"`
+	TeamOwnerDisabled bool    `json:"team_owner_disabled"` // 告知成员该团队 Key 只能由 Owner 恢复。
+	Key               string  `json:"key"`
+	Name              string  `json:"name"`
+	GroupID           *int64  `json:"group_id"`
+	GroupIDs          []int64 `json:"group_ids"`
+	IsComposite       bool    `json:"is_composite"`
 	// CompositeGroups 按用户设置顺序返回复合 Key 的分组映射。
 	CompositeGroups         []APIKeyCompositeGroup `json:"composite_groups"`
 	Status                  string                 `json:"status"`
 	FastModePolicy          string                 `json:"fast_mode_policy"`
+	RoutingStrategy         string                 `json:"routing_strategy"`
 	BillingMode             string                 `json:"billing_mode"`
 	PreferredSubscriptionID *int64                 `json:"preferred_subscription_id"`
 	ModelMapping            map[string]string      `json:"model_mapping"`
