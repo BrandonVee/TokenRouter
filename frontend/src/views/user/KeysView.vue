@@ -1400,7 +1400,7 @@
       <div
         v-if="groupSelectorKeyId !== null && dropdownPosition"
         ref="dropdownRef"
-        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] flex max-h-[calc(100vh-16px)] w-[440px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl duration-150 dark:border-dark-600 dark:bg-dark-800"
+        class="animate-in fade-in slide-in-from-top-2 fixed z-[100000020] flex max-h-[min(460px,calc(100vh-16px))] w-[420px] max-w-[calc(100vw-16px)] flex-col overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl duration-150 dark:border-dark-600 dark:bg-dark-800"
         style="pointer-events: auto !important;"
         :style="{
           top: dropdownPosition.top !== undefined ? dropdownPosition.top + 'px' : undefined,
@@ -1408,18 +1408,18 @@
           left: dropdownPosition.left + 'px'
         }"
       >
-        <div class="flex items-start justify-between border-b border-gray-100 px-4 py-3 dark:border-dark-700">
+        <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2 dark:border-dark-700">
           <div>
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('keys.smartRouting.quickTitle') }}</h3>
-            <p class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">{{ t('keys.smartRouting.quickHint') }}</p>
+            <p class="mt-0.5 text-[11px] text-gray-500 dark:text-dark-400">{{ t('keys.smartRouting.quickHint') }}</p>
           </div>
           <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700" :title="t('common.close')" @click="groupSelectorKeyId = null; dropdownPosition = null">
             <Icon name="x" size="sm" />
           </button>
         </div>
 
-        <div class="border-b border-gray-100 px-3 py-3 dark:border-dark-700">
-          <div class="mb-2 flex items-center justify-between">
+        <div class="border-b border-gray-100 px-3 py-2 dark:border-dark-700">
+          <div class="mb-1.5 flex items-center justify-between">
             <span class="text-xs font-semibold text-gray-700 dark:text-dark-200">{{ t('keys.smartRouting.modeLabel') }}</span>
             <span class="text-[11px] text-gray-400 dark:text-dark-400">{{ t('keys.smartRouting.selectedCount', { count: quickGroupIDs.length }) }}</span>
           </div>
@@ -1428,7 +1428,7 @@
               v-for="strategy in quickRoutingStrategyOptions"
               :key="strategy.value"
               type="button"
-              class="min-w-0 rounded px-1.5 py-1.5 text-[11px] font-medium transition-colors"
+              class="min-w-0 rounded px-1 py-1 text-[10px] font-medium transition-colors"
               :class="quickRoutingStrategy === strategy.value
                 ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
                 : 'text-gray-500 hover:text-gray-800 dark:text-dark-400 dark:hover:text-dark-200'"
@@ -1442,7 +1442,7 @@
         </div>
 
         <!-- Search box -->
-        <div class="border-b border-gray-100 p-3 dark:border-dark-700">
+        <div class="border-b border-gray-100 px-3 py-2 dark:border-dark-700">
           <div class="relative">
             <svg class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1450,19 +1450,19 @@
             <input
               v-model="groupSearchQuery"
               type="text"
-              class="w-full rounded-lg border border-primary-900/10 bg-gray-50 py-1.5 pl-8 pr-3 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-primary-900/10 focus:ring-2 focus:ring-black/10 dark:border-dark-600 dark:bg-dark-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-600 dark:focus:ring-primary-600"
+              class="w-full rounded-md border border-primary-900/10 bg-gray-50 py-1 pl-8 pr-3 text-xs text-gray-900 placeholder-gray-400 outline-none focus:border-primary-900/10 focus:ring-2 focus:ring-black/10 dark:border-dark-600 dark:bg-dark-700 dark:text-white dark:placeholder-gray-500 dark:focus:border-primary-600 dark:focus:ring-primary-600"
               :placeholder="t('keys.searchGroup')"
               @click.stop
             />
           </div>
         </div>
         <!-- Group list -->
-        <div class="min-h-0 flex-1 overflow-y-auto p-2">
+        <div class="min-h-0 max-h-56 flex-1 overflow-y-auto p-2">
           <div
             v-for="option in filteredGroupOptions"
             :key="option.value ?? 'null'"
             :class="[
-              'mb-1 flex min-h-12 items-center gap-1 rounded-md border px-2 py-1.5 last:mb-0',
+              'mb-1 flex min-h-10 items-center gap-1 rounded-md border px-2 py-1 last:mb-0',
               quickGroupPriority(option.value) >= 0
                 ? 'border-primary-200 bg-primary-50/70 dark:border-primary-800 dark:bg-primary-900/15'
                 : 'border-transparent hover:bg-gray-50 dark:hover:bg-dark-700'
@@ -1507,7 +1507,7 @@
             {{ t('keys.noGroupFound') }}
           </div>
         </div>
-        <div class="flex items-center justify-between border-t border-gray-100 px-3 py-2.5 dark:border-dark-700">
+        <div class="flex items-center justify-between border-t border-gray-100 px-3 py-2 dark:border-dark-700">
           <span class="text-[11px] text-gray-400 dark:text-dark-400">{{ t('keys.smartRouting.quickOrderHint') }}</span>
           <div class="flex gap-2">
             <button type="button" class="btn btn-secondary btn-sm" @click="groupSelectorKeyId = null; dropdownPosition = null">{{ t('common.cancel') }}</button>
@@ -2515,7 +2515,7 @@ const openGroupSelector = (key: ApiKey) => {
     const buttonEl = groupButtonRefs.value.get(key.id)
     if (buttonEl) {
       const rect = buttonEl.getBoundingClientRect()
-        const dropdownEstHeight = Math.min(560, Math.max(180, window.innerHeight - 16)) // 视口较矮时交给弹层内部滚动。
+      const dropdownEstHeight = Math.min(460, Math.max(180, window.innerHeight - 16)) // 紧凑弹层，分组列表内部滚动。
       const dropdownEstWidth = Math.min(440, window.innerWidth - 16)
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
