@@ -133,7 +133,8 @@ export default {
       priority: 'Priority {priority}',
       intelligent: 'Smart routing',
       standard: 'Standard routing',
-      defaultHint: 'When empty, the account default group is used.'
+      defaultHint: 'When empty, the account default group is used.',
+      groupFallback: 'Group #{id}'
     },
     composite: {
       label: 'Composite key',

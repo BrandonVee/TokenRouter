@@ -584,6 +584,12 @@
                   :peak-end="priorityGroupOption(groupId)!.peakEnd"
                   :peak-rate-multiplier="priorityGroupOption(groupId)!.peakRateMultiplier"
                 />
+                <span
+                  v-else
+                  class="min-w-0 flex-1 truncate text-sm text-gray-600 dark:text-dark-200"
+                >
+                  {{ t('keys.smartRouting.groupFallback', { id: groupId }) }}
+                </span>
                 <button type="button" class="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" :title="t('common.delete')" @click="removePriorityGroup(groupId)">
                   <Icon name="trash" size="sm" />
                 </button>
@@ -2509,7 +2515,7 @@ const openGroupSelector = (key: ApiKey) => {
     const buttonEl = groupButtonRefs.value.get(key.id)
     if (buttonEl) {
       const rect = buttonEl.getBoundingClientRect()
-      const dropdownEstHeight = 560 // 快捷编辑器包含策略和候选分组，需要预留完整高度。
+        const dropdownEstHeight = Math.min(560, Math.max(180, window.innerHeight - 16)) // 视口较矮时交给弹层内部滚动。
       const dropdownEstWidth = Math.min(440, window.innerWidth - 16)
       const spaceBelow = window.innerHeight - rect.bottom
       const spaceAbove = rect.top
@@ -2520,6 +2526,12 @@ const openGroupSelector = (key: ApiKey) => {
         // 下方空间不足时向上弹出。
         dropdownPosition.value = {
           bottom: window.innerHeight - rect.top + 4,
+          left
+        }
+      } else if (spaceBelow < dropdownEstHeight && spaceAbove < dropdownEstHeight) {
+        // 上下都不足时固定在视口顶部，避免弹层超出屏幕。
+        dropdownPosition.value = {
+          top: 8,
           left
         }
       } else {

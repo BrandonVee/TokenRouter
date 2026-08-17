@@ -133,7 +133,8 @@ export default {
       priority: '优先级 {priority}',
       intelligent: '智能路由',
       standard: '标准路由',
-      defaultHint: '未选择时使用账号默认分组。'
+      defaultHint: '未选择时使用账号默认分组。',
+      groupFallback: '分组 #{id}'
     },
     composite: {
       label: '复合 Key',
