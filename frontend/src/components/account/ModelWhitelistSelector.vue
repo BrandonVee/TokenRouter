@@ -105,7 +105,7 @@
         v-if="canSyncUpstream"
         type="button"
         @click="syncUpstreamModels"
-        :disabled="isSyncingUpstream"
+        :disabled="isSyncingUpstream || !hasSyncCredential"
         class="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm text-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
       >
         {{ isSyncingUpstream ? t('admin.accounts.syncUpstreamModelsLoading') : t('admin.accounts.syncUpstreamModels') }}
@@ -228,6 +228,8 @@ const canSyncUpstream = computed(() => {
   }
   return false
 })
+
+const hasSyncCredential = computed(() => Boolean(props.accountId || props.syncCredentials?.api_key?.trim()))
 
 const availableOptions = computed(() => {
   if (props.models) {

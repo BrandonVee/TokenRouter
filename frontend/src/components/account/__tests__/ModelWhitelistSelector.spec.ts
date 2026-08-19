@@ -150,6 +150,22 @@ describe('ModelWhitelistSelector', () => {
     expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual([`${platform}-model`])
   })
 
+  it.each(['kimi', 'zhipu', 'deepseek'])('国产供应商 %s 在未填写 API Key 时仍显示同步按钮但保持禁用', (platform) => {
+    const wrapper = mountSelector({
+      platform,
+      syncCredentials: {
+        platform,
+        type: 'apikey',
+        base_url: `https://${platform}.example.com/v1`,
+        api_key: ''
+      }
+    })
+
+    const button = wrapper.findAll('button').find((item) => item.text().includes('admin.accounts.syncUpstreamModels'))
+    expect(button).toBeTruthy()
+    expect(button!.attributes('disabled')).toBeDefined()
+  })
+
   it('编辑账号时仍使用账号 ID 同步上游模型', async () => {
     syncUpstreamModels.mockResolvedValue({ models: ['claude-sonnet-4-5'] })
     const wrapper = mountSelector({

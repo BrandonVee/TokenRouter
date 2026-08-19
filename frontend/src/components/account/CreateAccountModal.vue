@@ -4324,7 +4324,8 @@ watch([accountMode, apiProtocol], () => {
 })
 const apiKeyValue = ref('')
 const syncPreviewCredentials = computed(() => {
-  if (!apiKeyValue.value) return undefined
+  // API Key 账号始终传递预览凭证，让同步按钮在输入密钥前也可见并保持平台间一致。
+  if (form.type !== 'apikey') return undefined
   return {
     platform: form.platform,
     type: form.type,
