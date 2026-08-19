@@ -327,6 +327,10 @@ func RegisterGatewayRoutes(
 				})
 				return
 			}
+			if service.IsOpenAIResponsesInputTokensRequestPath(c) && isOpenAIResponsesCompatibleGatewayPlatform(c) {
+				h.OpenAIGateway.ResponsesInputTokens(c)
+				return
+			}
 			next(c)
 		}
 	}

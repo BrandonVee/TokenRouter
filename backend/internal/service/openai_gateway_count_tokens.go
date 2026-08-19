@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/apicompat"
@@ -39,9 +40,187 @@ type openAIInputTokensCountPrepared struct {
 	UpstreamModel   string
 }
 
-// EstimateGrokCountTokens 在本地估算 Anthropic 兼容的 count_tokens 请求。Grok 没有
-// 兼容的 token 计数端点，因此该路径不选择账号、不读取凭据，也不调用上游。
+// ForwardResponsesInputTokens handles the native OpenAI
+// POST /v1/responses/input_tokens shape. Custom OpenAI-compatible relays often
+// implement /responses but not this preflight endpoint, so those accounts use
+// the local estimator instead of receiving a request that is known to fail.
+func (s *OpenAIGatewayService) ForwardResponsesInputTokens(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	body []byte,
+) error {
+	if account == nil {
+		writeOpenAIResponsesInputTokensError(c, http.StatusServiceUnavailable, "api_error", "No available OpenAI accounts")
+		return fmt.Errorf("responses input_tokens: missing account")
+	}
+
+	prepared, err := prepareNativeOpenAIInputTokensCountRequest(body, account)
+	if err != nil {
+		writeOpenAIResponsesInputTokensError(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
+		return err
+	}
+
+	if shouldEstimateOpenAIInputTokensLocally(account) {
+		writeOpenAIResponsesInputTokensFallback(c, account, prepared, 0, "custom_relay")
+		return nil
+	}
+
+	token, _, err := s.GetAccessToken(ctx, account)
+	if err != nil {
+		writeOpenAIResponsesInputTokensError(c, http.StatusBadGateway, "upstream_error", "Failed to get access token")
+		return fmt.Errorf("responses input_tokens: get access token: %w", err)
+	}
+
+	upstreamBody := ReplaceModelInBody(body, prepared.UpstreamModel)
+	upstreamReq, err := s.buildInputTokensUpstreamRequest(ctx, c, account, upstreamBody, token)
+	if err != nil {
+		writeOpenAIResponsesInputTokensError(c, http.StatusInternalServerError, "api_error", "Failed to build request")
+		return fmt.Errorf("responses input_tokens: build upstream request: %w", err)
+	}
+
+	proxyURL := ""
+	if account.Proxy != nil {
+		proxyURL = account.Proxy.URL()
+	}
+	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
+	if err != nil {
+		safeErr := sanitizeUpstreamErrorMessage(err.Error())
+		setOpsUpstreamError(c, 0, safeErr, "")
+		writeOpenAIResponsesInputTokensError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
+		return fmt.Errorf("responses input_tokens: upstream request failed: %s", safeErr)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		writeOpenAIResponsesInputTokensError(c, http.StatusBadGateway, "upstream_error", "Failed to read response")
+		return fmt.Errorf("responses input_tokens: read upstream response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		if isOpenAIResponsesInputTokensUnsupported(account, resp.StatusCode, respBody) {
+			writeOpenAIResponsesInputTokensFallback(c, account, prepared, resp.StatusCode, "upstream_unsupported")
+			return nil
+		}
+		if s.rateLimitService != nil {
+			s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+		}
+		upstreamMsg := sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(respBody)))
+		setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, "")
+		writeOpenAIResponsesInputTokensError(c, resp.StatusCode, "upstream_error", "Upstream request failed")
+		if upstreamMsg == "" {
+			return fmt.Errorf("responses input_tokens: upstream error: %d", resp.StatusCode)
+		}
+		return fmt.Errorf("responses input_tokens: upstream error: %d message=%s", resp.StatusCode, upstreamMsg)
+	}
+
+	inputTokens := gjson.GetBytes(respBody, "input_tokens")
+	if !inputTokens.Exists() {
+		writeOpenAIResponsesInputTokensError(c, http.StatusBadGateway, "upstream_error", "Upstream response missing input_tokens")
+		return fmt.Errorf("responses input_tokens: upstream response missing input_tokens")
+	}
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	c.Data(http.StatusOK, contentType, respBody)
+	return nil
+}
+
+func prepareNativeOpenAIInputTokensCountRequest(body []byte, account *Account) (*openAIInputTokensCountPrepared, error) {
+	var req openAIInputTokensCountRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("parse responses input_tokens request: %w", err)
+	}
+	originalModel := strings.TrimSpace(req.Model)
+	if originalModel == "" {
+		return nil, fmt.Errorf("parse responses input_tokens request: model is required")
+	}
+	billingModel := resolveOpenAIForwardModel(account, originalModel, "")
+	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	req.Model = upstreamModel
+	return &openAIInputTokensCountPrepared{
+		Request:         req,
+		OriginalModel:   originalModel,
+		NormalizedModel: originalModel,
+		BillingModel:    billingModel,
+		UpstreamModel:   upstreamModel,
+	}, nil
+}
+
+func shouldEstimateOpenAIInputTokensLocally(account *Account) bool {
+	if account == nil || account.IsGrok() || account.IsCNProvider() || account.Type == AccountTypeUpstream {
+		return true
+	}
+	if account.Type != AccountTypeAPIKey {
+		return false
+	}
+	rawBaseURL := strings.TrimSpace(account.GetCredential("base_url"))
+	if rawBaseURL == "" {
+		return false
+	}
+	parsed, err := url.Parse(rawBaseURL)
+	if err != nil {
+		return true
+	}
+	return !strings.EqualFold(parsed.Hostname(), "api.openai.com")
+}
+
+func isOpenAIResponsesInputTokensUnsupported(account *Account, statusCode int, body []byte) bool {
+	if statusCode == http.StatusNotFound {
+		return true
+	}
+	return account != nil && account.Type == AccountTypeOAuth && isOpenAIOAuthInputTokensUnsupported(statusCode, body)
+}
+
+func writeOpenAIResponsesInputTokensFallback(c *gin.Context, account *Account, prepared *openAIInputTokensCountPrepared, statusCode int, reason string) {
+	estimated := openAIInputTokensFallbackMinimum
+	if prepared != nil {
+		if got, err := estimateOpenAIInputTokens(prepared.Request); err == nil && got > 0 {
+			estimated = got
+		}
+	}
+	accountID := int64(0)
+	upstreamModel := ""
+	if account != nil {
+		accountID = account.ID
+	}
+	if prepared != nil {
+		upstreamModel = prepared.UpstreamModel
+	}
+	logger.L().Info("openai responses input_tokens: local estimate fallback",
+		zap.Int64("account_id", accountID),
+		zap.Int("upstream_status", statusCode),
+		zap.Int("estimated_input_tokens", estimated),
+		zap.String("upstream_model", upstreamModel),
+		zap.String("reason", reason),
+	)
+	c.JSON(http.StatusOK, gin.H{
+		"object":       "response.input_tokens",
+		"input_tokens": estimated,
+	})
+}
+
+func writeOpenAIResponsesInputTokensError(c *gin.Context, status int, errType, message string) {
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"type":    errType,
+			"message": message,
+		},
+	})
+}
+
+// EstimateGrokCountTokens estimates an Anthropic-compatible count_tokens request
+// locally. Grok does not expose a compatible token-counting endpoint, so this
+// path deliberately avoids account selection, credentials, and upstream calls.
 func EstimateGrokCountTokens(body []byte) (int, error) {
+	return estimateAnthropicCountTokensLocally(body)
+}
+
+// estimateAnthropicCountTokensLocally 走 Anthropic→Responses→tiktoken 链本地估算
+// count_tokens，不发任何上游请求（上游无兼容端点的平台使用）。
+func estimateAnthropicCountTokensLocally(body []byte) (int, error) {
 	var anthropicReq apicompat.AnthropicRequest
 	if err := json.Unmarshal(body, &anthropicReq); err != nil {
 		return 0, fmt.Errorf("parse anthropic count_tokens request: %w", err)
@@ -63,7 +242,7 @@ func EstimateGrokCountTokens(body []byte) (int, error) {
 		ToolChoice:   responsesReq.ToolChoice,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("estimate grok input tokens: %w", err)
+		return 0, fmt.Errorf("estimate input tokens: %w", err)
 	}
 	if estimated < openAIInputTokensFallbackMinimum {
 		estimated = openAIInputTokensFallbackMinimum
@@ -71,8 +250,8 @@ func EstimateGrokCountTokens(body []byte) (int, error) {
 	return estimated, nil
 }
 
-// ForwardCountTokensAsAnthropic 将 Anthropic /v1/messages/count_tokens 桥接到
-// OpenAI POST /v1/responses/input_tokens，并返回 Anthropic 兼容结果。
+// ForwardCountTokensAsAnthropic bridges Anthropic /v1/messages/count_tokens to
+// OpenAI POST /v1/responses/input_tokens and returns Anthropic-compatible output.
 func (s *OpenAIGatewayService) ForwardCountTokensAsAnthropic(
 	ctx context.Context,
 	c *gin.Context,
@@ -83,6 +262,29 @@ func (s *OpenAIGatewayService) ForwardCountTokensAsAnthropic(
 	if account == nil {
 		writeAnthropicCountTokensError(c, http.StatusServiceUnavailable, "api_error", "No available OpenAI accounts")
 		return fmt.Errorf("count_tokens: missing account")
+	}
+
+	// 国产供应商（全部协议，含 anthropic）：一律本地估算，不发上游请求。
+	// 依据（2026-08 核实）：三家的 Anthropic 兼容层均未提供
+	// /v1/messages/count_tokens——DeepSeek 官方 anthropic_api 文档无此端点
+	// （且注明 anthropic-version 头被忽略），聚合网关 OpenModel 明确标注
+	// count_tokens 为 "Anthropic only"，Kimi/智谱亦无任何文档承诺。转发上游
+	// 只会常态 404，且错误还会流入账号处置逻辑误伤整账号调度；Claude Code
+	// 高频调用此端点，本地 tiktoken 估算是与 Grok 一致的既有方案。
+	if account.IsCNProvider() {
+		estimated, err := estimateAnthropicCountTokensLocally(body)
+		if err != nil {
+			writeAnthropicCountTokensError(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
+			return fmt.Errorf("count_tokens: estimate cn provider input tokens: %w", err)
+		}
+		logger.L().Debug("openai count_tokens: cn provider local estimate",
+			zap.Int64("account_id", account.ID),
+			zap.Int("estimated_input_tokens", estimated),
+		)
+		c.JSON(http.StatusOK, gin.H{
+			"input_tokens": estimated,
+		})
+		return nil
 	}
 
 	prepared, err := prepareOpenAIInputTokensCountRequest(body, account, defaultMappedModel)
@@ -125,14 +327,6 @@ func (s *OpenAIGatewayService) ForwardCountTokensAsAnthropic(
 	if err != nil {
 		safeErr := sanitizeUpstreamErrorMessage(err.Error())
 		setOpsUpstreamError(c, 0, safeErr, "")
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform:           account.Platform,
-			AccountID:          account.ID,
-			AccountName:        account.Name,
-			UpstreamStatusCode: 0,
-			Kind:               "request_error",
-			Message:            safeErr,
-		})
 		writeAnthropicCountTokensError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
 		return fmt.Errorf("openai input_tokens upstream request failed: %s", safeErr)
 	}
@@ -150,31 +344,14 @@ func (s *OpenAIGatewayService) ForwardCountTokensAsAnthropic(
 			writeOpenAIOAuthInputTokensFallback(c, account, prepared, resp.StatusCode)
 			return nil
 		}
+
+		if s.rateLimitService != nil {
+			s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+		}
+
 		if isOpenAIInputTokensUnsupported(resp.StatusCode, respBody) {
 			writeAnthropicCountTokensError(c, http.StatusNotFound, "not_found_error", "Token counting is not supported by upstream")
 			return nil
-		}
-		var decision UpstreamErrorDecision
-		if account.Platform == PlatformGrok {
-			decision = s.applyGrokAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, prepared.UpstreamModel)
-		} else {
-			decision = s.applyOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody, prepared.UpstreamModel)
-		}
-		if decision.ShouldReturnGenericError() {
-			writeAnthropicCountTokensError(c, http.StatusInternalServerError, "upstream_error", "Upstream gateway error")
-			return fmt.Errorf("input_tokens upstream error: %d (not in custom error codes)", resp.StatusCode)
-		}
-		defaultFailover := s.shouldFailoverOpenAIUpstreamResponse(resp.StatusCode, upstreamMsg, respBody)
-		if account.Platform == PlatformGrok {
-			defaultFailover = s.shouldFailoverGrokUpstreamError(resp.StatusCode, respBody)
-		}
-		if decision.ShouldFailover(account, resp.StatusCode, defaultFailover) {
-			return &UpstreamFailoverError{
-				StatusCode:             resp.StatusCode,
-				ResponseBody:           respBody,
-				ResponseHeaders:        resp.Header.Clone(),
-				RetryableOnSameAccount: decision.RetryableOnSameAccount(account, resp.StatusCode),
-			}
 		}
 
 		upstreamDetail := ""
@@ -186,22 +363,12 @@ func (s *OpenAIGatewayService) ForwardCountTokensAsAnthropic(
 			upstreamDetail = truncateString(string(respBody), maxBytes)
 		}
 		setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, upstreamDetail)
-		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
-			Platform:           account.Platform,
-			AccountID:          account.ID,
-			AccountName:        account.Name,
-			UpstreamStatusCode: resp.StatusCode,
-			UpstreamRequestID:  resp.Header.Get("x-request-id"),
-			Kind:               "request_error",
-			Message:            upstreamMsg,
-			Detail:             upstreamDetail,
-		})
 
 		errMsg := "Upstream request failed"
 		switch resp.StatusCode {
-		case http.StatusTooManyRequests:
+		case 429:
 			errMsg = "Rate limit exceeded"
-		case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, 529:
+		case 500, 502, 503, 504, 529:
 			errMsg = "Upstream service temporarily unavailable"
 		}
 		writeAnthropicCountTokensError(c, resp.StatusCode, "upstream_error", errMsg)
@@ -305,9 +472,6 @@ func (s *OpenAIGatewayService) buildInputTokensUpstreamRequest(
 			}
 		}
 	}
-	if customUA := account.GetOpenAIUserAgent(); customUA != "" {
-		req.Header.Set("user-agent", customUA)
-	}
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
@@ -382,8 +546,10 @@ func isOpenAIOAuthInputTokensUnsupported(statusCode int, body []byte) bool {
 		return true
 	}
 
-	// 上游代理可能在请求到达 API 前拦截 OAuth 平台端点，并返回没有结构化错误的 HTML 403 页面。
-	// 该响应属于端点不可用，count_tokens 应回退本地估算且不能影响账号健康状态。
+	// OAuth's platform endpoint can be blocked by an upstream proxy before it
+	// reaches the API and return an HTML 403 page without a structured error.
+	// Treat that endpoint-level response like the other unsupported cases so
+	// count_tokens remains a local, non-health-affecting convenience request.
 	if statusCode == http.StatusForbidden && isHTMLResponse(body) {
 		return true
 	}

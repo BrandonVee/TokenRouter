@@ -1134,7 +1134,13 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	models := make([]string, 0)
 	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
 	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek} {
-		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
+		if groupID != nil {
+			if _, ok := schedulablePlatforms[platform]; !ok {
+				continue
+			}
+		}
+		resolution := h.gatewayService.ResolveRequestableModels(ctx, groupID, platform)
+		platformModels := service.RequestableModelIDs(resolution.Models)
 		if len(platformModels) == 0 {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
 			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
@@ -1145,6 +1151,9 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 		for _, model := range platformModels {
 			model = strings.TrimSpace(model)
 			if model == "" {
+				continue
+			}
+			if detected, ok := service.DetectModelPlatform(model); ok && detected != platform {
 				continue
 			}
 			if _, ok := seen[model]; ok {
