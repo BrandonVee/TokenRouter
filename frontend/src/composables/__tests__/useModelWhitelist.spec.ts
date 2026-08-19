@@ -58,6 +58,18 @@ describe('useModelWhitelist', () => {
     expect(models).toContain('gemini-3-pro-image')
   })
 
+  it('Kimi 账号模型列表不会回落到 Claude', () => {
+    const models = getModelsByPlatform('kimi')
+
+    expect(models).toEqual([
+      'kimi-k3',
+      'kimi-k2.7-code',
+      'kimi-k2.7-code-highspeed',
+      'kimi-k2.6'
+    ])
+    expect(models).not.toContain('claude-opus-4-6')
+  })
+
   it('qoder 模型列表提供创建账号快捷候选且不暴露旧 route key', () => {
     const models = getModelsByPlatform('qoder')
 

@@ -125,6 +125,29 @@ describe('ModelWhitelistSelector', () => {
     expect(syncUpstreamModels).not.toHaveBeenCalled()
     expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual(['gpt-5.1', 'o3'])
     expect(showSuccess).toHaveBeenCalled()
+
+    await wrapper.get('div.cursor-pointer').trigger('click')
+    expect(wrapper.findAll('[data-testid="model-option"]').some(row => row.text().includes('gpt-5.1'))).toBe(true)
+  })
+
+  it.each(['kimi', 'zhipu', 'deepseek'])('国产供应商 %s 可以同步上游模型', async (platform) => {
+    syncUpstreamModelsPreview.mockResolvedValue({ models: [`${platform}-model`] })
+    const wrapper = mountSelector({
+      platform,
+      syncCredentials: {
+        platform,
+        type: 'apikey',
+        base_url: `https://${platform}.example.com/v1`,
+        api_key: 'provider-key'
+      }
+    })
+
+    const button = wrapper.findAll('button').find((item) => item.text().includes('admin.accounts.syncUpstreamModels'))
+    expect(button).toBeTruthy()
+    await button!.trigger('click')
+
+    expect(syncUpstreamModelsPreview).toHaveBeenCalledWith(expect.objectContaining({ platform }))
+    expect(wrapper.emitted('update:modelValue')?.[0]?.[0]).toEqual([`${platform}-model`])
   })
 
   it('编辑账号时仍使用账号 ID 同步上游模型', async () => {

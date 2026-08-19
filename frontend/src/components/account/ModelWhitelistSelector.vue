@@ -145,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { accountsAPI } from '@/api/admin/accounts'
@@ -183,6 +183,8 @@ const searchQuery = ref('')
 const customModel = ref('')
 const isComposing = ref(false)
 const isSyncingUpstream = ref(false)
+// 记录本次从上游获取的模型，确保非内置模型也能继续在下拉列表中选择。
+const syncedModels = ref<string[]>([])
 const normalizedPlatforms = computed(() => {
   const rawPlatforms =
     props.platforms && props.platforms.length > 0
@@ -200,7 +202,22 @@ const normalizedPlatforms = computed(() => {
   )
 })
 
-const upstreamSyncPlatforms = new Set(['anthropic', 'openai', 'gemini', 'antigravity', 'grok'])
+watch(normalizedPlatforms, () => {
+  // 切换账号平台后清理旧上游结果，避免把 Kimi 模型带到 GLM/DeepSeek 等平台。
+  syncedModels.value = []
+})
+
+// 国产供应商同样提供 OpenAI 兼容模型列表端点，创建和编辑流程都允许实时获取。
+const upstreamSyncPlatforms = new Set([
+  'anthropic',
+  'openai',
+  'gemini',
+  'antigravity',
+  'grok',
+  'kimi',
+  'zhipu',
+  'deepseek'
+])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {
     if (normalizedPlatforms.value.length === 0) return true
@@ -214,11 +231,21 @@ const canSyncUpstream = computed(() => {
 
 const availableOptions = computed(() => {
   if (props.models) {
-    const allowedModels = new Set(props.models)
-    return allModels.filter(model => allowedModels.has(model.value))
+    const allowedModels = new Set([...props.models, ...syncedModels.value])
+    return [
+      ...allModels.filter(model => allowedModels.has(model.value)),
+      ...syncedModels.value
+        .filter(model => !allModels.some(option => option.value === model))
+        .map(model => ({ value: model, label: model }))
+    ]
   }
   if (normalizedPlatforms.value.length === 0) {
-    return allModels
+    return [
+      ...allModels,
+      ...syncedModels.value
+        .filter(model => !allModels.some(option => option.value === model))
+        .map(model => ({ value: model, label: model }))
+    ]
   }
 
   const allowedModels = new Set<string>()
@@ -228,7 +255,12 @@ const availableOptions = computed(() => {
     }
   }
 
-  return allModels.filter(model => allowedModels.has(model.value))
+  return [
+    ...allModels.filter(model => allowedModels.has(model.value)),
+    ...syncedModels.value
+      .filter(model => !allModels.some(option => option.value === model))
+      .map(model => ({ value: model, label: model }))
+  ]
 })
 
 const filteredModels = computed(() => {
@@ -315,6 +347,7 @@ const syncUpstreamModels = async () => {
       return
     }
 
+    syncedModels.value = Array.from(new Set([...syncedModels.value, ...upstreamModels]))
     const newModels = [...props.modelValue]
     let addedCount = 0
     for (const model of upstreamModels) {

@@ -137,7 +137,7 @@ func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, acc
 		return s.buildAntigravityAPIKeyModelsRequest(ctx, account)
 	case account.IsGrok():
 		return s.buildGrokUpstreamModelsRequest(ctx, account)
-	case account.IsOpenAI():
+	case account.IsOpenAICompatible():
 		return s.buildOpenAIUpstreamModelsRequest(ctx, account)
 	case account.IsGemini():
 		return s.buildGeminiUpstreamModelsRequest(ctx, account)
@@ -350,6 +350,10 @@ func (s *AccountTestService) buildOpenAIUpstreamModelsRequest(ctx context.Contex
 	}
 
 	baseURL := account.GetOpenAIBaseURL()
+	if account.IsCNProvider() {
+		// 国产供应商的 Anthropic 账号地址可能不带 /v1，模型列表统一使用 OpenAI 兼容端点。
+		baseURL = account.GetOpenAIFormatBaseURL()
+	}
 	if strings.TrimSpace(baseURL) == "" {
 		baseURL = "https://api.openai.com"
 	}

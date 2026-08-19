@@ -2746,6 +2746,27 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		return
 	}
 
+	// 国产供应商统一使用 OpenAI 兼容模型结构，但各平台必须展示自己的默认模型目录。
+	if account.IsCNProvider() {
+		requestModels := account.GetConfiguredRequestModels()
+		if len(requestModels) == 0 {
+			switch account.Platform {
+			case service.PlatformKimi:
+				requestModels = []string{"kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6"}
+			case service.PlatformZhipu:
+				requestModels = []string{"glm-5.2", "glm-5.1", "glm-5-turbo", "glm-5", "glm-4.7", "glm-4.7-flash", "glm-4.7-flashx", "glm-4.6", "glm-4.5-air", "glm-4.5-airx", "glm-4.5-flash"}
+			case service.PlatformDeepseek:
+				requestModels = []string{"deepseek-v4-pro", "deepseek-v4-flash"}
+			}
+		}
+		models := make([]openai.Model, 0, len(requestModels))
+		for _, modelID := range requestModels {
+			models = append(models, openai.Model{ID: modelID, Object: "model", Type: "model", DisplayName: modelID})
+		}
+		response.Success(c, models)
+		return
+	}
+
 	// Handle Claude/Anthropic accounts
 	// For OAuth and Setup-Token accounts: return default models
 	if account.IsOAuth() {
@@ -2833,10 +2854,12 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 // POST /api/v1/admin/accounts/models/sync-upstream-preview
 func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
 	var req struct {
-		Platform string `json:"platform" binding:"required"`
-		Type     string `json:"type" binding:"required"`
-		BaseURL  string `json:"base_url"`
-		APIKey   string `json:"api_key" binding:"required"`
+		Platform    string `json:"platform" binding:"required"`
+		Type        string `json:"type" binding:"required"`
+		BaseURL     string `json:"base_url"`
+		APIKey      string `json:"api_key" binding:"required"`
+		AccountMode string `json:"account_mode"`
+		APIProtocol string `json:"api_protocol"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
@@ -2847,8 +2870,10 @@ func (h *AccountHandler) SyncUpstreamModelsPreview(c *gin.Context) {
 		Platform: req.Platform,
 		Type:     req.Type,
 		Credentials: map[string]any{
-			"api_key":  req.APIKey,
-			"base_url": req.BaseURL,
+			"api_key":      req.APIKey,
+			"base_url":     req.BaseURL,
+			"account_mode": req.AccountMode,
+			"api_protocol": req.APIProtocol,
 		},
 	}
 

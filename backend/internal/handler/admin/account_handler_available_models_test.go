@@ -432,6 +432,30 @@ func TestAccountHandlerGetAvailableModels_QoderUsesConfiguredModels(t *testing.T
 		"available models are driven by Qoder model_mapping keys when mapping is configured")
 }
 
+func TestAccountHandlerGetAvailableModels_KimiUsesKimiDefaults(t *testing.T) {
+	svc := &availableModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       46,
+			Platform: service.PlatformKimi,
+			Type:     service.AccountTypeAPIKey,
+			Status:   service.StatusActive,
+			Credentials: map[string]any{
+				"api_key": "kimi-key",
+			},
+		},
+	}
+	router := setupAvailableModelsRouter(svc)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/46/models", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotContains(t, rec.Body.String(), "claude-")
+	require.Contains(t, rec.Body.String(), "kimi-k2.6")
+}
+
 func TestAccountHandlerSyncUpstreamModels_ConfigErrorReturnsBadRequest(t *testing.T) {
 	svc := &availableModelsAdminService{
 		stubAdminService: newStubAdminService(),

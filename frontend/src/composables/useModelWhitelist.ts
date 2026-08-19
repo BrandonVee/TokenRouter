@@ -130,12 +130,9 @@ const qoderModels = [...new Set([...qoderGlobalModels, ...qoderCNModels])]
 
 // 智谱 GLM
 const zhipuModels = [
-  'glm-4', 'glm-4v', 'glm-4-plus', 'glm-4-0520',
-  'glm-4-air', 'glm-4-airx', 'glm-4-long', 'glm-4-flash',
-  'glm-4v-plus', 'glm-4.5', 'glm-4.6',
-  'glm-3-turbo', 'glm-4-alltools',
-  'chatglm_turbo', 'chatglm_pro', 'chatglm_std', 'chatglm_lite',
-  'cogview-3', 'cogvideo'
+  'glm-5.2', 'glm-5.1', 'glm-5-turbo', 'glm-5',
+  'glm-4.7', 'glm-4.7-flash', 'glm-4.7-flashx', 'glm-4.6',
+  'glm-4.5-air', 'glm-4.5-airx', 'glm-4.5-flash'
 ]
 
 // 阿里 通义千问
@@ -151,11 +148,8 @@ const qwenModels = [
 
 // DeepSeek
 const deepseekModels = [
-  'deepseek-chat', 'deepseek-coder', 'deepseek-reasoner',
-  'deepseek-v3', 'deepseek-v3-0324',
-  'deepseek-r1', 'deepseek-r1-0528',
-  'deepseek-r1-distill-qwen-32b', 'deepseek-r1-distill-qwen-14b', 'deepseek-r1-distill-qwen-7b',
-  'deepseek-r1-distill-llama-70b', 'deepseek-r1-distill-llama-8b'
+  'deepseek-v4-pro',
+  'deepseek-v4-flash'
 ]
 
 // Mistral
@@ -227,6 +221,14 @@ const moonshotModels = [
   'kimi-latest'
 ]
 
+// Kimi 账号使用独立模型目录，不能回落到 Claude 或通用 Moonshot 列表。
+const kimiModels = [
+  'kimi-k3',
+  'kimi-k2.7-code',
+  'kimi-k2.7-code-highspeed',
+  'kimi-k2.6'
+]
+
 // 字节跳动 豆包
 const doubaoModels = [
   'doubao-pro-256k', 'doubao-pro-128k', 'doubao-pro-32k', 'doubao-pro-4k',
@@ -287,6 +289,7 @@ const allModelsList: string[] = Array.from(new Set([
   ...xaiModels,
   ...cohereModels,
   ...yiModels,
+  ...kimiModels,
   ...moonshotModels,
   ...doubaoModels,
   ...minimaxModels,
@@ -507,6 +510,7 @@ export function getModelsByPlatform(platform: string, qoderSite?: QoderSite): st
       if (qoderSite === 'cn') return qoderCNModels
       return qoderModels
     case 'zhipu': return zhipuModels
+    case 'kimi': return kimiModels
     case 'qwen': return qwenModels
     case 'deepseek': return deepseekModels
     case 'mistral': return mistralModels

@@ -210,6 +210,28 @@ func TestBuildUpstreamModelsRequestsForAPIKeyAccounts(t *testing.T) {
 	require.Equal(t, "https://openai.example.com/v1/models", openAIReq.URL.String())
 	require.Equal(t, "Bearer openai-key", openAIReq.Header.Get("Authorization"))
 
+	for _, tc := range []struct {
+		platform string
+		baseURL  string
+		wantURL  string
+	}{
+		{platform: PlatformKimi, baseURL: "https://api.kimi.com/coding/v1", wantURL: "https://api.kimi.com/coding/v1/models"},
+		{platform: PlatformZhipu, baseURL: "https://open.bigmodel.cn/api/paas/v4", wantURL: "https://open.bigmodel.cn/api/paas/v4/models"},
+		{platform: PlatformDeepseek, baseURL: "https://api.deepseek.com", wantURL: "https://api.deepseek.com/v1/models"},
+	} {
+		req, reqErr := svc.buildUpstreamModelsRequest(ctx, &Account{
+			Platform: tc.platform,
+			Type:     AccountTypeAPIKey,
+			Credentials: map[string]any{
+				"api_key":  "provider-key",
+				"base_url": tc.baseURL,
+			},
+		})
+		require.NoError(t, reqErr)
+		require.Equal(t, tc.wantURL, req.URL.String())
+		require.Equal(t, "Bearer provider-key", req.Header.Get("Authorization"))
+	}
+
 	grokReq, err := svc.buildUpstreamModelsRequest(ctx, &Account{
 		Platform: PlatformGrok,
 		Type:     AccountTypeAPIKey,
