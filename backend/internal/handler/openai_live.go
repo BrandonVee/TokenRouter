@@ -31,7 +31,7 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		h.errorResponse(c, http.StatusInternalServerError, "api_error", "User context not found")
 		return
 	}
-	if apiKey.Group == nil || apiKey.Group.Platform != service.PlatformOpenAI {
+	if apiKey.Group == nil || (apiKey.Group.Platform != service.PlatformOpenAI && apiKey.Group.Platform != service.PlatformComposite) {
 		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Live is not supported for this platform")
 		return
 	}
@@ -44,10 +44,26 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return
 	}
-	clientModel := strings.TrimSpace(gjson.GetBytes(request.Session, "model").String())
-	redirectCtx, model := apiKeyModelRedirectContext(c.Request.Context(), apiKey, clientModel)
-	if model != clientModel {
-		request.Session, err = sjson.SetBytes(request.Session, "model", model)
+	model := strings.TrimSpace(gjson.GetBytes(request.Session, "model").String())
+	clientModel := model
+	if publicModel, ok := service.RequestedPublicModelFromContext(c.Request.Context()); ok {
+		clientModel = publicModel
+	}
+	if !compositeTargetPlatformAllowed(c, apiKey, model, service.PlatformOpenAI) {
+		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Live only supports OpenAI models for Composite groups")
+		return
+	}
+	if upstreamModel, ok := service.ResolvedUpstreamModelFromContext(c.Request.Context()); ok && upstreamModel != model {
+		request.Session, err = sjson.SetBytes(request.Session, "model", upstreamModel)
+		if err != nil {
+			h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to apply Composite model route")
+			return
+		}
+		model = upstreamModel
+	}
+	redirectCtx, redirectedModel := apiKeyModelRedirectContext(c.Request.Context(), apiKey, model)
+	if redirectedModel != model {
+		request.Session, err = sjson.SetBytes(request.Session, "model", redirectedModel)
 		if err != nil {
 			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "session.model is invalid")
 			return
@@ -261,6 +277,6 @@ func (h *OpenAIGatewayHandler) LiveSideband(c *gin.Context) {
 func liveEnabledForAPIKey(apiKey *service.APIKey) bool {
 	return apiKey != nil &&
 		apiKey.Group != nil &&
-		apiKey.Group.Platform == service.PlatformOpenAI &&
+		(apiKey.Group.Platform == service.PlatformOpenAI || apiKey.Group.Platform == service.PlatformComposite) &&
 		apiKey.Group.AllowLive
 }

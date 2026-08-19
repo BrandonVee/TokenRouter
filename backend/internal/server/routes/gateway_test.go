@@ -55,6 +55,12 @@ func newGatewayRoutesTestRouterWithOptions(cfg *config.Config, gatewayHandler *h
 // newGatewayRoutesTestRouterWithGroup 允许测试显式控制 nil 与空协议集合。
 func newGatewayRoutesTestRouterWithGroup(cfg *config.Config, gatewayHandler *handler.GatewayHandler, group *service.Group) *gin.Engine {
 	gin.SetMode(gin.TestMode)
+	if cfg.Gateway.MaxBodySize == 0 {
+		cfg.Gateway.MaxBodySize = 1024 * 1024
+	}
+	if cfg.Gateway.TextMaxBodySize == 0 {
+		cfg.Gateway.TextMaxBodySize = 1024 * 1024
+	}
 	router := gin.New()
 
 	if gatewayHandler == nil {
@@ -375,7 +381,7 @@ func TestGatewayRoutesOpenAIAlphaSearchPathsAreRegistered(t *testing.T) {
 }
 
 // 非 OpenAI 分组不能通过通用 /v1 路由调用 Codex Alpha Search。
-func TestGatewayRoutesAlphaSearchRejectsNonOpenAIGroup(t *testing.T) {
+func TestGatewayRoutesAlphaSearchRejectsUnsupportedGroup(t *testing.T) {
 	router := newGatewayRoutesTestRouter(service.PlatformGrok)
 	req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(`{"model":"gpt-5.6-sol"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -384,7 +390,7 @@ func TestGatewayRoutesAlphaSearchRejectsNonOpenAIGroup(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusNotFound, w.Code)
-	require.Contains(t, w.Body.String(), "only available for OpenAI groups")
+	require.Contains(t, w.Body.String(), "only available for OpenAI and Composite groups")
 }
 
 func TestGatewayRoutesOpenAIImagesPathsAreRegistered(t *testing.T) {
