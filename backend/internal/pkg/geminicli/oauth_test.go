@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+const testBuiltinOAuthClientID = "gemini-cli-test.apps.googleusercontent.com"
+
+func setTestBuiltinOAuthClient(t *testing.T) {
+	t.Helper()
+	t.Setenv(GeminiCLIOAuthClientIDEnv, testBuiltinOAuthClientID)
+	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+}
+
 // ---------------------------------------------------------------------------
 // SessionStore 测试
 // ---------------------------------------------------------------------------
@@ -327,7 +335,7 @@ func TestHasRestrictedScope(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestBuildAuthorizationURL(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-secret")
+	setTestBuiltinOAuthClient(t)
 
 	authURL, err := BuildAuthorizationURL(
 		OAuthConfig{},
@@ -344,7 +352,7 @@ func TestBuildAuthorizationURL(t *testing.T) {
 	// 检查返回的 URL 包含期望的参数
 	checks := []string{
 		"response_type=code",
-		"client_id=" + GeminiCLIOAuthClientID,
+		"client_id=" + testBuiltinOAuthClientID,
 		"redirect_uri=",
 		"state=test-state",
 		"code_challenge=test-challenge",
@@ -371,7 +379,7 @@ func TestBuildAuthorizationURL(t *testing.T) {
 }
 
 func TestBuildAuthorizationURL_EmptyRedirectURI(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-secret")
+	setTestBuiltinOAuthClient(t)
 
 	_, err := BuildAuthorizationURL(
 		OAuthConfig{},
@@ -390,7 +398,7 @@ func TestBuildAuthorizationURL_EmptyRedirectURI(t *testing.T) {
 }
 
 func TestBuildAuthorizationURL_WithProjectID(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-secret")
+	setTestBuiltinOAuthClient(t)
 
 	authURL, err := BuildAuthorizationURL(
 		OAuthConfig{},
@@ -408,7 +416,8 @@ func TestBuildAuthorizationURL_WithProjectID(t *testing.T) {
 	}
 }
 
-func TestBuildAuthorizationURL_UsesBuiltinSecretFallback(t *testing.T) {
+func TestBuildAuthorizationURL_RejectsMissingBuiltinCredentials(t *testing.T) {
+	t.Setenv(GeminiCLIOAuthClientIDEnv, "")
 	t.Setenv(GeminiCLIOAuthClientSecretEnv, "")
 
 	authURL, err := BuildAuthorizationURL(
@@ -419,11 +428,11 @@ func TestBuildAuthorizationURL_UsesBuiltinSecretFallback(t *testing.T) {
 		"",
 		"code_assist",
 	)
-	if err != nil {
-		t.Fatalf("BuildAuthorizationURL() 不应报错: %v", err)
+	if err == nil {
+		t.Fatalf("缺少 Gemini CLI OAuth 凭证时应报错，实际 URL: %s", authURL)
 	}
-	if !strings.Contains(authURL, "client_id="+GeminiCLIOAuthClientID) {
-		t.Errorf("应使用内置 Gemini CLI client_id，实际 URL: %s", authURL)
+	if !strings.Contains(err.Error(), GeminiCLIOAuthClientIDEnv) || !strings.Contains(err.Error(), GeminiCLIOAuthClientSecretEnv) {
+		t.Errorf("错误应说明两个必需环境变量，实际: %v", err)
 	}
 }
 
@@ -434,7 +443,7 @@ func TestBuildAuthorizationURL_UsesBuiltinSecretFallback(t *testing.T) {
 func TestEffectiveOAuthConfig_GoogleOne(t *testing.T) {
 	// 内置的 Gemini CLI client secret 不嵌入在此仓库中。
 	// 测试通过环境变量设置一个假的 secret 来模拟运维配置。
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+	setTestBuiltinOAuthClient(t)
 
 	tests := []struct {
 		name         string
@@ -448,7 +457,7 @@ func TestEffectiveOAuthConfig_GoogleOne(t *testing.T) {
 			name:         "Google One 使用内置客户端（空配置）",
 			input:        OAuthConfig{},
 			oauthType:    "google_one",
-			wantClientID: GeminiCLIOAuthClientID,
+			wantClientID: testBuiltinOAuthClientID,
 			wantScopes:   DefaultCodeAssistScopes,
 			wantErr:      false,
 		},
@@ -469,7 +478,7 @@ func TestEffectiveOAuthConfig_GoogleOne(t *testing.T) {
 				Scopes: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/generative-language.retriever https://www.googleapis.com/auth/drive.readonly",
 			},
 			oauthType:    "google_one",
-			wantClientID: GeminiCLIOAuthClientID,
+			wantClientID: testBuiltinOAuthClientID,
 			wantScopes:   "https://www.googleapis.com/auth/cloud-platform",
 			wantErr:      false,
 		},
@@ -479,7 +488,7 @@ func TestEffectiveOAuthConfig_GoogleOne(t *testing.T) {
 				Scopes: "https://www.googleapis.com/auth/generative-language.retriever https://www.googleapis.com/auth/drive.readonly",
 			},
 			oauthType:    "google_one",
-			wantClientID: GeminiCLIOAuthClientID,
+			wantClientID: testBuiltinOAuthClientID,
 			wantScopes:   DefaultCodeAssistScopes,
 			wantErr:      false,
 		},
@@ -487,7 +496,7 @@ func TestEffectiveOAuthConfig_GoogleOne(t *testing.T) {
 			name:         "Code Assist 使用内置客户端",
 			input:        OAuthConfig{},
 			oauthType:    "code_assist",
-			wantClientID: GeminiCLIOAuthClientID,
+			wantClientID: testBuiltinOAuthClientID,
 			wantScopes:   DefaultCodeAssistScopes,
 			wantErr:      false,
 		},
@@ -514,7 +523,7 @@ func TestEffectiveOAuthConfig_GoogleOne(t *testing.T) {
 }
 
 func TestEffectiveOAuthConfig_ScopeFiltering(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+	setTestBuiltinOAuthClient(t)
 
 	// 测试 Google One + 内置客户端过滤受限 scopes
 	cfg, err := EffectiveOAuthConfig(OAuthConfig{
@@ -575,7 +584,7 @@ func TestEffectiveOAuthConfig_OnlyClientSecret_NoID(t *testing.T) {
 }
 
 func TestEffectiveOAuthConfig_AIStudio_DefaultScopes_BuiltinClient(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+	setTestBuiltinOAuthClient(t)
 
 	// ai_studio 类型，使用内置客户端，scopes 为空 -> 应使用 DefaultCodeAssistScopes（因为内置客户端不能请求 generative-language scope）
 	cfg, err := EffectiveOAuthConfig(OAuthConfig{}, "ai_studio")
@@ -626,8 +635,6 @@ func TestEffectiveOAuthConfig_AIStudio_ScopeNormalization(t *testing.T) {
 }
 
 func TestEffectiveOAuthConfig_CommaSeparatedScopes(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
-
 	// 逗号分隔的 scopes 应被归一化为空格分隔
 	cfg, err := EffectiveOAuthConfig(OAuthConfig{
 		ClientID:     "custom-id",
@@ -686,23 +693,21 @@ func TestEffectiveOAuthConfig_WhitespaceTriming(t *testing.T) {
 	}
 }
 
-func TestEffectiveOAuthConfig_NoEnvSecret(t *testing.T) {
+func TestEffectiveOAuthConfig_MissingEnvSecret(t *testing.T) {
+	t.Setenv(GeminiCLIOAuthClientIDEnv, testBuiltinOAuthClientID)
 	t.Setenv(GeminiCLIOAuthClientSecretEnv, "")
 
-	cfg, err := EffectiveOAuthConfig(OAuthConfig{}, "code_assist")
-	if err != nil {
-		t.Fatalf("不设置环境变量时应回退到内置 secret，实际报错: %v", err)
+	_, err := EffectiveOAuthConfig(OAuthConfig{}, "code_assist")
+	if err == nil {
+		t.Fatal("缺少 Gemini CLI OAuth client secret 时应报错")
 	}
-	if strings.TrimSpace(cfg.ClientSecret) == "" {
-		t.Error("ClientSecret 不应为空")
-	}
-	if cfg.ClientID != GeminiCLIOAuthClientID {
-		t.Errorf("ClientID 应回退为内置客户端 ID，实际: %q", cfg.ClientID)
+	if !strings.Contains(err.Error(), GeminiCLIOAuthClientSecretEnv) {
+		t.Errorf("错误应指出缺少的环境变量，实际: %v", err)
 	}
 }
 
 func TestEffectiveOAuthConfig_AIStudio_BuiltinClient_CustomScopes(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+	setTestBuiltinOAuthClient(t)
 
 	// ai_studio + 内置客户端 + 自定义 scopes -> 应过滤受限 scopes
 	cfg, err := EffectiveOAuthConfig(OAuthConfig{
@@ -721,7 +726,7 @@ func TestEffectiveOAuthConfig_AIStudio_BuiltinClient_CustomScopes(t *testing.T) 
 }
 
 func TestEffectiveOAuthConfig_UnknownOAuthType_DefaultScopes(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+	setTestBuiltinOAuthClient(t)
 
 	// 未知的 oauthType 应回退到默认的 code_assist scopes
 	cfg, err := EffectiveOAuthConfig(OAuthConfig{}, "unknown_type")
@@ -734,7 +739,7 @@ func TestEffectiveOAuthConfig_UnknownOAuthType_DefaultScopes(t *testing.T) {
 }
 
 func TestEffectiveOAuthConfig_EmptyOAuthType_DefaultScopes(t *testing.T) {
-	t.Setenv(GeminiCLIOAuthClientSecretEnv, "test-built-in-secret")
+	setTestBuiltinOAuthClient(t)
 
 	// 空的 oauthType 应走 default 分支，使用 DefaultCodeAssistScopes
 	cfg, err := EffectiveOAuthConfig(OAuthConfig{}, "")

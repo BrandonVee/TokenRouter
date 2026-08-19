@@ -64,8 +64,8 @@ func (h *GeminiOAuthHandler) GenerateAuthURL(c *gin.Context) {
 		if strings.Contains(msg, "OAuth client not configured") ||
 			strings.Contains(msg, "requires your own OAuth Client") ||
 			strings.Contains(msg, "requires a custom OAuth Client") ||
-			strings.Contains(msg, "GEMINI_CLI_OAUTH_CLIENT_SECRET_MISSING") ||
-			strings.Contains(msg, "built-in Gemini CLI OAuth client_secret is not configured") {
+			strings.Contains(msg, "GEMINI_CLI_OAUTH_CLIENT_CREDENTIALS_MISSING") ||
+			strings.Contains(msg, "Gemini CLI OAuth client credentials are not configured") {
 			response.BadRequest(c, "Failed to generate auth URL: "+msg)
 			return
 		}

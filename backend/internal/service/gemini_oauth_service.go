@@ -84,7 +84,7 @@ func (s *GeminiOAuthService) GetOAuthConfig() *GeminiOAuthCapabilities {
 	// AI Studio OAuth is only enabled when the operator configures a custom OAuth client.
 	clientID := strings.TrimSpace(s.cfg.Gemini.OAuth.ClientID)
 	clientSecret := strings.TrimSpace(s.cfg.Gemini.OAuth.ClientSecret)
-	enabled := clientID != "" && clientSecret != "" && clientID != geminicli.GeminiCLIOAuthClientID
+	enabled := clientID != "" && clientSecret != "" && !geminicli.IsBuiltinOAuthClientID(clientID)
 
 	return &GeminiOAuthCapabilities{
 		AIStudioOAuthEnabled: enabled,
@@ -153,7 +153,7 @@ func (s *GeminiOAuthService) GenerateAuthURL(ctx context.Context, proxyID *int64
 		return nil, err
 	}
 
-	isBuiltinClient := effectiveCfg.ClientID == geminicli.GeminiCLIOAuthClientID
+	isBuiltinClient := geminicli.IsBuiltinOAuthClientID(effectiveCfg.ClientID)
 
 	// AI Studio OAuth requires a user-provided OAuth client (built-in Gemini CLI client is scope-restricted).
 	if oauthType == "ai_studio" && isBuiltinClient {
@@ -485,7 +485,7 @@ func (s *GeminiOAuthService) ExchangeCode(ctx context.Context, input *GeminiExch
 		if err != nil {
 			return nil, err
 		}
-		isBuiltinClient := effectiveCfg.ClientID == geminicli.GeminiCLIOAuthClientID
+		isBuiltinClient := geminicli.IsBuiltinOAuthClientID(effectiveCfg.ClientID)
 		if isBuiltinClient {
 			return nil, fmt.Errorf("AI Studio OAuth requires a custom OAuth Client. Please use an AI Studio API Key account, or configure GEMINI_OAUTH_CLIENT_ID / GEMINI_OAUTH_CLIENT_SECRET and re-authorize")
 		}
