@@ -4468,6 +4468,9 @@ const platformOptions = computed(() => [
   { value: "antigravity", label: "Antigravity" },
   { value: "qoder", label: "Qoder" },
   { value: "grok", label: "Grok" },
+  { value: "kimi", label: "Kimi" },
+  { value: "zhipu", label: "智谱 GLM" },
+  { value: "deepseek", label: "DeepSeek" },
 ]);
 
 const schedulerTypeOptions = computed(() => [

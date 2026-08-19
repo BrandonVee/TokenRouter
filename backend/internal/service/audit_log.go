@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	infraerrors "github.com/BrandonVee/TokenRouter/internal/pkg/errors"
 	"github.com/BrandonVee/TokenRouter/internal/util/logredact"
@@ -201,7 +202,13 @@ func RedactAuditBody(raw []byte, contentType string) string {
 	}
 	out := string(encoded)
 	if len(out) > auditRequestBodyMaxBytes {
-		out = out[:auditRequestBodyMaxBytes] + "...<truncated>"
+		// JSON 字符串按字节截断可能切断中文字符，必须回退到合法 UTF-8 边界，
+		// 否则 PostgreSQL 会以 invalid byte sequence 拒绝整批审计日志。
+		cut := encoded[:auditRequestBodyMaxBytes]
+		for len(cut) > 0 && !utf8.Valid(cut) {
+			cut = cut[:len(cut)-1]
+		}
+		out = string(cut) + "...<truncated>"
 	}
 	return out
 }

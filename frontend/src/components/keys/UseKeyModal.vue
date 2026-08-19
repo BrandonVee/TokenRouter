@@ -379,7 +379,10 @@ const openCodeProtocolPriority: Record<GroupPlatform, readonly GroupClientProtoc
   gemini: ['gemini_generate_content', 'openai_responses', 'openai_chat_completions', 'anthropic_messages'],
   antigravity: ['openai_responses', 'openai_chat_completions', 'anthropic_messages', 'gemini_generate_content'],
   qoder: ['openai_chat_completions', 'openai_responses', 'anthropic_messages'],
-  grok: ['openai_responses', 'openai_chat_completions', 'anthropic_messages']
+  grok: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
+  kimi: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
+  zhipu: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
+  deepseek: ['openai_responses', 'openai_chat_completions', 'anthropic_messages']
 }
 
 function preferredOpenCodeProtocol(
@@ -1091,6 +1094,24 @@ function generateCompatibleCodexFiles(
       name: 'TokenRouter Grok',
       model: 'grok-4.5',
       contextWindow: 1000000
+    },
+    kimi: {
+      provider: 'tokenrouter_kimi',
+      name: 'TokenRouter Kimi',
+      model: 'kimi-k2.5',
+      contextWindow: 256000
+    },
+    zhipu: {
+      provider: 'tokenrouter_zhipu',
+      name: 'TokenRouter 智谱 GLM',
+      model: 'glm-4.5',
+      contextWindow: 200000
+    },
+    deepseek: {
+      provider: 'tokenrouter_deepseek',
+      name: 'TokenRouter DeepSeek',
+      model: 'deepseek-chat',
+      contextWindow: 128000
     }
   }
   const config = platformConfig[platform]

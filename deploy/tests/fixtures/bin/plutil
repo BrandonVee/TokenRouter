@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -euo pipefail
+
+[[ "${1-}" == "-extract" ]]
+key_path=${2-}
+format=${3-}
+input=$(cat)
+
+case "${key_path}:${format}" in
+    0.configuration.labels:json)
+        label=$(printf '%s' "${input}" | sed -n 's/.*"org.sub2api.stack":"\([^"]*\)".*/\1/p')
+        [[ -n "${label}" ]]
+        printf '{"org.sub2api.stack":"%s"}\n' "${label}"
+        ;;
+    0.status.networks.0.ipv4Address:raw)
+        address=$(printf '%s' "${input}" | sed -n 's/.*"ipv4Address":"\([^"]*\)".*/\1/p')
+        [[ -n "${address}" ]]
+        printf '%s\n' "${address}"
+        ;;
+    *)
+        printf 'Unsupported fake plutil extraction: %s (%s)\n' "${key_path}" "${format}" >&2
+        exit 1
+        ;;
+esac

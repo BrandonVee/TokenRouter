@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 import UsageRankingView from '../UsageRankingView.vue'
 
@@ -34,6 +35,7 @@ vi.mock('@/composables/useBalanceDisplay', () => ({
 
 describe('UsageRankingView', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     mocks.getRanking.mockReset()
     mocks.getRanking.mockResolvedValue({
       ranking: [

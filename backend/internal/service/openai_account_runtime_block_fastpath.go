@@ -134,6 +134,10 @@ func (s *OpenAIGatewayService) applyOpenAIAccountUpstreamErrorInternal(
 	if s == nil || account == nil {
 		return UpstreamErrorDecision{Policy: ErrorPolicyNone}
 	}
+	// 在模型错误等早退分支前触发 Team 联动熔断。
+	if s.rateLimitService != nil {
+		s.rateLimitService.maybeHandleOpenAITeamLinkedError(stateCtx, account, statusCode, responseBody)
+	}
 	stateCtx = withTempUnschedulableModel(stateCtx, canonicalModel)
 	decision := upstreamErrorDecisionWithoutPersistence(account, statusCode)
 	if s.rateLimitService != nil {

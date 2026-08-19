@@ -404,6 +404,12 @@
       </div>
     </template>
 
+    <!-- 国产供应商：按账号模式展示余额或 Coding Plan 窗口。 -->
+    <template v-else-if="['kimi', 'zhipu', 'deepseek'].includes(account.platform)">
+      <CNProviderBalanceCell :account="account" />
+      <CNProviderQuotaCell :account="account" />
+    </template>
+
     <!-- Qoder COSY 账号：上游月度 credits -->
     <template v-else-if="account.platform === 'qoder'">
       <div v-if="loading" class="space-y-1.5">
@@ -688,6 +694,8 @@ import AccountQuotaInfo from './AccountQuotaInfo.vue'
 import OpenAIQuotaResetCell from './OpenAIQuotaResetCell.vue'
 import GrokQuotaProbeCell from './GrokQuotaProbeCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
+import CNProviderBalanceCell from './CNProviderBalanceCell.vue'
+import CNProviderQuotaCell from './CNProviderQuotaCell.vue'
 
 // 模块级缓存供所有 AccountUsageCell 实例共享
 const _usageCache = new Map<number, { data: AccountUsageInfo; ts: number }>()

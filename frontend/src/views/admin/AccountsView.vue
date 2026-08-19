@@ -280,6 +280,13 @@
                 <span :class="['h-1.5 w-1.5 rounded-full', getOpenAICompactMeta(row)?.dotClass]" />
                 <span>{{ getOpenAICompactMeta(row)?.label }}</span>
               </div>
+              <div
+                v-if="getCNProviderMeta(row)"
+                class="inline-flex items-center gap-1 pl-0.5 text-[11px] leading-4 text-gray-500 dark:text-gray-400"
+                :title="getCNProviderMeta(row)?.title"
+              >
+                <span>{{ getCNProviderMeta(row)?.label }}</span>
+              </div>
             </div>
           </template>
           <template #cell-capacity="{ row }">
@@ -1659,6 +1666,19 @@ function getOpenAICompactTitle(row: any): string {
   const label = getOpenAICompactMeta(row)?.label || ''
   if (!checkedAt) return label
   return `${label} | ${t('admin.accounts.openai.compactLastChecked')}: ${formatDateTime(new Date(checkedAt))}`
+}
+
+// 国产供应商账号直接展示计费模式与上游协议，便于管理员区分同平台渠道。
+function getCNProviderMeta(row: any): { label: string; title: string } | null {
+  if (!['kimi', 'zhipu', 'deepseek'].includes(row.platform) || row.type !== 'apikey') return null
+  const mode = row.credentials?.account_mode === 'coding' ? 'coding' : 'payg'
+  const protocol = ['anthropic', 'responses'].includes(row.credentials?.api_protocol)
+    ? row.credentials.api_protocol
+    : 'chat_completions'
+  const modeLabel = t(`admin.accounts.cnProviders.accountMode.${mode}`)
+  const protocolKey = protocol === 'chat_completions' ? 'chatCompletions' : protocol
+  const protocolLabel = t(`admin.accounts.cnProviders.apiProtocol.${protocolKey}`)
+  return { label: `${modeLabel} · ${protocolLabel}`, title: `${modeLabel} / ${protocolLabel}` }
 }
 
 function getAntigravityTierClass(row: any): string {

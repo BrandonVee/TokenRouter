@@ -10,7 +10,7 @@
 
 - [HTTP 接口边界](http_api.md)：公共、用户、管理员、支付和网关路由族及认证/错误边界。读取时机：新增或移动路由、调整中间件、认证方式或公共响应语义时读取。
 - [配置边界](configuration.md)：默认值、YAML、环境变量、数据库运行时设置和首次初始化之间的边界。读取时机：新增配置项、修改加载优先级、设置页面或部署变量时读取。
-- [上游账号能力矩阵](upstream_account_matrix.md)：六个平台、七类账号和全部公开网关协议的正式支持、兼容保留与不支持边界。读取时机：新增平台/账号类型、修改创建导入校验、路由分派或能力承诺时读取。
+- [上游账号能力矩阵](upstream_account_matrix.md)：九个平台、七类账号和全部公开网关协议的正式支持、兼容保留与不支持边界。读取时机：新增平台/账号类型、修改创建导入校验、路由分派或能力承诺时读取。
 - [Anthropic 上游](anthropic_upstream.md)：OAuth、Setup Token、API Key、Bedrock、Vertex，以及 Messages/OpenAI 兼容转换和缓存/限流契约。读取时机：修改 Anthropic 认证、协议、beta、thinking、缓存或错误分类时读取。
 - [OpenAI 上游](openai_upstream.md)：OAuth/API Key、Responses、Chat、Messages、Embeddings、Images、Realtime 和 Codex 传输契约。读取时机：修改 OpenAI 认证、endpoint capability、WebSocket、模型或配额调度时读取。
 - [Gemini 上游](gemini_upstream.md)：OAuth 变体、API Key、Vertex Service Account、v1beta 原生和兼容协议契约。读取时机：修改 Gemini 认证、project/tier、协议转换、thought signature 或配额时读取。

@@ -122,7 +122,7 @@ func (s *AccountTestService) ProbeOpenAIAPIKeyResponsesSupport(ctx context.Conte
 		return
 	}
 
-	apiKey := account.GetOpenAIApiKey()
+	apiKey := account.GetOpenAIProtocolAPIKey()
 	if apiKey == "" {
 		logger.LegacyPrintf("service.openai_probe", "probe_skip_no_apikey: account_id=%d", accountID)
 		return

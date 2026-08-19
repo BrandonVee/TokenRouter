@@ -661,6 +661,30 @@ export default {
       accountName: '账号名称',
       enterAccountName: '请输入账号名称',
       accountType: '账号类型',
+      cnProviders: {
+        accountMode: {
+          title: '账号模式',
+          payg: '按量付费',
+          paygDesc: '使用供应商余额，按 Token 计费。',
+          coding: 'Coding Plan',
+          codingDesc: '使用 5 小时和周额度窗口。'
+        },
+        apiProtocol: {
+          title: 'API 协议',
+          chatCompletions: 'OpenAI Chat',
+          chatCompletionsDesc: 'OpenAI 兼容 Chat Completions 接口。',
+          anthropic: 'Anthropic Messages',
+          anthropicDesc: '适用于 Claude 客户端的原生 Anthropic 接口。',
+          responses: 'OpenAI Responses',
+          responsesDesc: '适用于 Codex 客户端的 DeepSeek Responses 接口。'
+        },
+        balance: '余额',
+        window5h: '5 小时',
+        windowWeekly: '每周',
+        probeTooltip: '查询供应商额度或余额',
+        balanceLow: '余额不足',
+        resetSoon: '即将重置'
+      },
       claudeCode: 'Claude Code',
       claudeConsole: 'Claude Console',
       bedrockLabel: 'AWS Bedrock',

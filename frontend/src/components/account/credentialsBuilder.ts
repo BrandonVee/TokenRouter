@@ -347,3 +347,49 @@ export function applyPlanType(
   }
   return credentials
 }
+
+// 国产供应商账号模式与协议的联合端点预设，保持创建和编辑表单共用一套事实源。
+export type CnAccountMode = 'payg' | 'coding'
+export type CnApiProtocol = 'chat_completions' | 'anthropic' | 'responses'
+
+export interface CnBaseUrlPreset {
+  mode: CnAccountMode
+  protocol: CnApiProtocol
+  label: string
+  url: string
+}
+
+export const CN_BASE_URL_PRESETS: Record<'kimi' | 'zhipu' | 'deepseek', CnBaseUrlPreset[]> = {
+  kimi: [
+    { mode: 'payg', protocol: 'chat_completions', label: 'Moonshot', url: 'https://api.moonshot.cn/v1' },
+    { mode: 'payg', protocol: 'anthropic', label: 'Moonshot Anthropic', url: 'https://api.moonshot.cn/anthropic' },
+    { mode: 'coding', protocol: 'chat_completions', label: 'Kimi For Coding', url: 'https://api.kimi.com/coding/v1' },
+    { mode: 'coding', protocol: 'anthropic', label: 'Kimi Coding Anthropic', url: 'https://api.kimi.com/coding' }
+  ],
+  zhipu: [
+    { mode: 'payg', protocol: 'chat_completions', label: 'GLM PaaS', url: 'https://open.bigmodel.cn/api/paas/v4' },
+    { mode: 'payg', protocol: 'anthropic', label: 'GLM Anthropic', url: 'https://open.bigmodel.cn/api/anthropic' },
+    { mode: 'coding', protocol: 'chat_completions', label: 'GLM Coding', url: 'https://open.bigmodel.cn/api/coding/paas/v4' },
+    { mode: 'coding', protocol: 'anthropic', label: 'GLM Coding Anthropic', url: 'https://open.bigmodel.cn/api/anthropic' }
+  ],
+  deepseek: [
+    { mode: 'payg', protocol: 'chat_completions', label: 'DeepSeek', url: 'https://api.deepseek.com' },
+    { mode: 'payg', protocol: 'anthropic', label: 'DeepSeek Anthropic', url: 'https://api.deepseek.com/anthropic' },
+    { mode: 'payg', protocol: 'responses', label: 'DeepSeek Responses', url: 'https://api.deepseek.com' }
+  ]
+}
+
+// 根据模式和协议选择官方默认端点；用户仍可覆盖为第三方兼容地址。
+export function defaultCNBaseUrl(platform: string, mode: CnAccountMode, protocol: CnApiProtocol): string {
+  const preset = CN_BASE_URL_PRESETS[platform as keyof typeof CN_BASE_URL_PRESETS]
+    ?.find(item => item.mode === mode && item.protocol === protocol)
+  return preset?.url ?? ''
+}
+
+export function cnQuotaCellVisible(platform: string, accountMode: string): boolean {
+  return (platform === 'kimi' || platform === 'zhipu') && accountMode === 'coding'
+}
+
+export function cnBalanceCellVisible(platform: string, accountMode: string): boolean {
+  return (platform === 'kimi' || platform === 'deepseek') && accountMode !== 'coding'
+}

@@ -154,7 +154,7 @@ func isBareOrSubpathOf(path, root string) bool {
 
 // DeriveUpstreamEndpoint 根据账号平台和归一化后的入站端点推导上游端点。
 //
-// 平台规则：OpenAI 与 Grok 默认转到 /v1/responses，并保留 /compact 等子路径；
+// 平台规则：OpenAI、Grok 及国产 OpenAI 兼容供应商默认转到 /v1/responses，并保留 /compact 等子路径；
 // Grok 原始 Chat 请求会由转发结果覆盖实际上游端点。embeddings、alpha search 等
 // 原生端点保留自身路径；Anthropic 转到 /v1/messages；Gemini 转到
 // /v1beta/models；Antigravity 根据入站端点区分 Claude 与 Gemini。
@@ -162,7 +162,7 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 	inbound = strings.TrimSpace(inbound)
 
 	switch platform {
-	case service.PlatformOpenAI, service.PlatformGrok:
+	case service.PlatformOpenAI, service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek:
 		if inbound == EndpointEmbeddings || inbound == EndpointAlphaSearch || inbound == EndpointImagesGenerations || inbound == EndpointImagesEdits || inbound == EndpointVideosGenerations || inbound == EndpointVideosEdits || inbound == EndpointVideosExtensions || inbound == EndpointVideos {
 			return inbound
 		}

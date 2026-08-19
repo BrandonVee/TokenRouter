@@ -36,6 +36,18 @@ const GROUP_CLIENT_PROTOCOL_POLICIES: Record<GroupPlatform, GroupClientProtocolP
   grok: {
     supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'],
     defaults: ['openai_responses', 'openai_chat_completions']
+  },
+  kimi: {
+    supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'],
+    defaults: ['openai_responses', 'openai_chat_completions']
+  },
+  zhipu: {
+    supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'],
+    defaults: ['openai_responses', 'openai_chat_completions']
+  },
+  deepseek: {
+    supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'],
+    defaults: ['openai_responses', 'openai_chat_completions']
   }
 }
 

@@ -40,6 +40,14 @@ func TestLoadServerTimingConfig(t *testing.T) {
 	})
 }
 
+func TestLoadCORSAllowedOriginsFromEnvironment(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("CORS_ALLOWED_ORIGINS", " https://panel.example.com,https://admin.example.com ")
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.Equal(t, []string{"https://panel.example.com", "https://admin.example.com"}, cfg.CORS.AllowedOrigins)
+}
+
 func TestLoadRejectsLegacyAdvancedSchedulerConfig(t *testing.T) {
 	t.Run("legacy YAML key", func(t *testing.T) {
 		resetViperWithJWTSecret(t)

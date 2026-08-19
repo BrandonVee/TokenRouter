@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestMaskAuditCredential(t *testing.T) {
@@ -150,6 +151,24 @@ func TestRedactAuditBody_Empty(t *testing.T) {
 	if got := RedactAuditBody(nil, "application/json"); got != "" {
 		t.Fatalf("expected empty for nil body, got %q", got)
 	}
+}
+
+func TestRedactAuditBody_TruncationPreservesUTF8(t *testing.T) {
+	raw := []byte(`{"message":"` + strings.Repeat("中文内容", 5000) + `"}`)
+	out := RedactAuditBody(raw, "application/json")
+	if !utf8.ValidString(out) {
+		t.Fatal("truncated audit body must remain valid UTF-8")
+	}
+	if !strings.HasSuffix(out, "...<truncated>") {
+		t.Fatalf("expected truncation marker, got suffix %q", out[len(out)-minInt(len(out), 32):])
+	}
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func TestSessionBindingHash(t *testing.T) {

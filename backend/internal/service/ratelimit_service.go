@@ -34,6 +34,9 @@ type RateLimitService struct {
 	usageCache             map[int64]*geminiUsageCacheEntry
 	advancedSchedulerMu    sync.Mutex
 	advancedSchedulerStats *advancedAccountRuntimeStats
+	// OpenAI Team 联动熔断按 teamID 去重，避免同一工作区并发错误重复扫描账号。
+	openaiTeamLinkedMu     sync.Mutex
+	openaiTeamLinkedRecent map[string]time.Time
 }
 
 type AccountRuntimeBlocker interface {
@@ -374,6 +377,7 @@ func (s *RateLimitService) ApplyExplicitErrorPolicy(ctx context.Context, account
 // HandleUpstreamError 处理上游错误响应，标记账号状态
 // 返回是否应该停止该账号的调度
 func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, requestedModel ...string) (shouldDisable bool) {
+	s.maybeHandleOpenAITeamLinkedError(ctx, account, statusCode, responseBody)
 	return s.ApplyUpstreamError(ctx, account, statusCode, headers, responseBody, requestedModel...).StopScheduling
 }
 

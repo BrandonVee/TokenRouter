@@ -82,7 +82,7 @@ describe('AppSidebar sliding hover indicator', () => {
     expect(componentSource).toContain('transform 220ms cubic-bezier(0.22, 1, 0.36, 1)')
     expect(componentSource).toContain('@media (prefers-reduced-motion: reduce)')
     expect(styleSource).toContain('.dark .sidebar-hover-indicator')
-    expect(styleSource).toContain('--sidebar-hover-bg: #1f1f23;')
+    expect(styleSource).toContain('--sidebar-hover-bg: #2A2E35;')
     expect(componentSource).toContain('function hideHoverIndicator()')
     expect(componentSource).toContain('hoverIndicator.value.visible = false')
     expect(componentSource).not.toContain("querySelector<HTMLElement>('.sidebar-link-active')")

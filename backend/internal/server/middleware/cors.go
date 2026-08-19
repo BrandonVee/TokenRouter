@@ -30,7 +30,7 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 
 	corsWarningOnce.Do(func() {
 		if len(allowedOrigins) == 0 {
-			log.Println("Warning: CORS allowed_origins not configured; cross-origin requests will be rejected.")
+			log.Println("Warning: CORS allowed_origins not configured; cross-origin requests will be rejected. Set CORS_ALLOWED_ORIGINS or cors.allowed_origins to the frontend origin(s).")
 		}
 		if wildcardWithSpecific {
 			log.Println("Warning: CORS allowed_origins includes '*'; wildcard will take precedence over explicit origins.")

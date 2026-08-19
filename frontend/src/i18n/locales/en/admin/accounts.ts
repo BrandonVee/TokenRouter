@@ -587,6 +587,30 @@ export default {
       accountName: 'Account Name',
       enterAccountName: 'Enter account name',
       accountType: 'Account Type',
+      cnProviders: {
+        accountMode: {
+          title: 'Account Mode',
+          payg: 'Pay as you go',
+          paygDesc: 'Use provider balance and pay per token.',
+          coding: 'Coding Plan',
+          codingDesc: 'Use rolling 5-hour and weekly quota windows.'
+        },
+        apiProtocol: {
+          title: 'API Protocol',
+          chatCompletions: 'OpenAI Chat',
+          chatCompletionsDesc: 'OpenAI-compatible chat completions endpoint.',
+          anthropic: 'Anthropic Messages',
+          anthropicDesc: 'Native Anthropic messages endpoint for Claude clients.',
+          responses: 'OpenAI Responses',
+          responsesDesc: 'DeepSeek Responses endpoint for Codex clients.'
+        },
+        balance: 'Balance',
+        window5h: '5h',
+        windowWeekly: 'Weekly',
+        probeTooltip: 'Query provider quota or balance',
+        balanceLow: 'Low balance',
+        resetSoon: 'soon'
+      },
       claudeCode: 'Claude Code',
       claudeConsole: 'Claude Console',
       bedrockLabel: 'AWS Bedrock',

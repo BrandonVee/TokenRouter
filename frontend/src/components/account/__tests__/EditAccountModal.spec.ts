@@ -323,6 +323,20 @@ function buildGrokAPIKeyAccount() {
     concurrency: 2
   } as any
 }
+
+function buildKimiAnthropicAPIKeyAccount() {
+  return {
+    ...buildAccount(),
+    id: 8,
+    name: 'Kimi API Key',
+    platform: 'kimi',
+    credentials: {
+      account_mode: 'payg',
+      api_protocol: 'anthropic'
+    },
+    credentials_status: { has_api_key: true }
+  } as any
+}
 function mountModal(account = buildAccount()) {
   return mount(EditAccountModal, {
     props: {
@@ -591,6 +605,25 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.base_url).toBe('https://api.x.ai/v1')
   })
 
+  it('uses the selected CN provider protocol default when editing without a base URL', async () => {
+    const account = buildKimiAnthropicAPIKeyAccount()
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+
+    expect((wrapper.get('[data-testid="edit-account-base-url"]').element as HTMLInputElement).value)
+      .toBe('https://api.moonshot.cn/anthropic')
+
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
+      base_url: 'https://api.moonshot.cn/anthropic',
+      account_mode: 'payg',
+      api_protocol: 'anthropic'
+    })
+  })
+
   it('only submits model mapping credentials when saving an OpenAI spark shadow account', async () => {
     authIsSimpleMode.value = false
     const account = buildOpenAISparkShadowAccount()
@@ -636,10 +669,9 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials).toMatchObject({
       email: 'oauth@example.com',
       plan_type: 'free',
-      model_mapping: {
-        'gpt-5.4': 'gpt-5.4'
-      }
+      model_whitelist: ['gpt-5.4']
     })
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toBeUndefined()
   })
 
   it('loads and submits the Codex fingerprint mode for OpenAI OAuth accounts', async () => {

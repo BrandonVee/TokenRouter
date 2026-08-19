@@ -34,6 +34,7 @@ import riskControlAPI from './riskControl'
 import adminDataSharingAPI from './dataSharing'
 import auditAPI from './audit'
 import teamsAPI from './teams'
+import cnProvidersAPI from './cnProviders'
 
 /**
  * Unified admin API object for convenient access
@@ -69,7 +70,8 @@ export const adminAPI = {
   riskControl: riskControlAPI,
   dataSharing: adminDataSharingAPI,
   audit: auditAPI,
-  teams: teamsAPI
+  teams: teamsAPI,
+  cnProviders: cnProvidersAPI
 }
 
 export {
@@ -103,7 +105,8 @@ export {
   riskControlAPI,
   adminDataSharingAPI,
   auditAPI,
-  teamsAPI
+  teamsAPI,
+  cnProvidersAPI
 }
 
 export default adminAPI

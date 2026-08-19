@@ -79,7 +79,7 @@ describe('UserPlatformQuotaModal', () => {
     expect(apiMocks.getPlatformQuotas).toHaveBeenCalledWith(99)
   })
 
-  it('空数据渲染 6 个 platform 行', async () => {
+  it('空数据渲染 9 个 platform 行', async () => {
     const w = await mountAndOpen()
     const html = w.html()
     expect(html).toContain('anthropic')
@@ -88,6 +88,9 @@ describe('UserPlatformQuotaModal', () => {
     expect(html).toContain('antigravity')
     expect(html).toContain('qoder')
     expect(html).toContain('grok')
+    expect(html).toContain('kimi')
+    expect(html).toContain('zhipu')
+    expect(html).toContain('deepseek')
   })
 
   it('已有数据正确填充 limit input', async () => {
@@ -99,13 +102,13 @@ describe('UserPlatformQuotaModal', () => {
     })
     const w = await mountAndOpen()
     const inputs = w.findAll('input[type=number]')
-    // 6 个平台 × 3 个窗口 = 18 个输入框
-    expect(inputs.length).toBe(18)
+    // 9 个平台 × 3 个窗口 = 27 个输入框
+    expect(inputs.length).toBe(27)
     // 第一个 input 是 anthropic.daily = 10
     expect((inputs[0].element as HTMLInputElement).value).toBe('10')
   })
 
-  it('保存提交完整 6 platform payload', async () => {
+  it('保存提交完整 9 platform payload', async () => {
     apiMocks.getPlatformQuotas.mockResolvedValueOnce({
       platform_quotas: [
         { platform: 'openai', daily_limit_usd: null, weekly_limit_usd: 20, monthly_limit_usd: null,
@@ -122,7 +125,7 @@ describe('UserPlatformQuotaModal', () => {
     expect(apiMocks.updatePlatformQuotas).toHaveBeenCalledTimes(1)
     const [uid, payload] = apiMocks.updatePlatformQuotas.mock.calls[0]
     expect(uid).toBe(99)
-    expect(payload).toHaveLength(6) // 始终提交 6 个 USD quota 平台
+    expect(payload).toHaveLength(9) // 始终提交 9 个 USD quota 平台
     const openai = payload.find((p: any) => p.platform === 'openai')
     expect(openai.weekly_limit_usd).toBe(20)
   })

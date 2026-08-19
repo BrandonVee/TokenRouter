@@ -265,8 +265,14 @@ func (a *Account) IsGrokOAuth() bool {
 	return a.IsGrok() && a.Type == AccountTypeOAuth
 }
 
+// IsCNProvider 判断账号是否属于国产 OpenAI 兼容供应商。
+func (a *Account) IsCNProvider() bool {
+	return a != nil && IsCNProvider(a.Platform)
+}
+
 func (a *Account) IsOpenAICompatible() bool {
-	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok)
+	return a != nil && (a.Platform == PlatformOpenAI || a.Platform == PlatformGrok ||
+		a.Platform == PlatformKimi || a.Platform == PlatformZhipu || a.Platform == PlatformDeepseek)
 }
 
 func (a *Account) GeminiOAuthType() string {
@@ -1480,16 +1486,131 @@ func (a *Account) IsOpenAIApiKey() bool {
 }
 
 func (a *Account) GetOpenAIBaseURL() string {
-	if !a.IsOpenAI() {
+	if a == nil || (!a.IsOpenAI() && !a.IsCNProvider()) {
 		return ""
 	}
-	if a.Type == AccountTypeAPIKey {
-		baseURL := a.GetCredential("base_url")
+	if a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream {
+		baseURL := strings.TrimSpace(a.GetCredential("base_url"))
 		if baseURL != "" {
 			return baseURL
 		}
 	}
-	return "https://api.openai.com"
+	switch a.Platform {
+	case PlatformKimi:
+		if a.GetAccountMode() == AccountModeCoding {
+			return DefaultKimiCodingBaseURL
+		}
+		return DefaultKimiPayGBaseURL
+	case PlatformZhipu:
+		if a.GetAccountMode() == AccountModeCoding {
+			return DefaultZhipuCodingBaseURL
+		}
+		return DefaultZhipuPayGBaseURL
+	case PlatformDeepseek:
+		return DefaultDeepseekBaseURL
+	default:
+		return "https://api.openai.com"
+	}
+}
+
+// GetAccountMode 返回国产供应商账号模式，旧账号缺失时按按量付费处理。
+func (a *Account) GetAccountMode() string {
+	if a == nil || !a.IsCNProvider() {
+		return ""
+	}
+	if strings.TrimSpace(a.GetCredential("account_mode")) == AccountModeCoding && a.Platform != PlatformDeepseek {
+		return AccountModeCoding
+	}
+	return AccountModePayG
+}
+
+// IsCodingPlan 判断账号是否使用 Coding Plan。
+func (a *Account) IsCodingPlan() bool {
+	return a.GetAccountMode() == AccountModeCoding
+}
+
+// GetAPIProtocol 返回国产供应商的上游协议，非法组合回退 Chat Completions。
+func (a *Account) GetAPIProtocol() string {
+	if a == nil || !a.IsCNProvider() {
+		return APIProtocolChatCompletions
+	}
+	switch strings.TrimSpace(a.GetCredential("api_protocol")) {
+	case APIProtocolAnthropic:
+		return APIProtocolAnthropic
+	case APIProtocolResponses:
+		if a.Platform == PlatformDeepseek {
+			return APIProtocolResponses
+		}
+	}
+	return APIProtocolChatCompletions
+}
+
+// IsAnthropicProtocol 报告国产供应商是否使用 Anthropic Messages 上游协议。
+func (a *Account) IsAnthropicProtocol() bool {
+	return a != nil && a.IsCNProvider() && a.GetAPIProtocol() == APIProtocolAnthropic
+}
+
+// GetOpenAIFormatBaseURL 返回国产供应商的 OpenAI 格式基地址。
+// Anthropic 协议账号的凭证地址可能带有 /anthropic，余额探测等 OpenAI 格式端点
+// 需要回退到同一供应商的 OpenAI 默认基地址。
+func (a *Account) GetOpenAIFormatBaseURL() string {
+	if a == nil {
+		return ""
+	}
+	if !a.IsAnthropicProtocol() {
+		return a.GetOpenAIBaseURL()
+	}
+	switch a.Platform {
+	case PlatformKimi:
+		if a.GetAccountMode() == AccountModeCoding {
+			return DefaultKimiCodingBaseURL
+		}
+		return DefaultKimiPayGBaseURL
+	case PlatformZhipu:
+		if a.GetAccountMode() == AccountModeCoding {
+			return DefaultZhipuCodingBaseURL
+		}
+		return DefaultZhipuPayGBaseURL
+	case PlatformDeepseek:
+		return DefaultDeepseekBaseURL
+	default:
+		return a.GetOpenAIBaseURL()
+	}
+}
+
+// GetCodingPlanProvider 根据账号端点识别 Kimi 或智谱 Coding Plan。
+func (a *Account) GetCodingPlanProvider() string {
+	if a == nil || !a.IsCodingPlan() {
+		return ""
+	}
+	baseURL := strings.ToLower(a.GetOpenAIBaseURL())
+	switch {
+	case strings.Contains(baseURL, "api.kimi.com/coding"):
+		return PlatformKimi
+	case strings.Contains(baseURL, "bigmodel.cn"), strings.Contains(baseURL, "api.z.ai"):
+		return PlatformZhipu
+	default:
+		return a.Platform
+	}
+}
+
+// GetCNAPIKey 返回国产供应商 API Key。
+func (a *Account) GetCNAPIKey() string {
+	if a == nil || !a.IsCNProvider() {
+		return ""
+	}
+	return a.GetCredential("api_key")
+}
+
+// GetOpenAIProtocolAPIKey 返回 OpenAI 网关兼容账号的 API Key。
+func (a *Account) GetOpenAIProtocolAPIKey() string {
+	if a == nil {
+		return ""
+	}
+	if a.IsCNProvider() && a.Type == AccountTypeAPIKey {
+		return a.GetCredential("api_key")
+	}
+	return a.GetOpenAIApiKey()
 }
 
 func (a *Account) GetOpenAIAccessToken() string {
