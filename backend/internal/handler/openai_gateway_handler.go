@@ -236,7 +236,36 @@ func allowOpenAICompatibleMessagesDispatch(apiKey *service.APIKey) bool {
 	if apiKey == nil || apiKey.Group == nil {
 		return true
 	}
-	return apiKey.Group.AllowsClientProtocol(service.GroupClientProtocolAnthropicMessages)
+	if apiKey.Group.Platform == service.PlatformGrok {
+		return true
+	}
+	// 国产供应商分组与 grok 同语义:/v1/messages 就是其主要服务形态(anthropic
+	// 协议账号原生直通 Claude Code),无需 allow_messages_dispatch 开关授权——
+	// 该开关对非 openai 平台恒被 sanitizeGroupMessagesDispatchFields 置 false,
+	// 若不豁免,CN 分组将永远 403。
+	if service.IsCNProvider(apiKey.Group.Platform) {
+		return true
+	}
+	return apiKey.Group.AllowMessagesDispatch
+}
+
+func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
+	return compositeTargetPlatformAllowed(c, apiKey, model,
+		service.PlatformOpenAI, service.PlatformGrok,
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek)
+}
+
+// isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
+// 上可服务的目标平台。CN 供应商（kimi/zhipu/deepseek）刻意排除：其账号无法通过
+// WSv2 ingress 的 transport 过滤，且 WS HTTP 桥没有面向 CN 的 Responses 转换，
+// 放行只会把明确的策略拒绝变成误导性的 "no available account"。
+func isResponsesWebSocketCompositePlatform(platform string) bool {
+	switch platform {
+	case service.PlatformOpenAI, service.PlatformGrok:
+		return true
+	default:
+		return false
+	}
 }
 
 // NewOpenAIGatewayHandler creates a new OpenAIGatewayHandler
@@ -1688,7 +1717,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	ctx = c.Request.Context()
 	if apiKey.Group != nil && apiKey.Group.Platform == service.PlatformComposite {
 		platform, ok := service.ResolvedTargetPlatformFromContext(ctx)
-		if !ok || !isOpenAICompatibleTextPlatform(platform) {
+		if !ok || !isResponsesWebSocketCompositePlatform(platform) {
 			closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "Responses WebSocket API only supports OpenAI-compatible models for composite groups")
 			return
 		}

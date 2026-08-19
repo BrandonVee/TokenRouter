@@ -235,8 +235,6 @@ func defaultModelsListCandidateIDs(platform string) []string {
 		return qoder.DefaultRequestModelIDs()
 	case PlatformGrok:
 		return xai.DefaultModelIDs()
-	case PlatformKimi, PlatformZhipu, PlatformDeepseek:
-		return nil
 	case PlatformComposite:
 		return nil
 	default:
