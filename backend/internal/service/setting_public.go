@@ -547,6 +547,8 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		TableDefaultPageSize:                settings.TableDefaultPageSize,
 		TablePageSizeOptions:                settings.TablePageSizeOptions,
 		UsageRankingLimit:                   settings.UsageRankingLimit,
+		UsageRankingEnabled:                 settings.UsageRankingEnabled,
+		UsageRankingDataVisible:             settings.UsageRankingDataVisible,
 		CustomMenuItems:                     filterUserVisibleMenuItems(settings.CustomMenuItems),
 		CustomEndpoints:                     safeRawJSONArray(settings.CustomEndpoints),
 		FooterLinks:                         safeRawJSONArray(settings.FooterLinks),

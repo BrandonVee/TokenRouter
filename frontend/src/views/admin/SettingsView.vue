@@ -6336,7 +6336,8 @@
                       {{ t("admin.settings.site.usageRankingLimitHint") }}
                     </p>
                   </div>
-                  <div class="space-y-3 md:col-span-3">
+                  <!-- 两个排行榜开关在桌面端并排，窄屏时保持可读性自动换行。 -->
+                  <div class="grid grid-cols-1 gap-3 md:col-span-3 md:grid-cols-2">
                     <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
                       <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingEnabled") }}</label>

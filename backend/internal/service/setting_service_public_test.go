@@ -85,6 +85,34 @@ func TestSettingService_GetPublicSettings_ExposesTablePreferences(t *testing.T) 
 	require.Equal(t, []int{20, 50, 100}, settings.TablePageSizeOptions)
 }
 
+// 排行榜页面和明细开关必须同时注入公开配置，才能支持“显示排行榜但隐藏明细”。
+func TestSettingService_GetPublicSettings_ExposesUsageRankingVisibility(t *testing.T) {
+	repo := &settingPublicRepoStub{
+		values: map[string]string{
+			SettingKeyUsageRankingEnabled:     "true",
+			SettingKeyUsageRankingDataVisible: "false",
+		},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	settings, err := svc.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.True(t, settings.UsageRankingEnabled)
+	require.False(t, settings.UsageRankingDataVisible)
+
+	payload, err := svc.GetPublicSettingsForInjection(context.Background())
+	require.NoError(t, err)
+	encoded, err := json.Marshal(payload)
+	require.NoError(t, err)
+	var injected struct {
+		UsageRankingEnabled     bool `json:"usage_ranking_enabled"`
+		UsageRankingDataVisible bool `json:"usage_ranking_data_visible"`
+	}
+	require.NoError(t, json.Unmarshal(encoded, &injected))
+	require.True(t, injected.UsageRankingEnabled)
+	require.False(t, injected.UsageRankingDataVisible)
+}
+
 func TestSettingService_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t *testing.T) {
 	repo := &settingPublicRepoStub{
 		values: map[string]string{
