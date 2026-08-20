@@ -11,6 +11,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 // TestIsOpenAIImageModel_AllowsGeminiCompatibleImageModel 验证账号测试会把 Gemini 生图模型路由到 Images 端点。
@@ -137,4 +138,38 @@ func TestAccountTestService_OpenAIImageAPIKeyUsesConfiguredV1BaseURL(t *testing.
 	require.Equal(t, "Bearer test-api-key", upstream.lastReq.Header.Get("Authorization"))
 	require.Contains(t, rec.Body.String(), "data:image/png;base64,aGVsbG8=")
 	require.Contains(t, rec.Body.String(), "\"success\":true")
+}
+
+// TestAccountTestService_OpenAICompatibleGeminiImageUsesImagesEndpoint 验证完整账号测试分派使用生图端点。
+func TestAccountTestService_OpenAICompatibleGeminiImageUsesImagesEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/1/test", nil)
+
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"b64_json":"aGVsbG8="}]}`)),
+		},
+	}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: &config.Config{}}
+	account := &Account{
+		ID:       56,
+		Name:     "openai-gemini-compatible",
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "test-api-key",
+			"base_url": "https://image-upstream.example/v1",
+		},
+	}
+
+	// 即使客户端残留 compact 模式，图片模型也必须优先进入 Images 测试链路。
+	err := svc.testOpenAIAccountConnection(c, account, "gemini-3-pro-image-c", "draw a cat", AccountTestModeCompact)
+	require.NoError(t, err)
+	require.NotNil(t, upstream.lastReq)
+	require.Equal(t, "https://image-upstream.example/v1/images/generations", upstream.lastReq.URL.String())
+	require.Equal(t, "gemini-3-pro-image-c", gjson.GetBytes(upstream.lastBody, "model").String())
 }

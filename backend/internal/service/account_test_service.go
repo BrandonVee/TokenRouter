@@ -694,11 +694,8 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 	// 测试请求先应用普通账号模型映射；原生 v2 压缩不使用旧端点专属映射。
 	testModelID = account.GetMappedModel(testModelID)
-	if mode == AccountTestModeCompact {
-		return s.testOpenAICompactConnection(c, account, testModelID)
-	}
 
-	// Route to image generation test if an image model is selected
+	// 图片模型始终优先走生图测试，避免客户端残留 compact 模式把它送入文本压缩探测。
 	if isOpenAIImageModel(testModelID) {
 		imagePrompt := strings.TrimSpace(prompt)
 		if imagePrompt == "" {
@@ -708,6 +705,9 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 			return s.testOpenAIImageAPIKey(c, ctx, account, testModelID, imagePrompt)
 		}
 		return s.testOpenAIImageOAuth(c, ctx, account, testModelID, imagePrompt)
+	}
+	if mode == AccountTestModeCompact {
+		return s.testOpenAICompactConnection(c, account, testModelID)
 	}
 
 	credentialAccount := account

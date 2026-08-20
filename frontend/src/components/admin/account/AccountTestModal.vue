@@ -55,7 +55,7 @@
         />
       </div>
 
-      <div v-if="isOpenAIAccount" class="space-y-1.5">
+      <div v-if="isOpenAIAccount && !supportsImageTest" class="space-y-1.5">
         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
           {{ t('admin.accounts.openai.testMode') }}
         </label>
@@ -295,17 +295,32 @@ const openAITestModeOptions = computed(() => [
   { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
 ])
 const prioritizedGeminiModels = ['gemini-3.1-flash-image', 'gemini-2.5-flash-image', 'gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3-flash-preview', 'gemini-3-pro-preview', 'gemini-2.0-flash']
+
+// 与后端保持相同的 Gemini 生图模型结构规则，避免前端依赖具体模型名单。
+const isGeminiImageTestModel = (modelID: string) => {
+  const normalized = modelID.trim().toLowerCase().replace(/^models\//, '')
+  const parts = normalized.split('-')
+  if (parts.length < 4 || parts[0] !== 'gemini' || !/^\d+(?:\.\d+)*$/.test(parts[1])) {
+    return false
+  }
+
+  const modelSegments = parts.slice(2)
+  const imageSegmentIndex = modelSegments.indexOf('image')
+  return imageSegmentIndex >= 1
+    && imageSegmentIndex === modelSegments.lastIndexOf('image')
+    && modelSegments.every((segment) => /^[a-z0-9]+$/.test(segment))
+}
+
 const supportsGeminiImageTest = computed(() => {
-  const modelID = selectedModelId.value.toLowerCase()
-  if (!modelID.startsWith('gemini-') || !modelID.includes('-image')) return false
+  if (!isGeminiImageTestModel(selectedModelId.value)) return false
 
   return props.account?.platform === 'gemini' || (props.account?.platform === 'antigravity' && props.account?.type === 'apikey')
 })
 
 const supportsOpenAIImageTest = computed(() => {
-  const modelID = selectedModelId.value.toLowerCase()
-  if (!modelID.startsWith('gpt-image-')) return false
-  return props.account?.platform === 'openai'
+  const modelID = selectedModelId.value.trim().toLowerCase()
+  const isImageModel = modelID.startsWith('gpt-image-') || isGeminiImageTestModel(modelID)
+  return props.account?.platform === 'openai' && isImageModel
 })
 
 const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value)
@@ -427,7 +442,7 @@ const startTest = async () => {
       model_id: selectedModelId.value,
       prompt: supportsImageTest.value ? testPrompt.value.trim() : ''
     }
-    if (isOpenAIAccount.value) {
+    if (isOpenAIAccount.value && !supportsImageTest.value) {
       requestBody.mode = testMode.value
     }
 

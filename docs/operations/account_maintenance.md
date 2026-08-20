@@ -34,7 +34,7 @@
 
 管理端即时测试和 `scheduled-test-plans` 使用平台测试服务调用真实凭据/模型，并保存测试结果。计划使用分钟级 cron 表达式；每个计划可配置自动恢复。成功测试可以清除符合条件的 error、rate limit、temporary unschedulable 和模型限流，但不能绕过管理员禁用、账号过期或类型不匹配。
 
-测试本身应使用受控超时、代理/TLS 路由和脱敏日志。一个模型测试成功只证明该路径当时可用，不证明所有 endpoint capability 或媒体资格。失败结果需区分认证、模型、配额、代理、TLS 和上游容量，以免自动恢复形成启停抖动。
+测试本身应使用受控超时、代理/TLS 路由和脱敏日志。OpenAI API Key 兼容账号选择符合 Gemini 生图结构规则的模型时，管理端提交生图提示词且不提交 Compact 模式，后端始终优先通过 `/v1/images/generations` 测试，不走 Responses、Compact 或 Chat 文本探测。一个模型测试成功只证明该路径当时可用，不证明所有 endpoint capability 或媒体资格。失败结果需区分认证、模型、配额、代理、TLS 和上游容量，以免自动恢复形成启停抖动。
 
 ## 额度与能力探测
 

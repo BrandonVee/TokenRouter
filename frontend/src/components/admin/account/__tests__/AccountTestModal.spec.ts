@@ -216,4 +216,39 @@ describe('AccountTestModal', () => {
       mode: 'compact'
     })
   })
+
+  it('OpenAI 兼容 Gemini 生图模型测试会携带生图提示词', async () => {
+    getAvailableModels.mockResolvedValue([
+      { id: 'gemini-3-pro-image-c', display_name: 'Gemini 3 Pro Image' }
+    ])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 43,
+      name: 'OpenAI Compatible Image',
+      platform: 'openai',
+      type: 'apikey',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const promptInput = wrapper.find('textarea.textarea-stub')
+    expect(promptInput.exists()).toBe(true)
+    await promptInput.setValue('draw a tiny orange cat astronaut')
+
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const [, request] = (global.fetch as any).mock.calls[0]
+    expect(JSON.parse(request.body)).toEqual({
+      model_id: 'gemini-3-pro-image-c',
+      prompt: 'draw a tiny orange cat astronaut'
+    })
+  })
 })
