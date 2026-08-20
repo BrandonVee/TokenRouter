@@ -13,6 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestIsOpenAIImageModel_AllowsGeminiCompatibleImageModel 验证账号测试会把 Gemini 生图模型路由到 Images 端点。
+func TestIsOpenAIImageModel_AllowsGeminiCompatibleImageModel(t *testing.T) {
+	require.True(t, isOpenAIImageModel("gemini-3-pro-image-c"))
+	require.False(t, isOpenAIImageModel("gemini-3-pro"))
+}
+
 func TestAccountTestService_OpenAIImageOAuthHandlesOutputItemDoneFallback(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()

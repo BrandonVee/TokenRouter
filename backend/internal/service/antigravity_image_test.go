@@ -17,8 +17,34 @@ func TestIsImageGenerationModel_GeminiProImage(t *testing.T) {
 
 // TestIsImageGenerationModel_GeminiFlashImage 测试 gemini-2.5-flash-image 识别
 func TestIsImageGenerationModel_GeminiFlashImage(t *testing.T) {
+	require.True(t, isImageGenerationModel("gemini-2.0-flash-exp-image-generation"))
 	require.True(t, isImageGenerationModel("gemini-2.5-flash-image"))
 	require.True(t, isImageGenerationModel("gemini-2.5-flash-image-preview"))
+	require.True(t, isImageGenerationModel("gemini-3.1-flash-image-preview"))
+	require.True(t, isImageGenerationModel("gemini-3.1-flash-lite-image"))
+}
+
+// TestIsImageGenerationModel_RuleBasedFamilies 验证未来模型系列无需加入具体名称列表。
+func TestIsImageGenerationModel_RuleBasedFamilies(t *testing.T) {
+	for _, model := range []string{
+		"gemini-4-ultra-image",
+		"gemini-4.2-flash-nano-image-preview-2027",
+		"models/gemini-10-pro-image-v2",
+	} {
+		require.True(t, isImageGenerationModel(model), model)
+	}
+
+	for _, model := range []string{
+		"custom-gemini-4-pro-image",
+		"gemini-latest-pro-image",
+		"gemini-4-image",
+		"gemini-4-pro-vision",
+		"gemini-4-pro--image",
+		"gemini-4-image-pro-image",
+		"gemini-4-pro-image_preview",
+	} {
+		require.False(t, isImageGenerationModel(model), model)
+	}
 }
 
 // TestIsImageGenerationModel_RegularModel 测试普通模型不被识别为图片模型

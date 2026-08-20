@@ -116,9 +116,9 @@ const (
 	defaultOpenAIImageTestPrompt = "Generate a cute orange cat astronaut sticker on a clean pastel background."
 )
 
-// isOpenAIImageModel checks if the model is an OpenAI image generation model (e.g. gpt-image-2).
+// isOpenAIImageModel 判断 OpenAI 兼容账号是否应通过 Images 端点测试模型。
 func isOpenAIImageModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(model), "gpt-image-")
+	return isOpenAIImageGenerationModel(model)
 }
 
 // AccountTestService handles account testing operations

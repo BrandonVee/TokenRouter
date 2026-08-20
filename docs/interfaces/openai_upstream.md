@@ -33,7 +33,7 @@ OpenAI 平台拥有以下正式协议族：
 | Chat Completions | 可原生转发或转换到 Responses；每次 attempt 重建协议状态；响应兼容 `reasoning` 推理别名 |
 | Anthropic Messages | 转换到 OpenAI 请求并把事件、工具、thinking/usage 恢复为 Anthropic 形状 |
 | Embeddings | 仅 OpenAI 分组，账号必须声明或探测到相应 endpoint capability |
-| Images | OpenAI 图片生成/编辑；当前网关保留同步生命周期，批量图片由 Gemini/Vertex 专题定义 |
+| Images | OpenAI 图片生成/编辑；OpenAI API Key 兼容上游按 `gemini-<数字版本>-<系列...>-image[-<后缀...>]` 结构识别 Gemini 生图模型，不维护具体模型名单；当前网关保留同步生命周期，批量图片由 Gemini/Vertex 专题定义 |
 | Realtime/Live/sideband、Alpha Search | 仅 OpenAI 分组，并受分组开关、账号类型和 transport capability 限制 |
 
 OpenAI 分组支持 Messages、Responses 和 Chat，新建时默认启用 Responses 与 Chat；三项都可关闭。已有分组迁移时仅在旧 `allow_messages_dispatch` 开启时加入 Messages。该旧字段只作为 Messages 的弃用兼容镜像，专用 `messages_dispatch_model_config` 仍只负责 Claude 到 GPT 模型映射；系列和精确映射都只在目标值非空时生效，全部留空时不执行分组层模型映射。Responses WebSocket 是 OpenAI/Grok 的原生传输能力，不因其它平台启用兼容 Responses 而开放。

@@ -1175,21 +1175,59 @@ func (s *AntigravityGatewayService) extractImageInputSize(body []byte) string {
 	return ""
 }
 
-// isImageGenerationModel 判断模型是否为图片生成模型
-// 支持的模型：gemini-3.1-flash-image, gemini-3-pro-image, gemini-2.5-flash-image 等
+// isImageGenerationModel 判断模型是否为 Gemini 图片生成模型。
 func isImageGenerationModel(model string) bool {
-	modelLower := strings.ToLower(model)
-	// 移除 models/ 前缀
+	modelLower := strings.ToLower(strings.TrimSpace(model))
+	// 移除 Gemini 原生请求允许携带的 models/ 前缀。
 	modelLower = strings.TrimPrefix(modelLower, "models/")
 
-	// 精确匹配或前缀匹配
-	return modelLower == "gemini-3.1-flash-image" ||
-		modelLower == "gemini-3.1-flash-image-preview" ||
-		strings.HasPrefix(modelLower, "gemini-3.1-flash-image-") ||
-		modelLower == "gemini-3-pro-image" ||
-		modelLower == "gemini-3-pro-image-preview" ||
-		strings.HasPrefix(modelLower, "gemini-3-pro-image-") ||
-		modelLower == "gemini-2.5-flash-image" ||
-		modelLower == "gemini-2.5-flash-image-preview" ||
-		strings.HasPrefix(modelLower, "gemini-2.5-flash-image-")
+	parts := strings.Split(modelLower, "-")
+	if len(parts) < 4 || parts[0] != "gemini" || !isGeminiNumericVersion(parts[1]) {
+		return false
+	}
+
+	imageSegmentIndex := -1
+	for index, part := range parts[2:] {
+		if !isGeminiModelIDSegment(part) {
+			return false
+		}
+		// 版本后至少保留一个模型系列段，避免把 gemini-4-image 之类的宽泛名称当成生图模型。
+		if part == "image" {
+			if index == 0 || imageSegmentIndex >= 0 {
+				return false
+			}
+			imageSegmentIndex = index
+		}
+	}
+	return imageSegmentIndex >= 1
+}
+
+// isGeminiNumericVersion 校验 Gemini 模型 ID 中由数字和点组成的版本段。
+func isGeminiNumericVersion(version string) bool {
+	components := strings.Split(version, ".")
+	for _, component := range components {
+		if component == "" {
+			return false
+		}
+		for index := 0; index < len(component); index++ {
+			if component[index] < '0' || component[index] > '9' {
+				return false
+			}
+		}
+	}
+	return len(components) > 0
+}
+
+// isGeminiModelIDSegment 限制系列和后缀段为 Gemini 模型 ID 使用的 ASCII 字母数字。
+func isGeminiModelIDSegment(segment string) bool {
+	if segment == "" {
+		return false
+	}
+	for index := 0; index < len(segment); index++ {
+		char := segment[index]
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') {
+			return false
+		}
+	}
+	return true
 }
