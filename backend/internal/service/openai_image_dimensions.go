@@ -15,8 +15,8 @@ import (
 // maxOpenAIImageDimensionProbeBytes 限制图片头探测量，避免异常响应触发无界读取。
 const maxOpenAIImageDimensionProbeBytes int64 = 1 << 20
 
-// detectOpenAIImageResultSize 从 base64 图片结果中读取实际像素尺寸，不解码完整像素数据。
-func detectOpenAIImageResultSize(encoded string) string {
+// detectBase64ImageSize 从 base64 图片结果中读取实际像素尺寸，不解码完整像素数据。
+func detectBase64ImageSize(encoded string) string {
 	payload := strings.TrimSpace(encoded)
 	if strings.HasPrefix(strings.ToLower(payload), "data:") {
 		comma := strings.IndexByte(payload, ',')
@@ -43,6 +43,11 @@ func detectOpenAIImageResultSize(encoded string) string {
 		return fmt.Sprintf("%dx%d", cfg.Width, cfg.Height)
 	}
 	return ""
+}
+
+// detectOpenAIImageResultSize 保留旧的包内调用名，统一复用通用图片尺寸探测逻辑。
+func detectOpenAIImageResultSize(encoded string) string {
+	return detectBase64ImageSize(encoded)
 }
 
 // detectOpenAIWebPDimensions 从 WebP 的 VP8X、VP8 或 VP8L 头中读取画布尺寸。
@@ -82,7 +87,7 @@ func detectOpenAIWebPDimensions(header []byte) (int, int, bool) {
 func reconcileOpenAIResponsesImageResultSizes(results []openAIResponsesImageResult, firstMeta *openAIResponsesImageResult) {
 	for i := range results {
 		// ChatGPT OAuth 可能把显式尺寸归一化为 auto，最终图片字节才是元数据与分档计费的权威来源。
-		if actualSize := detectOpenAIImageResultSize(results[i].Result); actualSize != "" {
+		if actualSize := detectBase64ImageSize(results[i].Result); actualSize != "" {
 			results[i].Size = actualSize
 		}
 	}

@@ -98,16 +98,17 @@ type qoderAccountTestOAuthClient interface {
 
 // TestEvent represents a SSE event for account testing
 type TestEvent struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	Model    string `json:"model,omitempty"`
-	Status   string `json:"status,omitempty"`
-	Code     string `json:"code,omitempty"`
-	ImageURL string `json:"image_url,omitempty"`
-	MimeType string `json:"mime_type,omitempty"`
-	Data     any    `json:"data,omitempty"`
-	Success  bool   `json:"success,omitempty"`
-	Error    string `json:"error,omitempty"`
+	Type       string `json:"type"`
+	Text       string `json:"text,omitempty"`
+	Model      string `json:"model,omitempty"`
+	Status     string `json:"status,omitempty"`
+	Code       string `json:"code,omitempty"`
+	ImageURL   string `json:"image_url,omitempty"`
+	MimeType   string `json:"mime_type,omitempty"`
+	Resolution string `json:"resolution,omitempty"`
+	Data       any    `json:"data,omitempty"`
+	Success    bool   `json:"success,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 const (
@@ -1326,8 +1327,11 @@ func (s *AccountTestService) testGeminiAccountConnection(c *gin.Context, account
 		return s.sendErrorAndEnd(c, fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(body)))
 	}
 
-	// Process SSE stream
-	return s.processGeminiStream(c, resp.Body)
+	// Code Assist 仍使用内部流式端点；Gemini 原生账号测试统一使用 generateContent JSON。
+	if strings.Contains(req.URL.Path, "streamGenerateContent") {
+		return s.processGeminiStream(c, resp.Body)
+	}
+	return s.processGeminiJSON(c, resp.Body)
 }
 
 // routeAntigravityTest 路由 Antigravity 账号的测试请求。
@@ -1556,8 +1560,8 @@ func (s *AccountTestService) buildGeminiAPIKeyRequest(ctx context.Context, accou
 		return nil, err
 	}
 
-	// Use streamGenerateContent for real-time feedback
-	fullURL, err := buildGeminiAIStudioModelActionURL(normalizedBaseURL, modelID, "streamGenerateContent", true)
+	// 账号测试使用 Gemini 原生非流式动作，兼容只接受 :generateContent 的上游。
+	fullURL, err := buildGeminiAIStudioModelActionURL(normalizedBaseURL, modelID, "generateContent", false)
 	if err != nil {
 		return nil, err
 	}
@@ -1597,7 +1601,7 @@ func (s *AccountTestService) buildGeminiOAuthRequest(ctx context.Context, accoun
 		if err != nil {
 			return nil, err
 		}
-		fullURL, err := buildGeminiAIStudioModelActionURL(normalizedBaseURL, modelID, "streamGenerateContent", true)
+		fullURL, err := buildGeminiAIStudioModelActionURL(normalizedBaseURL, modelID, "generateContent", false)
 		if err != nil {
 			return nil, err
 		}
@@ -1624,7 +1628,7 @@ func (s *AccountTestService) buildGeminiServiceAccountRequest(ctx context.Contex
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service account access token: %w", err)
 	}
-	fullURL, err := buildVertexGeminiURL(account.VertexProjectID(), account.VertexLocation(modelID), modelID, "streamGenerateContent", true)
+	fullURL, err := buildVertexGeminiURL(account.VertexProjectID(), account.VertexLocation(modelID), modelID, "generateContent", false)
 	if err != nil {
 		return nil, err
 	}
@@ -1724,7 +1728,75 @@ func createGeminiTestPayload(modelID string, prompt string) []byte {
 	return bytes
 }
 
-// processGeminiStream processes SSE stream from Gemini API
+// processGeminiJSON 处理 Gemini generateContent 的非流式 JSON 响应。
+func (s *AccountTestService) processGeminiJSON(c *gin.Context, body io.Reader) error {
+	var data map[string]any
+	if err := json.NewDecoder(body).Decode(&data); err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse response: %s", err.Error()))
+	}
+	if _, err := s.processGeminiPayload(c, data); err != nil {
+		return s.sendErrorAndEnd(c, err.Error())
+	}
+	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+	return nil
+}
+
+// processGeminiPayload 提取 Gemini 原生响应中的文本、图片和完成状态。
+func (s *AccountTestService) processGeminiPayload(c *gin.Context, data map[string]any) (bool, error) {
+	// Code Assist 会在 response 字段中包裹标准 Gemini 响应。
+	if resp, ok := data["response"].(map[string]any); ok && resp != nil {
+		data = resp
+	}
+
+	completed := false
+	if candidates, ok := data["candidates"].([]any); ok {
+		for _, candidateValue := range candidates {
+			candidate, ok := candidateValue.(map[string]any)
+			if !ok {
+				continue
+			}
+			if content, ok := candidate["content"].(map[string]any); ok {
+				if parts, ok := content["parts"].([]any); ok {
+					for _, partValue := range parts {
+						part, ok := partValue.(map[string]any)
+						if !ok {
+							continue
+						}
+						if text, ok := part["text"].(string); ok && text != "" {
+							s.sendEvent(c, TestEvent{Type: "content", Text: text})
+						}
+						inlineData, _ := part["inlineData"].(map[string]any)
+						if inlineData == nil {
+							inlineData, _ = part["inline_data"].(map[string]any)
+						}
+						mimeType, _ := inlineData["mimeType"].(string)
+						if mimeType == "" {
+							mimeType, _ = inlineData["mime_type"].(string)
+						}
+						encoded, _ := inlineData["data"].(string)
+						if strings.HasPrefix(strings.ToLower(mimeType), "image/") && encoded != "" {
+							s.sendEvent(c, newAccountTestImageEvent(mimeType, encoded))
+						}
+					}
+				}
+			}
+			if finishReason, ok := candidate["finishReason"].(string); ok && finishReason != "" {
+				completed = true
+			}
+		}
+	}
+
+	if errData, ok := data["error"].(map[string]any); ok {
+		errorMsg := "Unknown error"
+		if msg, ok := errData["message"].(string); ok && msg != "" {
+			errorMsg = msg
+		}
+		return completed, errors.New(errorMsg)
+	}
+	return completed, nil
+}
+
+// processGeminiStream 处理 Code Assist 的 Gemini SSE 响应。
 func (s *AccountTestService) processGeminiStream(c *gin.Context, body io.Reader) error {
 	reader := bufio.NewReader(body)
 
@@ -1739,11 +1811,11 @@ func (s *AccountTestService) processGeminiStream(c *gin.Context, body io.Reader)
 		}
 
 		line = strings.TrimSpace(line)
-		if line == "" || !strings.HasPrefix(line, "data: ") {
+		if line == "" || !sseDataPrefix.MatchString(line) {
 			continue
 		}
 
-		jsonStr := strings.TrimPrefix(line, "data: ")
+		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
 			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
 			return nil
@@ -1754,54 +1826,24 @@ func (s *AccountTestService) processGeminiStream(c *gin.Context, body io.Reader)
 			continue
 		}
 
-		// Support two Gemini response formats:
-		// - AI Studio: {"candidates": [...]}
-		// - Gemini CLI: {"response": {"candidates": [...]}}
-		if resp, ok := data["response"].(map[string]any); ok && resp != nil {
-			data = resp
+		completed, err := s.processGeminiPayload(c, data)
+		if err != nil {
+			return s.sendErrorAndEnd(c, err.Error())
 		}
-		if candidates, ok := data["candidates"].([]any); ok && len(candidates) > 0 {
-			if candidate, ok := candidates[0].(map[string]any); ok {
-				// Extract content first (before checking completion)
-				if content, ok := candidate["content"].(map[string]any); ok {
-					if parts, ok := content["parts"].([]any); ok {
-						for _, part := range parts {
-							if partMap, ok := part.(map[string]any); ok {
-								if text, ok := partMap["text"].(string); ok && text != "" {
-									s.sendEvent(c, TestEvent{Type: "content", Text: text})
-								}
-								if inlineData, ok := partMap["inlineData"].(map[string]any); ok {
-									mimeType, _ := inlineData["mimeType"].(string)
-									data, _ := inlineData["data"].(string)
-									if strings.HasPrefix(strings.ToLower(mimeType), "image/") && data != "" {
-										s.sendEvent(c, TestEvent{
-											Type:     "image",
-											ImageURL: fmt.Sprintf("data:%s;base64,%s", mimeType, data),
-											MimeType: mimeType,
-										})
-									}
-								}
-							}
-						}
-					}
-				}
+		if completed {
+			s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+			return nil
+		}
+	}
+}
 
-				// Check for completion after extracting content
-				if finishReason, ok := candidate["finishReason"].(string); ok && finishReason != "" {
-					s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
-					return nil
-				}
-			}
-		}
-
-		// Handle errors
-		if errData, ok := data["error"].(map[string]any); ok {
-			errorMsg := "Unknown error"
-			if msg, ok := errData["message"].(string); ok {
-				errorMsg = msg
-			}
-			return s.sendErrorAndEnd(c, errorMsg)
-		}
+// newAccountTestImageEvent 构造统一的图片事件，并附带实际像素分辨率。
+func newAccountTestImageEvent(mimeType, encoded string) TestEvent {
+	return TestEvent{
+		Type:       "image",
+		ImageURL:   fmt.Sprintf("data:%s;base64,%s", mimeType, encoded),
+		MimeType:   mimeType,
+		Resolution: detectBase64ImageSize(encoded),
 	}
 }
 
@@ -2166,11 +2208,7 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
 		}
 		if item.B64JSON != "" {
-			s.sendEvent(c, TestEvent{
-				Type:     "image",
-				ImageURL: "data:image/png;base64," + item.B64JSON,
-				MimeType: "image/png",
-			})
+			s.sendEvent(c, newAccountTestImageEvent("image/png", item.B64JSON))
 		}
 	}
 
@@ -2293,11 +2331,7 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
 		}
 		mimeType := openAIImageOutputMIMEType(item.OutputFormat)
-		s.sendEvent(c, TestEvent{
-			Type:     "image",
-			ImageURL: "data:" + mimeType + ";base64," + item.Result,
-			MimeType: mimeType,
-		})
+		s.sendEvent(c, newAccountTestImageEvent(mimeType, item.Result))
 	}
 
 	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})

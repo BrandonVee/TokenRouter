@@ -1674,6 +1674,8 @@ export default {
       imagePromptDefault: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',
       imageTestHint:
         '调用独立 /v1/images/generations 生图，并在下方预览返回图片。',
+      geminiImageTestHint:
+        '使用 Gemini 原生 generateContent 格式生图，并在下方预览返回图片。',
       imageTestMode: '模式：生图测试',
       videoPromptLabel: '视频提示词',
       videoPromptPlaceholder: '例如：一只红球在白地板上弹跳一次，动作简短。',

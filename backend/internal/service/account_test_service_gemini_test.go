@@ -4,9 +4,11 @@ package service
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -56,4 +58,40 @@ func TestProcessGeminiStream_EmitsImageEvent(t *testing.T) {
 	require.Contains(t, body, "\"type\":\"image\"")
 	require.Contains(t, body, "\"image_url\":\"data:image/png;base64,QUJD\"")
 	require.Contains(t, body, "\"mime_type\":\"image/png\"")
+}
+
+func TestBuildGeminiAPIKeyRequest_UsesGenerateContent(t *testing.T) {
+	t.Parallel()
+
+	svc := &AccountTestService{cfg: &config.Config{}}
+	account := &Account{
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "test-key",
+			"base_url": "https://gemini.example",
+		},
+	}
+
+	req, err := svc.buildGeminiAPIKeyRequest(t.Context(), account, "gemini-2.5-flash-image", []byte(`{"contents":[]}`))
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, req.Method)
+	require.Equal(t, "https://gemini.example/v1beta/models/gemini-2.5-flash-image:generateContent", req.URL.String())
+	require.NotContains(t, req.URL.String(), "/v1/images/generations")
+}
+
+func TestProcessGeminiJSON_EmitsImageResolution(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	ctx, recorder := newTestContext()
+	svc := &AccountTestService{}
+	encoded := encodeOpenAIImageTestPNG(t, 321, 123)
+	body := strings.NewReader(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"` + encoded + `"}}]},"finishReason":"STOP"}]}`)
+
+	err := svc.processGeminiJSON(ctx, body)
+	require.NoError(t, err)
+	require.Contains(t, recorder.Body.String(), "\"type\":\"image\"")
+	require.Contains(t, recorder.Body.String(), "\"resolution\":\"321x123\"")
+	require.Contains(t, recorder.Body.String(), "\"success\":true")
 }

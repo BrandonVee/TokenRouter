@@ -71,7 +71,7 @@
           v-model="testPrompt"
           :label="t('admin.accounts.imagePromptLabel')"
           :placeholder="t('admin.accounts.imagePromptPlaceholder')"
-          :hint="t('admin.accounts.imageTestHint')"
+          :hint="imageTestHint"
           :disabled="status === 'connecting'"
           rows="3"
         />
@@ -146,8 +146,11 @@
             <div class="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
               <Icon name="eye" size="lg" class="text-white opacity-0 drop-shadow-lg transition-opacity group-hover/img:opacity-100" :stroke-width="2" />
             </div>
-            <div class="border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-dark-500 dark:text-gray-300">
-              {{ image.mimeType || 'image/*' }}
+            <div class="flex items-center justify-between gap-3 border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-dark-500 dark:text-gray-300">
+              <span>{{ image.mimeType || 'image/*' }}</span>
+              <span v-if="image.resolution" class="font-mono text-gray-700 dark:text-gray-200">
+                {{ image.resolution }}
+              </span>
             </div>
           </div>
         </div>
@@ -265,6 +268,7 @@ interface OutputLine {
 interface PreviewImage {
   url: string
   mimeType?: string
+  resolution?: string
 }
 
 const props = defineProps<{
@@ -324,6 +328,11 @@ const supportsOpenAIImageTest = computed(() => {
 })
 
 const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value)
+const imageTestHint = computed(() => t(
+  supportsGeminiImageTest.value
+    ? 'admin.accounts.geminiImageTestHint'
+    : 'admin.accounts.imageTestHint'
+))
 
 const sortTestModels = (models: ClaudeModel[]) => {
   const priorityMap = new Map(prioritizedGeminiModels.map((id, index) => [id, index]))
@@ -515,6 +524,7 @@ const handleEvent = (event: {
   error?: string
   image_url?: string
   mime_type?: string
+  resolution?: string
 }) => {
   switch (event.type) {
     case 'test_start':
@@ -543,7 +553,8 @@ const handleEvent = (event: {
       if (event.image_url) {
         generatedImages.value.push({
           url: event.image_url,
-          mimeType: event.mime_type
+          mimeType: event.mime_type,
+          resolution: event.resolution
         })
         addLine(t('admin.accounts.imageReceived', { count: generatedImages.value.length }), 'text-purple-300')
       }

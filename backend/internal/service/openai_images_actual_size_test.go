@@ -21,22 +21,22 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func TestDetectOpenAIImageResultSize(t *testing.T) {
+func TestDetectBase64ImageSize(t *testing.T) {
 	pngEncoded := encodeOpenAIImageTestPNG(t, 1672, 941)
 	jpegEncoded := encodeOpenAIImageTestJPEG(t, 640, 360)
 	webpVP8XEncoded := encodeOpenAIImageTestWebPVP8X(1920, 1080)
 	webpVP8Encoded := encodeOpenAIImageTestWebPVP8(1280, 720)
 	webpVP8LEncoded := encodeOpenAIImageTestWebPVP8L(640, 480)
 
-	require.Equal(t, "1672x941", detectOpenAIImageResultSize(pngEncoded))
-	require.Equal(t, "1672x941", detectOpenAIImageResultSize(strings.TrimRight(pngEncoded, "=")))
-	require.Equal(t, "1672x941", detectOpenAIImageResultSize("data:image/png;base64,"+pngEncoded))
-	require.Equal(t, "640x360", detectOpenAIImageResultSize(jpegEncoded))
-	require.Equal(t, "1920x1080", detectOpenAIImageResultSize(webpVP8XEncoded))
-	require.Equal(t, "1280x720", detectOpenAIImageResultSize(webpVP8Encoded))
-	require.Equal(t, "640x480", detectOpenAIImageResultSize(webpVP8LEncoded))
-	require.Empty(t, detectOpenAIImageResultSize("data:image/png;base64"))
-	require.Empty(t, detectOpenAIImageResultSize("not-image-data"))
+	require.Equal(t, "1672x941", detectBase64ImageSize(pngEncoded))
+	require.Equal(t, "1672x941", detectBase64ImageSize(strings.TrimRight(pngEncoded, "=")))
+	require.Equal(t, "1672x941", detectBase64ImageSize("data:image/png;base64,"+pngEncoded))
+	require.Equal(t, "640x360", detectBase64ImageSize(jpegEncoded))
+	require.Equal(t, "1920x1080", detectBase64ImageSize(webpVP8XEncoded))
+	require.Equal(t, "1280x720", detectBase64ImageSize(webpVP8Encoded))
+	require.Equal(t, "640x480", detectBase64ImageSize(webpVP8LEncoded))
+	require.Empty(t, detectBase64ImageSize("data:image/png;base64"))
+	require.Empty(t, detectBase64ImageSize("not-image-data"))
 }
 
 func TestOpenAIGatewayServiceForwardImages_OAuthUsesDecodedOutputDimensions(t *testing.T) {
