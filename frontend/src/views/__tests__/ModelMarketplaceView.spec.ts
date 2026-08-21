@@ -237,6 +237,7 @@ describe('ModelMarketplaceView', () => {
     const wrapper = await mountMarketplace()
 
     expect(wrapper.findAll('[data-testid="marketplace-group-section"]')).toHaveLength(4)
+    expect(wrapper.findAll('.marketplace-model-card')).toHaveLength(5)
     expect(modelCards(wrapper)).toHaveLength(0)
     expect(wrapper.findAll('[data-testid="marketplace-group-section"]').map((section) => section.text()).join('\n')).toContain('marketplace.dataSharingTag')
   })

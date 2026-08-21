@@ -33,5 +33,8 @@ describe('全局主题表面', () => {
     expect(dataTableSource).toContain('--sticky-col-bg: rgba(250, 253, 255, 0.72);')
     expect(dataTableSource).toContain('--sticky-col-bg: rgba(29, 35, 41, 0.7);')
     expect(dataTableSource).not.toContain('tbody .sticky-col {\n  background-color: white;')
+    expect(styleSource).toContain('html:not(.dark) .marketplace-model-card {')
+    expect(styleSource).toContain('background-color: rgba(255, 255, 255, 0.78) !important;')
+    expect(styleSource).toContain('border-color: rgba(94, 128, 143, 0.34) !important;')
   })
 })

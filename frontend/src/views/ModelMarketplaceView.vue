@@ -176,7 +176,7 @@
               <article
                 v-for="model in group.models"
                 :key="`${group.id}-${model.id}`"
-                class="group rounded-xl border border-gray-100 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-sm dark:border-dark-700 dark:bg-dark-950/80 dark:hover:border-primary-500/50"
+                class="marketplace-model-card group rounded-xl border border-gray-100 bg-gray-50/80 p-4 transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-sm dark:border-dark-700 dark:bg-dark-950/80 dark:hover:border-primary-500/50"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -225,7 +225,7 @@
             <article
               v-for="model in filteredModels"
               :key="model.id"
-              class="card flex flex-col overflow-hidden"
+              class="marketplace-model-card card flex flex-col overflow-hidden"
               data-testid="marketplace-model-card"
             >
               <div class="card-header px-4 py-4">
