@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -10,6 +11,36 @@ import (
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/stretchr/testify/require"
 )
+
+type pricingRemoteClientStub struct {
+	hash func(context.Context, string) (string, error)
+}
+
+func (s pricingRemoteClientStub) FetchPricingJSON(context.Context, string) ([]byte, error) {
+	return nil, nil
+}
+
+func (s pricingRemoteClientStub) FetchHashText(ctx context.Context, url string) (string, error) {
+	return s.hash(ctx, url)
+}
+
+func TestPricingServiceFetchRemoteHashUsesHTTPClientTimeout(t *testing.T) {
+	started := make(chan time.Duration, 1)
+	svc := &PricingService{
+		cfg: &config.Config{Pricing: config.PricingConfig{HashURL: "https://example.com/hash"}},
+		remoteClient: pricingRemoteClientStub{hash: func(ctx context.Context, _ string) (string, error) {
+			deadline, ok := ctx.Deadline()
+			require.True(t, ok, "hash request must have a deadline")
+			started <- time.Until(deadline)
+			return "hash", nil
+		}},
+	}
+
+	hash, err := svc.fetchRemoteHash()
+	require.NoError(t, err)
+	require.Equal(t, "hash", hash)
+	require.InDelta(t, pricingRemoteRequestTimeout, <-started, float64(250*time.Millisecond))
+}
 
 func TestPricingSchedulerBlankRemoteURLDoesNotStart(t *testing.T) {
 	svc := NewPricingService(&config.Config{Pricing: config.PricingConfig{RemoteURL: "  \t  "}}, nil)

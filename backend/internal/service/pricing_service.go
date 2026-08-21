@@ -22,6 +22,8 @@ import (
 )
 
 var (
+	// 定价远程请求与 repository HTTP 客户端保持一致，避免 service 层提前取消请求。
+	pricingRemoteRequestTimeout = 30 * time.Second
 	openAIModelDatePattern      = regexp.MustCompile(`-\d{8}$`)
 	openAIModelBasePattern      = regexp.MustCompile(`^(gpt-\d+(?:\.\d+)?)(?:-|$)`)
 	claudeOpus48FallbackPricing = &LiteLLMModelPricing{
@@ -402,7 +404,7 @@ func (s *PricingService) downloadPricingData() error {
 	}
 	logger.LegacyPrintf("service.pricing", "[Pricing] Downloading from %s", remoteURL)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), pricingRemoteRequestTimeout)
 	defer cancel()
 
 	// 获取远程哈希（用于同步锚点，不作为完整性校验）
@@ -657,7 +659,7 @@ func (s *PricingService) fetchRemoteHash() (string, error) {
 		return "", err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), pricingRemoteRequestTimeout)
 	defer cancel()
 
 	hash, err := s.remoteClient.FetchHashText(ctx, hashURL)
