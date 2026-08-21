@@ -45,11 +45,6 @@ func detectBase64ImageSize(encoded string) string {
 	return ""
 }
 
-// detectOpenAIImageResultSize 保留旧的包内调用名，统一复用通用图片尺寸探测逻辑。
-func detectOpenAIImageResultSize(encoded string) string {
-	return detectBase64ImageSize(encoded)
-}
-
 // detectOpenAIWebPDimensions 从 WebP 的 VP8X、VP8 或 VP8L 头中读取画布尺寸。
 func detectOpenAIWebPDimensions(header []byte) (int, int, bool) {
 	if len(header) < 16 || string(header[:4]) != "RIFF" || string(header[8:12]) != "WEBP" {
