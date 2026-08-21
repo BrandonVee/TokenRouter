@@ -20,58 +20,60 @@
       </span>
     </button>
 
-    <Transition name="date-picker-dropdown">
-      <div v-if="isOpen" class="date-picker-dropdown" :style="dropdownStyle">
-        <!-- Quick presets -->
-        <div class="date-picker-presets">
-          <button
-            v-for="preset in presets"
-            :key="preset.value"
-            @click="selectPreset(preset)"
-            :class="['date-picker-preset', isPresetActive(preset) && 'date-picker-preset-active']"
-          >
-            {{ t(preset.labelKey) }}
-          </button>
-        </div>
-
-        <div class="date-picker-divider"></div>
-
-        <!-- Custom date range inputs -->
-        <div class="date-picker-custom">
-          <div class="date-picker-field">
-            <label class="date-picker-label">{{ t('dates.startDate') }}</label>
-            <input
-              type="date"
-              :value="dateInputValue(localStartDate)"
-              :max="dateInputValue(localEndDate) || tomorrow"
-              class="date-picker-input"
-              @change="onStartDateInputChange"
-            />
+    <Teleport to="body">
+      <Transition name="date-picker-dropdown">
+        <div v-if="isOpen" ref="dropdownRef" class="date-picker-dropdown" :style="dropdownStyle">
+          <!-- Quick presets -->
+          <div class="date-picker-presets">
+            <button
+              v-for="preset in presets"
+              :key="preset.value"
+              @click="selectPreset(preset)"
+              :class="['date-picker-preset', isPresetActive(preset) && 'date-picker-preset-active']"
+            >
+              {{ t(preset.labelKey) }}
+            </button>
           </div>
-          <div class="date-picker-separator">
-            <Icon name="arrowRight" size="sm" class="text-gray-400" />
-          </div>
-          <div class="date-picker-field">
-            <label class="date-picker-label">{{ t('dates.endDate') }}</label>
-            <input
-              type="date"
-              :value="dateInputValue(localEndDate)"
-              :min="dateInputValue(localStartDate)"
-              :max="tomorrow"
-              class="date-picker-input"
-              @change="onEndDateInputChange"
-            />
-          </div>
-        </div>
 
-        <!-- Apply button -->
-        <div class="date-picker-actions">
-          <button @click="apply" class="date-picker-apply">
-            {{ t('dates.apply') }}
-          </button>
+          <div class="date-picker-divider"></div>
+
+          <!-- Custom date range inputs -->
+          <div class="date-picker-custom">
+            <div class="date-picker-field">
+              <label class="date-picker-label">{{ t('dates.startDate') }}</label>
+              <input
+                type="date"
+                :value="dateInputValue(localStartDate)"
+                :max="dateInputValue(localEndDate) || tomorrow"
+                class="date-picker-input"
+                @change="onStartDateInputChange"
+              />
+            </div>
+            <div class="date-picker-separator">
+              <Icon name="arrowRight" size="sm" class="text-gray-400" />
+            </div>
+            <div class="date-picker-field">
+              <label class="date-picker-label">{{ t('dates.endDate') }}</label>
+              <input
+                type="date"
+                :value="dateInputValue(localEndDate)"
+                :min="dateInputValue(localStartDate)"
+                :max="tomorrow"
+                class="date-picker-input"
+                @change="onEndDateInputChange"
+              />
+            </div>
+          </div>
+
+          <!-- Apply button -->
+          <div class="date-picker-actions">
+            <button @click="apply" class="date-picker-apply">
+              {{ t('dates.apply') }}
+            </button>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -106,6 +108,7 @@ const { t, locale } = useI18n()
 
 const isOpen = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownLeft = ref(0)
 const dropdownTop = ref(0)
 const localStartDate = ref(props.startDate)
@@ -114,6 +117,7 @@ const activePreset = ref<string | null>('last24Hours')
 
 const dropdownWidth = 640
 const dropdownMargin = 12
+const dropdownHeight = 244
 
 const dropdownStyle = computed(() => ({
   left: `${dropdownLeft.value}px`,
@@ -371,11 +375,20 @@ const updateDropdownPosition = () => {
   const maxLeft = Math.max(dropdownMargin, window.innerWidth - dropdownWidth - dropdownMargin)
   const preferredLeft = trigger.left
   dropdownLeft.value = Math.min(Math.max(dropdownMargin, preferredLeft), maxLeft)
-  dropdownTop.value = trigger.bottom + 8
+  const preferredTop = trigger.bottom + 8
+  const fitsBelow = preferredTop + dropdownHeight <= window.innerHeight - dropdownMargin
+  dropdownTop.value = fitsBelow
+    ? preferredTop
+    : Math.max(dropdownMargin, trigger.top - dropdownHeight - 8)
 }
 
 const handleClickOutside = (event: MouseEvent) => {
-  if (containerRef.value && !containerRef.value.contains(event.target as Node)) {
+  const target = event.target as Node
+  if (
+    containerRef.value &&
+    !containerRef.value.contains(target) &&
+    !dropdownRef.value?.contains(target)
+  ) {
     isOpen.value = false
   }
 }
@@ -457,13 +470,20 @@ onUnmounted(() => {
 }
 
 .date-picker-dropdown {
-  @apply fixed z-[100];
-  @apply bg-white dark:bg-dark-900;
+  @apply fixed z-[10000];
   @apply rounded-xl;
   @apply border border-primary-900/10 dark:border-dark-600;
   @apply shadow-lg shadow-black/10 dark:shadow-black/30;
   @apply overflow-hidden;
   @apply max-w-[calc(100vw-1.5rem)];
+  /* 弹出层保持近乎不透明，避免玻璃背景透出后影响日期文字辨识。 */
+  background-color: rgba(248, 252, 254, 0.96);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
+}
+
+.dark .date-picker-dropdown {
+  background-color: rgba(27, 33, 39, 0.96);
 }
 
 .date-picker-presets {

@@ -6,18 +6,32 @@ import { describe, expect, it } from 'vitest'
 
 const stylePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../../style.css')
 const styleSource = readFileSync(stylePath, 'utf8')
+const dataTableSource = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../common/DataTable.vue'), 'utf8')
 
 describe('全局主题表面', () => {
-  it('为工作区和卡片使用 Atom One Dark 层级', () => {
-    // 工作区保持低明度，卡片通过提升面和更清晰的描边建立层级。
+  it('为明暗工作区使用液态玻璃层级', () => {
+    // 两种主题共享玻璃材质，但各自保留不同的明度和环境光色阶。
     const shellBlock = styleSource.match(/\.ba-theme-shell\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? ''
     const backdropBlock = styleSource.match(/\.ba-theme-backdrop\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? ''
     const cardBlock = styleSource.match(/\.card\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? ''
+    const lightSurfaceBlock = styleSource.match(/html:not\(\.dark\) :is\(\n\s{4}\.glass,[\s\S]*?\n\s{2}\}/)?.[0] ?? ''
+    const darkSurfaceBlock = styleSource.match(/\.dark :is\(\n\s{4}\.glass,[\s\S]*?\n\s{2}\}/)?.[0] ?? ''
 
-    expect(shellBlock).toContain('@apply bg-white dark:bg-[#1b1d1ff2];')
-    expect(backdropBlock).toContain('@apply bg-white dark:bg-[#1b1d1ff2];')
+    expect(shellBlock).toContain('@apply bg-transparent dark:bg-[#1b1d1ff2];')
+    expect(backdropBlock).toContain('linear-gradient')
+    expect(backdropBlock).toContain('@apply dark:bg-[#1b1d1ff2];')
+    expect(styleSource).toContain('.dark .ba-theme-backdrop {\n    background:\n      radial-gradient')
     expect(cardBlock).toContain('@apply bg-white dark:bg-[#282c34];')
     expect(cardBlock).toContain('@apply rounded-xl;')
     expect(cardBlock).toContain('dark:border-[#3e4451]')
+    expect(lightSurfaceBlock).toContain('background-color: rgba(250, 253, 255, 0.68);')
+    expect(lightSurfaceBlock).toContain('backdrop-filter: blur(28px) saturate(155%);')
+    expect(lightSurfaceBlock).toContain('inset 0 1px 0 rgba(255, 255, 255, 0.92)')
+    expect(darkSurfaceBlock).toContain('background-color: rgba(29, 35, 41, 0.7);')
+    expect(darkSurfaceBlock).toContain('backdrop-filter: blur(28px) saturate(135%);')
+    expect(darkSurfaceBlock).toContain('inset 0 1px 0 rgba(255, 255, 255, 0.08)')
+    expect(dataTableSource).toContain('--sticky-col-bg: rgba(250, 253, 255, 0.72);')
+    expect(dataTableSource).toContain('--sticky-col-bg: rgba(29, 35, 41, 0.7);')
+    expect(dataTableSource).not.toContain('tbody .sticky-col {\n  background-color: white;')
   })
 })

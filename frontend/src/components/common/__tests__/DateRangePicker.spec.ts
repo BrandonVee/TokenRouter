@@ -74,13 +74,14 @@ describe('DateRangePicker', () => {
     })
 
     await wrapper.find('.date-picker-trigger').trigger('click')
-    const presetButton = wrapper.findAll('.date-picker-preset').find((node) =>
-      node.text().includes('Last 24 Hours')
-    )
+    const presetButton = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.date-picker-preset')).reverse()
+      .find((node) => node.textContent?.includes('Last 24 Hours'))
     expect(presetButton).toBeDefined()
 
-    await presetButton!.trigger('click')
-    await wrapper.find('.date-picker-apply').trigger('click')
+    presetButton!.click()
+    await wrapper.vm.$nextTick()
+    document.body.querySelector<HTMLButtonElement>('.date-picker-apply')?.click()
+    await wrapper.vm.$nextTick()
 
     const nowAfterClick = new Date()
     const yesterdayAfterClick = new Date(nowAfterClick.getTime() - 24 * 60 * 60 * 1000)
@@ -116,17 +117,17 @@ describe('DateRangePicker', () => {
     })
 
     await wrapper.find('.date-picker-trigger').trigger('click')
-    const presetButton = wrapper.findAll('.date-picker-preset').find((node) =>
-      node.text().includes('Last Month')
-    )
+    const presetButton = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.date-picker-preset')).reverse()
+      .find((node) => node.textContent?.includes('Last Month'))
     expect(presetButton).toBeDefined()
 
-    await presetButton!.trigger('click')
+    presetButton!.click()
+    await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('change')?.[0]?.[0]).toMatchObject({
       preset: 'lastMonth'
     })
     await waitForTransition()
-    expect(wrapper.find('.date-picker-dropdown').exists()).toBe(false)
+    expect(document.body.querySelector('.date-picker-dropdown')).toBeNull()
   })
 })

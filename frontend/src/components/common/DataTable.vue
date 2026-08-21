@@ -959,6 +959,10 @@ defineExpose({
 .table-wrapper {
   --select-col-width: 52px; /* 勾选列宽度：px-6 (24px*2) + checkbox (16px) */
   --sticky-boundary-line-color: rgb(228 228 231);
+  /* 固定列沿用全局玻璃材质，避免滚动时露出纯白底。 */
+  --sticky-header-bg: rgba(246, 251, 253, 0.72);
+  --sticky-col-bg: rgba(250, 253, 255, 0.72);
+  --sticky-col-hover-bg: rgba(236, 246, 250, 0.76);
   position: relative;
   overflow-x: auto;
   overflow-y: auto;
@@ -969,6 +973,9 @@ defineExpose({
 
 .dark .table-wrapper {
   --sticky-boundary-line-color: rgb(51 51 56);
+  --sticky-header-bg: rgba(38, 47, 54, 0.62);
+  --sticky-col-bg: rgba(29, 35, 41, 0.7);
+  --sticky-col-hover-bg: rgba(57, 79, 91, 0.3);
 }
 
 /* 表头容器，确保在滚动时覆盖表体内容 */
@@ -976,11 +983,13 @@ defineExpose({
   position: sticky;
   top: 0;
   z-index: 200;
-  background-color: rgb(249 250 251);
+  background-color: var(--sticky-header-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
 }
 
 .dark .table-wrapper .table-header {
-  background-color: rgb(37 42 47);
+  background-color: var(--sticky-header-bg);
 }
 
 /* 表体保持在表头下方 */
@@ -994,11 +1003,13 @@ defineExpose({
   position: sticky;
   top: 0;
   z-index: 210; /* 必须高于所有表体内容 */
-  background-color: rgb(249 250 251);
+  background-color: var(--sticky-header-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
 }
 
 .dark .sticky-header-cell {
-  background-color: rgb(37 42 47);
+  background-color: var(--sticky-header-bg);
 }
 
 /* Sticky 列基础样式 */
@@ -1034,20 +1045,22 @@ defineExpose({
 
 /* 表体 sticky 列背景 */
 tbody .sticky-col {
-  background-color: white;
+  background-color: var(--sticky-col-bg) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
 }
 
 .dark tbody .sticky-col {
-  background-color: rgb(37 42 47);
+  background-color: var(--sticky-col-bg) !important;
 }
 
 /* hover 状态保持 */
 tbody tr:hover .sticky-col {
-  background-color: rgb(249 250 251);
+  background-color: var(--sticky-col-hover-bg) !important;
 }
 
 .dark tbody tr:hover .sticky-col {
-  background-color: rgb(42 46 53);
+  background-color: var(--sticky-col-hover-bg) !important;
 }
 
 /* 所有固定列统一使用细线边界，避免滚动时出现渐变阴影带。 */
