@@ -597,6 +597,10 @@ export default {
         },
         apiProtocol: {
           title: 'API Protocol',
+          adaptive: 'Adaptive',
+          adaptiveDesc: 'Selects the native endpoint matching each inbound protocol.',
+          endpoints: 'Protocol endpoints',
+          responsesFallbackDesc: 'This provider has no native Responses endpoint; requests use Chat Completions.',
           chatCompletions: 'OpenAI Chat',
           chatCompletionsDesc: 'OpenAI-compatible chat completions endpoint.',
           anthropic: 'Anthropic Messages',

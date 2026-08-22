@@ -361,6 +361,27 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		}
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 	}
+	// 国产供应商使用 OpenAI 兼容测试链，避免落入 Claude 测试逻辑。
+	if account.IsCNProvider() {
+		if account.GetAPIProtocol() == APIProtocolAnthropic {
+			return s.testClaudeAccountConnection(c, account, modelID, prompt)
+		}
+		testModelID := strings.TrimSpace(modelID)
+		if testModelID == "" {
+			testModelID = openai.DefaultTestModel
+		}
+		testModelID = account.GetMappedModel(testModelID)
+		authToken := account.GetOpenAIProtocolAPIKey()
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		baseURL := account.GetCNProtocolBaseURL(APIProtocolChatCompletions)
+		normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
+		if err != nil {
+			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
+		}
+		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+	}
 
 	if account.IsGemini() {
 		return s.testGeminiAccountConnection(c, account, modelID, prompt)
@@ -421,6 +442,9 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		}
 
 		baseURL := account.GetBaseURL()
+		if account.IsCNProvider() && (account.IsAnthropicProtocol() || account.IsAdaptiveAPIProtocol()) {
+			baseURL = account.GetCNProtocolBaseURL(APIProtocolAnthropic)
+		}
 		if baseURL == "" {
 			baseURL = "https://api.anthropic.com"
 		}

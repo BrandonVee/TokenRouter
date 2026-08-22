@@ -18,7 +18,7 @@ import { CN_BASE_URL_PRESETS, type CnBaseUrlPreset } from './credentialsBuilder'
 
 const props = defineProps<{
   platform: 'kimi' | 'zhipu' | 'deepseek'
-  protocol?: 'chat_completions' | 'anthropic' | 'responses'
+  protocol?: 'adaptive' | 'chat_completions' | 'anthropic' | 'responses'
 }>()
 
 const emit = defineEmits<{ (event: 'select', preset: CnBaseUrlPreset): void }>()

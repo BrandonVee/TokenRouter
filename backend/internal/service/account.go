@@ -1490,6 +1490,11 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return ""
 	}
 	if a.Type == AccountTypeAPIKey || a.Type == AccountTypeUpstream {
+		if a.IsAdaptiveAPIProtocol() {
+			if baseURL := a.GetCNProtocolBaseURL(APIProtocolChatCompletions); baseURL != "" {
+				return baseURL
+			}
+		}
 		baseURL := strings.TrimSpace(a.GetCredential("base_url"))
 		if baseURL != "" {
 			return baseURL
@@ -1535,6 +1540,8 @@ func (a *Account) GetAPIProtocol() string {
 		return APIProtocolChatCompletions
 	}
 	switch strings.TrimSpace(a.GetCredential("api_protocol")) {
+	case APIProtocolAdaptive:
+		return APIProtocolAdaptive
 	case APIProtocolAnthropic:
 		return APIProtocolAnthropic
 	case APIProtocolResponses:
@@ -1543,6 +1550,60 @@ func (a *Account) GetAPIProtocol() string {
 		}
 	}
 	return APIProtocolChatCompletions
+}
+
+// IsAdaptiveAPIProtocol 报告国产供应商是否按入站协议动态选择原生端点。
+func (a *Account) IsAdaptiveAPIProtocol() bool {
+	return a != nil && a.IsCNProvider() && a.GetAPIProtocol() == APIProtocolAdaptive
+}
+
+// GetCNProtocolBaseURL 返回自适应账号指定协议的上游地址，并兼容旧 base_url 字段。
+func (a *Account) GetCNProtocolBaseURL(protocol string) string {
+	if a == nil || !a.IsCNProvider() {
+		return ""
+	}
+	if a.IsAdaptiveAPIProtocol() {
+		if baseURLs, ok := a.Credentials["api_base_urls"].(map[string]any); ok {
+			if value, ok := baseURLs[protocol].(string); ok && strings.TrimSpace(value) != "" {
+				return strings.TrimSpace(value)
+			}
+		}
+		if protocol == APIProtocolChatCompletions {
+			if value := strings.TrimSpace(a.GetCredential("base_url")); value != "" {
+				return value
+			}
+		}
+	}
+	switch protocol {
+	case APIProtocolAnthropic:
+		switch a.Platform {
+		case PlatformKimi:
+			if a.GetAccountMode() == AccountModeCoding {
+				return DefaultKimiCodingAnthropicBaseURL
+			}
+			return DefaultKimiPayGAnthropicBaseURL
+		case PlatformZhipu:
+			return DefaultZhipuAnthropicBaseURL
+		case PlatformDeepseek:
+			return DefaultDeepseekAnthropicBaseURL
+		}
+	case APIProtocolChatCompletions, APIProtocolResponses:
+		switch a.Platform {
+		case PlatformKimi:
+			if a.GetAccountMode() == AccountModeCoding {
+				return DefaultKimiCodingBaseURL
+			}
+			return DefaultKimiPayGBaseURL
+		case PlatformZhipu:
+			if a.GetAccountMode() == AccountModeCoding {
+				return DefaultZhipuCodingBaseURL
+			}
+			return DefaultZhipuPayGBaseURL
+		case PlatformDeepseek:
+			return DefaultDeepseekBaseURL
+		}
+	}
+	return ""
 }
 
 // IsAnthropicProtocol 报告国产供应商是否使用 Anthropic Messages 上游协议。
@@ -1557,8 +1618,11 @@ func (a *Account) GetOpenAIFormatBaseURL() string {
 	if a == nil {
 		return ""
 	}
-	if !a.IsAnthropicProtocol() {
+	if !a.IsAnthropicProtocol() && !a.IsAdaptiveAPIProtocol() {
 		return a.GetOpenAIBaseURL()
+	}
+	if a.IsAdaptiveAPIProtocol() {
+		return a.GetCNProtocolBaseURL(APIProtocolChatCompletions)
 	}
 	switch a.Platform {
 	case PlatformKimi:

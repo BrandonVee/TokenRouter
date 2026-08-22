@@ -66,7 +66,7 @@
 
       <!-- API Key fields (only for apikey type) -->
       <div v-if="account.type === 'apikey'" class="space-y-4">
-        <div>
+        <div v-if="!isCNApiKeyAccount || editApiProtocol !== 'adaptive'">
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="editBaseUrl"
@@ -98,6 +98,15 @@
             :protocol="editApiProtocol"
             @select="onCnPresetSelect"
           />
+        </div>
+        <div v-else>
+          <label class="input-label">{{ t('admin.accounts.cnProviders.apiProtocol.endpoints') }}</label>
+          <div class="mt-2 space-y-3">
+            <div v-for="item in editAdaptiveProtocolOptions" :key="item.value">
+              <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{{ t(`admin.accounts.cnProviders.apiProtocol.${item.labelKey}`) }}</label>
+              <input v-model="editAdaptiveBaseUrls[item.value]" type="text" class="input" />
+            </div>
+          </div>
         </div>
         <!-- 国产供应商模式与协议分别保存，避免编辑后退化为默认 Chat 协议。 -->
         <div v-if="isCNApiKeyAccount" class="space-y-4">
@@ -2756,6 +2765,7 @@ import {
   applyInterceptWarmup,
   CN_BASE_URL_PRESETS,
   defaultCNBaseUrl,
+  defaultCNAdaptiveBaseUrls,
   applyPlanType,
   buildPlanTypeOptions,
   readPlanType,
@@ -2768,6 +2778,7 @@ import {
   type HeaderOverrideRow,
   type CnAccountMode,
   type CnApiProtocol,
+  type CnNativeApiProtocol,
   type CnBaseUrlPreset
 } from '@/components/account/credentialsBuilder'
 import { formatDateTime, formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
@@ -2860,7 +2871,8 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editAccountMode = ref<CnAccountMode>('payg')
-const editApiProtocol = ref<CnApiProtocol>('chat_completions')
+const editApiProtocol = ref<CnApiProtocol>('adaptive')
+const editAdaptiveBaseUrls = ref<Record<CnNativeApiProtocol, string>>({ chat_completions: '', anthropic: '', responses: '' })
 const isCNApiKeyAccount = computed(() =>
   props.account?.type === 'apikey' && ['kimi', 'zhipu', 'deepseek'].includes(props.account.platform)
 )
@@ -2873,11 +2885,19 @@ const cnAccountModeOptions = computed(() =>
     : [{ value: 'payg' as const }, { value: 'coding' as const }]
 )
 const cnProtocolOptions = computed(() => {
-  const options: Array<{ value: CnApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }> = [
+  const options: Array<{ value: CnApiProtocol; labelKey: 'adaptive' | 'chatCompletions' | 'anthropic' | 'responses' }> = [
+    { value: 'adaptive', labelKey: 'adaptive' },
     { value: 'chat_completions' as const, labelKey: 'chatCompletions' },
     { value: 'anthropic' as const, labelKey: 'anthropic' }
   ]
   if (props.account?.platform === 'deepseek') options.push({ value: 'responses' as const, labelKey: 'responses' })
+  return options
+})
+const editAdaptiveProtocolOptions = computed<Array<{ value: CnNativeApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }>>(() => {
+  const options: Array<{ value: CnNativeApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }> = [
+    { value: 'chat_completions', labelKey: 'chatCompletions' }, { value: 'anthropic', labelKey: 'anthropic' }
+  ]
+  if (props.account?.platform === 'deepseek') options.push({ value: 'responses', labelKey: 'responses' })
   return options
 })
 const onCnPresetSelect = (preset: CnBaseUrlPreset) => {
@@ -3376,6 +3396,14 @@ watch(editAccountMode, mode => {
 })
 watch([editAccountMode, editApiProtocol], () => {
   if (!isCNApiKeyAccount.value) return
+  if (editApiProtocol.value === 'adaptive') {
+    const defaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, editAccountMode.value)
+    for (const item of editAdaptiveProtocolOptions.value) {
+      if (!editAdaptiveBaseUrls.value[item.value]) editAdaptiveBaseUrls.value[item.value] = defaults[item.value]
+    }
+    editBaseUrl.value = editAdaptiveBaseUrls.value.chat_completions
+    return
+  }
   const current = editBaseUrl.value.trim()
   const known = CN_BASE_URL_PRESETS[cnPresetPlatform.value].some(item => item.url === current)
   if (known || !current) editBaseUrl.value = defaultBaseUrl.value
@@ -3573,10 +3601,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   editAccountMode.value =
     newAccount.platform !== 'deepseek' && credentials?.account_mode === 'coding' ? 'coding' : 'payg'
   editApiProtocol.value =
-    credentials?.api_protocol === 'anthropic' ||
+    credentials?.api_protocol === 'adaptive' || credentials?.api_protocol === 'anthropic' ||
     (newAccount.platform === 'deepseek' && credentials?.api_protocol === 'responses')
       ? credentials.api_protocol
-      : 'chat_completions'
+      : 'adaptive'
   geminiProviderType.value = 'official'
   geminiAIStudioTier.value = 'aistudio_free'
   if (newAccount.platform === 'gemini' && newAccount.type === 'apikey') {
@@ -3803,7 +3831,20 @@ const syncFormFromAccount = (newAccount: Account | null) => {
                   editApiProtocol.value
                 )
             : 'https://api.anthropic.com'
-    editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
+    const adaptiveDefaults = ['kimi', 'zhipu', 'deepseek'].includes(newAccount.platform)
+      ? defaultCNAdaptiveBaseUrls(newAccount.platform as 'kimi' | 'zhipu' | 'deepseek', editAccountMode.value)
+      : null
+    const storedAdaptive = (credentials.api_base_urls as Record<string, unknown> | undefined) || {}
+    if (editApiProtocol.value === 'adaptive' && adaptiveDefaults) {
+      editAdaptiveBaseUrls.value = {
+        chat_completions: typeof storedAdaptive.chat_completions === 'string' ? storedAdaptive.chat_completions : adaptiveDefaults.chat_completions,
+        anthropic: typeof storedAdaptive.anthropic === 'string' ? storedAdaptive.anthropic : adaptiveDefaults.anthropic,
+        responses: typeof storedAdaptive.responses === 'string' ? storedAdaptive.responses : adaptiveDefaults.responses
+      }
+      editBaseUrl.value = editAdaptiveBaseUrls.value.chat_completions
+    } else {
+      editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
+    }
 
     // 统一从 model_mapping 恢复白名单与映射两个视图，避免配置映射后把白名单误判为空。
     const existingMappings = credentials.model_mapping as Record<string, string> | undefined
@@ -4579,6 +4620,11 @@ const handleSubmit = async () => {
         newCredentials.account_mode =
           props.account.platform === 'deepseek' ? 'payg' : editAccountMode.value
         newCredentials.api_protocol = editApiProtocol.value
+        if (editApiProtocol.value === 'adaptive') {
+          const defaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, editAccountMode.value)
+          newCredentials.api_base_urls = Object.fromEntries(editAdaptiveProtocolOptions.value.map(item => [item.value, (editAdaptiveBaseUrls.value[item.value] || defaults[item.value]).trim()]))
+          newCredentials.base_url = (newCredentials.api_base_urls as Record<string, string>).chat_completions
+        }
       }
 
       // 处理 API Key。

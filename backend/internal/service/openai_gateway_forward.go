@@ -107,6 +107,10 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if account.Platform == PlatformGrok {
 		return s.forwardGrokResponses(ctx, c, account, body, originalModel, reqStream, startTime)
 	}
+	// Kimi/智谱没有原生 Responses，按自适应策略回退到 CC；DeepSeek 保留原生 Responses。
+	if account.IsAdaptiveAPIProtocol() && account.Platform != PlatformDeepseek {
+		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body, tlsRouterMatch)
+	}
 	if err := validateOpenAIReasoningEffort(body, originalModel); err != nil {
 		if c != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -1031,6 +1035,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	case AccountTypeAPIKey:
 		// API Key accounts use Platform API or custom base URL
 		baseURL := account.GetOpenAIBaseURL()
+		if account.Platform == PlatformDeepseek && account.IsAdaptiveAPIProtocol() {
+			baseURL = account.GetCNProtocolBaseURL(APIProtocolResponses)
+		}
 		if baseURL == "" {
 			targetURL = openaiPlatformAPIURL
 		} else {

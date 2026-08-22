@@ -350,7 +350,9 @@ export function applyPlanType(
 
 // 国产供应商账号模式与协议的联合端点预设，保持创建和编辑表单共用一套事实源。
 export type CnAccountMode = 'payg' | 'coding'
-export type CnApiProtocol = 'chat_completions' | 'anthropic' | 'responses'
+/** adaptive 按入站协议选择原生端点。 */
+export type CnApiProtocol = 'adaptive' | 'chat_completions' | 'anthropic' | 'responses'
+export type CnNativeApiProtocol = Exclude<CnApiProtocol, 'adaptive'>
 
 export interface CnBaseUrlPreset {
   mode: CnAccountMode
@@ -384,6 +386,18 @@ export function defaultCNBaseUrl(platform: string, mode: CnAccountMode, protocol
   const preset = CN_BASE_URL_PRESETS[platform as keyof typeof CN_BASE_URL_PRESETS]
     ?.find(item => item.mode === mode && item.protocol === protocol)
   return preset?.url ?? ''
+}
+
+// 返回自适应模式下各原生协议的默认端点。
+export function defaultCNAdaptiveBaseUrls(
+  platform: 'kimi' | 'zhipu' | 'deepseek',
+  mode: CnAccountMode
+): Record<CnNativeApiProtocol, string> {
+  return {
+    chat_completions: defaultCNBaseUrl(platform, mode, 'chat_completions'),
+    anthropic: defaultCNBaseUrl(platform, mode, 'anthropic'),
+    responses: platform === 'deepseek' ? defaultCNBaseUrl(platform, mode, 'responses') : ''
+  }
 }
 
 export function cnQuotaCellVisible(platform: string, accountMode: string): boolean {

@@ -74,6 +74,10 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 		}
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel, tlsRouterMatch...)
 	}
+	// 自适应账号的 Chat Completions 入站始终使用原生 CC 端点。
+	if account.IsAdaptiveAPIProtocol() {
+		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel, tlsRouterMatch...)
+	}
 	if err := validateOpenAIReasoningEffort(body, gjson.GetBytes(body, "model").String()); err != nil {
 		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err

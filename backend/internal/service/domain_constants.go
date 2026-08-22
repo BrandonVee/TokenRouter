@@ -24,15 +24,20 @@ const (
 	APIProtocolChatCompletions = domain.APIProtocolChatCompletions
 	APIProtocolAnthropic       = domain.APIProtocolAnthropic
 	APIProtocolResponses       = domain.APIProtocolResponses
+	APIProtocolAdaptive        = domain.APIProtocolAdaptive
 )
 
 // 国产供应商默认端点与管理端预设保持一致。
 const (
-	DefaultKimiPayGBaseURL    = "https://api.moonshot.cn/v1"
-	DefaultKimiCodingBaseURL  = "https://api.kimi.com/coding/v1"
-	DefaultZhipuPayGBaseURL   = "https://open.bigmodel.cn/api/paas/v4"
-	DefaultZhipuCodingBaseURL = "https://open.bigmodel.cn/api/coding/paas/v4"
-	DefaultDeepseekBaseURL    = "https://api.deepseek.com"
+	DefaultKimiPayGBaseURL            = "https://api.moonshot.cn/v1"
+	DefaultKimiCodingBaseURL          = "https://api.kimi.com/coding/v1"
+	DefaultZhipuPayGBaseURL           = "https://open.bigmodel.cn/api/paas/v4"
+	DefaultZhipuCodingBaseURL         = "https://open.bigmodel.cn/api/coding/paas/v4"
+	DefaultDeepseekBaseURL            = "https://api.deepseek.com"
+	DefaultKimiPayGAnthropicBaseURL   = "https://api.moonshot.cn/anthropic"
+	DefaultKimiCodingAnthropicBaseURL = "https://api.kimi.com/coding"
+	DefaultZhipuAnthropicBaseURL      = "https://open.bigmodel.cn/api/anthropic"
+	DefaultDeepseekAnthropicBaseURL   = "https://api.deepseek.com/anthropic"
 )
 
 // IsCNProvider 判断平台是否属于国产 OpenAI 兼容供应商。

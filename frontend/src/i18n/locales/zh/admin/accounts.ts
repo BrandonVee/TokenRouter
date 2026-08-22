@@ -671,6 +671,10 @@ export default {
         },
         apiProtocol: {
           title: 'API 协议',
+          adaptive: '自适应',
+          adaptiveDesc: '根据入站协议选择对应的供应商原生端点。',
+          endpoints: '协议端点',
+          responsesFallbackDesc: '该供应商没有原生 Responses 端点，请求将使用 Chat Completions。',
           chatCompletions: 'OpenAI Chat',
           chatCompletionsDesc: 'OpenAI 兼容 Chat Completions 接口。',
           anthropic: 'Anthropic Messages',
