@@ -6703,6 +6703,16 @@
                     <Select v-model="item.visibility" :options="customMenuVisibilityOptions" class="text-sm" />
                   </div>
 
+                  <!-- 打开方式 -->
+                  <div>
+                    <label
+                      class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >
+                      {{ t("admin.settings.customMenu.openMode") }}
+                    </label>
+                    <Select v-model="item.open_mode" :options="customMenuOpenModeOptions" class="text-sm" />
+                  </div>
+
                   <!-- URL (full width) -->
                   <div class="sm:col-span-2">
                     <label
@@ -9225,6 +9235,7 @@ const form = reactive<SettingsForm>({
     label: string;
     icon_svg: string;
     url: string;
+    open_mode: "iframe" | "new_tab" | "same_tab";
     visibility: "user" | "admin";
     sort_order: number;
   }>,
@@ -9491,6 +9502,16 @@ const customMenuVisibilityOptions = computed(() => [
   { value: "user", label: t("admin.settings.customMenu.visibilityUser") },
   { value: "admin", label: t("admin.settings.customMenu.visibilityAdmin") },
 ]);
+
+const customMenuOpenModeOptions = computed(() => [
+  { value: "iframe", label: t("admin.settings.customMenu.openModeIframe") },
+  { value: "new_tab", label: t("admin.settings.customMenu.openModeNewTab") },
+  { value: "same_tab", label: t("admin.settings.customMenu.openModeSameTab") },
+]);
+
+function normalizeCustomMenuOpenMode(value: unknown): "iframe" | "new_tab" | "same_tab" {
+  return value === "new_tab" || value === "same_tab" ? value : "iframe";
+}
 
 const userPromptReplacementTypeOptions = computed(() => [
   {
@@ -10333,6 +10354,7 @@ function addMenuItem() {
     label: "",
     icon_svg: "",
     url: "",
+    open_mode: "iframe",
     visibility: "user",
     sort_order: form.custom_menu_items.length,
   });
@@ -10534,6 +10556,13 @@ async function loadSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    form.custom_menu_items = (Array.isArray(settings.custom_menu_items)
+      ? settings.custom_menu_items
+      : []
+    ).map((item) => ({
+      ...item,
+      open_mode: normalizeCustomMenuOpenMode(item.open_mode),
+    }));
     form.site_name_zh = form.site_name_zh || settings.site_name || "Sub2API";
     form.site_name_en = form.site_name_en || "";
     form.site_subtitle_zh =

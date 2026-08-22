@@ -59,6 +59,8 @@ setup 使用 `DATA_DIR > 可写 /app/data > 当前目录` 选择 `config.yaml` �
 
 `settings` 是 `key/value/updated_at` 表，删除键表示恢复该 getter 的默认语义。`SettingService` 负责类型解析、范围/组合校验、敏感值保留、批量原子写入和更新后的缓存通知；handler 只负责 HTTP binding、权限、审计和响应。
 
+自定义菜单设置 `custom_menu_items` 保存侧边栏页面及其打开方式。每项的 `open_mode` 可为 `iframe`、`new_tab` 或 `same_tab`；省略该字段的历史配置按 `iframe` 兼容处理。`iframe` 使用站内 `/custom/:id` 页面承载外部 URL，另两种模式直接导航到经过校验的 URL；`md:<slug>` 页面在非 iframe 模式下仍通过自身路由打开。
+
 运行时设置包括注册与邮件验证、第三方登录、SMTP、TOTP/session binding/step-up、登录协议、面板限流、部分冷却与流超时、数据共享、支付展示以及各类功能开关。不同 getter 的回退可能来自代码常量或 `config.Config`，不能假设所有缺失键都等价于 `false`。
 
 `registration_email_domain_quota_enabled` 控制邮箱白名单非空时是否允许非白名单域名按可注册主域名限量注册，缺失或读取失败均按关闭处理，以保持严格白名单的安全默认。该设置通过公开设置和 SSR 注入提供给注册前端用于选择本地白名单预检策略，但最终准入仍由服务端在注册事务内重新读取并判定；管理更新请求省略该字段时必须保留当前值，不能把兼容请求解释为显式关闭。

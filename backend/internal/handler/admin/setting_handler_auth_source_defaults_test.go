@@ -240,7 +240,67 @@ func TestSettingHandler_UpdateSettings_AcceptsMarkdownCustomMenuURL(t *testing.T
 	handler.UpdateSettings(c)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	require.JSONEq(t, `[{"id":"guide","label":"Guide","icon_svg":"","url":"md:guide","visibility":"user","sort_order":0}]`, repo.values[service.SettingKeyCustomMenuItems])
+	require.JSONEq(t, `[{"id":"guide","label":"Guide","icon_svg":"","url":"md:guide","open_mode":"iframe","visibility":"user","sort_order":0}]`, repo.values[service.SettingKeyCustomMenuItems])
+}
+
+func TestSettingHandler_UpdateSettingsAcceptsCustomMenuOpenModes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &settingHandlerRepoStub{
+		values: map[string]string{service.SettingKeyPromoCodeEnabled: "true"},
+	}
+	svc := service.NewSettingService(repo, &config.Config{Default: config.DefaultConfig{UserConcurrency: 5}})
+	handler := NewSettingHandler(svc, nil, nil, nil, nil, nil, nil)
+
+	body := map[string]any{
+		"promo_code_enabled": true,
+		"custom_menu_items": []map[string]any{
+			{"id": "iframe", "label": "Embedded", "url": "https://example.com/embed", "open_mode": "iframe", "visibility": "user"},
+			{"id": "new", "label": "New tab", "url": "https://example.com/new", "open_mode": "new_tab", "visibility": "user"},
+			{"id": "same", "label": "Same tab", "url": "https://example.com/same", "open_mode": "same_tab", "visibility": "admin"},
+		},
+	}
+	rawBody, err := json.Marshal(body)
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(rawBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.UpdateSettings(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.JSONEq(t, `[
+		{"id":"iframe","label":"Embedded","icon_svg":"","url":"https://example.com/embed","open_mode":"iframe","visibility":"user","sort_order":0},
+		{"id":"new","label":"New tab","icon_svg":"","url":"https://example.com/new","open_mode":"new_tab","visibility":"user","sort_order":0},
+		{"id":"same","label":"Same tab","icon_svg":"","url":"https://example.com/same","open_mode":"same_tab","visibility":"admin","sort_order":0}
+	]`, repo.values[service.SettingKeyCustomMenuItems])
+}
+
+func TestSettingHandler_UpdateSettingsRejectsInvalidCustomMenuOpenMode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &settingHandlerRepoStub{
+		values: map[string]string{service.SettingKeyPromoCodeEnabled: "true"},
+	}
+	svc := service.NewSettingService(repo, &config.Config{Default: config.DefaultConfig{UserConcurrency: 5}})
+	handler := NewSettingHandler(svc, nil, nil, nil, nil, nil, nil)
+
+	body := map[string]any{
+		"promo_code_enabled": true,
+		"custom_menu_items": []map[string]any{
+			{"id": "bad-mode", "label": "Bad", "url": "https://example.com", "open_mode": "popup", "visibility": "user"},
+		},
+	}
+	rawBody, err := json.Marshal(body)
+	require.NoError(t, err)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPut, "/api/v1/admin/settings", bytes.NewReader(rawBody))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.UpdateSettings(c)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.NotContains(t, repo.values, service.SettingKeyCustomMenuItems)
 }
 
 func TestSettingHandler_UpdateSettings_RejectsEmptyMarkdownCustomMenuSlug(t *testing.T) {

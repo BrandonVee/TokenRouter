@@ -1367,6 +1367,13 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			// 保存规范化后的 URL，避免前后空白导致运行时 md: 页面识别失败。
 			items[i].URL = urlTrimmed
+			// 旧配置没有打开方式时继续使用 iframe，避免升级后改变已有菜单行为。
+			if item.OpenMode == "" {
+				items[i].OpenMode = "iframe"
+			} else if item.OpenMode != "iframe" && item.OpenMode != "new_tab" && item.OpenMode != "same_tab" {
+				response.BadRequest(c, "Custom menu item open mode must be 'iframe', 'new_tab' or 'same_tab'")
+				return
+			}
 			if item.Visibility != "user" && item.Visibility != "admin" {
 				response.BadRequest(c, "Custom menu item visibility must be 'user' or 'admin'")
 				return

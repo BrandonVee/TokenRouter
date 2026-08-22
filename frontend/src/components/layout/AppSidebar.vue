@@ -95,9 +95,10 @@
               </div>
             </template>
             <!-- Normal item (no children) -->
-            <router-link
+            <component
               v-else
-              :to="item.path"
+              :is="navigationComponent(item)"
+              v-bind="navigationProps(item)"
               class="sidebar-link mb-1"
               :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
               :title="sidebarCollapsed ? item.label : undefined"
@@ -115,7 +116,7 @@
               <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
               <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
               <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
-            </router-link>
+            </component>
           </template>
         </div>
 
@@ -127,10 +128,11 @@
             </span>
           </div>
 
-          <router-link
+          <component
             v-for="item in personalNavItems"
             :key="item.path"
-            :to="item.path"
+            :is="navigationComponent(item)"
+            v-bind="navigationProps(item)"
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
@@ -140,17 +142,18 @@
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
-          </router-link>
+          </component>
         </div>
       </template>
 
       <!-- Regular User View -->
       <template v-else-if="!appStore.backendModeEnabled">
         <div class="sidebar-section">
-          <router-link
+          <component
             v-for="item in userNavItems"
             :key="item.path"
-            :to="item.path"
+            :is="navigationComponent(item)"
+            v-bind="navigationProps(item)"
             class="sidebar-link mb-1"
             :class="{ 'sidebar-link-active': isActive(item.path), 'sidebar-link-collapsed': sidebarCollapsed }"
             :title="sidebarCollapsed ? item.label : undefined"
@@ -160,7 +163,7 @@
             <span v-if="item.iconSvg" class="h-5 w-5 flex-shrink-0 sidebar-svg-icon" v-html="sanitizeSvg(item.iconSvg)"></span>
             <component v-else :is="item.icon" class="h-5 w-5 flex-shrink-0" />
             <span class="sidebar-label" :class="{ 'sidebar-label-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">{{ item.label }}</span>
-          </router-link>
+          </component>
         </div>
       </template>
       </div>
@@ -187,6 +190,7 @@ import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import type { CustomMenuItem } from '@/types'
 
 interface NavItem {
   path: string
@@ -197,6 +201,8 @@ interface NavItem {
   // featureFlag 返回 false 时隐藏菜单项，用于按公开设置控制可选入口。
   featureFlag?: () => boolean
   children?: NavItem[]
+  openMode?: CustomMenuItem['open_mode']
+  externalUrl?: string
 }
 
 const { t } = useI18n()
@@ -680,6 +686,8 @@ const userNavItems = computed((): NavItem[] => {
       label: item.label,
       icon: null,
       iconSvg: item.icon_svg,
+      openMode: item.open_mode ?? 'iframe',
+      externalUrl: customMenuExternalUrl(item),
     })),
   ]
   const visibleItems = items.filter(item => item.featureFlag?.() !== false)
@@ -735,6 +743,8 @@ const personalNavItems = computed((): NavItem[] => {
       label: item.label,
       icon: null,
       iconSvg: item.icon_svg,
+      openMode: item.open_mode ?? 'iframe',
+      externalUrl: customMenuExternalUrl(item),
     })),
   ]
   const visibleItems = items.filter(item => item.featureFlag?.() !== false)
@@ -820,7 +830,7 @@ const adminNavItems = computed((): NavItem[] => {
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
     // Add admin custom menu items after settings
     for (const cm of customMenuItemsForAdmin.value) {
-      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg, openMode: cm.open_mode ?? 'iframe', externalUrl: customMenuExternalUrl(cm) })
     }
     return filtered
   }
@@ -829,10 +839,31 @@ const adminNavItems = computed((): NavItem[] => {
   visibleItems.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
   // Add admin custom menu items after settings
   for (const cm of customMenuItemsForAdmin.value) {
-    visibleItems.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+    visibleItems.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg, openMode: cm.open_mode ?? 'iframe', externalUrl: customMenuExternalUrl(cm) })
   }
   return visibleItems
 })
+
+function customMenuExternalUrl(item: CustomMenuItem): string | undefined {
+  const mode = item.open_mode ?? 'iframe'
+  if (mode !== 'new_tab' && mode !== 'same_tab') return undefined
+  if (item.url?.startsWith('md:')) return `/custom/${item.id}`
+  const url = sanitizeUrl(item.url || '')
+  return url || undefined
+}
+
+function navigationComponent(item: NavItem) {
+  return item.externalUrl ? 'a' : 'router-link'
+}
+
+function navigationProps(item: NavItem) {
+  if (!item.externalUrl) return { to: item.path }
+  return {
+    href: item.externalUrl,
+    target: item.openMode === 'new_tab' ? '_blank' : undefined,
+    rel: item.openMode === 'new_tab' ? 'noopener noreferrer' : undefined,
+  }
+}
 
 function closeMobile() {
   appStore.setMobileOpen(false)

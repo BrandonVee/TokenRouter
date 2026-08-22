@@ -191,6 +191,7 @@ export interface CustomMenuItem {
   label: string
   icon_svg: string
   url: string
+  open_mode?: 'iframe' | 'new_tab' | 'same_tab'
   page_slug?: string
   visibility: 'user' | 'admin'
   sort_order: number

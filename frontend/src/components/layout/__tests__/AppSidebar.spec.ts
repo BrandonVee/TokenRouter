@@ -36,6 +36,15 @@ describe('AppSidebar custom SVG styles', () => {
   })
 })
 
+describe('AppSidebar custom menu opening modes', () => {
+  it('supports iframe, same-tab, and new-tab navigation', () => {
+    // 自定义菜单的打开方式必须影响导航元素类型和新标签页安全属性。
+    expect(componentSource).toContain("return item.externalUrl ? 'a' : 'router-link'")
+    expect(componentSource).toContain("target: item.openMode === 'new_tab' ? '_blank' : undefined")
+    expect(componentSource).toContain("openMode: item.open_mode ?? 'iframe'")
+  })
+})
+
 describe('AppSidebar scroll position persistence', () => {
   it('binds a template ref to the sidebar nav element', () => {
     expect(componentSource).toContain('ref="sidebarNavRef"')
@@ -82,7 +91,7 @@ describe('AppSidebar sliding hover indicator', () => {
     expect(componentSource).toContain('transform 220ms cubic-bezier(0.22, 1, 0.36, 1)')
     expect(componentSource).toContain('@media (prefers-reduced-motion: reduce)')
     expect(styleSource).toContain('.dark .sidebar-hover-indicator')
-    expect(styleSource).toContain('--sidebar-hover-bg: #2A2E35;')
+    expect(styleSource).toContain('--sidebar-hover-bg: rgba(52, 71, 82, 0.56);')
     expect(componentSource).toContain('function hideHoverIndicator()')
     expect(componentSource).toContain('hoverIndicator.value.visible = false')
     expect(componentSource).not.toContain("querySelector<HTMLElement>('.sidebar-link-active')")
