@@ -430,6 +430,7 @@
 </template>
 
 <script setup lang="ts">
+import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import { ref, reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -491,7 +492,8 @@ const platformOptions = [
   { value: 'gemini', label: 'Gemini' },
   { value: 'antigravity', label: 'Antigravity' },
   { value: 'qoder', label: 'Qoder' },
-  { value: 'grok', label: 'Grok' }
+  { value: 'grok', label: 'Grok' },
+  ...CONCRETE_PLATFORM_OPTIONS,
 ]
 
 // Load rules when dialog opens

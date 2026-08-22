@@ -4518,6 +4518,8 @@ import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesMo
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
 import GroupClientProtocolSelector from "@/components/admin/group/GroupClientProtocolSelector.vue";
+import { GROUP_PLATFORM_OPTIONS } from "@/constants/platforms";
+import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 import GroupAdvancedSchedulerOverridesModal from "@/components/admin/group/GroupAdvancedSchedulerOverridesModal.vue";
 import PricingEntryCard from "@/components/admin/channel/PricingEntryCard.vue";
 import type { PricingFormEntry } from "@/components/admin/channel/types";
@@ -4846,6 +4848,7 @@ const platformOptions = computed(() => [
   { value: "zhipu", label: "智谱 GLM" },
   { value: "deepseek", label: "DeepSeek" },
   { value: "composite", label: "Composite" },
+  ...GROUP_PLATFORM_OPTIONS,
 ]);
 
 const schedulerTypeOptions = computed(() => [
@@ -4892,6 +4895,7 @@ const saveAdvancedSchedulerOverrides = (value: GroupAdvancedSchedulerOverrides) 
 
 const platformFilterOptions = computed(() => [
   { value: "", label: t("admin.groups.allPlatforms") },
+  ...GROUP_PLATFORM_OPTIONS,
   { value: "anthropic", label: "Anthropic" },
   { value: "openai", label: "OpenAI" },
   { value: "gemini", label: "Gemini" },
@@ -4902,6 +4906,7 @@ const platformFilterOptions = computed(() => [
 ]);
 
 const compositeRoutePlatformOptions = computed(() => [
+  ...CONCRETE_PLATFORM_OPTIONS,
   { value: "anthropic", label: "Anthropic" },
   { value: "openai", label: "OpenAI" },
   { value: "gemini", label: "Gemini" },
