@@ -345,8 +345,16 @@ func populateChannelCache(channels []Channel, groupPlatforms map[int64]string) *
 }
 
 // isPlatformPricingMatch 判断定价条目的平台是否匹配分组平台。
-// 各平台（antigravity / anthropic / gemini / openai）严格独立，不跨平台匹配。
+// Composite 分组按目标平台承接定价，其余平台严格独立。
 func isPlatformPricingMatch(groupPlatform, pricingPlatform string) bool {
+	if groupPlatform == PlatformComposite {
+		for _, platform := range matchingPlatforms(groupPlatform) {
+			if platform == pricingPlatform {
+				return true
+			}
+		}
+		return false
+	}
 	return groupPlatform == pricingPlatform
 }
 
@@ -783,7 +791,7 @@ func validateAccountStatsPricingEntries(pricing []ChannelModelPricing) error {
 		if p.FastModeMultiplier != nil || p.FastMultiplier != nil || p.FlexMultiplier != nil {
 			return infraerrors.BadRequest(
 				"ACCOUNT_STATS_FAST_MODE_MULTIPLIER_UNSUPPORTED",
-				"service tier multipliers are not supported for account stats pricing",
+				"fast_mode_multiplier is not supported for account stats pricing (service tier multipliers are disabled)",
 			)
 		}
 	}

@@ -18,6 +18,62 @@ func ptrGroupClientProtocols(value []GroupClientProtocol) *[]GroupClientProtocol
 	return &value
 }
 
+// compositeRouteRepoStubForAdmin 覆盖管理端复合路由测试所需的最小仓储行为。
+type compositeRouteRepoStubForAdmin struct {
+	routes  []CompositeModelRoute
+	created *CompositeModelRoute
+	updated *CompositeModelRoute
+	deleted []int64
+	nextID  int64
+}
+
+func (s *compositeRouteRepoStubForAdmin) ListByGroup(_ context.Context, groupID int64, includeDisabled bool) ([]CompositeModelRoute, error) {
+	result := make([]CompositeModelRoute, 0, len(s.routes))
+	for _, route := range s.routes {
+		if route.GroupID != groupID || (!includeDisabled && !route.Enabled) {
+			continue
+		}
+		result = append(result, route)
+	}
+	return result, nil
+}
+
+func (s *compositeRouteRepoStubForAdmin) Create(_ context.Context, route *CompositeModelRoute) error {
+	if s.nextID > 0 {
+		route.ID = s.nextID
+	}
+	s.created = route
+	s.routes = append(s.routes, *route)
+	return nil
+}
+
+func (s *compositeRouteRepoStubForAdmin) Update(_ context.Context, route *CompositeModelRoute) error {
+	s.updated = route
+	for i := range s.routes {
+		if s.routes[i].ID == route.ID {
+			s.routes[i] = *route
+			break
+		}
+	}
+	return nil
+}
+
+func (s *compositeRouteRepoStubForAdmin) Delete(_ context.Context, routeID int64) error {
+	s.deleted = append(s.deleted, routeID)
+	return nil
+}
+
+func (s *compositeRouteRepoStubForAdmin) DeleteByGroup(_ context.Context, groupID int64) error {
+	filtered := s.routes[:0]
+	for _, route := range s.routes {
+		if route.GroupID != groupID {
+			filtered = append(filtered, route)
+		}
+	}
+	s.routes = filtered
+	return nil
+}
+
 func TestAdminServiceCreateGroupUsesPlatformClientProtocolDefaults(t *testing.T) {
 	tests := []struct {
 		platform string

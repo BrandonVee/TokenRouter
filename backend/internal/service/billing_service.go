@@ -387,7 +387,7 @@ func (s *BillingService) initFallbackPricing() {
 		InputPricePerToken:         30e-6,  // $30 per MTok
 		OutputPricePerToken:        180e-6, // $180 per MTok
 		CacheCreationPricePerToken: 30e-6,  // 官方未列独立 cache-write 价
-		CacheReadPricePerToken:     30e-6,  // 官方未列独立 cached-input 价
+		CacheReadPricePerToken:     3e-6,   // 官方 cached-input 价为 $3/百万 token
 		SupportsCacheBreakdown:     false,
 		// GPT-5.5 Pro 长上下文阈值/倍率官方尚未明确，暂沿用 GPT-5.4 规则兜底。
 		LongContextInputThreshold:   openAIGPT54LongContextInputThreshold,
@@ -1047,8 +1047,12 @@ func (s *BillingService) GetModelPricingWithChannel(model string, channelPricing
 
 // channelTierOverridePrice 在覆盖标准价时保留模型价卡中显式 Fast/priority 价的比例。
 func channelTierOverridePrice(baseStandard, baseTier, channelStandard float64) float64 {
-	if baseStandard > 0 && baseTier > 0 {
-		return channelStandard * (baseTier / baseStandard)
+	if baseStandard > 0 {
+		if baseTier > 0 {
+			return channelStandard * (baseTier / baseStandard)
+		}
+		// 未提供模型层级价时，渠道标准价同时作为 Fast/priority 价。
+		return channelStandard
 	}
 	return 0
 }
@@ -1189,6 +1193,10 @@ func (s *BillingService) computeTokenBreakdown(
 		}
 		if pricing.CacheCreationPricePerTokenPriority > 0 {
 			cacheCreationPrice = pricing.CacheCreationPricePerTokenPriority
+		}
+		// 5m/1h 缓存价格没有单独的 Fast 字段，沿用通用缓存价的层级比例。
+		if pricing.SupportsCacheBreakdown && pricing.CacheCreationPricePerToken > 0 && pricing.CacheCreationPricePerTokenPriority > 0 {
+			cacheCreationMultiplier = pricing.CacheCreationPricePerTokenPriority / pricing.CacheCreationPricePerToken
 		}
 	} else {
 		tierMultiplier = configuredServiceTierMultiplier(serviceTier, pricing)

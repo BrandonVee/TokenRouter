@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -66,22 +67,23 @@ func newGatewayRoutesTestRouterWithGroup(cfg *config.Config, gatewayHandler *han
 	if gatewayHandler == nil {
 		gatewayHandler = &handler.GatewayHandler{}
 	}
+	qoderGateway := newGatewayRoutesQoderHandler(cfg, group)
 
 	RegisterGatewayRoutes(
 		router,
 		&handler.Handlers{
 			Gateway:       gatewayHandler,
 			OpenAIGateway: &handler.OpenAIGatewayHandler{},
-			QoderGateway:  &handler.QoderGatewayHandler{},
+			QoderGateway:  qoderGateway,
 		},
 		servermiddleware.APIKeyAuthMiddleware(func(c *gin.Context) {
 			groupID := group.ID
 			c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{
-				User:    &service.User{ID: 1, Status: service.StatusActive, Concurrency: 1},
+				User:    &service.User{ID: 1, Status: service.StatusActive, Concurrency: 0},
 				GroupID: &groupID,
 				Group:   group,
 			})
-			c.Set(string(servermiddleware.ContextKeyUser), servermiddleware.AuthSubject{UserID: 1, Concurrency: 1})
+			c.Set(string(servermiddleware.ContextKeyUser), servermiddleware.AuthSubject{UserID: 1, Concurrency: 0})
 			c.Next()
 		}),
 		nil,
@@ -93,6 +95,53 @@ func newGatewayRoutesTestRouterWithGroup(cfg *config.Config, gatewayHandler *han
 	)
 
 	return router
+}
+
+// gatewayRoutesGroupRepoStub 仅为路由测试提供当前分组，避免触发真实数据库查询。
+type gatewayRoutesGroupRepoStub struct {
+	service.GroupRepository
+	group *service.Group
+}
+
+func (r *gatewayRoutesGroupRepoStub) GetByIDLite(_ context.Context, _ int64) (*service.Group, error) {
+	return r.group, nil
+}
+
+func (r *gatewayRoutesGroupRepoStub) GetByID(_ context.Context, _ int64) (*service.Group, error) {
+	return r.group, nil
+}
+
+// gatewayRoutesAccountRepoStub 返回空账号集，使 Qoder 路由测试停在可预期的业务错误。
+type gatewayRoutesAccountRepoStub struct {
+	service.AccountRepository
+}
+
+func (*gatewayRoutesAccountRepoStub) ListSchedulableByGroupIDAndPlatform(context.Context, int64, string) ([]service.Account, error) {
+	return nil, nil
+}
+
+// newGatewayRoutesQoderHandler 构造不会访问外部服务的 Qoder 测试处理器。
+func newGatewayRoutesQoderHandler(cfg *config.Config, group *service.Group) *handler.QoderGatewayHandler {
+	groupRepo := &gatewayRoutesGroupRepoStub{group: group}
+	accountRepo := &gatewayRoutesAccountRepoStub{}
+	gatewayService := service.NewGatewayService(
+		accountRepo,
+		groupRepo,
+		nil, nil, nil, nil, nil,
+		nil,
+		cfg,
+		nil,
+		service.NewConcurrencyService(nil),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil,
+	)
+	qoderService := service.NewQoderGatewayService(nil, accountRepo, nil, nil, nil)
+	return handler.NewQoderGatewayHandler(
+		gatewayService,
+		qoderService,
+		service.NewConcurrencyService(nil),
+		nil, nil, nil, nil,
+	)
 }
 
 type protocolGateTrackingReader struct {

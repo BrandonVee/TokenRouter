@@ -543,8 +543,10 @@ func (s *OpenAIGatewayService) newOpenAICompatBufferedReadFailoverError(
 	if resp != nil {
 		responseHeaders = resp.Header
 	}
-	_ = responseHeaders
-	failoverErr := s.newOpenAIStreamFailoverError(c, account, false, requestID, payload, message)
+	// 读取阶段失败时保留上游响应头，便于错误透传和故障诊断继续使用 request id。
+	failoverErr := s.newOpenAIStreamPolicyFailoverError(
+		c, account, false, requestID, responseHeaders, http.StatusBadGateway, payload, message, false,
+	)
 	// 保留稳定错误码，确保重试耗尽后客户端和错误透传规则仍能识别传输故障。
 	failoverErr.ResponseBody = payload
 	return failoverErr
