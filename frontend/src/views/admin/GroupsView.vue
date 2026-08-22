@@ -7022,7 +7022,7 @@ watch(
       editForm.fallback_group_id_on_invalid_request = null
     }
     if (newVal !== 'openai') {
-      editForm.allow_messages_dispatch = false
+      if ('allow_messages_dispatch' in editForm) editForm.allow_messages_dispatch = false
       editForm.default_mapped_model = ''
     }
     if (!supportsLivePlatform(newVal)) {

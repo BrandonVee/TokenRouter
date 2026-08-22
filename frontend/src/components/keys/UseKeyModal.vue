@@ -382,7 +382,8 @@ const openCodeProtocolPriority: Record<GroupPlatform, readonly GroupClientProtoc
   grok: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
   kimi: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
   zhipu: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
-  deepseek: ['openai_responses', 'openai_chat_completions', 'anthropic_messages']
+  deepseek: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
+  composite: ['openai_responses', 'openai_chat_completions', 'anthropic_messages', 'gemini_generate_content']
 }
 
 function preferredOpenCodeProtocol(
@@ -1112,6 +1113,12 @@ function generateCompatibleCodexFiles(
       name: 'TokenRouter DeepSeek',
       model: 'deepseek-chat',
       contextWindow: 128000
+    },
+    composite: {
+      provider: 'tokenrouter_composite',
+      name: 'TokenRouter Composite',
+      model: OPENAI_CODEX_DEFAULT_MODEL,
+      contextWindow: 1050000
     }
   }
   const config = platformConfig[platform]

@@ -48,6 +48,10 @@ const GROUP_CLIENT_PROTOCOL_POLICIES: Record<GroupPlatform, GroupClientProtocolP
   deepseek: {
     supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'],
     defaults: ['openai_responses', 'openai_chat_completions']
+  },
+  composite: {
+    supported: GROUP_CLIENT_PROTOCOL_ORDER,
+    defaults: ['openai_responses', 'openai_chat_completions', 'anthropic_messages']
   }
 }
 

@@ -14,6 +14,8 @@
 
 ## 配置分层
 
+代理连通性探测支持有序目标列表，并按目标解析 `ip-api`、`ipify`、`chatgpt-trace`；配置留空时沿用内置默认。渠道价格配置新增 `fast_multiplier`、`flex_multiplier` 与上下文区间倍率字段。
+
 | 层 | 例子 | 权威来源 | 生效方式 |
 | --- | --- | --- | --- |
 | 进程基础设施配置 | server、database、Redis、日志、CORS、JWT、worker/queue、连接池和硬安全开关 | `config.Config`，由默认值/YAML/环境变量加载 | 通常启动时读取，修改后重启 |

@@ -24,6 +24,8 @@ OpenAI OAuth 账号的 `extra.codex_fingerprint_mode` 控制普通 Codex Respons
 <a id="openai_protocol_dispatch"></a>
 ## 协议与传输
 
+`POST /v1/responses/input_tokens` 是独立的预检端点。官方 OpenAI 账号透传并返回真实 `input_tokens`；自定义中转、Grok 与国产供应商使用本地估算。路径别名会在入口规范化，预检不进入正常 Responses 用量结算。
+
 OpenAI 平台拥有以下正式协议族：
 
 | 协议 | 处理边界 |
