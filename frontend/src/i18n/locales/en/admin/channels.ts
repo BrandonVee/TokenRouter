@@ -358,6 +358,7 @@ riskControl: {
         maxPositive: 'Interval #{index}: maximum token count ({value}) must be greater than 0',
         maxGreaterThanMin: 'Interval #{index}: maximum token count ({max}) must be greater than minimum token count ({min})',
         negativePrice: 'Interval #{index}: {field} cannot be negative',
+        multiplierPositive: 'Interval #{index}: {field} must be greater than 0',
         unboundedLast: 'Interval #{index}: an unbounded interval (empty maximum token count) must be last',
         overlap: 'Intervals #{previousIndex} and #{currentIndex} overlap: previous upper bound ({previousMax}) is greater than current lower bound ({currentMin})',
         price: {
@@ -365,6 +366,10 @@ riskControl: {
           outputPrice: 'output price',
           cacheWritePrice: 'cache write price',
           cacheReadPrice: 'cache read price',
+          inputMultiplier: 'input multiplier',
+          outputMultiplier: 'output multiplier',
+          cacheWriteMultiplier: 'cache write multiplier',
+          cacheReadMultiplier: 'cache read multiplier',
           perRequestPrice: 'per-request price'
         }
       },
@@ -404,6 +409,14 @@ riskControl: {
         fastModeMultiplier: 'Fast Mode Multiplier',
         fastModeMultiplierPlaceholder: 'For example, 2',
         fastModeMultiplierRequiresPrice: 'Model {models} must have at least one explicit price before a Fast mode multiplier can be set',
+        fastMultiplier: 'Fast Multiplier',
+        flexMultiplier: 'Flex Multiplier',
+        multiplierPlaceholder: 'Not set',
+        multiplierPositive: 'Fast/Flex multipliers must be greater than 0',
+        inputMultiplier: 'Input Mult.',
+        outputMultiplier: 'Output Mult.',
+        cacheWriteMultiplier: 'Cache Write Mult.',
+        cacheReadMultiplier: 'Cache Read Mult.',
         defaultPrices: 'Default prices (fallback when no interval matches)',
         inputPrice: 'Input',
         outputPrice: 'Output',

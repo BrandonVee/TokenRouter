@@ -16,6 +16,10 @@ export interface PricingInterval {
   output_price: number | null
   cache_write_price: number | null
   cache_read_price: number | null
+  input_multiplier?: number | null
+  output_multiplier?: number | null
+  cache_write_multiplier?: number | null
+  cache_read_multiplier?: number | null
   per_request_price: number | null
   sort_order: number
 }
@@ -29,6 +33,9 @@ export interface ChannelModelPricing {
   price_multiplier?: number | null
   // 仅用于 OpenAI token 定价；可空表示沿用模型默认 Fast 定价。
   fast_mode_multiplier?: number | null
+  // 通用服务层级倍率，应用到最终标准渠道价。
+  fast_multiplier?: number | null
+  flex_multiplier?: number | null
   input_price: number | null
   output_price: number | null
   cache_write_price: number | null

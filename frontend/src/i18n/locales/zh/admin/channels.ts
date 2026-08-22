@@ -358,6 +358,7 @@ riskControl: {
         maxPositive: '区间 #{index}：最大 token 数（{value}）必须大于 0',
         maxGreaterThanMin: '区间 #{index}：最大 token 数（{max}）必须大于最小 token 数（{min}）',
         negativePrice: '区间 #{index}：{field}不能为负数',
+        multiplierPositive: '区间 #{index}：{field}必须大于 0',
         unboundedLast: '区间 #{index}：无上限区间（最大 token 数为空）必须放在最后',
         overlap: '区间 #{previousIndex} 和 #{currentIndex} 重叠：前一个上界（{previousMax}）大于当前下界（{currentMin}）',
         price: {
@@ -365,6 +366,10 @@ riskControl: {
           outputPrice: '输出价格',
           cacheWritePrice: '缓存写入价格',
           cacheReadPrice: '缓存读取价格',
+          inputMultiplier: '输入倍率',
+          outputMultiplier: '输出倍率',
+          cacheWriteMultiplier: '缓存写倍率',
+          cacheReadMultiplier: '缓存读倍率',
           perRequestPrice: '单次价格'
         }
       },
@@ -404,6 +409,14 @@ riskControl: {
         fastModeMultiplier: 'Fast 模式倍率',
         fastModeMultiplierPlaceholder: '例如 2',
         fastModeMultiplierRequiresPrice: '模型 {models} 配置 Fast 模式倍率时，必须至少填写一项价格',
+        fastMultiplier: 'Fast 倍率',
+        flexMultiplier: 'Flex 倍率',
+        multiplierPlaceholder: '未配置',
+        multiplierPositive: 'Fast/Flex 倍率必须大于 0',
+        inputMultiplier: '输入倍率',
+        outputMultiplier: '输出倍率',
+        cacheWriteMultiplier: '缓存写倍率',
+        cacheReadMultiplier: '缓存读倍率',
         defaultPrices: '默认价格（未命中区间时使用）',
         inputPrice: '输入',
         outputPrice: '输出',

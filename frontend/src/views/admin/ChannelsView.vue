@@ -450,6 +450,7 @@
                   :entry="entry"
                   :platform="section.platform"
                   :show-fast-mode-multiplier="section.platform === 'openai'"
+                  enable-tier-multipliers
                   @update="updatePricingEntry(sIdx, idx, $event)"
                   @remove="removePricingEntry(sIdx, idx)"
                 />
@@ -634,7 +635,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
 import type { PricingFormEntry } from '@/components/admin/channel/types'
-import { mTokToPerToken, perTokenToMTok, toNullableNumber, hasExplicitPricing, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, validateIntervals } from '@/components/admin/channel/types'
+import { mTokToPerToken, perTokenToMTok, toNullableNumber, hasExplicitPricing, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, isValidPositiveMultiplier, validateIntervals } from '@/components/admin/channel/types'
 import type { AdminGroup, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
@@ -866,6 +867,8 @@ function addPricingEntry(sectionIdx: number) {
     billing_mode: 'token',
     price_multiplier: null,
     fast_mode_multiplier: null,
+    fast_multiplier: null,
+    flex_multiplier: null,
     input_price: null,
     output_price: null,
     cache_write_price: null,
@@ -926,6 +929,8 @@ async function syncLatestModels(sectionIdx: number) {
       billing_mode: 'token',
       price_multiplier: null,
       fast_mode_multiplier: null,
+      fast_multiplier: null,
+      flex_multiplier: null,
       input_price: defaultPricing.input_price,
       output_price: defaultPricing.output_price,
       cache_write_price: defaultPricing.cache_write_price,
@@ -993,6 +998,8 @@ function addRulePricingEntry(sectionIdx: number, ruleIndex: number) {
     billing_mode: 'token',
     price_multiplier: null,
     fast_mode_multiplier: null,
+    fast_multiplier: null,
+    flex_multiplier: null,
     input_price: null,
     output_price: null,
     cache_write_price: null,
@@ -1153,6 +1160,8 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
         billing_mode: entry.billing_mode,
         price_multiplier: toNullableNumber(entry.price_multiplier),
         fast_mode_multiplier: toNullableNumber(entry.fast_mode_multiplier),
+        fast_multiplier: toNullableNumber(entry.fast_multiplier),
+        flex_multiplier: toNullableNumber(entry.flex_multiplier),
         input_price: mTokToPerToken(entry.input_price),
         output_price: mTokToPerToken(entry.output_price),
         cache_write_price: mTokToPerToken(entry.cache_write_price),
@@ -1245,6 +1254,8 @@ function apiToForm(channel: Channel): PlatformSection[] {
         billing_mode: p.billing_mode,
         price_multiplier: p.price_multiplier ?? null,
         fast_mode_multiplier: p.fast_mode_multiplier ?? null,
+        fast_multiplier: p.fast_multiplier ?? null,
+        flex_multiplier: p.flex_multiplier ?? null,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
@@ -1436,6 +1447,8 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         billing_mode: p.billing_mode,
         price_multiplier: p.price_multiplier ?? null,
         fast_mode_multiplier: null,
+        fast_multiplier: null,
+        flex_multiplier: null,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
@@ -1594,6 +1607,14 @@ async function handleSubmit() {
   // 校验区间合法性（范围、重叠等）
   for (const section of form.platforms.filter(s => s.enabled)) {
     for (const entry of section.model_pricing) {
+      if (!isValidPositiveMultiplier(entry.fast_multiplier) ||
+          !isValidPositiveMultiplier(entry.flex_multiplier)) {
+        const platformLabel = t('admin.groups.platforms.' + section.platform, section.platform)
+        const modelLabel = entry.models.join(', ') || t('admin.channels.form.unnamed')
+        appStore.showError(`${platformLabel} - ${modelLabel}: ${t('admin.channels.form.multiplierPositive')}`)
+        activeTab.value = section.platform
+        return
+      }
       if (!entry.intervals || entry.intervals.length === 0) continue
       const intervalErr = validateIntervals(entry.intervals, entry.billing_mode, t)
       if (intervalErr) {

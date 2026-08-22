@@ -180,6 +180,21 @@
             </div>
           </div>
 
+          <div v-if="enableTierMultipliers" class="mt-3 grid max-w-md grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.fastMultiplier', 'Fast 倍率') }}</label>
+              <input :value="entry.fast_multiplier" @input="emitField('fast_multiplier', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm"
+                :placeholder="t('admin.channels.form.multiplierPlaceholder', '未配置')" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.flexMultiplier', 'Flex 倍率') }}</label>
+              <input :value="entry.flex_multiplier" @input="emitField('flex_multiplier', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0.000001" class="input mt-0.5 text-sm"
+                :placeholder="t('admin.channels.form.multiplierPlaceholder', '未配置')" />
+            </div>
+          </div>
+
           <!-- token 区间仅用于渠道；分组长上下文价格使用内置模型规则。 -->
           <div v-if="!hideTokenIntervals" class="mt-3">
             <div class="flex items-center justify-between">
@@ -197,6 +212,7 @@
                 :key="idx"
                 :interval="iv"
                 :mode="entry.billing_mode"
+                :enable-multipliers="enableTierMultipliers"
                 @update="updateInterval(idx, $event)"
                 @remove="removeInterval(idx)"
               />
@@ -299,9 +315,11 @@ const props = withDefaults(defineProps<{
   entry: PricingFormEntry
   platform?: string
   showFastModeMultiplier?: boolean
+  enableTierMultipliers?: boolean
   hideTokenIntervals?: boolean
 }>(), {
   showFastModeMultiplier: false,
+  enableTierMultipliers: false,
   hideTokenIntervals: false,
 })
 
@@ -335,6 +353,8 @@ function onBillingModeUpdate(billingMode: BillingMode) {
     ...props.entry,
     billing_mode: billingMode,
     fast_mode_multiplier: billingMode === 'token' ? props.entry.fast_mode_multiplier : null,
+    fast_multiplier: billingMode === 'token' ? props.entry.fast_multiplier : null,
+    flex_multiplier: billingMode === 'token' ? props.entry.flex_multiplier : null,
     intervals: [],
   })
 }
@@ -345,6 +365,8 @@ function addInterval() {
     min_tokens: 0, max_tokens: null, tier_label: '',
     input_price: null, output_price: null, cache_write_price: null,
     cache_read_price: null, per_request_price: null,
+    input_multiplier: null, output_multiplier: null,
+    cache_write_multiplier: null, cache_read_multiplier: null,
     sort_order: intervals.length
   })
   emit('update', { ...props.entry, intervals })
@@ -359,6 +381,8 @@ function addMediaTier() {
     min_tokens: 0, max_tokens: null, tier_label: labels[intervals.length] || '',
     input_price: null, output_price: null, cache_write_price: null,
     cache_read_price: null, per_request_price: null,
+    input_multiplier: null, output_multiplier: null,
+    cache_write_multiplier: null, cache_read_multiplier: null,
     sort_order: intervals.length
   })
   emit('update', { ...props.entry, intervals })

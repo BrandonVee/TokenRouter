@@ -760,16 +760,27 @@ func checkPricesNotNegative(p ChannelModelPricing) error {
 			return infraerrors.BadRequest("NEGATIVE_PRICE", fmt.Sprintf("%s must be >= 0", c.field))
 		}
 	}
+	for _, multiplier := range []struct {
+		field string
+		val   *float64
+	}{
+		{"fast_multiplier", p.FastMultiplier},
+		{"flex_multiplier", p.FlexMultiplier},
+	} {
+		if multiplier.val != nil && *multiplier.val <= 0 {
+			return infraerrors.BadRequest("INVALID_PRICE_MULTIPLIER", fmt.Sprintf("%s must be > 0", multiplier.field))
+		}
+	}
 	return nil
 }
 
 // validateAccountStatsPricingEntries 校验账号统计定价，并拒绝仅用于实际请求计费的 Fast 倍率。
 func validateAccountStatsPricingEntries(pricing []ChannelModelPricing) error {
 	for _, p := range pricing {
-		if p.FastModeMultiplier != nil {
+		if p.FastModeMultiplier != nil || p.FastMultiplier != nil || p.FlexMultiplier != nil {
 			return infraerrors.BadRequest(
 				"ACCOUNT_STATS_FAST_MODE_MULTIPLIER_UNSUPPORTED",
-				"fast_mode_multiplier is not supported for account stats pricing",
+				"service tier multipliers are not supported for account stats pricing",
 			)
 		}
 	}
@@ -780,6 +791,8 @@ func checkIntervalsHavePrices(p ChannelModelPricing) error {
 	for _, iv := range p.Intervals {
 		if iv.InputPrice == nil && iv.OutputPrice == nil &&
 			iv.CacheWritePrice == nil && iv.CacheReadPrice == nil &&
+			iv.InputMultiplier == nil && iv.OutputMultiplier == nil &&
+			iv.CacheWriteMultiplier == nil && iv.CacheReadMultiplier == nil &&
 			iv.PerRequestPrice == nil {
 			return infraerrors.BadRequest(
 				"INTERVAL_MISSING_PRICE",

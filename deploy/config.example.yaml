@@ -181,6 +181,14 @@ security:
     # Allow skipping TLS verification for proxy probe (debug only)
     # 允许代理探测时跳过 TLS 证书验证（仅用于调试）
     insecure_skip_verify: false
+    # 可选的有序探测目标；留空时使用内置 ip-api/ipify 回退。
+    # parser 支持：ip-api、ipify、chatgpt-trace。
+    urls: []
+    # urls:
+    #   - url: "https://chatgpt.com/cdn-cgi/trace"
+    #     parser: "chatgpt-trace"
+    #   - url: "https://api64.ipify.org?format=json"
+    #     parser: "ipify"
   proxy_fallback:
     # Allow auxiliary services (update check, pricing data) to fallback to direct
     # connection when proxy initialization fails. Does NOT affect AI gateway connections.

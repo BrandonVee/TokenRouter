@@ -31,11 +31,19 @@ func NewProxyExitInfoProber(cfg *config.Config) service.ProxyExitInfoProber {
 	if insecure {
 		log.Printf("[ProxyProbe] Warning: insecure_skip_verify is not allowed and will cause probe failure.")
 	}
+	var configuredTargets []configuredProbeTarget
+	if cfg != nil && len(cfg.Security.ProxyProbe.URLs) > 0 {
+		configuredTargets = make([]configuredProbeTarget, 0, len(cfg.Security.ProxyProbe.URLs))
+		for _, target := range cfg.Security.ProxyProbe.URLs {
+			configuredTargets = append(configuredTargets, configuredProbeTarget{url: target.URL, parser: target.Parser})
+		}
+	}
 	return &proxyProbeService{
-		insecureSkipVerify: insecure,
-		allowPrivateHosts:  allowPrivate,
-		validateResolvedIP: validateResolvedIP,
-		maxResponseBytes:   maxResponseBytes,
+		insecureSkipVerify:  insecure,
+		allowPrivateHosts:   allowPrivate,
+		validateResolvedIP:  validateResolvedIP,
+		maxResponseBytes:    maxResponseBytes,
+		configuredProbeURLs: configuredTargets,
 	}
 }
 
@@ -54,11 +62,17 @@ var probeURLs = []struct {
 	{"http://api64.ipify.org?format=json", "ipify"},
 }
 
+type configuredProbeTarget struct {
+	url    string
+	parser string
+}
+
 type proxyProbeService struct {
-	insecureSkipVerify bool
-	allowPrivateHosts  bool
-	validateResolvedIP bool
-	maxResponseBytes   int64
+	insecureSkipVerify  bool
+	allowPrivateHosts   bool
+	validateResolvedIP  bool
+	maxResponseBytes    int64
+	configuredProbeURLs []configuredProbeTarget
 }
 
 func (s *proxyProbeService) ProbeProxy(ctx context.Context, proxyURL string) (*service.ProxyExitInfo, int64, error) {
@@ -74,6 +88,16 @@ func (s *proxyProbeService) ProbeProxy(ctx context.Context, proxyURL string) (*s
 	}
 
 	var lastErr error
+	if len(s.configuredProbeURLs) > 0 {
+		for _, probe := range s.configuredProbeURLs {
+			exitInfo, latencyMs, err := s.probeWithURL(ctx, client, probe.url, probe.parser)
+			if err == nil {
+				return exitInfo, latencyMs, nil
+			}
+			lastErr = err
+		}
+		return nil, 0, fmt.Errorf("all probe URLs failed, last error: %w", lastErr)
+	}
 	for _, probe := range probeURLs {
 		exitInfo, latencyMs, err := s.probeWithURL(ctx, client, probe.url, probe.parser)
 		if err == nil {
@@ -121,9 +145,36 @@ func (s *proxyProbeService) probeWithURL(ctx context.Context, client *http.Clien
 		return s.parseIPAPI(body, latencyMs)
 	case "ipify":
 		return s.parseIPify(body, latencyMs)
+	case "chatgpt-trace":
+		return s.parseChatGPTTrace(body, latencyMs)
 	default:
 		return nil, latencyMs, fmt.Errorf("unknown parser: %s", parser)
 	}
+}
+
+// parseChatGPTTrace 解析 Cloudflare trace 文本中的出口 IP 和国家代码。
+func (s *proxyProbeService) parseChatGPTTrace(body []byte, latencyMs int64) (*service.ProxyExitInfo, int64, error) {
+	var ip, countryCode string
+	for _, line := range strings.Split(string(body), "\n") {
+		key, value, found := strings.Cut(strings.TrimSpace(line), "=")
+		if !found {
+			continue
+		}
+		switch key {
+		case "ip":
+			ip = strings.TrimSpace(value)
+		case "loc":
+			countryCode = strings.TrimSpace(value)
+		}
+	}
+	if ip == "" {
+		preview := string(body)
+		if len(preview) > 200 {
+			preview = preview[:200] + "..."
+		}
+		return nil, latencyMs, fmt.Errorf("chatgpt-trace: no ip= found in response (body: %s)", preview)
+	}
+	return &service.ProxyExitInfo{IP: ip, CountryCode: countryCode}, latencyMs, nil
 }
 
 func (s *proxyProbeService) parseIPAPI(body []byte, latencyMs int64) (*service.ProxyExitInfo, int64, error) {

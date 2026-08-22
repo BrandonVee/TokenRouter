@@ -25,7 +25,7 @@ export function applyAntigravityProjectID(
   }
 }
 
-// ========== 请求头覆写（anthropic/openai 的 api_key 账号 + grok 的 api_key/oauth 账号） ==========
+// ========== 请求头覆写（文本供应商 api_key 账号 + grok 的 api_key/oauth 账号） ==========
 
 /** 请求头覆写开关在 credentials 中的字段名。 */
 export const HEADER_OVERRIDE_ENABLED_CREDENTIAL_KEY = 'header_override_enabled'
@@ -40,7 +40,13 @@ export interface HeaderOverrideRow {
 
 /** 请求头覆写资格（与后端 IsHeaderOverrideEligible 保持一致） */
 export function isHeaderOverrideCapable(platform: string, type: string): boolean {
-  if (platform === 'anthropic' || platform === 'openai') {
+  if (
+    platform === 'anthropic' ||
+    platform === 'openai' ||
+    platform === 'kimi' ||
+    platform === 'zhipu' ||
+    platform === 'deepseek'
+  ) {
     return type === 'apikey'
   }
   if (platform === 'grok') {
