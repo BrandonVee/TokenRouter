@@ -41,16 +41,6 @@ func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, m
 		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek)
 }
 
-func isOpenAICompatibleTextPlatform(platform string) bool {
-	switch platform {
-	case service.PlatformOpenAI, service.PlatformGrok,
-		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek:
-		return true
-	default:
-		return false
-	}
-}
-
 func effectiveAPIKeyPlatform(c *gin.Context, apiKey *service.APIKey) string {
 	if c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok {

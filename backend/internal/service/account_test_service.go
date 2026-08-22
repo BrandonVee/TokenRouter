@@ -1031,7 +1031,8 @@ func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *
 // testGrokImageGeneration 使用 Grok 媒体端点执行管理端生图测试，并保留上游 URL 结果。
 func (s *AccountTestService) testGrokImageGeneration(c *gin.Context, ctx context.Context, account *Account, modelID, prompt string) error {
 	var authToken string
-	if account.Type == AccountTypeOAuth {
+	switch account.Type {
+	case AccountTypeOAuth:
 		if s.grokTokenProvider == nil {
 			return s.sendErrorAndEnd(c, "Grok token provider not configured")
 		}
@@ -1040,7 +1041,7 @@ func (s *AccountTestService) testGrokImageGeneration(c *gin.Context, ctx context
 		if err != nil {
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to get Grok access token: %s", err.Error()))
 		}
-	} else if account.Type == AccountTypeAPIKey {
+	case AccountTypeAPIKey:
 		authToken = strings.TrimSpace(account.GetCredential("api_key"))
 	}
 	if authToken == "" {

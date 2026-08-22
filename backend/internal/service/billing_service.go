@@ -169,19 +169,6 @@ func configuredServiceTierMultiplier(serviceTier string, pricing *ModelPricing) 
 	return serviceTierCostMultiplier(serviceTier)
 }
 
-// pricingWithPriorityMultiplier 为内置价卡生成独立的 Fast/priority 价格。
-func pricingWithPriorityMultiplier(base *ModelPricing, multiplier float64) *ModelPricing {
-	if base == nil {
-		return nil
-	}
-	cloned := *base
-	cloned.InputPricePerTokenPriority = cloned.InputPricePerToken * multiplier
-	cloned.OutputPricePerTokenPriority = cloned.OutputPricePerToken * multiplier
-	cloned.CacheCreationPricePerTokenPriority = cloned.CacheCreationPricePerToken * multiplier
-	cloned.CacheReadPricePerTokenPriority = cloned.CacheReadPricePerToken * multiplier
-	return &cloned
-}
-
 // normalizedFastModeMultiplier 返回渠道 Fast 倍率；负值按 0 防御处理。
 func normalizedFastModeMultiplier(pricing *ModelPricing) (float64, bool) {
 	if pricing == nil || pricing.FastModeMultiplier == nil {
