@@ -184,6 +184,44 @@ describe('AccountTestModal', () => {
     })
   })
 
+  it('grok imagine 图片模型进入图片测试模式并显示 URL 图片', async () => {
+    getAvailableModels.mockResolvedValue([
+      { id: 'grok-imagine-image-2.0', display_name: 'Grok Imagine Image 2.0' }
+    ])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_start","model":"grok-imagine-image-2.0"}\n',
+        'data: {"type":"image","image_url":"https://images.example.test/generated.png","mime_type":"image/png"}\n',
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 14,
+      name: 'Grok Image Account',
+      platform: 'grok',
+      type: 'apikey',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect(wrapper.find('textarea.textarea-stub').exists()).toBe(true)
+    await (wrapper.find('textarea.textarea-stub')).setValue('draw a tiny orange cat astronaut')
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    expect(startButton).toBeTruthy()
+    await startButton!.trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    const [, request] = (global.fetch as any).mock.calls[0]
+    expect(JSON.parse(request.body)).toEqual({
+      model_id: 'grok-imagine-image-2.0',
+      prompt: 'draw a tiny orange cat astronaut'
+    })
+    expect(wrapper.find('img[alt="test-image-1"]').attributes('src')).toBe('https://images.example.test/generated.png')
+  })
+
   it('OpenAI 旧版 Compact 端点探测会携带 compact 测试模式', async () => {
     getAvailableModels.mockResolvedValue([
       { id: 'gpt-5.4', display_name: 'GPT-5.4' }

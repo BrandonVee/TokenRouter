@@ -2211,7 +2211,7 @@ func TestAccountTestServiceGrokAPIKeyUsesXAIResponses(t *testing.T) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/54/test", nil)
 
-	err := svc.testGrokAccountConnection(c, account, "grok")
+	err := svc.testGrokAccountConnection(c, account, "grok", "")
 	require.NoError(t, err)
 	require.Equal(t, "https://api.x.ai/v1/responses", upstream.lastReq.URL.String())
 	require.Equal(t, "Bearer xai-test-key", upstream.lastReq.Header.Get("Authorization"))
@@ -2245,7 +2245,7 @@ func TestAccountTestServiceGrokAPIKeyAllowsConfiguredHTTPWhenGlobalPolicyDoes(t 
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/55/test", nil)
 
-	err := svc.testGrokAccountConnection(c, account, "grok")
+	err := svc.testGrokAccountConnection(c, account, "grok", "")
 	require.NoError(t, err)
 	require.Equal(t, "http://grok.example.test/v1/responses", upstream.lastReq.URL.String())
 	require.Equal(t, "Bearer third-party-key", upstream.lastReq.Header.Get("Authorization"))
@@ -2273,7 +2273,7 @@ func TestAccountTestServiceGrokOAuthPaymentRequiredTemporarilyUnschedulesAccount
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/56/test", nil)
 	before := time.Now()
 
-	err := svc.testGrokAccountConnection(c, account, "grok")
+	err := svc.testGrokAccountConnection(c, account, "grok", "")
 
 	require.Error(t, err)
 	require.Zero(t, repo.tempUnschedCalls)

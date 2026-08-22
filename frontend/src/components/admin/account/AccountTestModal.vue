@@ -327,7 +327,17 @@ const supportsOpenAIImageTest = computed(() => {
   return props.account?.platform === 'openai' && isImageModel
 })
 
-const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value)
+// Grok Imagine 生图模型使用独立的图片端点，管理端测试时也展示图片提示词。
+const supportsGrokImageTest = computed(() => {
+  const modelID = selectedModelId.value.trim().toLowerCase()
+  return props.account?.platform === 'grok' && (
+    modelID === 'grok-imagine' ||
+    modelID === 'grok-imagine-edit' ||
+    modelID.startsWith('grok-imagine-image')
+  )
+})
+
+const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value || supportsGrokImageTest.value)
 const imageTestHint = computed(() => t(
   supportsGeminiImageTest.value
     ? 'admin.accounts.geminiImageTestHint'

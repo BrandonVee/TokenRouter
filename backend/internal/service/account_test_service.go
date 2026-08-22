@@ -367,7 +367,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 	}
 
 	if account.Platform == PlatformGrok {
-		return s.testGrokAccountConnection(c, account, modelID)
+		return s.testGrokAccountConnection(c, account, modelID, prompt)
 	}
 
 	if account.Platform == PlatformAntigravity {
@@ -869,8 +869,8 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	return s.processOpenAIStream(c, resp.Body)
 }
 
-// testGrokAccountConnection 通过 xAI Responses API 测试 Grok OAuth 或 API-key 账号。
-func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *Account, modelID string) error {
+// testGrokAccountConnection 通过 xAI Responses 或 Images API 测试 Grok OAuth/API-key 账号。
+func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
 	ctx := c.Request.Context()
 
 	if s.httpUpstream == nil {
@@ -882,6 +882,13 @@ func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *
 		billingModel = mapped
 	}
 	testModelID := normalizeOpenAIModelForUpstream(account, billingModel)
+	if isGrokImageGenerationModel(testModelID) {
+		imagePrompt := strings.TrimSpace(prompt)
+		if imagePrompt == "" {
+			imagePrompt = defaultOpenAIImageTestPrompt
+		}
+		return s.testGrokImageGeneration(c, ctx, account, testModelID, imagePrompt)
+	}
 
 	var authToken string
 	switch account.Type {
@@ -995,6 +1002,102 @@ func (s *AccountTestService) testGrokAccountConnection(c *gin.Context, account *
 	}
 
 	return s.processOpenAIStream(c, resp.Body)
+}
+
+// testGrokImageGeneration 使用 Grok 媒体端点执行管理端生图测试，并保留上游 URL 结果。
+func (s *AccountTestService) testGrokImageGeneration(c *gin.Context, ctx context.Context, account *Account, modelID, prompt string) error {
+	var authToken string
+	if account.Type == AccountTypeOAuth {
+		if s.grokTokenProvider == nil {
+			return s.sendErrorAndEnd(c, "Grok token provider not configured")
+		}
+		var err error
+		authToken, err = s.grokTokenProvider.GetAccessTokenForManualTest(ctx, account)
+		if err != nil {
+			return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to get Grok access token: %s", err.Error()))
+		}
+	} else if account.Type == AccountTypeAPIKey {
+		authToken = strings.TrimSpace(account.GetCredential("api_key"))
+	}
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "Grok API key or access token is missing")
+	}
+
+	apiURL, err := buildGrokMediaURL(account, s.cfg, GrokMediaEndpointImagesGenerations, "")
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Grok base URL: %s", err.Error()))
+	}
+	payloadBytes, err := json.Marshal(map[string]any{"model": modelID, "prompt": prompt, "n": 1})
+	if err != nil {
+		return s.sendErrorAndEnd(c, "Failed to create Grok image test payload")
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+	s.sendEvent(c, TestEvent{Type: "test_start", Model: modelID})
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return s.sendErrorAndEnd(c, "Failed to create Grok image request")
+	}
+	req.Header.Set("Authorization", "Bearer "+authToken)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	if account.IsGrokOAuth() && isGrokCLIProxyTarget(apiURL) {
+		applyGrokCLIHeaders(req.Header)
+	}
+	account.ApplyHeaderOverrides(req.Header)
+	proxyURL := ""
+	if account.ProxyID != nil && account.Proxy != nil {
+		proxyURL = account.Proxy.URL()
+	}
+	resp, err := s.httpUpstream.Do(req, proxyURL, account.ID, account.Concurrency)
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok Images API request failed: %s", err.Error()))
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to read Grok image response: %s", err.Error()))
+	}
+	if resp.StatusCode != http.StatusOK {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Grok Images API returned %d: %s", resp.StatusCode, string(body)))
+	}
+	var result struct {
+		Data []struct {
+			URL           string `json:"url"`
+			ImageURL      string `json:"image_url"`
+			B64JSON       string `json:"b64_json"`
+			RevisedPrompt string `json:"revised_prompt"`
+			MIMEType      string `json:"mime_type"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse Grok image response: %s", err.Error()))
+	}
+	if len(result.Data) == 0 {
+		return s.sendErrorAndEnd(c, "No images returned from Grok Images API")
+	}
+	for _, item := range result.Data {
+		if item.RevisedPrompt != "" {
+			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
+		}
+		imageURL := strings.TrimSpace(item.URL)
+		if imageURL == "" {
+			imageURL = strings.TrimSpace(item.ImageURL)
+		}
+		if imageURL == "" && item.B64JSON != "" {
+			imageURL = item.B64JSON
+		}
+		if imageURL != "" {
+			s.sendEvent(c, newAccountTestImageEvent(item.MIMEType, imageURL))
+		}
+	}
+	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
+	return nil
 }
 
 // testOpenAIChatCompletionsConnection 通过原始 /v1/chat/completions 端点测试 OpenAI 兼容 API Key 账号。
@@ -1839,9 +1942,17 @@ func (s *AccountTestService) processGeminiStream(c *gin.Context, body io.Reader)
 
 // newAccountTestImageEvent 构造统一的图片事件，并附带实际像素分辨率。
 func newAccountTestImageEvent(mimeType, encoded string) TestEvent {
+	encoded = strings.TrimSpace(encoded)
+	imageURL := encoded
+	if !strings.HasPrefix(strings.ToLower(encoded), "data:") && !strings.HasPrefix(strings.ToLower(encoded), "http://") && !strings.HasPrefix(strings.ToLower(encoded), "https://") {
+		if strings.TrimSpace(mimeType) == "" {
+			mimeType = "image/png"
+		}
+		imageURL = fmt.Sprintf("data:%s;base64,%s", mimeType, encoded)
+	}
 	return TestEvent{
 		Type:       "image",
-		ImageURL:   fmt.Sprintf("data:%s;base64,%s", mimeType, encoded),
+		ImageURL:   imageURL,
 		MimeType:   mimeType,
 		Resolution: detectBase64ImageSize(encoded),
 	}

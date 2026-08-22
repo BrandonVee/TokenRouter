@@ -173,3 +173,37 @@ func TestAccountTestService_OpenAICompatibleGeminiImageUsesImagesEndpoint(t *tes
 	require.Equal(t, "https://image-upstream.example/v1/images/generations", upstream.lastReq.URL.String())
 	require.Equal(t, "gemini-3-pro-image-c", gjson.GetBytes(upstream.lastBody, "model").String())
 }
+
+// TestAccountTestService_GrokImageTestPreservesURLAndBase64 验证图片 URL 与 Base64 两种响应格式。
+func TestAccountTestService_GrokImageTestPreservesURLAndBase64(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "url", body: `{"data":[{"url":"https://images.example.test/generated.png"}]}`, want: "https://images.example.test/generated.png"},
+		{name: "base64", body: `{"data":[{"b64_json":"aGVsbG8="}]}`, want: "data:image/png;base64,aGVsbG8="},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/1/test", nil)
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(tc.body)),
+			}}
+			svc := &AccountTestService{httpUpstream: upstream, cfg: &config.Config{}}
+			account := &Account{ID: 57, Name: "grok-image", Platform: PlatformGrok, Type: AccountTypeAPIKey, Credentials: map[string]any{
+				"api_key": "grok-test-key", "base_url": "https://image-upstream.example/v1",
+			}}
+
+			err := svc.testGrokAccountConnection(c, account, "grok-imagine-image-2.0", "draw a cat")
+			require.NoError(t, err)
+			require.Equal(t, "https://image-upstream.example/v1/images/generations", upstream.lastReq.URL.String())
+			require.Contains(t, rec.Body.String(), tc.want)
+			require.Contains(t, rec.Body.String(), `"success":true`)
+		})
+	}
+}
