@@ -2,7 +2,7 @@
   <BaseDialog
     :show="show"
     :title="t('admin.accounts.testAccountConnection')"
-    width="normal"
+    width="wide"
     @close="handleClose"
   >
     <div class="space-y-4">
@@ -143,7 +143,7 @@
             @click="previewImageUrl = image.url"
           >
             <img :src="image.url" :alt="`test-image-${index + 1}`" class="max-h-[360px] w-full object-contain" />
-            <div class="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
+            <div class="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
               <Icon name="eye" size="lg" class="text-white opacity-0 drop-shadow-lg transition-opacity group-hover/img:opacity-100" :stroke-width="2" />
             </div>
             <div class="flex items-center justify-between gap-3 border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-dark-500 dark:text-gray-300">
@@ -152,9 +152,114 @@
                 {{ image.resolution }}
               </span>
             </div>
+            <div class="flex max-w-[360px] items-center gap-2 border-t border-gray-100 px-3 py-2 dark:border-dark-500" @click.stop>
+              <a
+                v-if="isExternalImageUrl(image.url)"
+                :href="image.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex min-w-0 flex-1 items-center gap-1 text-xs text-primary-600 hover:underline dark:text-primary-300"
+                :title="image.url"
+              >
+                <Icon name="externalLink" size="xs" :stroke-width="2" />
+                <span class="break-all">{{ image.url }}</span>
+              </a>
+              <span v-else class="min-w-0 flex-1 break-all text-xs text-gray-500 dark:text-gray-400">
+                {{ image.url.startsWith('data:') ? 'data URL' : image.url }}
+              </span>
+              <button
+                type="button"
+                class="shrink-0 rounded p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-600 dark:hover:text-white"
+                :title="t('admin.accounts.copyImageUrl')"
+                @click="copyImageUrl(image.url)"
+              >
+                <Icon name="copy" size="sm" :stroke-width="2" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      <!-- 完整 SSE 结果独立展示，默认折叠避免占用测试卡片空间。 -->
+      <details v-if="responseEvents.length > 0" class="api-response-panel rounded-xl border border-gray-200 bg-gray-50 dark:border-dark-500 dark:bg-dark-800">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-xs font-medium text-gray-700 dark:text-gray-200">
+          <span>
+            {{ t('admin.accounts.apiResponseDetails') }}
+            <span class="ml-1 text-gray-500 dark:text-gray-400">({{ responseEvents.length }})</span>
+          </span>
+          <button
+            type="button"
+            class="rounded p-1 text-gray-500 transition hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-dark-600 dark:hover:text-white"
+            :title="t('admin.accounts.copyApiResponse')"
+            @click.stop="copyResponseDetails"
+          >
+            <Icon name="copy" size="sm" :stroke-width="2" />
+          </button>
+        </summary>
+        <div class="space-y-2 border-t border-gray-200 p-3 dark:border-dark-500">
+          <div v-if="responseText" class="space-y-1">
+            <div class="flex items-center justify-between gap-2 text-[11px] font-medium text-gray-600 dark:text-gray-300">
+              <span>{{ t('admin.accounts.completeResponse') }}</span>
+              <button
+                type="button"
+                class="rounded p-1 text-gray-500 transition hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-dark-600 dark:hover:text-white"
+                :title="t('admin.accounts.copyCompleteResponse')"
+                @click="copyCompleteResponse"
+              >
+                <Icon name="copy" size="sm" :stroke-width="2" />
+              </button>
+            </div>
+            <pre class="whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-white p-3 text-sm leading-6 text-gray-800 dark:border-dark-500 dark:bg-dark-900 dark:text-gray-200">{{ responseText }}</pre>
+          </div>
+          <div v-if="rawSSELines.length > 0" class="space-y-1">
+            <div class="flex items-center justify-between gap-2 text-[11px] font-medium text-gray-600 dark:text-gray-300">
+              <span>{{ t('admin.accounts.rawSseEvents') }}</span>
+              <button
+                type="button"
+                class="rounded p-1 text-gray-500 transition hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-dark-600 dark:hover:text-white"
+                :title="t('admin.accounts.copyRawSse')"
+                @click="copyRawSSE"
+              >
+                <Icon name="copy" size="sm" :stroke-width="2" />
+              </button>
+            </div>
+            <div class="max-h-[480px] space-y-1 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2 dark:border-dark-500 dark:bg-dark-900">
+              <div
+                v-for="(line, index) in rawSSELines"
+                :key="`${index}-${line}`"
+                class="group flex items-start gap-2 rounded-md border border-gray-100 bg-gray-50 px-2 py-1.5 dark:border-dark-700 dark:bg-dark-800"
+              >
+                <span class="w-7 shrink-0 select-none pt-0.5 text-right font-mono text-[10px] text-gray-400">{{ index + 1 }}</span>
+                <code class="min-w-0 flex-1 whitespace-pre-wrap break-all text-[11px] leading-5 text-gray-700 dark:text-gray-300">{{ line }}</code>
+                <button
+                  type="button"
+                  class="shrink-0 rounded p-1 text-gray-400 opacity-70 transition hover:bg-gray-200 hover:text-gray-900 group-hover:opacity-100 dark:hover:bg-dark-600 dark:hover:text-white"
+                  :title="t('admin.accounts.copySseEvent')"
+                  @click="copySSELine(line)"
+                >
+                  <Icon name="copy" size="xs" :stroke-width="2" />
+                </button>
+              </div>
+            </div>
+          </div>
+          <details class="rounded-lg border border-gray-200 dark:border-dark-500">
+            <summary class="cursor-pointer px-2.5 py-2 text-[11px] font-medium text-gray-600 dark:text-gray-300">
+              {{ t('admin.accounts.sseEvents') }}
+            </summary>
+            <div class="flex justify-end border-t border-gray-200 px-2 py-1 dark:border-dark-500">
+              <button
+                type="button"
+                class="rounded p-1 text-gray-500 transition hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-dark-600 dark:hover:text-white"
+                :title="t('admin.accounts.copyApiResponse')"
+                @click="copyResponseDetails"
+              >
+                <Icon name="copy" size="sm" :stroke-width="2" />
+              </button>
+            </div>
+            <pre class="max-h-[360px] overflow-auto whitespace-pre-wrap break-all border-t border-gray-200 bg-white p-3 text-[11px] leading-5 text-gray-700 dark:border-dark-500 dark:bg-dark-900 dark:text-gray-300">{{ formatResponseEvents(responseEvents) }}</pre>
+          </details>
+        </div>
+      </details>
 
       <!-- Image Lightbox -->
       <Teleport to="body">
@@ -271,6 +376,20 @@ interface PreviewImage {
   resolution?: string
 }
 
+interface AccountTestEvent {
+  type: string
+  text?: string
+  model?: string
+  success?: boolean
+  error?: string
+  image_url?: string
+  mime_type?: string
+  resolution?: string
+  response?: unknown
+  raw_sse?: string
+  [key: string]: unknown
+}
+
 const props = defineProps<{
   show: boolean
   account: Account | null
@@ -283,6 +402,7 @@ const emit = defineEmits<{
 const terminalRef = ref<HTMLElement | null>(null)
 const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
 const outputLines = ref<OutputLine[]>([])
+const responseEvents = ref<AccountTestEvent[]>([])
 const streamingContent = ref('')
 const errorMessage = ref('')
 const availableModels = ref<ClaudeModel[]>([])
@@ -323,7 +443,11 @@ const supportsGeminiImageTest = computed(() => {
 
 const supportsOpenAIImageTest = computed(() => {
   const modelID = selectedModelId.value.trim().toLowerCase()
-  const isImageModel = modelID.startsWith('gpt-image-') || isGeminiImageTestModel(modelID)
+  // 兼容供应商可能使用 Firefly/Nano Banana 命名，但返回标准 Images 响应。
+  const isImageModel = modelID.startsWith('gpt-image-') ||
+    modelID.startsWith('firefly-') ||
+    modelID.includes('nano-banana') ||
+    isGeminiImageTestModel(modelID)
   return props.account?.platform === 'openai' && isImageModel
 })
 
@@ -338,6 +462,45 @@ const supportsGrokImageTest = computed(() => {
 })
 
 const supportsImageTest = computed(() => supportsGeminiImageTest.value || supportsOpenAIImageTest.value || supportsGrokImageTest.value)
+
+const isExternalImageUrl = (url: string) => /^https?:\/\//i.test(url)
+
+const copyImageUrl = (url: string) => {
+  void copyToClipboard(url, t('admin.accounts.imageUrlCopied'))
+}
+
+const formatResponseEvents = (events: AccountTestEvent[]) => {
+  try {
+    return JSON.stringify(events, null, 2)
+  } catch {
+    return String(events)
+  }
+}
+
+const responseText = computed(() => responseEvents.value
+  .filter((event) => event.type === 'content' && typeof event.text === 'string')
+  .map((event) => event.text)
+  .join(''))
+
+const rawSSELines = computed(() => responseEvents.value
+  .filter((event) => event.type === 'upstream_sse' && typeof event.raw_sse === 'string')
+  .map((event) => event.raw_sse as string))
+
+const copyResponseDetails = () => {
+  void copyToClipboard(formatResponseEvents(responseEvents.value), t('admin.accounts.imageResponseCopied'))
+}
+
+const copyCompleteResponse = () => {
+  void copyToClipboard(responseText.value, t('admin.accounts.completeResponseCopied'))
+}
+
+const copyRawSSE = () => {
+  void copyToClipboard(rawSSELines.value.join('\n'), t('admin.accounts.rawSseCopied'))
+}
+
+const copySSELine = (line: string) => {
+  void copyToClipboard(line, t('admin.accounts.sseEventCopied'))
+}
 const imageTestHint = computed(() => t(
   supportsGeminiImageTest.value
     ? 'admin.accounts.geminiImageTestHint'
@@ -409,6 +572,7 @@ const loadAvailableModels = async () => {
 const resetState = () => {
   status.value = 'idle'
   outputLines.value = []
+  responseEvents.value = []
   streamingContent.value = ''
   errorMessage.value = ''
   generatedImages.value = []
@@ -492,26 +656,32 @@ const startTest = async () => {
     const decoder = new TextDecoder()
     let buffer = ''
 
+    const processSSELine = (line: string) => {
+      if (!line.startsWith('data: ')) return
+      const jsonStr = line.slice(6).trim()
+      if (!jsonStr) return
+      try {
+        handleEvent(JSON.parse(jsonStr))
+      } catch (e) {
+        console.error('Failed to parse SSE event:', e)
+      }
+    }
+
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        // 处理没有换行结尾的最后一条 SSE 数据，避免丢失完整响应。
+        buffer += decoder.decode()
+        processSSELine(buffer.trim())
+        break
+      }
 
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6).trim()
-          if (jsonStr) {
-            try {
-              const event = JSON.parse(jsonStr)
-              handleEvent(event)
-            } catch (e) {
-              console.error('Failed to parse SSE event:', e)
-            }
-          }
-        }
+        processSSELine(line)
       }
     }
   } catch (error: unknown) {
@@ -526,16 +696,8 @@ const startTest = async () => {
   }
 }
 
-const handleEvent = (event: {
-  type: string
-  text?: string
-  model?: string
-  success?: boolean
-  error?: string
-  image_url?: string
-  mime_type?: string
-  resolution?: string
-}) => {
+const handleEvent = (event: AccountTestEvent) => {
+  responseEvents.value.push(event)
   switch (event.type) {
     case 'test_start':
       addLine(t('admin.accounts.connectedToApi'), 'text-green-400')

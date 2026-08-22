@@ -107,7 +107,7 @@ describe('AccountTestModal', () => {
       createStreamResponse([
         'data: {"type":"test_start","model":"gemini-2.5-flash-image"}\n',
         'data: {"type":"image","image_url":"data:image/png;base64,QUJD","mime_type":"image/png","resolution":"1024x1024"}\n',
-        'data: {"type":"test_complete","success":true}\n'
+        'data: {"type":"test_complete","success":true}'
       ])
     ) as any
   })
@@ -222,13 +222,55 @@ describe('AccountTestModal', () => {
     expect(wrapper.find('img[alt="test-image-1"]').attributes('src')).toBe('https://images.example.test/generated.png')
   })
 
+  it('OpenAI 兼容 Firefly 生图模型显示远程 URL 图片', async () => {
+    getAvailableModels.mockResolvedValue([
+      { id: 'firefly-nano-banana2', display_name: 'Firefly Nano Banana 2' }
+    ])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_start","model":"firefly-nano-banana2"}\n',
+        'data: {"type":"image","image_url":"https://download.example.test/image.png","response":{"url":"https://download.example.test/image.png","image_generation_route":{"provider":"adobe","target_size":"1536x864"}}}\n',
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 15,
+      name: 'Firefly Image Account',
+      platform: 'openai',
+      type: 'apikey',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    expect(wrapper.find('textarea.textarea-stub').exists()).toBe(true)
+    const startButton = wrapper.findAll('button').find((button) => button.text().includes('admin.accounts.startTest'))
+    await startButton!.trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('img[alt="test-image-1"]').attributes('src')).toBe('https://download.example.test/image.png')
+    expect(wrapper.text()).toContain('https://download.example.test/image.png')
+    expect(wrapper.text()).toContain('image_generation_route')
+    expect(wrapper.text()).toContain('1536x864')
+
+    const responsePanel = wrapper.find('.api-response-panel')
+    expect(responsePanel.exists()).toBe(true)
+    expect(responsePanel.text()).toContain('admin.accounts.apiResponseDetails')
+    expect((responsePanel.element as HTMLDetailsElement).open).toBe(false)
+  })
+
   it('OpenAI 旧版 Compact 端点探测会携带 compact 测试模式', async () => {
     getAvailableModels.mockResolvedValue([
       { id: 'gpt-5.4', display_name: 'GPT-5.4' }
     ])
     global.fetch = vi.fn().mockResolvedValue(
       createStreamResponse([
-        'data: {"type":"test_complete","success":true}\n'
+        'data: {"type":"test_start","model":"gpt-5.4"}\n',
+        'data: {"type":"upstream_sse","raw_sse":"data: {\\"type\\":\\"response.output_text.delta\\",\\"delta\\":\\"streamed answer\\"}"}\n',
+        'data: {"type":"content","text":"streamed answer"}\n',
+        'data: {"type":"test_complete","success":true}'
       ])
     ) as any
 
@@ -254,6 +296,9 @@ describe('AccountTestModal', () => {
       prompt: '',
       mode: 'compact'
     })
+    expect(wrapper.find('.api-response-panel').text()).toContain('streamed answer')
+    expect(wrapper.find('.api-response-panel').text()).toContain('admin.accounts.completeResponse')
+    expect(wrapper.find('.api-response-panel').text()).toContain('response.output_text.delta')
   })
 
   it('OpenAI 兼容 Gemini 生图模型测试会携带生图提示词', async () => {

@@ -106,7 +106,9 @@ type TestEvent struct {
 	ImageURL   string `json:"image_url,omitempty"`
 	MimeType   string `json:"mime_type,omitempty"`
 	Resolution string `json:"resolution,omitempty"`
+	RawSSE     string `json:"raw_sse,omitempty"`
 	Data       any    `json:"data,omitempty"`
+	Response   any    `json:"response,omitempty"`
 	Success    bool   `json:"success,omitempty"`
 	Error      string `json:"error,omitempty"`
 }
@@ -119,7 +121,11 @@ const (
 
 // isOpenAIImageModel 判断 OpenAI 兼容账号是否应通过 Images 端点测试模型。
 func isOpenAIImageModel(model string) bool {
-	return isOpenAIImageGenerationModel(model)
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	// 部分兼容供应商使用 Firefly/Nano Banana 等非 OpenAI 命名，但仍返回标准 Images 响应。
+	return isOpenAIImageGenerationModel(normalized) ||
+		strings.HasPrefix(normalized, "firefly-") ||
+		strings.Contains(normalized, "nano-banana")
 }
 
 // AccountTestService handles account testing operations
@@ -1106,6 +1112,7 @@ func (s *AccountTestService) testGrokImageGeneration(c *gin.Context, ctx context
 	if len(result.Data) == 0 {
 		return s.sendErrorAndEnd(c, "No images returned from Grok Images API")
 	}
+	responseMetadata := accountTestImageResponseMetadata(body)
 	for _, item := range result.Data {
 		if item.RevisedPrompt != "" {
 			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
@@ -1118,7 +1125,9 @@ func (s *AccountTestService) testGrokImageGeneration(c *gin.Context, ctx context
 			imageURL = item.B64JSON
 		}
 		if imageURL != "" {
-			s.sendEvent(c, newAccountTestImageEvent(item.MIMEType, imageURL))
+			event := newAccountTestImageEvent(item.MIMEType, imageURL)
+			event.Response = responseMetadata
+			s.sendEvent(c, event)
 		}
 	}
 	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
@@ -1903,7 +1912,12 @@ func (s *AccountTestService) processGeminiPayload(c *gin.Context, data map[strin
 						}
 						encoded, _ := inlineData["data"].(string)
 						if strings.HasPrefix(strings.ToLower(mimeType), "image/") && encoded != "" {
-							s.sendEvent(c, newAccountTestImageEvent(mimeType, encoded))
+							event := newAccountTestImageEvent(mimeType, encoded)
+							event.Response = map[string]any{
+								"mime_type":  mimeType,
+								"resolution": event.Resolution,
+							}
+							s.sendEvent(c, event)
 						}
 					}
 				}
@@ -1939,9 +1953,14 @@ func (s *AccountTestService) processGeminiStream(c *gin.Context, body io.Reader)
 		}
 
 		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "event:") {
+			s.sendRawSSEEvent(c, line)
+			continue
+		}
 		if line == "" || !sseDataPrefix.MatchString(line) {
 			continue
 		}
+		s.sendRawSSEEvent(c, line)
 
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
@@ -1981,6 +2000,23 @@ func newAccountTestImageEvent(mimeType, encoded string) TestEvent {
 		MimeType:   mimeType,
 		Resolution: detectBase64ImageSize(encoded),
 	}
+}
+
+// accountTestImageResponseMetadata 保留上游图片响应的结构化信息，同时移除大体积图片载荷。
+func accountTestImageResponseMetadata(body []byte) any {
+	var response map[string]any
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil
+	}
+	if items, ok := response["data"].([]any); ok {
+		for _, item := range items {
+			if image, ok := item.(map[string]any); ok {
+				delete(image, "b64_json")
+				delete(image, "result")
+			}
+		}
+	}
+	return response
 }
 
 // createOpenAITestPayload creates a test payload for OpenAI Responses API
@@ -2049,9 +2085,14 @@ func (s *AccountTestService) processClaudeStream(c *gin.Context, body io.Reader)
 		}
 
 		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "event:") {
+			s.sendRawSSEEvent(c, line)
+			continue
+		}
 		if line == "" || !sseDataPrefix.MatchString(line) {
 			continue
 		}
+		s.sendRawSSEEvent(c, line)
 
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
@@ -2098,7 +2139,11 @@ func (s *AccountTestService) processQoderStream(c *gin.Context, body io.ReadClos
 	scanner.Buffer(make([]byte, 0, 64*1024), defaultMaxLineSize)
 	seenEvent := false
 	for scanner.Scan() {
-		events, err := qoder.ParseSSELine(scanner.Text())
+		line := scanner.Text()
+		if strings.TrimSpace(line) != "" {
+			s.sendRawSSEEvent(c, line)
+		}
+		events, err := qoder.ParseSSELine(line)
 		if err != nil {
 			return s.sendErrorAndEnd(c, err.Error())
 		}
@@ -2147,9 +2192,14 @@ func (s *AccountTestService) processOpenAIChatCompletionsStream(c *gin.Context, 
 		}
 
 		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "event:") {
+			s.sendRawSSEEvent(c, line)
+			continue
+		}
 		if line == "" || !sseDataPrefix.MatchString(line) {
 			continue
 		}
+		s.sendRawSSEEvent(c, line)
 
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
@@ -2211,9 +2261,14 @@ func (s *AccountTestService) processOpenAIStream(c *gin.Context, body io.Reader)
 		}
 
 		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "event:") {
+			s.sendRawSSEEvent(c, line)
+			continue
+		}
 		if line == "" || !sseDataPrefix.MatchString(line) {
 			continue
 		}
+		s.sendRawSSEEvent(c, line)
 
 		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
 		if jsonStr == "[DONE]" {
@@ -2324,11 +2379,15 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 		return s.sendErrorAndEnd(c, fmt.Sprintf("API returned %d: %s", resp.StatusCode, string(body)))
 	}
 
-	// Parse {"data": [{"b64_json": "...", "revised_prompt": "..."}]}
+	// 兼容标准 Images 响应中的远程 URL、图片 URL 和 Base64 三种字段。
 	var result struct {
 		Data []struct {
+			URL           string `json:"url"`
+			ImageURL      string `json:"image_url"`
 			B64JSON       string `json:"b64_json"`
 			RevisedPrompt string `json:"revised_prompt"`
+			MIMEType      string `json:"mime_type"`
+			Resolution    string `json:"resolution"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -2338,13 +2397,30 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 	if len(result.Data) == 0 {
 		return s.sendErrorAndEnd(c, "No images returned from API")
 	}
+	responseMetadata := accountTestImageResponseMetadata(body)
 
 	for _, item := range result.Data {
 		if item.RevisedPrompt != "" {
 			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
 		}
-		if item.B64JSON != "" {
-			s.sendEvent(c, newAccountTestImageEvent("image/png", item.B64JSON))
+		imageURL := strings.TrimSpace(item.URL)
+		if imageURL == "" {
+			imageURL = strings.TrimSpace(item.ImageURL)
+		}
+		if imageURL == "" {
+			imageURL = strings.TrimSpace(item.B64JSON)
+		}
+		if imageURL != "" {
+			mimeType := strings.TrimSpace(item.MIMEType)
+			if mimeType == "" && item.B64JSON != "" {
+				mimeType = "image/png"
+			}
+			event := newAccountTestImageEvent(mimeType, imageURL)
+			if item.Resolution != "" {
+				event.Resolution = item.Resolution
+			}
+			event.Response = responseMetadata
+			s.sendEvent(c, event)
 		}
 	}
 
@@ -2453,6 +2529,12 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to read image response: %s", err.Error()))
 	}
 	body = redactAgentIdentitySensitiveBodyForAccount(ctx, s.accountRepo, credentialAccount, body)
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" && sseDataPrefix.MatchString(line) {
+			s.sendRawSSEEvent(c, line)
+		}
+	}
 
 	results, _, _, _, _, err := collectOpenAIImagesFromResponsesBody(body)
 	if err != nil {
@@ -2467,7 +2549,13 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 			s.sendEvent(c, TestEvent{Type: "content", Text: item.RevisedPrompt})
 		}
 		mimeType := openAIImageOutputMIMEType(item.OutputFormat)
-		s.sendEvent(c, newAccountTestImageEvent(mimeType, item.Result))
+		event := newAccountTestImageEvent(mimeType, item.Result)
+		event.Response = map[string]any{
+			"type":           "image_generation_call",
+			"output_format":  item.OutputFormat,
+			"revised_prompt": item.RevisedPrompt,
+		}
+		s.sendEvent(c, event)
 	}
 
 	s.sendEvent(c, TestEvent{Type: "test_complete", Success: true})
@@ -2481,6 +2569,11 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 		return
 	}
 	c.Writer.Flush()
+}
+
+// sendRawSSEEvent 保留上游逐条 SSE 数据，供管理端查看未经归一化的原始响应。
+func (s *AccountTestService) sendRawSSEEvent(c *gin.Context, line string) {
+	s.sendEvent(c, TestEvent{Type: "upstream_sse", RawSSE: line})
 }
 
 // sendErrorAndEnd sends an error event and ends the stream

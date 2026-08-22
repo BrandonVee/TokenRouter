@@ -18,6 +18,7 @@ import (
 func TestIsOpenAIImageModel_AllowsGeminiCompatibleImageModel(t *testing.T) {
 	require.True(t, isOpenAIImageModel("gemini-3-pro-image-c"))
 	require.False(t, isOpenAIImageModel("gemini-3-pro"))
+	require.True(t, isOpenAIImageModel("firefly-nano-banana2"))
 }
 
 func TestAccountTestService_OpenAIImageOAuthHandlesOutputItemDoneFallback(t *testing.T) {
@@ -172,6 +173,38 @@ func TestAccountTestService_OpenAICompatibleGeminiImageUsesImagesEndpoint(t *tes
 	require.NotNil(t, upstream.lastReq)
 	require.Equal(t, "https://image-upstream.example/v1/images/generations", upstream.lastReq.URL.String())
 	require.Equal(t, "gemini-3-pro-image-c", gjson.GetBytes(upstream.lastBody, "model").String())
+}
+
+// TestAccountTestService_OpenAIImageAPIKeyPreservesURL 验证兼容供应商返回远程图片地址时仍能直接预览。
+func TestAccountTestService_OpenAIImageAPIKeyPreservesURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/1/test", nil)
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"url":"https://download.example.test/image.png"}],"image_generation_route":{"provider":"adobe","target_size":"1536x864"}}`)),
+	}}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: &config.Config{}}
+	account := &Account{
+		ID:       58,
+		Name:     "openai-url-image",
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "test-api-key",
+			"base_url": "https://image-upstream.example/v1",
+		},
+	}
+
+	err := svc.testOpenAIImageAPIKey(c, context.Background(), account, "firefly-nano-banana2", "draw a cat")
+	require.NoError(t, err)
+	require.Contains(t, rec.Body.String(), "https://download.example.test/image.png")
+	require.Contains(t, rec.Body.String(), "image_generation_route")
+	require.Contains(t, rec.Body.String(), "1536x864")
+	require.Contains(t, rec.Body.String(), `"success":true`)
 }
 
 // TestAccountTestService_GrokImageTestPreservesURLAndBase64 验证图片 URL 与 Base64 两种响应格式。
