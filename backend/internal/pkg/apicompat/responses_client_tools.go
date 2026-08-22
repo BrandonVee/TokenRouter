@@ -204,6 +204,14 @@ func normalizeClientToolOutput(item map[string]any) {
 	item["output"] = string(encoded)
 }
 
+// dropInvalidLoweredFunctionItemID 删除降级为 function 项后上游不接受的客户端 ID。
+func dropInvalidLoweredFunctionItemID(item map[string]any) {
+	id := strings.TrimSpace(stringValue(item["id"]))
+	if id != "" && !strings.HasPrefix(id, "fc") {
+		delete(item, "id")
+	}
+}
+
 // normalizeToolSearchOutput converts both tool_search output wire shapes into
 // the string output required by function_call_output. Older clients send an
 // output field directly; newer Codex clients return discovered definitions in
