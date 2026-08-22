@@ -2141,7 +2141,7 @@ func (s *AccountTestService) processQoderStream(c *gin.Context, body io.ReadClos
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.TrimSpace(line) != "" {
-			s.sendRawSSEEvent(c, line)
+			s.sendRawSSEEvent(c, redactQoderRawSSELine(line))
 		}
 		events, err := qoder.ParseSSELine(line)
 		if err != nil {
@@ -2574,6 +2574,51 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 // sendRawSSEEvent 保留上游逐条 SSE 数据，供管理端查看未经归一化的原始响应。
 func (s *AccountTestService) sendRawSSEEvent(c *gin.Context, line string) {
 	s.sendEvent(c, TestEvent{Type: "upstream_sse", RawSSE: line})
+}
+
+// redactQoderRawSSELine 保留 Qoder 原始事件结构，但移除不可展示的推理内容。
+func redactQoderRawSSELine(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, "data:") {
+		return line
+	}
+	payload := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
+	var envelope map[string]any
+	if json.Unmarshal([]byte(payload), &envelope) != nil {
+		return line
+	}
+	redactReasoningFields(envelope)
+	if body, ok := envelope["body"].(string); ok {
+		var nested any
+		if json.Unmarshal([]byte(body), &nested) == nil {
+			redactReasoningFields(nested)
+			if encoded, err := json.Marshal(nested); err == nil {
+				envelope["body"] = string(encoded)
+			}
+		}
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		return line
+	}
+	return "data: " + string(encoded)
+}
+
+func redactReasoningFields(value any) {
+	switch current := value.(type) {
+	case map[string]any:
+		for key := range current {
+			if strings.EqualFold(key, "reasoning_content") {
+				delete(current, key)
+				continue
+			}
+			redactReasoningFields(current[key])
+		}
+	case []any:
+		for _, item := range current {
+			redactReasoningFields(item)
+		}
+	}
 }
 
 // sendErrorAndEnd sends an error event and ends the stream
