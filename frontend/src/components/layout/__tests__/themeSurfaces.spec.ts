@@ -9,6 +9,13 @@ const styleSource = readFileSync(stylePath, 'utf8')
 const dataTableSource = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../common/DataTable.vue'), 'utf8')
 
 describe('全局主题表面', () => {
+  it('清除根节点间距和暗色边框，避免画布出现额外边缘空隙', () => {
+    expect(styleSource).toMatch(/html \{[\s\S]*?margin: 0;\n    padding: 0;/)
+    expect(styleSource).toMatch(/body \{[\s\S]*?margin: 0;\n    padding: 0;/)
+    expect(styleSource).toContain('html.dark {\n    /* 暗色画布由背景铺满视口，根节点不应携带额外边框。 */\n    border: 0 !important;')
+    expect(styleSource).toContain('  #app {\n    margin: 0;\n    padding: 0;\n  }')
+  })
+
   it('为明暗工作区使用液态玻璃层级', () => {
     // 两种主题共享玻璃材质，但各自保留不同的明度和环境光色阶。
     const shellBlock = styleSource.match(/\.ba-theme-shell\s*\{[\s\S]*?\n {2}\}/)?.[0] ?? ''
