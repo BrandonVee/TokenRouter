@@ -44,6 +44,10 @@ func (r *groupAvailabilityProbeRunnerRepoStub) GetSummaryByGroupIDs(context.Cont
 	return nil, nil
 }
 
+func (r *groupAvailabilityProbeRunnerRepoStub) GetPassiveSummaryByGroupIDs(context.Context, []int64, int, int, string, time.Time) (map[int64]*GroupAvailabilitySummary, error) {
+	return nil, nil
+}
+
 func (r *groupAvailabilityProbeRunnerRepoStub) CleanupOldResults(context.Context, time.Time) error {
 	return nil
 }

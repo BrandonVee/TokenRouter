@@ -393,6 +393,7 @@ const (
 	SettingKeyUSDExchangeRate                      = "usd_exchange_rate"                       // 美元兑人民币汇率（1 USD = N CNY）
 	SettingKeyMarketplaceAvailabilityWindowDays    = "marketplace_availability_window_days"    // 模型广场可用率展示天数
 	SettingKeyMarketplaceAvailabilityBucketMinutes = "marketplace_availability_bucket_minutes" // 模型广场可用率每根柱子的分钟数
+	SettingKeyMarketplaceAvailabilityMode          = "marketplace_availability_mode"           // 模型广场可用率数据来源：active/passive
 
 	// 第三方认证来源默认授予配置
 	SettingKeyAuthSourceDefaultEmailBalance             = "auth_source_default_email_balance"

@@ -19,6 +19,8 @@ import (
 )
 
 const (
+	MarketplaceAvailabilityModeActive           = "active"
+	MarketplaceAvailabilityModePassive          = "passive"
 	DefaultMarketplaceAvailabilityWindowDays    = 7
 	DefaultMarketplaceAvailabilityBucketMinutes = 120
 	minMarketplaceAvailabilityWindowDays        = 1
@@ -27,6 +29,14 @@ const (
 	maxMarketplaceAvailabilityBucketMinutes     = 1440
 	maxMarketplaceAvailabilityBuckets           = 720
 )
+
+// NormalizeMarketplaceAvailabilityMode 将系统设置限制为支持的数据来源。
+func NormalizeMarketplaceAvailabilityMode(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), MarketplaceAvailabilityModePassive) {
+		return MarketplaceAvailabilityModePassive
+	}
+	return MarketplaceAvailabilityModeActive
+}
 
 type ModelMarketplaceGroup struct {
 	ID                         int64
@@ -227,6 +237,7 @@ func (s *ModelMarketplaceService) getPublicAvailabilityMap(ctx context.Context, 
 	if s.availabilityRepo == nil || len(groups) == 0 {
 		return nil
 	}
+	mode := s.resolveMarketplaceAvailabilityMode(ctx)
 
 	groupIDs := make([]int64, 0, len(groups))
 	for i := range groups {
@@ -234,7 +245,7 @@ func (s *ModelMarketplaceService) getPublicAvailabilityMap(ctx context.Context, 
 		if group.IsExclusive || group.ActiveAccountCount <= 0 {
 			continue
 		}
-		if !group.AvailabilityProbeConfig.Enabled {
+		if mode == MarketplaceAvailabilityModeActive && !group.AvailabilityProbeConfig.Enabled {
 			continue
 		}
 		groupIDs = append(groupIDs, group.ID)
@@ -249,11 +260,28 @@ func (s *ModelMarketplaceService) getPublicAvailabilityMap(ctx context.Context, 
 	}
 	// 可用性是模型广场的辅助信息，获取失败时不影响模型和价格展示。
 	windowDays, bucketMinutes := s.resolveMarketplaceAvailabilityWindow(ctx)
-	availabilityMap, err := s.availabilityRepo.GetSummaryByGroupIDs(ctx, groupIDs, windowDays, bucketMinutes, timezone, time.Now())
+	var availabilityMap map[int64]*GroupAvailabilitySummary
+	var err error
+	if mode == MarketplaceAvailabilityModePassive {
+		availabilityMap, err = s.availabilityRepo.GetPassiveSummaryByGroupIDs(ctx, groupIDs, windowDays, bucketMinutes, timezone, time.Now())
+	} else {
+		availabilityMap, err = s.availabilityRepo.GetSummaryByGroupIDs(ctx, groupIDs, windowDays, bucketMinutes, timezone, time.Now())
+	}
 	if err != nil {
 		return nil
 	}
 	return availabilityMap
+}
+
+func (s *ModelMarketplaceService) resolveMarketplaceAvailabilityMode(ctx context.Context) string {
+	if s == nil || s.settingRepo == nil {
+		return MarketplaceAvailabilityModeActive
+	}
+	settings, err := s.settingRepo.GetMultiple(ctx, []string{SettingKeyMarketplaceAvailabilityMode})
+	if err != nil {
+		return MarketplaceAvailabilityModeActive
+	}
+	return NormalizeMarketplaceAvailabilityMode(settings[SettingKeyMarketplaceAvailabilityMode])
 }
 
 func (s *ModelMarketplaceService) resolveMarketplaceAvailabilityWindow(ctx context.Context) (int, int) {

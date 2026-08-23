@@ -200,6 +200,7 @@ type UpdateSettingsRequest struct {
 	USDExchangeRate                           *float64                          `json:"usd_exchange_rate"`
 	MarketplaceAvailabilityWindowDays         *int                              `json:"marketplace_availability_window_days"`
 	MarketplaceAvailabilityBucketMinutes      *int                              `json:"marketplace_availability_bucket_minutes"`
+	MarketplaceAvailabilityMode               *string                           `json:"marketplace_availability_mode"`
 	AuthSourceDefaultEmailBalance             *float64                          `json:"auth_source_default_email_balance"`
 	AuthSourceDefaultEmailConcurrency         *int                              `json:"auth_source_default_email_concurrency"`
 	AuthSourceDefaultEmailSubscriptions       *[]dto.DefaultSubscriptionSetting `json:"auth_source_default_email_subscriptions"`
@@ -1794,11 +1795,17 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		USDExchangeRate:                      float64ValueOrDefault(req.USDExchangeRate, previousSettings.USDExchangeRate),
 		MarketplaceAvailabilityWindowDays:    intValueOrDefault(req.MarketplaceAvailabilityWindowDays, previousSettings.MarketplaceAvailabilityWindowDays),
 		MarketplaceAvailabilityBucketMinutes: intValueOrDefault(req.MarketplaceAvailabilityBucketMinutes, previousSettings.MarketplaceAvailabilityBucketMinutes),
-		EnableModelFallback:                  req.EnableModelFallback,
-		FallbackModelAnthropic:               req.FallbackModelAnthropic,
-		FallbackModelOpenAI:                  req.FallbackModelOpenAI,
-		FallbackModelGemini:                  req.FallbackModelGemini,
-		FallbackModelAntigravity:             req.FallbackModelAntigravity,
+		MarketplaceAvailabilityMode: func() string {
+			if req.MarketplaceAvailabilityMode != nil {
+				return *req.MarketplaceAvailabilityMode
+			}
+			return previousSettings.MarketplaceAvailabilityMode
+		}(),
+		EnableModelFallback:      req.EnableModelFallback,
+		FallbackModelAnthropic:   req.FallbackModelAnthropic,
+		FallbackModelOpenAI:      req.FallbackModelOpenAI,
+		FallbackModelGemini:      req.FallbackModelGemini,
+		FallbackModelAntigravity: req.FallbackModelAntigravity,
 		GrokDefaultTextModel: func() string {
 			if req.GrokDefaultTextModel != nil {
 				return strings.TrimSpace(*req.GrokDefaultTextModel)
@@ -2322,6 +2329,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		USDExchangeRate:                                  updatedSettings.USDExchangeRate,
 		MarketplaceAvailabilityWindowDays:                updatedSettings.MarketplaceAvailabilityWindowDays,
 		MarketplaceAvailabilityBucketMinutes:             updatedSettings.MarketplaceAvailabilityBucketMinutes,
+		MarketplaceAvailabilityMode:                      updatedSettings.MarketplaceAvailabilityMode,
 		EnableModelFallback:                              updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:                           updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:                              updatedSettings.FallbackModelOpenAI,

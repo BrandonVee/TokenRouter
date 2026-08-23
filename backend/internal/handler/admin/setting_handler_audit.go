@@ -95,6 +95,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.MarketplaceAvailabilityBucketMinutes != after.MarketplaceAvailabilityBucketMinutes {
 		changed = append(changed, "marketplace_availability_bucket_minutes")
 	}
+	if before.MarketplaceAvailabilityMode != after.MarketplaceAvailabilityMode {
+		changed = append(changed, "marketplace_availability_mode")
+	}
 	if before.TotpEnabled != after.TotpEnabled {
 		changed = append(changed, "totp_enabled")
 	}

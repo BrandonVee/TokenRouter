@@ -249,6 +249,7 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 	}
 
 	for _, summary := range out {
+		summary.Mode = service.MarketplaceAvailabilityModeActive
 		summary.AvailabilityRate = availabilityRate(summary.SuccessCount, summary.TotalCount)
 	}
 
@@ -281,6 +282,104 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 		return nil, err
 	}
 
+	return out, nil
+}
+
+// GetPassiveSummaryByGroupIDs 从真实请求日志构建最近 60 次请求的可用性摘要。
+func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezoneName string, now time.Time) (map[int64]*service.GroupAvailabilitySummary, error) {
+	out := make(map[int64]*service.GroupAvailabilitySummary, len(groupIDs))
+	if r == nil || r.db == nil || len(groupIDs) == 0 {
+		return out, nil
+	}
+	days, bucketMinutes = service.NormalizeMarketplaceAvailabilityWindow(days, bucketMinutes)
+	for _, groupID := range groupIDs {
+		out[groupID] = &service.GroupAvailabilitySummary{
+			Mode:          service.MarketplaceAvailabilityModePassive,
+			WindowDays:    days,
+			BucketMinutes: bucketMinutes,
+			Requests:      make([]service.GroupAvailabilityRequest, 0, 60),
+		}
+	}
+
+	start := now.Add(-time.Duration(days) * 24 * time.Hour)
+	rows, err := r.db.QueryContext(ctx, `
+		WITH events AS (
+			SELECT
+				ul.id,
+				ul.group_id,
+				ul.request_id,
+				ul.created_at,
+				'success'::text AS status,
+				true AS success,
+				1 AS source_priority
+			FROM usage_logs ul
+			WHERE ul.group_id = ANY($1) AND ul.created_at >= $2 AND ul.created_at < $3
+			UNION ALL
+			SELECT
+				oe.id,
+				oe.group_id,
+				oe.request_id,
+				oe.created_at,
+				CASE
+					WHEN COALESCE(oe.status_code, 0) IN (429, 503, 529)
+						OR COALESCE(oe.upstream_status_code, 0) IN (429, 503, 529)
+						OR LOWER(COALESCE(oe.error_type, '') || ' ' || COALESCE(oe.error_message, '')) ~ '(rate.?limit|throttl|capacity|compute|overload|concurrency)'
+						THEN 'pressure'
+					WHEN LOWER(COALESCE(oe.error_owner, '')) = 'provider'
+						OR COALESCE(oe.upstream_status_code, 0) > 0
+						THEN 'upstream_error'
+					ELSE 'unknown'
+				END AS status,
+				false AS success,
+				0 AS source_priority
+			FROM ops_error_logs oe
+			WHERE oe.group_id = ANY($1) AND oe.created_at >= $2 AND oe.created_at < $3
+		), deduplicated AS (
+			SELECT *, ROW_NUMBER() OVER (
+				PARTITION BY group_id, COALESCE(NULLIF(request_id, ''), source_priority::text || ':' || id::text)
+				ORDER BY created_at DESC, source_priority DESC, id DESC
+			) AS request_rank
+			FROM events
+		), recent AS (
+			SELECT *, ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY created_at DESC, id DESC) AS group_rank
+			FROM deduplicated
+			WHERE request_rank = 1
+		)
+		SELECT group_id, status, success, created_at
+		FROM recent
+		WHERE group_rank <= 60
+		ORDER BY group_id, created_at ASC, id ASC
+	`, pq.Array(groupIDs), start, now)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var groupID int64
+		var request service.GroupAvailabilityRequest
+		if err := rows.Scan(&groupID, &request.Status, &request.Success, &request.CreatedAt); err != nil {
+			return nil, err
+		}
+		summary, ok := out[groupID]
+		if !ok {
+			continue
+		}
+		summary.Requests = append(summary.Requests, request)
+		summary.TotalCount++
+		if request.Success {
+			summary.SuccessCount++
+		}
+		summary.LastStatus = request.Status
+		checkedAt := request.CreatedAt
+		summary.LastCheckedAt = &checkedAt
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, summary := range out {
+		summary.Mode = service.MarketplaceAvailabilityModePassive
+		summary.AvailabilityRate = availabilityRate(summary.SuccessCount, summary.TotalCount)
+	}
 	return out, nil
 }
 

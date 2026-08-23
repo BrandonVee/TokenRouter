@@ -83,6 +83,11 @@ dataSharing: {
         title: 'Marketplace Availability',
         description:
           'Adjust the public marketplace availability bar window and bucket size. Saved changes apply on the next marketplace refresh.',
+        mode: 'Data source',
+        modeHint:
+          'Active mode sends scheduled lightweight requests; passive mode uses the latest 60 real requests.',
+        activeMode: 'Active probes (current behavior)',
+        passiveMode: 'Passive probes (latest 60 real requests)',
         windowDays: 'Window (days)',
         windowDaysHint: 'Range {min}-{max} days. Default is 7 days.',
         bucketMinutes: 'Bucket size (minutes)',

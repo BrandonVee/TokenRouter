@@ -6,8 +6,11 @@ import (
 )
 
 const (
-	GroupAvailabilityProbeStatusSuccess = "success"
-	GroupAvailabilityProbeStatusFailed  = "failed"
+	GroupAvailabilityProbeStatusSuccess         = "success"
+	GroupAvailabilityProbeStatusFailed          = "failed"
+	GroupAvailabilityRequestStatusPressure      = "pressure"
+	GroupAvailabilityRequestStatusUpstreamError = "upstream_error"
+	GroupAvailabilityRequestStatusUnknown       = "unknown"
 )
 
 // GroupAvailabilityProbeDueGroup 是等待主动探测的分组快照。
@@ -32,6 +35,13 @@ type GroupAvailabilityProbeResult struct {
 	FinishedAt   time.Time
 }
 
+// GroupAvailabilityRequest 是被动模式下最近一次真实请求的状态样本。
+type GroupAvailabilityRequest struct {
+	Status    string    `json:"status"`
+	Success   bool      `json:"success"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // GroupAvailabilityBucket 是模型广场条形组件的时间桶聚合。
 type GroupAvailabilityBucket struct {
 	Date             string
@@ -40,8 +50,9 @@ type GroupAvailabilityBucket struct {
 	AvailabilityRate *float64
 }
 
-// GroupAvailabilitySummary 是分组主动可用性摘要。
+// GroupAvailabilitySummary 是模型广场分组可用性摘要。
 type GroupAvailabilitySummary struct {
+	Mode             string
 	WindowDays       int
 	BucketMinutes    int
 	SuccessCount     int64
@@ -50,6 +61,7 @@ type GroupAvailabilitySummary struct {
 	LastStatus       string
 	LastCheckedAt    *time.Time
 	Days             []GroupAvailabilityBucket
+	Requests         []GroupAvailabilityRequest
 }
 
 // GroupAvailabilityProbeRepository 定义分组主动可用性探测的数据访问接口。
@@ -57,5 +69,6 @@ type GroupAvailabilityProbeRepository interface {
 	ClaimDue(ctx context.Context, now time.Time, lockUntil time.Time, lockedBy string, limit int) ([]GroupAvailabilityProbeDueGroup, error)
 	SaveResultAndScheduleNext(ctx context.Context, result *GroupAvailabilityProbeResult, nextRunAt time.Time) error
 	GetSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezone string, now time.Time) (map[int64]*GroupAvailabilitySummary, error)
+	GetPassiveSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezone string, now time.Time) (map[int64]*GroupAvailabilitySummary, error)
 	CleanupOldResults(ctx context.Context, before time.Time) error
 }

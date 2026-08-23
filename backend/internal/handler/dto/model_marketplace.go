@@ -74,14 +74,22 @@ type ModelMarketplaceAvailabilityDay struct {
 }
 
 type ModelMarketplaceAvailability struct {
-	WindowDays       int                               `json:"window_days"`
-	BucketMinutes    int                               `json:"bucket_minutes"`
-	SuccessCount     int64                             `json:"success_count"`
-	TotalCount       int64                             `json:"total_count"`
-	AvailabilityRate *float64                          `json:"availability_rate,omitempty"`
-	LastStatus       string                            `json:"last_status,omitempty"`
-	LastCheckedAt    *time.Time                        `json:"last_checked_at,omitempty"`
-	Days             []ModelMarketplaceAvailabilityDay `json:"days"`
+	Mode             string                                `json:"mode"`
+	WindowDays       int                                   `json:"window_days"`
+	BucketMinutes    int                                   `json:"bucket_minutes"`
+	SuccessCount     int64                                 `json:"success_count"`
+	TotalCount       int64                                 `json:"total_count"`
+	AvailabilityRate *float64                              `json:"availability_rate,omitempty"`
+	LastStatus       string                                `json:"last_status,omitempty"`
+	LastCheckedAt    *time.Time                            `json:"last_checked_at,omitempty"`
+	Days             []ModelMarketplaceAvailabilityDay     `json:"days"`
+	Requests         []ModelMarketplaceAvailabilityRequest `json:"requests,omitempty"`
+}
+
+type ModelMarketplaceAvailabilityRequest struct {
+	Status    string    `json:"status"`
+	Success   bool      `json:"success"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type ModelMarketplaceGroup struct {
@@ -138,7 +146,7 @@ func ModelMarketplaceGroupsFromService(groups []service.ModelMarketplaceGroup) [
 	return out
 }
 
-// modelMarketplaceAvailabilityFromService 将主动可用性摘要转换为公开 DTO。
+// modelMarketplaceAvailabilityFromService 将可用性摘要转换为公开 DTO。
 func modelMarketplaceAvailabilityFromService(availability *service.GroupAvailabilitySummary) *ModelMarketplaceAvailability {
 	if availability == nil {
 		return nil
@@ -152,7 +160,14 @@ func modelMarketplaceAvailabilityFromService(availability *service.GroupAvailabi
 			AvailabilityRate: day.AvailabilityRate,
 		})
 	}
+	requests := make([]ModelMarketplaceAvailabilityRequest, 0, len(availability.Requests))
+	for _, request := range availability.Requests {
+		requests = append(requests, ModelMarketplaceAvailabilityRequest{
+			Status: request.Status, Success: request.Success, CreatedAt: request.CreatedAt,
+		})
+	}
 	return &ModelMarketplaceAvailability{
+		Mode:             availability.Mode,
 		WindowDays:       availability.WindowDays,
 		BucketMinutes:    availability.BucketMinutes,
 		SuccessCount:     availability.SuccessCount,
@@ -161,6 +176,7 @@ func modelMarketplaceAvailabilityFromService(availability *service.GroupAvailabi
 		LastStatus:       availability.LastStatus,
 		LastCheckedAt:    availability.LastCheckedAt,
 		Days:             days,
+		Requests:         requests,
 	}
 }
 

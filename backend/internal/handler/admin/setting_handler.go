@@ -299,6 +299,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		USDExchangeRate:                                  settings.USDExchangeRate,
 		MarketplaceAvailabilityWindowDays:                settings.MarketplaceAvailabilityWindowDays,
 		MarketplaceAvailabilityBucketMinutes:             settings.MarketplaceAvailabilityBucketMinutes,
+		MarketplaceAvailabilityMode:                      settings.MarketplaceAvailabilityMode,
 		EnableModelFallback:                              settings.EnableModelFallback,
 		FallbackModelAnthropic:                           settings.FallbackModelAnthropic,
 		FallbackModelOpenAI:                              settings.FallbackModelOpenAI,

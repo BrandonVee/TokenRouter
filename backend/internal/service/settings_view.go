@@ -201,6 +201,7 @@ type SystemSettings struct {
 	USDExchangeRate                      float64
 	MarketplaceAvailabilityWindowDays    int
 	MarketplaceAvailabilityBucketMinutes int
+	MarketplaceAvailabilityMode          string
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

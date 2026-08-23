@@ -153,6 +153,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyUSDExchangeRate:                           "0",
 		SettingKeyMarketplaceAvailabilityWindowDays:         strconv.Itoa(DefaultMarketplaceAvailabilityWindowDays),
 		SettingKeyMarketplaceAvailabilityBucketMinutes:      strconv.Itoa(DefaultMarketplaceAvailabilityBucketMinutes),
+		SettingKeyMarketplaceAvailabilityMode:               MarketplaceAvailabilityModeActive,
 		SettingKeyAuthSourceDefaultEmailBalance:             "0",
 		SettingKeyAuthSourceDefaultEmailConcurrency:         "5",
 		SettingKeyAuthSourceDefaultEmailSubscriptions:       "[]",
@@ -445,6 +446,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.USDExchangeRate = rate
 	}
 	result.MarketplaceAvailabilityWindowDays, result.MarketplaceAvailabilityBucketMinutes = parseMarketplaceAvailabilityWindowSettings(settings)
+	result.MarketplaceAvailabilityMode = NormalizeMarketplaceAvailabilityMode(settings[SettingKeyMarketplaceAvailabilityMode])
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 
 	// 敏感信息直接返回，方便测试连接时使用

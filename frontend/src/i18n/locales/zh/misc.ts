@@ -34,6 +34,14 @@ marketplace: {
     availabilityNoData: '暂无数据',
     availabilityHint: '近 {days} 天主动探测可用率 {rate}（成功 {success} / 总计 {total}）',
     availabilityHintNoData: '近 {days} 天暂无主动探测数据',
+    passiveAvailabilityAriaLabel: '最近 60 次真实请求：绿色表示成功，黄色表示算力或限流压力，红色表示已确认的上游故障，灰色表示未知或无数据。',
+    passiveAvailabilityHint: '最近 60 次真实请求可用率 {rate}（成功 {success} / 总计 {total}）',
+    passiveAvailabilityStatus: {
+      success: '成功',
+      pressure: '算力或限流压力',
+      upstream_error: '已确认的上游故障',
+      unknown: '未知或无数据'
+    },
     rateMultiplier: '分组倍率',
     rateMultiplierValue: '分组倍率{multiplier}',
     imageRateMultiplierValue: '生图倍率{multiplier}',

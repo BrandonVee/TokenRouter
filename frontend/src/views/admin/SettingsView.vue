@@ -6075,6 +6075,20 @@
             </div>
             <div class="space-y-5 p-6">
               <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div class="md:col-span-2">
+                  <label class="input-label">
+                    {{ t("admin.settings.marketplaceAvailability.mode") }}
+                  </label>
+                  <Select
+                    v-model="form.marketplace_availability_mode"
+                    :options="marketplaceAvailabilityModeOptions"
+                    class="max-w-md"
+                    :aria-label="t('admin.settings.marketplaceAvailability.mode')"
+                  />
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.marketplaceAvailability.modeHint") }}
+                  </p>
+                </div>
                 <div>
                   <label class="input-label">
                     {{ t("admin.settings.marketplaceAvailability.windowDays") }}
@@ -8963,6 +8977,17 @@ const marketplaceAvailabilityBucketMinutesMin = 5;
 const marketplaceAvailabilityBucketMinutesMax = 1440;
 const marketplaceAvailabilityBucketMinutesDefault = 120;
 
+const marketplaceAvailabilityModeOptions = computed(() => [
+  {
+    value: "active",
+    label: t("admin.settings.marketplaceAvailability.activeMode"),
+  },
+  {
+    value: "passive",
+    label: t("admin.settings.marketplaceAvailability.passiveMode"),
+  },
+]);
+
 function defaultLoginAgreementDocuments(): LoginAgreementDocument[] {
   return [
     {
@@ -9183,6 +9208,7 @@ const form = reactive<SettingsForm>({
     marketplaceAvailabilityWindowDaysDefault,
   marketplace_availability_bucket_minutes:
     marketplaceAvailabilityBucketMinutesDefault,
+  marketplace_availability_mode: "active",
   force_email_on_third_party_signup: false,
   default_user_rpm_limit: 0,
   default_user_api_key_limit: 100,
@@ -10874,6 +10900,8 @@ async function saveSettings() {
         ),
       ),
     );
+    form.marketplace_availability_mode =
+      form.marketplace_availability_mode === "passive" ? "passive" : "active";
     if (
       form.openai_account_quota_auto_pause.default_threshold_5h < 0 ||
       form.openai_account_quota_auto_pause.default_threshold_5h > 1 ||
@@ -11047,6 +11075,7 @@ async function saveSettings() {
         form.marketplace_availability_window_days,
       marketplace_availability_bucket_minutes:
         form.marketplace_availability_bucket_minutes,
+      marketplace_availability_mode: form.marketplace_availability_mode,
       force_email_on_third_party_signup: form.force_email_on_third_party_signup,
       default_user_rpm_limit: form.default_user_rpm_limit,
       default_user_api_key_limit: form.default_user_api_key_limit,

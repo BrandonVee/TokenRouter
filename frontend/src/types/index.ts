@@ -639,7 +639,14 @@ export interface MarketplaceGroupAvailabilityDay {
   availability_rate?: number | null
 }
 
+export interface MarketplaceGroupAvailabilityRequest {
+  status: 'success' | 'pressure' | 'upstream_error' | 'unknown' | string
+  success: boolean
+  created_at: string
+}
+
 export interface MarketplaceGroupAvailability {
+  mode?: 'active' | 'passive' | string
   window_days: number
   bucket_minutes?: number
   success_count: number
@@ -648,6 +655,7 @@ export interface MarketplaceGroupAvailability {
   last_status?: string
   last_checked_at?: string | null
   days: MarketplaceGroupAvailabilityDay[]
+  requests?: MarketplaceGroupAvailabilityRequest[]
 }
 
 export interface MarketplaceGroup {

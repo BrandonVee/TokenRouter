@@ -464,6 +464,7 @@ export interface SystemSettings {
   usd_exchange_rate: number;
   marketplace_availability_window_days: number;
   marketplace_availability_bucket_minutes: number;
+  marketplace_availability_mode: "active" | "passive" | string;
   auth_source_default_email_balance?: number;
   auth_source_default_email_concurrency?: number;
   auth_source_default_email_subscriptions?: DefaultSubscriptionSetting[];
@@ -792,6 +793,7 @@ export interface UpdateSettingsRequest {
   usd_exchange_rate?: number;
   marketplace_availability_window_days?: number;
   marketplace_availability_bucket_minutes?: number;
+  marketplace_availability_mode?: "active" | "passive" | string;
   auth_source_default_email_balance?: number;
   auth_source_default_email_concurrency?: number;
   auth_source_default_email_subscriptions?: DefaultSubscriptionSetting[];

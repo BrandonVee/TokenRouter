@@ -1,6 +1,25 @@
 <template>
   <div class="flex w-full min-w-0 items-center gap-2" :title="tooltip">
     <div
+      v-if="isPassive"
+      class="grid h-8 min-w-0 flex-1 items-center overflow-hidden"
+      :style="passiveGridStyle"
+      role="img"
+      :aria-label="t('marketplace.passiveAvailabilityAriaLabel')"
+    >
+      <span
+        v-for="(request, index) in normalizedRequests"
+        :key="`${request.created_at || 'empty'}-${index}`"
+        :class="[
+          'h-6 max-w-full justify-self-center rounded-[2px]',
+          requestClass(request.status, request.success),
+        ]"
+        :title="requestTitle(request.status)"
+        :style="{ width: passiveBarWidth }"
+      />
+    </div>
+    <div
+      v-else
       class="grid h-8 min-w-0 flex-1 items-center overflow-hidden"
       :style="barGridStyle"
       role="img"
@@ -27,13 +46,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { MarketplaceGroupAvailability, MarketplaceGroupAvailabilityDay } from '@/types'
+import type {
+  MarketplaceGroupAvailability,
+  MarketplaceGroupAvailabilityDay,
+  MarketplaceGroupAvailabilityRequest,
+} from '@/types'
 
 const props = defineProps<{
   availability?: MarketplaceGroupAvailability | null
 }>()
 
 const { t } = useI18n()
+const isPassive = computed(() => props.availability?.mode === 'passive')
 
 const windowDays = computed(() => Math.max(props.availability?.window_days ?? 7, 1))
 const bucketMinutes = computed(() => Math.max(props.availability?.bucket_minutes ?? 24 * 60, 1))
@@ -57,6 +81,25 @@ const normalizedBuckets = computed<MarketplaceGroupAvailabilityDay[]>(() => {
     ...buckets,
   ]
 })
+
+const normalizedRequests = computed<MarketplaceGroupAvailabilityRequest[]>(() => {
+  const requests = props.availability?.requests ?? []
+  return [
+    ...Array.from({ length: Math.max(60 - requests.length, 0) }, () => ({
+      status: 'unknown' as const,
+      success: false,
+      created_at: '',
+    })),
+    ...requests.slice(-60),
+  ]
+})
+
+const passiveGridStyle = computed(() => ({
+  gap: '2px',
+  gridTemplateColumns: 'repeat(60, minmax(0, 1fr))',
+}))
+
+const passiveBarWidth = computed(() => '100%')
 
 const barGridStyle = computed(() => ({
   gap:
@@ -92,6 +135,13 @@ const rateLabel = computed(() => {
 
 const tooltip = computed(() => {
   const availability = props.availability
+  if (isPassive.value) {
+    return t('marketplace.passiveAvailabilityHint', {
+      rate: rateLabel.value,
+      success: availability?.success_count ?? 0,
+      total: availability?.total_count ?? 0,
+    })
+  }
   if (!availability || typeof availability.availability_rate !== 'number') {
     return t('marketplace.availabilityHintNoData', {
       days: windowDays.value,
@@ -108,6 +158,17 @@ const tooltip = computed(() => {
 const ariaLabel = computed(
   () => `${t('marketplace.availabilityWindow', { days: windowDays.value })}: ${rateLabel.value}`,
 )
+
+function requestClass(status: string, success: boolean): string {
+  if (success || status === 'success') return 'bg-emerald-500'
+  if (status === 'pressure') return 'bg-amber-400'
+  if (status === 'upstream_error') return 'bg-rose-500'
+  return 'bg-gray-200 dark:bg-dark-700'
+}
+
+function requestTitle(status: string): string {
+  return t(`marketplace.passiveAvailabilityStatus.${status}`, {}, status)
+}
 
 function bucketClass(rate?: number | null, totalCount?: number): string {
   if (!totalCount || typeof rate !== 'number') {
