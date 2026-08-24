@@ -41,18 +41,9 @@ const toJsStringLiteral = (value: string) =>
     .replace(/\u2028/g, '\\u2028')
     .replace(/\u2029/g, '\\u2029')
 
-// 用量接口固定在 API 域名根路径；无效旧配置回退到兼容的后缀规范化。
-const resolveCcSwitchUsageUrl = (baseUrl: string): string => {
-  try {
-    return `${new URL(baseUrl).origin}/v1/usage`
-  } catch {
-    return `${stripTrailingV1(baseUrl)}/v1/usage`
-  }
-}
-
-// 固化导入时的用量端点，避免 CCS 中的 provider endpoint 被修改后影响用量统计。
-export function buildCcSwitchUsageScript(baseUrl: string, fallbackUnit: string): string {
-  const usageUrlLiteral = toJsStringLiteral(resolveCcSwitchUsageUrl(baseUrl))
+// 用量端点使用 CCS 模板变量，导入后会跟随 provider 的 Base URL。
+export function buildCcSwitchUsageScript(fallbackUnit: string): string {
+  const usageUrlLiteral = '"{{baseUrl}}/v1/usage"'
   const fallbackUnitLiteral = toJsStringLiteral(fallbackUnit)
 
   return `({

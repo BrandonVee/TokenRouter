@@ -57,6 +57,7 @@ const messages: Record<string, string> = {
   'keys.createKey': 'Create API Key',
   'keys.disable': 'Disable',
   'keys.enable': 'Enable',
+  'keys.importToCcSwitch': 'Import to CCS',
   'keys.apiKeyLimitReached': 'API key limit reached',
   'keys.created': 'Created',
   'keys.expiresAt': 'Expires',
@@ -461,14 +462,24 @@ describe('user KeysView column settings', () => {
     expect(wrapper.find('.mb-6').exists()).toBe(false)
   })
 
-  it('keeps only edit, status and more as primary row actions', async () => {
+  it('keeps edit, status, CCS import and more as primary row actions', async () => {
+    const wrapper = await mountView()
+
+    const actionButtons = wrapper.get('[data-test="actions"]').findAll('button')
+    expect(actionButtons).toHaveLength(4)
+    expect(actionButtons.some((button) => button.text().includes('Edit'))).toBe(true)
+    expect(actionButtons.some((button) => button.text().includes('Disable'))).toBe(true)
+    expect(actionButtons.some((button) => button.text().includes('Import to CCS'))).toBe(true)
+    expect(actionButtons.some((button) => button.text().includes('More'))).toBe(true)
+  })
+
+  it('hides the inline CCS import action when public settings disable it', async () => {
+    getPublicSettings.mockResolvedValueOnce({ hide_ccs_import_button: true })
     const wrapper = await mountView()
 
     const actionButtons = wrapper.get('[data-test="actions"]').findAll('button')
     expect(actionButtons).toHaveLength(3)
-    expect(actionButtons.some((button) => button.text().includes('Edit'))).toBe(true)
-    expect(actionButtons.some((button) => button.text().includes('Disable'))).toBe(true)
-    expect(actionButtons.some((button) => button.text().includes('More'))).toBe(true)
+    expect(actionButtons.some((button) => button.text().includes('Import to CCS'))).toBe(false)
   })
 
   it('shows a hidden column when toggled and persists the preference', async () => {

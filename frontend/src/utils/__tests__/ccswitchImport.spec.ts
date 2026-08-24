@@ -25,17 +25,10 @@ describe('ccswitchImport utils', () => {
     expect(GROK_CC_SWITCH_MODEL).toBe('grok-4.5')
   })
 
-  it.each([
-    'https://api.example.com',
-    'https://api.example.com/',
-    'https://api.example.com/v1',
-    'https://api.example.com/v1/',
-    'https://api.example.com/api/v1'
-  ])('pins the usage script to /v1/usage for base URL %s', (baseUrl) => {
-    const usageScript = buildCcSwitchUsageScript(baseUrl, 'USD')
+  it('uses the CCS base URL variable for the usage endpoint', () => {
+    const usageScript = buildCcSwitchUsageScript('USD')
 
-    expect(usageScript).toContain('url: "https://api.example.com/v1/usage"')
-    expect(usageScript).not.toContain('{{baseUrl}}')
+    expect(usageScript).toContain('url: "{{baseUrl}}/v1/usage"')
     expect(usageScript).toContain('"Authorization": "Bearer {{apiKey}}"')
   })
 

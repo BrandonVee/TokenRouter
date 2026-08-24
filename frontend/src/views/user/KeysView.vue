@@ -442,6 +442,15 @@
                 <Icon v-else name="checkCircle" size="sm" />
                 <span class="text-xs">{{ row.status === 'active' ? t('keys.disable') : t('keys.enable') }}</span>
               </button>
+              <!-- CCS 导入作为行级高频操作展示，不再收纳到更多菜单。 -->
+              <button
+                v-if="!publicSettings?.hide_ccs_import_button"
+                @click="importToCcswitch(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
+              >
+                <Icon name="upload" size="sm" />
+                <span class="text-xs">{{ t('keys.importToCcSwitch') }}</span>
+              </button>
               <button
                 class="key-action-menu-trigger flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white"
                 :class="{ 'bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-white': actionMenuKey?.id === row.id }"
@@ -556,7 +565,15 @@
               :disabled="formGroupsLoading"
               data-tour="key-form-group"
               @update:model-value="addPriorityGroup"
-            />
+            >
+              <template #option="{ option, selected }">
+                <!-- 候选分组下拉与已选分组列表保持同一套信息密度。 -->
+                <GroupOptionItem
+                  v-bind="groupDisplayProps(option)"
+                  :selected="selected"
+                />
+              </template>
+            </Select>
 
             <VueDraggable v-model="formData.group_ids" handle=".priority-group-handle" :animation="160" class="space-y-2">
               <div
@@ -648,7 +665,22 @@
               :searchable="true"
               :disabled="formGroupsLoading"
               class="min-w-0"
-            />
+            >
+              <template #selected="{ option }">
+                <GroupBadge
+                  v-if="asSelectedGroupOption(option)"
+                  v-bind="groupDisplayProps(option)"
+                />
+                <span v-else class="text-gray-400 dark:text-dark-500">{{ t('keys.selectGroup') }}</span>
+              </template>
+              <template #option="{ option, selected }">
+                <!-- 下拉选项复用列表分组卡片，显示平台/品牌、描述和用户倍率。 -->
+                <GroupOptionItem
+                  v-bind="groupDisplayProps(option)"
+                  :selected="selected"
+                />
+              </template>
+            </Select>
             <div class="min-w-0">
               <input
                 v-model="binding.prefix"
@@ -1304,10 +1336,8 @@
       :show="Boolean(actionMenuKey)"
       :api-key="actionMenuKey"
       :position="actionMenuPosition"
-      :allow-import="!publicSettings?.hide_ccs_import_button"
       @close="closeKeyActionMenu"
       @use="openUseKeyModal"
-      @import="importToCcswitch"
       @delete="confirmDelete"
     />
 
@@ -1591,6 +1621,26 @@ interface GroupOption extends Record<string, unknown> {
   peakRateMultiplier: number
   platform: GroupPlatform
   dataSharingEnabled?: boolean
+}
+
+// Select 插槽参数是 unknown，这里统一收窄为带平台和倍率信息的分组选项。
+const asGroupOption = (option: unknown): GroupOption => option as GroupOption
+const asSelectedGroupOption = (option: unknown): GroupOption | null =>
+  option && typeof option === 'object' ? option as GroupOption : null
+const groupDisplayProps = (option: unknown) => {
+  const group = asGroupOption(option)
+  return {
+    name: group.label,
+    platform: group.platform,
+    displayBrand: group.displayBrand,
+    rateMultiplier: group.rate,
+    userRateMultiplier: group.userRate,
+    peakRateEnabled: group.peakRateEnabled,
+    peakStart: group.peakStart,
+    peakEnd: group.peakEnd,
+    peakRateMultiplier: group.peakRateMultiplier,
+    description: group.description
+  }
 }
 
 const appStore = useAppStore()
@@ -2489,7 +2539,7 @@ const openKeyActionMenu = (key: ApiKey, event: MouseEvent) => {
   if (!target) return
   const rect = target.getBoundingClientRect()
   const width = 192
-  const height = publicSettings.value?.hide_ccs_import_button ? 102 : 142
+  const height = 102
   const padding = 8
   const left = Math.max(padding, Math.min(rect.right - width, window.innerWidth - width - padding))
   let top = rect.bottom + 4
@@ -3080,7 +3130,7 @@ const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
   const baseUrl = publicSettings.value?.api_base_url || window.location.origin
   const platform = row.group?.platform || 'anthropic'
 
-  const usageScript = buildCcSwitchUsageScript(baseUrl, balanceUnitName.value)
+  const usageScript = buildCcSwitchUsageScript(balanceUnitName.value)
   const providerName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
   const deeplink = buildCcSwitchImportDeeplink({
     baseUrl,

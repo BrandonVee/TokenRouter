@@ -47,19 +47,18 @@ describe('KeyActionMenu', () => {
     document.body.innerHTML = ''
   })
 
-  it('将使用、导入和删除收纳到更多菜单', async () => {
+  it('将使用和删除收纳到更多菜单', async () => {
     const wrapper = mount(KeyActionMenu, {
       props: {
         show: true,
         apiKey,
         position: { top: 80, left: 100 },
-        allowImport: true,
       },
       attachTo: document.body,
     })
 
     expect(document.body.textContent).toContain('keys.useKey')
-    expect(document.body.textContent).toContain('keys.importToCcSwitch')
+    expect(document.body.textContent).not.toContain('keys.importToCcSwitch')
     expect(document.body.textContent).toContain('common.delete')
 
     const deleteButton = Array.from(document.body.querySelectorAll('button'))
@@ -72,18 +71,4 @@ describe('KeyActionMenu', () => {
     wrapper.unmount()
   })
 
-  it('按设置隐藏 CCS 导入入口', () => {
-    const wrapper = mount(KeyActionMenu, {
-      props: {
-        show: true,
-        apiKey,
-        position: { top: 80, left: 100 },
-        allowImport: false,
-      },
-      attachTo: document.body,
-    })
-
-    expect(document.body.textContent).not.toContain('keys.importToCcSwitch')
-    wrapper.unmount()
-  })
 })

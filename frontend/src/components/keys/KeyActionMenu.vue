@@ -12,10 +12,6 @@
             <Icon name="terminal" size="sm" class="text-gray-400" :stroke-width="2" />
             {{ t('keys.useKey') }}
           </button>
-          <button v-if="allowImport" type="button" class="menu-item" @click="emitAction('import')">
-            <Icon name="upload" size="sm" class="text-blue-500" :stroke-width="2" />
-            {{ t('keys.importToCcSwitch') }}
-          </button>
           <div class="my-1 border-t border-gray-100 dark:border-dark-700"></div>
           <button type="button" class="menu-item text-red-600 dark:text-red-400" @click="emitAction('delete')">
             <Icon name="trash" size="sm" :stroke-width="2" />
@@ -37,23 +33,20 @@ const props = defineProps<{
   show: boolean
   apiKey: ApiKey | null
   position: { top: number; left: number } | null
-  allowImport: boolean
 }>()
 
 const emit = defineEmits<{
   (event: 'close'): void
   (event: 'use', apiKey: ApiKey): void
-  (event: 'import', apiKey: ApiKey): void
   (event: 'delete', apiKey: ApiKey): void
 }>()
 
 const { t } = useI18n()
 
 // 菜单动作先传递当前 Key，再关闭浮层，确保后续弹窗不被透明遮罩拦截。
-const emitAction = (event: 'use' | 'import' | 'delete') => {
+const emitAction = (event: 'use' | 'delete') => {
   if (!props.apiKey) return
   if (event === 'use') emit('use', props.apiKey)
-  else if (event === 'import') emit('import', props.apiKey)
   else emit('delete', props.apiKey)
   emit('close')
 }
