@@ -11,6 +11,7 @@ const {
   getUsageSummary,
   getCapacitySummary,
   getLiveCapability,
+  getSettings,
   listAccounts,
   showError,
   showSuccess,
@@ -23,6 +24,7 @@ const {
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
   getLiveCapability: vi.fn(),
+  getSettings: vi.fn(),
   listAccounts: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
@@ -46,6 +48,7 @@ const messages: Record<string, string> = {
   'admin.groups.columns.usage': 'Usage',
   'admin.groups.columns.status': 'Status',
   'admin.groups.columns.actions': 'Actions',
+  'admin.groups.availabilityProbe.passiveModeHint': 'Passive availability is enabled',
 }
 
 vi.mock('@/api/admin', () => ({
@@ -64,6 +67,9 @@ vi.mock('@/api/admin', () => ({
     },
     accounts: {
       list: listAccounts,
+    },
+    settings: {
+      getSettings,
     },
   },
 }))
@@ -245,6 +251,7 @@ describe('admin GroupsView column settings', () => {
     getUsageSummary.mockReset()
     getCapacitySummary.mockReset()
     getLiveCapability.mockReset()
+    getSettings.mockReset()
     listAccounts.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
@@ -263,6 +270,7 @@ describe('admin GroupsView column settings', () => {
     getUsageSummary.mockResolvedValue([])
     getCapacitySummary.mockResolvedValue([])
     getLiveCapability.mockResolvedValue({ supported: false, reason: 'test server unsupported' })
+    getSettings.mockResolvedValue({ marketplace_availability_mode: 'active' })
     listAccounts.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
     isCurrentStep.mockReturnValue(false)
   })
@@ -313,6 +321,16 @@ describe('admin GroupsView column settings', () => {
     await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
 
     expect(wrapper.text()).not.toContain('Manual Sort Value')
+  })
+
+  it('shows passive availability state without active probe controls', async () => {
+    getSettings.mockResolvedValue({ marketplace_availability_mode: 'passive' })
+    const wrapper = await mountView()
+
+    await wrapper.get('[data-tour="groups-create-btn"]').trigger('click')
+
+    expect(wrapper.text()).toContain('Passive availability is enabled')
+    expect(wrapper.find('[data-test="availability-probe-toggle"]').exists()).toBe(false)
   })
 
   it('applies saved hidden columns on mount and ignores unknown keys', async () => {

@@ -650,6 +650,7 @@ export interface MarketplaceGroupAvailability {
   window_days: number
   bucket_minutes?: number
   success_count: number
+  pressure_count?: number
   total_count: number
   availability_rate?: number | null
   last_status?: string

@@ -8,7 +8,7 @@
       :aria-label="t('marketplace.passiveAvailabilityAriaLabel')"
     >
       <span
-        v-for="(request, index) in normalizedRequests"
+        v-for="(request, index) in passiveRequestGroups"
         :key="`${request.created_at || 'empty'}-${index}`"
         :class="[
           'h-6 max-w-full justify-self-center rounded-[2px]',
@@ -58,6 +58,9 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const isPassive = computed(() => props.availability?.mode === 'passive')
+const passiveRequestLimit = 300
+const passiveRequestGroupSize = 5
+const passiveBarCount = passiveRequestLimit / passiveRequestGroupSize
 
 const windowDays = computed(() => Math.max(props.availability?.window_days ?? 7, 1))
 const bucketMinutes = computed(() => Math.max(props.availability?.bucket_minutes ?? 24 * 60, 1))
@@ -85,18 +88,47 @@ const normalizedBuckets = computed<MarketplaceGroupAvailabilityDay[]>(() => {
 const normalizedRequests = computed<MarketplaceGroupAvailabilityRequest[]>(() => {
   const requests = props.availability?.requests ?? []
   return [
-    ...Array.from({ length: Math.max(60 - requests.length, 0) }, () => ({
+    ...Array.from({ length: Math.max(passiveRequestLimit - requests.length, 0) }, () => ({
       status: 'unknown' as const,
       success: false,
       created_at: '',
     })),
-    ...requests.slice(-60),
+    ...requests.slice(-passiveRequestLimit),
   ]
+})
+
+// 每根柱子汇总连续 5 次有效请求，孤立故障降级为黄色，同组至少 2 次明确上游故障才标红。
+const passiveRequestGroups = computed<MarketplaceGroupAvailabilityRequest[]>(() => {
+  const groups: MarketplaceGroupAvailabilityRequest[] = []
+  for (let start = 0; start < normalizedRequests.value.length; start += passiveRequestGroupSize) {
+    const requests = normalizedRequests.value.slice(start, start + passiveRequestGroupSize)
+    const actualRequests = requests.filter((request) => Boolean(request.created_at))
+    const upstreamErrors = actualRequests.filter((request) => request.status === 'upstream_error').length
+    const hasPressure = actualRequests.some((request) => request.status === 'pressure')
+    const allSuccess = actualRequests.length > 0 && actualRequests.every(
+      (request) => request.success || request.status === 'success',
+    )
+
+    let status = 'unknown'
+    if (upstreamErrors >= 2) {
+      status = 'upstream_error'
+    } else if (upstreamErrors > 0 || hasPressure) {
+      status = 'pressure'
+    } else if (allSuccess) {
+      status = 'success'
+    }
+    groups.push({
+      status,
+      success: status === 'success',
+      created_at: actualRequests.at(-1)?.created_at ?? '',
+    })
+  }
+  return groups
 })
 
 const passiveGridStyle = computed(() => ({
   gap: '2px',
-  gridTemplateColumns: 'repeat(60, minmax(0, 1fr))',
+  gridTemplateColumns: `repeat(${passiveBarCount}, minmax(0, 1fr))`,
 }))
 
 const passiveBarWidth = computed(() => '100%')
@@ -139,6 +171,7 @@ const tooltip = computed(() => {
     return t('marketplace.passiveAvailabilityHint', {
       rate: rateLabel.value,
       success: availability?.success_count ?? 0,
+      pressure: availability?.pressure_count ?? 0,
       total: availability?.total_count ?? 0,
     })
   }

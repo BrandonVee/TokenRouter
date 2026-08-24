@@ -2,10 +2,28 @@ package service
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
 )
+
+type groupAvailabilitySettingRepoStub struct {
+	SettingRepository
+	settings map[string]string
+	err      error
+}
+
+func (r *groupAvailabilitySettingRepoStub) GetMultiple(_ context.Context, keys []string) (map[string]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	values := make(map[string]string, len(keys))
+	for _, key := range keys {
+		values[key] = r.settings[key]
+	}
+	return values, nil
+}
 
 // groupAvailabilityProbeRunnerRepoStub 记录领取参数，并可阻塞首轮领取以验证 runner 非重入。
 type groupAvailabilityProbeRunnerRepoStub struct {
@@ -70,6 +88,39 @@ func TestGroupAvailabilityProbeRunDueClaimsOnlyRunnableBatch(t *testing.T) {
 	}
 	if limit != groupAvailabilityProbeDefaultMaxWorkers {
 		t.Fatalf("ClaimDue() limit = %d, want %d", limit, groupAvailabilityProbeDefaultMaxWorkers)
+	}
+}
+
+func TestGroupAvailabilityProbeRunDueSkipsClaimInPassiveMode(t *testing.T) {
+	repo := &groupAvailabilityProbeRunnerRepoStub{}
+	settingRepo := &groupAvailabilitySettingRepoStub{settings: map[string]string{
+		SettingKeyMarketplaceAvailabilityMode: MarketplaceAvailabilityModePassive,
+	}}
+	runner := &GroupAvailabilityProbeRunnerService{
+		repo:        repo,
+		settingRepo: settingRepo,
+		instanceID:  "test-instance",
+	}
+
+	runner.runDue()
+
+	if calls, _ := repo.claimSnapshot(); calls != 0 {
+		t.Fatalf("ClaimDue() calls = %d, want 0 in passive mode", calls)
+	}
+}
+
+func TestGroupAvailabilityProbeRunDueSkipsClaimWhenModeReadFails(t *testing.T) {
+	repo := &groupAvailabilityProbeRunnerRepoStub{}
+	runner := &GroupAvailabilityProbeRunnerService{
+		repo:        repo,
+		settingRepo: &groupAvailabilitySettingRepoStub{err: errors.New("setting storage unavailable")},
+		instanceID:  "test-instance",
+	}
+
+	runner.runDue()
+
+	if calls, _ := repo.claimSnapshot(); calls != 0 {
+		t.Fatalf("ClaimDue() calls = %d, want 0 when mode cannot be read", calls)
 	}
 }
 

@@ -27,6 +27,7 @@ const (
 // GroupAvailabilityProbeRunnerService 定期执行分组主动可用性探测。
 type GroupAvailabilityProbeRunnerService struct {
 	repo            GroupAvailabilityProbeRepository
+	settingRepo     SettingRepository
 	accountTestSvc  *AccountTestService
 	gatewaySvc      *GatewayService
 	openAIGateway   *OpenAIGatewayService
@@ -43,6 +44,7 @@ type GroupAvailabilityProbeRunnerService struct {
 
 func NewGroupAvailabilityProbeRunnerService(
 	repo GroupAvailabilityProbeRepository,
+	settingRepo SettingRepository,
 	accountTestSvc *AccountTestService,
 	gatewaySvc *GatewayService,
 	openAIGateway *OpenAIGatewayService,
@@ -51,6 +53,7 @@ func NewGroupAvailabilityProbeRunnerService(
 ) *GroupAvailabilityProbeRunnerService {
 	return &GroupAvailabilityProbeRunnerService{
 		repo:            repo,
+		settingRepo:     settingRepo,
 		accountTestSvc:  accountTestSvc,
 		gatewaySvc:      gatewaySvc,
 		openAIGateway:   openAIGateway,
@@ -117,6 +120,12 @@ func (s *GroupAvailabilityProbeRunnerService) runDue() {
 	maintenanceCtx, maintenanceCancel := context.WithTimeout(context.Background(), groupAvailabilityProbeMaintenanceTimeout)
 	s.cleanupIfNeeded(maintenanceCtx, time.Now())
 	maintenanceCancel()
+	modeCtx, modeCancel := context.WithTimeout(context.Background(), groupAvailabilityProbeClaimTimeout)
+	shouldRun := s.shouldRunActiveProbes(modeCtx)
+	modeCancel()
+	if !shouldRun {
+		return
+	}
 
 	// 只领取能够立即交给 worker 的分组，确保领取租约不会在排队期间过期。
 	claimCtx, claimCancel := context.WithTimeout(context.Background(), groupAvailabilityProbeClaimTimeout)
@@ -147,6 +156,19 @@ func (s *GroupAvailabilityProbeRunnerService) runDue() {
 		}()
 	}
 	wg.Wait()
+}
+
+// shouldRunActiveProbes 使 runner 与模型广场的全局可用性数据源保持一致。
+// 读取失败时暂停本轮领取，避免在无法确认数据源时误发主动请求。
+func (s *GroupAvailabilityProbeRunnerService) shouldRunActiveProbes(ctx context.Context) bool {
+	if s == nil || s.settingRepo == nil {
+		return true
+	}
+	settings, err := s.settingRepo.GetMultiple(ctx, []string{SettingKeyMarketplaceAvailabilityMode})
+	if err != nil {
+		return false
+	}
+	return NormalizeMarketplaceAvailabilityMode(settings[SettingKeyMarketplaceAvailabilityMode]) == MarketplaceAvailabilityModeActive
 }
 
 func (s *GroupAvailabilityProbeRunnerService) cleanupIfNeeded(ctx context.Context, now time.Time) {

@@ -11,6 +11,10 @@ const (
 	GroupAvailabilityRequestStatusPressure      = "pressure"
 	GroupAvailabilityRequestStatusUpstreamError = "upstream_error"
 	GroupAvailabilityRequestStatusUnknown       = "unknown"
+	// PassiveAvailabilityMinimumSamples 是被动健康分对外展示前需要的最小有效样本数。
+	PassiveAvailabilityMinimumSamples = 10
+	// PassiveAvailabilitySampleLimit 为模型广场保留的最近有效请求上限。
+	PassiveAvailabilitySampleLimit = 300
 )
 
 // GroupAvailabilityProbeDueGroup 是等待主动探测的分组快照。
@@ -56,6 +60,7 @@ type GroupAvailabilitySummary struct {
 	WindowDays       int
 	BucketMinutes    int
 	SuccessCount     int64
+	PressureCount    int64
 	TotalCount       int64
 	AvailabilityRate *float64
 	LastStatus       string

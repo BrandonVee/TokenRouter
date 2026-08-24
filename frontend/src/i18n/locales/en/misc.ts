@@ -34,8 +34,8 @@ marketplace: {
     availabilityNoData: 'No data',
     availabilityHint: '{days}-day active probe availability {rate} ({success} success / {total} total)',
     availabilityHintNoData: 'No active probe data in the last {days} days',
-    passiveAvailabilityAriaLabel: 'Last 60 real requests: green means success, yellow means compute or rate-limit pressure, red means a confirmed upstream failure, and gray means unknown or no data.',
-    passiveAvailabilityHint: 'Latest 60 real-request availability {rate} ({success} success / {total} total)',
+    passiveAvailabilityAriaLabel: 'Latest 300 eligible requests, grouped into 60 bars of 5: green means success, yellow means pressure or an isolated failure, red means at least two confirmed upstream failures in a group, and gray means no data.',
+    passiveAvailabilityHint: 'Health score for the latest {total} eligible requests: {rate} ({success} success, {pressure} under pressure)',
     passiveAvailabilityStatus: {
       success: 'Success',
       pressure: 'Compute or rate-limit pressure',

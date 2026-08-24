@@ -78,6 +78,7 @@ type ModelMarketplaceAvailability struct {
 	WindowDays       int                                   `json:"window_days"`
 	BucketMinutes    int                                   `json:"bucket_minutes"`
 	SuccessCount     int64                                 `json:"success_count"`
+	PressureCount    int64                                 `json:"pressure_count"`
 	TotalCount       int64                                 `json:"total_count"`
 	AvailabilityRate *float64                              `json:"availability_rate,omitempty"`
 	LastStatus       string                                `json:"last_status,omitempty"`
@@ -171,6 +172,7 @@ func modelMarketplaceAvailabilityFromService(availability *service.GroupAvailabi
 		WindowDays:       availability.WindowDays,
 		BucketMinutes:    availability.BucketMinutes,
 		SuccessCount:     availability.SuccessCount,
+		PressureCount:    availability.PressureCount,
 		TotalCount:       availability.TotalCount,
 		AvailabilityRate: availability.AvailabilityRate,
 		LastStatus:       availability.LastStatus,

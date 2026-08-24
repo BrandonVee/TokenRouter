@@ -285,7 +285,7 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 	return out, nil
 }
 
-// GetPassiveSummaryByGroupIDs 从真实请求日志构建最近 60 次请求的可用性摘要。
+// GetPassiveSummaryByGroupIDs 从真实请求日志构建最近 300 次有效请求的可用性摘要。
 func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezoneName string, now time.Time) (map[int64]*service.GroupAvailabilitySummary, error) {
 	out := make(map[int64]*service.GroupAvailabilitySummary, len(groupIDs))
 	if r == nil || r.db == nil || len(groupIDs) == 0 {
@@ -297,7 +297,7 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 			Mode:          service.MarketplaceAvailabilityModePassive,
 			WindowDays:    days,
 			BucketMinutes: bucketMinutes,
-			Requests:      make([]service.GroupAvailabilityRequest, 0, 60),
+			Requests:      make([]service.GroupAvailabilityRequest, 0, service.PassiveAvailabilitySampleLimit),
 		}
 	}
 
@@ -327,17 +327,41 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 						THEN 'pressure'
 					WHEN LOWER(COALESCE(oe.error_owner, '')) = 'provider'
 						OR COALESCE(oe.upstream_status_code, 0) > 0
+						OR COALESCE(
+							CASE
+								WHEN jsonb_typeof(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb)) = 'array'
+									THEN jsonb_array_length(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb))
+								ELSE 0
+							END,
+							0
+						) > 0
 						THEN 'upstream_error'
 					ELSE 'unknown'
 				END AS status,
 				false AS success,
 				0 AS source_priority
 			FROM ops_error_logs oe
-			WHERE oe.group_id = ANY($1) AND oe.created_at >= $2 AND oe.created_at < $3
+			WHERE oe.group_id = ANY($1)
+			  AND oe.created_at >= $2 AND oe.created_at < $3
+			  AND NOT COALESCE(oe.is_business_limited, false)
+			  AND NOT COALESCE(oe.is_count_tokens, false)
+			  AND (
+				LOWER(COALESCE(oe.error_owner, '')) = 'provider'
+				OR COALESCE(oe.upstream_status_code, 0) IN (401, 403)
+				OR COALESCE(oe.upstream_status_code, 0) >= 500
+				OR COALESCE(
+					CASE
+						WHEN jsonb_typeof(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb)) = 'array'
+							THEN jsonb_array_length(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb))
+						ELSE 0
+					END,
+					0
+				) > 0
+			  )
 		), deduplicated AS (
 			SELECT *, ROW_NUMBER() OVER (
 				PARTITION BY group_id, COALESCE(NULLIF(request_id, ''), source_priority::text || ':' || id::text)
-				ORDER BY created_at DESC, source_priority DESC, id DESC
+				ORDER BY source_priority DESC, created_at DESC, id DESC
 			) AS request_rank
 			FROM events
 		), recent AS (
@@ -347,9 +371,9 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 		)
 		SELECT group_id, status, success, created_at
 		FROM recent
-		WHERE group_rank <= 60
+		WHERE group_rank <= $4
 		ORDER BY group_id, created_at ASC, id ASC
-	`, pq.Array(groupIDs), start, now)
+	`, pq.Array(groupIDs), start, now, service.PassiveAvailabilitySampleLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -368,6 +392,8 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 		summary.TotalCount++
 		if request.Success {
 			summary.SuccessCount++
+		} else if request.Status == service.GroupAvailabilityRequestStatusPressure {
+			summary.PressureCount++
 		}
 		summary.LastStatus = request.Status
 		checkedAt := request.CreatedAt
@@ -378,7 +404,7 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 	}
 	for _, summary := range out {
 		summary.Mode = service.MarketplaceAvailabilityModePassive
-		summary.AvailabilityRate = availabilityRate(summary.SuccessCount, summary.TotalCount)
+		summary.AvailabilityRate = passiveAvailabilityRate(summary.SuccessCount, summary.PressureCount, summary.TotalCount)
 	}
 	return out, nil
 }
@@ -412,6 +438,15 @@ func availabilityRate(successCount int64, totalCount int64) *float64 {
 		return nil
 	}
 	value := float64(successCount) / float64(totalCount)
+	return &value
+}
+
+// passiveAvailabilityRate 对明确上游压力给予半分，并在样本不足时保持未知。
+func passiveAvailabilityRate(successCount int64, pressureCount int64, totalCount int64) *float64 {
+	if totalCount < service.PassiveAvailabilityMinimumSamples {
+		return nil
+	}
+	value := (float64(successCount) + float64(pressureCount)*0.5) / float64(totalCount)
 	return &value
 }
 

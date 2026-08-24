@@ -864,7 +864,7 @@
         </div>
 
         <div class="border-t pt-4">
-          <div class="mb-3 flex items-center justify-between gap-3">
+          <div v-if="!isPassiveAvailabilityMode" class="mb-3 flex items-center justify-between gap-3">
             <div>
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {{ t("admin.groups.availabilityProbe.title") }}
@@ -875,6 +875,7 @@
             </div>
             <button
               type="button"
+              data-test="availability-probe-toggle"
               @click="createForm.availability_probe_enabled = !createForm.availability_probe_enabled"
               :class="[
                 'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
@@ -892,7 +893,18 @@
             </button>
           </div>
           <div
-            v-if="createForm.availability_probe_enabled"
+            v-else
+            class="border-l-2 border-primary-500 pl-3"
+          >
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.availabilityProbe.title") }}
+            </label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.groups.availabilityProbe.passiveModeHint") }}
+            </p>
+          </div>
+          <div
+            v-if="!isPassiveAvailabilityMode && createForm.availability_probe_enabled"
             class="grid gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-dark-600 dark:bg-dark-800/40 md:grid-cols-2"
           >
             <div>
@@ -2671,7 +2683,7 @@
         </div>
 
         <div class="border-t pt-4">
-          <div class="mb-3 flex items-center justify-between gap-3">
+          <div v-if="!isPassiveAvailabilityMode" class="mb-3 flex items-center justify-between gap-3">
             <div>
               <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {{ t("admin.groups.availabilityProbe.title") }}
@@ -2682,6 +2694,7 @@
             </div>
             <button
               type="button"
+              data-test="availability-probe-toggle"
               @click="editForm.availability_probe_enabled = !editForm.availability_probe_enabled"
               :class="[
                 'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors',
@@ -2699,7 +2712,18 @@
             </button>
           </div>
           <div
-            v-if="editForm.availability_probe_enabled"
+            v-else
+            class="border-l-2 border-primary-500 pl-3"
+          >
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.availabilityProbe.title") }}
+            </label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.groups.availabilityProbe.passiveModeHint") }}
+            </p>
+          </div>
+          <div
+            v-if="!isPassiveAvailabilityMode && editForm.availability_probe_enabled"
             class="grid gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-dark-600 dark:bg-dark-800/40 md:grid-cols-2"
           >
             <div>
@@ -6034,6 +6058,24 @@ const loadGroups = async () => {
   }
 };
 
+const marketplaceAvailabilityMode = ref<"active" | "passive">("active");
+const isPassiveAvailabilityMode = computed(
+  () => marketplaceAvailabilityMode.value === "passive",
+);
+
+// 分组页只需全局数据源字段；读取失败时保持现有主动探测表单可用。
+const loadMarketplaceAvailabilityMode = async () => {
+  try {
+    const getSettings = adminAPI.settings?.getSettings;
+    if (!getSettings) return;
+    const settings = await getSettings();
+    marketplaceAvailabilityMode.value =
+      settings.marketplace_availability_mode === "passive" ? "passive" : "active";
+  } catch (error) {
+    console.error("Error loading marketplace availability mode:", error);
+  }
+};
+
 const loadUnavailableFallbackGroups = async () => {
   try {
     unavailableFallbackGroups.value = await adminAPI.groups.getAll();
@@ -7097,6 +7139,7 @@ const saveSortOrder = async () => {
 
 onMounted(() => {
   loadGroups();
+  void loadMarketplaceAvailabilityMode();
   loadUnavailableFallbackGroups();
   void loadLiveCapability();
   loadModelsListCandidates("create", 0, createForm.platform);
