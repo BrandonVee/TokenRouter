@@ -114,6 +114,18 @@ func TestNormalizeOpenAIResponsesRejectedFieldRetryBodyBindsMaxOutputTokensToRej
 	require.False(t, gjson.GetBytes(retryBody, "max_output_tokens").Exists())
 }
 
+func TestNormalizeOpenAIResponsesRejectedFieldRetryBodyRemovesStatusByInputType(t *testing.T) {
+	body := []byte(`{"input":[{"type":"message","status":"completed","content":[]},{"type":"function_call","status":"completed"},{"type":"message","status":"in_progress","content":[]}]}`)
+	response := []byte(`{"error":{"code":"unsupported_parameter","param":"input[0].status","message":"Unsupported parameter: input[0].status"}}`)
+	retryBody, reason, changed, err := normalizeOpenAIResponsesRejectedFieldRetryBody(http.StatusBadRequest, body, response)
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Contains(t, reason, "message")
+	require.False(t, gjson.GetBytes(retryBody, "input.0.status").Exists())
+	require.False(t, gjson.GetBytes(retryBody, "input.2.status").Exists())
+	require.True(t, gjson.GetBytes(retryBody, "input.1.status").Exists())
+}
+
 func TestOpenAIGatewayService_APIKeyStripsAllIndexedNamespacesBeforeFirstForward(t *testing.T) {
 	body := []byte(`{"model":"gpt-5.5","stream":false,"input":[{"type":"function_call","name":"first","namespace":"remove-first","arguments":"{}"},{"type":"custom_tool_call","name":"second","namespace":"remove-second","input":"{}"}]}`)
 	upstream := &httpUpstreamRecorder{responses: []*http.Response{

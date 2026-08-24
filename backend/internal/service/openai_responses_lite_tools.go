@@ -108,11 +108,32 @@ func ensureOpenAIResponsesLiteReasoningContext(reqBody map[string]any) (bool, er
 
 // ensureOpenAIResponsesLiteParallelToolCallsDisabled 强制 Lite 上游只串行发起顶层工具调用。
 func ensureOpenAIResponsesLiteParallelToolCallsDisabled(reqBody map[string]any) bool {
+	// additional_tools 由客户端显式携带并行调用开关时必须原样保留；Lite
+	// 上游需要该字段判断工具发现请求的执行模式。
+	if _, exists := reqBody["parallel_tool_calls"]; exists && openAIResponsesLiteHasAdditionalTools(reqBody["input"]) {
+		if _, ok := reqBody["parallel_tool_calls"].(bool); ok {
+			return false
+		}
+	}
 	if parallelToolCalls, exists := reqBody["parallel_tool_calls"].(bool); exists && !parallelToolCalls {
 		return false
 	}
 	reqBody["parallel_tool_calls"] = false
 	return true
+}
+
+func openAIResponsesLiteHasAdditionalTools(input any) bool {
+	items, ok := input.([]any)
+	if !ok {
+		return false
+	}
+	for _, raw := range items {
+		item, ok := raw.(map[string]any)
+		if ok && strings.TrimSpace(firstNonEmptyString(item["type"])) == "additional_tools" {
+			return true
+		}
+	}
+	return false
 }
 
 func appendOpenAIResponsesLiteAdditionalTools(input any, namespaceTools []any) ([]any, error) {

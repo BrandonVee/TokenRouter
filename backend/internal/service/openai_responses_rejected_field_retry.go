@@ -17,7 +17,9 @@ const maxOpenAIResponsesRejectedFieldRetries = 6
 
 var (
 	openAIResponsesRejectedNamespaceParamPattern = regexp.MustCompile(`(?i)^input\[(\d+)\]\.namespace$`)
+	openAIResponsesRejectedStatusParamPattern    = regexp.MustCompile(`(?i)^input\[(\d+)\]\.status$`)
 	openAIResponsesRejectedMessageParamPattern   = regexp.MustCompile(`(?i)(?:unknown|unsupported)[ _-]+parameter\s*(?::|=|is)?\s*["']?(max_output_tokens|input\[\d+\]\.namespace)(?:["']|\b)`)
+	openAIResponsesRejectedStatusMessagePattern  = regexp.MustCompile(`(?i)(?:unknown|unsupported)[ _-]+parameter\s*(?::|=|is)?\s*["']?(input\[\d+\]\.status)(?:["']|\b)`)
 )
 
 type openAIResponsesRejectedFieldRetryState struct {
@@ -72,9 +74,17 @@ func normalizeOpenAIResponsesRejectedFieldRetryBody(statusCode int, body, respon
 	param := strings.ToLower(strings.TrimSpace(gjson.GetBytes(responseBody, "error.param").String()))
 	if param == "" {
 		param = openAIResponsesRejectedParamFromMessage(message)
+		if param == "" {
+			if match := openAIResponsesRejectedStatusMessagePattern.FindStringSubmatch(message); len(match) == 2 {
+				param = strings.ToLower(strings.TrimSpace(match[1]))
+			}
+		}
 	}
 	if index, ok := openAIResponsesRejectedNamespaceIndex(param); ok {
 		return removeOpenAIResponsesRejectedNamespaceAtIndex(body, index)
+	}
+	if index, ok := openAIResponsesRejectedStatusIndex(param); ok {
+		return removeOpenAIResponsesRejectedStatusByType(body, index)
 	}
 	if param == "max_output_tokens" && gjson.GetBytes(body, "max_output_tokens").Exists() {
 		retryBody, err := sjson.DeleteBytes(body, "max_output_tokens")
@@ -84,6 +94,46 @@ func normalizeOpenAIResponsesRejectedFieldRetryBody(statusCode int, body, respon
 		return retryBody, "max_output_tokens parameter rejection", true, nil
 	}
 	return nil, "", false, nil
+}
+
+func openAIResponsesRejectedStatusIndex(param string) (int, bool) {
+	match := openAIResponsesRejectedStatusParamPattern.FindStringSubmatch(strings.TrimSpace(param))
+	if len(match) != 2 {
+		match = openAIResponsesRejectedStatusMessagePattern.FindStringSubmatch(strings.TrimSpace(param))
+	}
+	if len(match) != 2 {
+		return 0, false
+	}
+	index, err := strconv.Atoi(match[1])
+	return index, err == nil && index >= 0
+}
+
+func removeOpenAIResponsesRejectedStatusByType(body []byte, index int) ([]byte, string, bool, error) {
+	items := gjson.GetBytes(body, "input").Array()
+	if index < 0 || index >= len(items) {
+		return nil, "", false, nil
+	}
+	typ := strings.TrimSpace(items[index].Get("type").String())
+	if typ == "" {
+		return nil, "", false, nil
+	}
+	result := append([]byte(nil), body...)
+	changed := false
+	for i, item := range items {
+		if strings.TrimSpace(item.Get("type").String()) != typ || !item.Get("status").Exists() {
+			continue
+		}
+		var err error
+		result, err = sjson.DeleteBytes(result, fmt.Sprintf("input.%d.status", i))
+		if err != nil {
+			return nil, "", false, fmt.Errorf("delete rejected status at input[%d]: %w", i, err)
+		}
+		changed = true
+	}
+	if !changed {
+		return nil, "", false, nil
+	}
+	return result, fmt.Sprintf("status field rejection for input type %s", typ), true, nil
 }
 
 func isExplicitOpenAIResponsesFieldRejection(code, message string) bool {

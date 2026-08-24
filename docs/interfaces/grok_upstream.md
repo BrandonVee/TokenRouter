@@ -63,6 +63,8 @@ Grok 兼容账号对所选端点返回 HTTP `405` 时，表示该账号不支持
 
 `POST /v1/web_search` 和 `POST /v1/x_search` 只允许 Grok 分组，接收查询或 `input` 和最多 20 条结果。两者在选择账号前进入共同内容审计，随后复用常规 Grok 账号资格、并发等待和最多四次账号尝试。`web_search` 使用原生 Responses `web_search` 工具；`x_search` 强制使用 `x_search`，并接受 `allowed_x_handles`、`excluded_x_handles`、`from_date`、`to_date` 及图片/视频理解开关。两者只返回实际工具来源 URL 对应的结果，分别以 `grok-web-search` 和 `grok-x-search` 记录计费模型。每次调用使用独立服务端 request ID 作为结算幂等键；不得用查询、IP 或 User-Agent 哈希合并相同搜索。Responses/Chat 路径会保留原生 `x_search` 工具字段，并从上游 usage 或工具事件恢复 `SearchCount` 作为 token 费用之外的附加费。
 
+发往 `cli-chat-proxy.grok.com` 的订阅请求统一使用 `xai-grok-workspace/<version>` 官方 CLI User-Agent，并附带 CLI client identifier/version/mode 头；不透传 Claude Code、Codex、浏览器或网关自定义 User-Agent。
+
 Voice HTTP 入口包括 TTS、STT 和自定义 Voice 的创建、读取、修改、删除与音频下载；`GET /v1/realtime` 代理 xAI Voice WebSocket。所有入口只允许 Grok 分组，并在整个会话持有并发槽。TTS 按字符、STT 按音频时长生成 `AudioUsage`；Realtime 必须先在任一中继方向观察到包含非空音频负载的事件，才按连接会话时长生成用量，握手失败、纯文本或只有转录事件的会话不结算。正常或常见断开仍要结算此前已确认的音频会话。Voice 和搜索分别使用分组显式价格，`NULL` 回退代码默认价，显式 `0` 表示免费，且都使用基础分组倍率，不混入文本 token 价格。
 
 ## 任务归属与结算

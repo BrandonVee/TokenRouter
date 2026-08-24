@@ -1342,9 +1342,11 @@ func applyGrokCLIHeaders(headers http.Header) {
 	if headers == nil {
 		return
 	}
-	headers.Set("User-Agent", grokGatewayUserAgent)
-	headers.Set("X-Grok-Client-Version", grokCLIVersion)
+	// cli-chat-proxy 会校验官方 CLI 的 workspace User-Agent，而不是网关自定义标识。
+	headers.Set("User-Agent", xai.CLIUserAgent(xai.ResolveCLIVersion()))
+	headers.Set("X-Grok-Client-Version", xai.ResolveCLIVersion())
 	headers.Set("X-Grok-Client-Mode", "interactive")
+	headers.Set("x-grok-client-identifier", xai.CLIClientIdentifier)
 }
 
 func (s *OpenAIGatewayService) updateGrokUsageSnapshot(ctx context.Context, account *Account, snapshot *xai.QuotaSnapshot) {
