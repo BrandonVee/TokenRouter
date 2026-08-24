@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/xai"
 	"github.com/stretchr/testify/require"
 )
 
@@ -293,7 +294,7 @@ func TestBuildUpstreamModelsRequestSupportsGrokOAuth(t *testing.T) {
 	require.Equal(t, "Bearer oauth-access-token", req.Header.Get("Authorization"))
 	require.Equal(t, grokCLIVersion, req.Header.Get("X-Grok-Client-Version"))
 	require.Equal(t, "interactive", req.Header.Get("X-Grok-Client-Mode"))
-	require.Equal(t, grokGatewayUserAgent, req.Header.Get("User-Agent"))
+	require.Equal(t, xai.CLIUserAgent(xai.ResolveCLIVersion()), req.Header.Get("User-Agent"))
 	require.Equal(t, "grok-user-id", req.Header.Get("X-UserID"))
 	require.Equal(t, "grok-user@example.com", req.Header.Get("X-Email"))
 	require.NotContains(t, req.Header.Get("Authorization"), "oauth-refresh-token")
@@ -423,6 +424,7 @@ func TestFetchUpstreamSupportedModelsParsesGrokOAuthResponse(t *testing.T) {
 	require.Equal(t, "https://cli-chat-proxy.grok.com/v1/models", upstream.lastReq.URL.String())
 	require.Equal(t, "Bearer oauth-access-token", upstream.lastReq.Header.Get("Authorization"))
 	require.Equal(t, grokCLIVersion, upstream.lastReq.Header.Get("X-Grok-Client-Version"))
+	require.Equal(t, xai.CLIUserAgent(xai.ResolveCLIVersion()), upstream.lastReq.Header.Get("User-Agent"))
 	require.Equal(t, "interactive", upstream.lastReq.Header.Get("X-Grok-Client-Mode"))
 	require.Equal(t, "grok-user-id", upstream.lastReq.Header.Get("X-UserID"))
 	require.Equal(t, "grok-user@example.com", upstream.lastReq.Header.Get("X-Email"))

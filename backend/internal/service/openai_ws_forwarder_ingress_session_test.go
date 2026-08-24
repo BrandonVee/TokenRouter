@@ -1015,7 +1015,8 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 
 	litePayload := requestToJSONString(captureConn.writes[1])
 	require.True(t, gjson.Get(litePayload, "parallel_tool_calls").Exists())
-	require.False(t, gjson.Get(litePayload, "parallel_tool_calls").Bool())
+	// additional_tools 请求需要保留客户端显式传入的并行调用参数。
+	require.True(t, gjson.Get(litePayload, "parallel_tool_calls").Bool())
 	require.False(t, gjson.Get(litePayload, `tools.#(type=="image_generation")`).Exists())
 	require.NotContains(t, gjson.Get(litePayload, "instructions").String(), "image_generation")
 	require.Equal(t, "exec", gjson.Get(litePayload, `input.#(type=="additional_tools").tools.0.name`).String())
