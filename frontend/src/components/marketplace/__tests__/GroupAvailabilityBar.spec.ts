@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-import type { MarketplaceGroupAvailabilityRequest } from '@/types'
+import type { MarketplaceGroupAvailabilityDay } from '@/types'
 import GroupAvailabilityBar from '../GroupAvailabilityBar.vue'
 
 vi.mock('vue-i18n', async () => {
@@ -14,20 +14,25 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-function request(index: number, status: string): MarketplaceGroupAvailabilityRequest {
+function bucket(index: number, overrides: Partial<MarketplaceGroupAvailabilityDay> = {}): MarketplaceGroupAvailabilityDay {
   return {
-    status,
-    success: status === 'success',
-    created_at: new Date(Date.UTC(2026, 7, 24, 0, index)).toISOString(),
+    date: new Date(Date.UTC(2026, 7, 24, index)).toISOString(),
+    success_count: 10,
+    slow_stream_count: 0,
+    total_count: 10,
+    availability_rate: 1,
+    ...overrides,
   }
 }
 
-describe('GroupAvailabilityBar passive groups', () => {
-  it('renders sixty bars and summarizes each five eligible requests', () => {
-    const requests = Array.from({ length: 300 }, (_, index) => request(index, 'success'))
-    requests[5] = request(5, 'upstream_error')
-    requests[10] = request(10, 'upstream_error')
-    requests[11] = request(11, 'upstream_error')
+describe('GroupAvailabilityBar passive time buckets', () => {
+  it('renders sixty time buckets with weighted color thresholds', () => {
+    const days = Array.from({ length: 60 }, (_, index) => bucket(index))
+    days[0] = bucket(0, { success_count: 0, total_count: 0, availability_rate: null })
+    days[1] = bucket(1, { success_count: 13, total_count: 20, availability_rate: 0.65 })
+    days[2] = bucket(2, { success_count: 2, total_count: 5, availability_rate: 0.4 })
+    days[3] = bucket(3, { slow_stream_count: 10 })
+    days[4] = bucket(4, { success_count: 6, slow_stream_count: 1, total_count: 10, availability_rate: 0.6 })
 
     const wrapper = mount(GroupAvailabilityBar, {
       props: {
@@ -35,12 +40,11 @@ describe('GroupAvailabilityBar passive groups', () => {
           mode: 'passive',
           window_days: 7,
           bucket_minutes: 120,
-          success_count: 297,
+          success_count: 41,
           pressure_count: 0,
-          total_count: 300,
-          availability_rate: 0.99,
-          days: [],
-          requests,
+          total_count: 50,
+          availability_rate: 0.82,
+          days,
         },
       },
     })
@@ -50,5 +54,27 @@ describe('GroupAvailabilityBar passive groups', () => {
     expect(bars[0].classes()).toContain('bg-emerald-500')
     expect(bars[1].classes()).toContain('bg-amber-400')
     expect(bars[2].classes()).toContain('bg-rose-500')
+    expect(bars[3].classes()).toContain('bg-amber-400')
+    expect(bars[4].classes()).toContain('bg-amber-400')
+  })
+
+  it('fills missing time buckets as successful bars', () => {
+    const wrapper = mount(GroupAvailabilityBar, {
+      props: {
+        availability: {
+          mode: 'passive',
+          window_days: 7,
+          bucket_minutes: 120,
+          success_count: 0,
+          total_count: 0,
+          availability_rate: 1,
+          days: [],
+        },
+      },
+    })
+
+    const bars = wrapper.get('[role="img"]').findAll('span')
+    expect(bars).toHaveLength(60)
+    expect(bars.every((bar) => bar.classes().includes('bg-emerald-500'))).toBe(true)
   })
 })

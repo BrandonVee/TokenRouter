@@ -5,16 +5,16 @@
       class="grid h-8 min-w-0 flex-1 items-center overflow-hidden"
       :style="passiveGridStyle"
       role="img"
-      :aria-label="t('marketplace.passiveAvailabilityAriaLabel')"
+      :aria-label="passiveAriaLabel"
     >
       <span
-        v-for="(request, index) in passiveRequestGroups"
-        :key="`${request.created_at || 'empty'}-${index}`"
+        v-for="(bucket, index) in passiveBuckets"
+        :key="`${bucket.date || 'empty'}-${index}`"
         :class="[
           'h-6 max-w-full justify-self-center rounded-[2px]',
-          requestClass(request.status, request.success),
+          passiveBucketClass(bucket),
         ]"
-        :title="requestTitle(request.status)"
+        :title="passiveBucketTitle(bucket)"
         :style="{ width: passiveBarWidth }"
       />
     </div>
@@ -49,7 +49,6 @@ import { useI18n } from 'vue-i18n'
 import type {
   MarketplaceGroupAvailability,
   MarketplaceGroupAvailabilityDay,
-  MarketplaceGroupAvailabilityRequest,
 } from '@/types'
 
 const props = defineProps<{
@@ -58,9 +57,7 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const isPassive = computed(() => props.availability?.mode === 'passive')
-const passiveRequestLimit = 300
-const passiveRequestGroupSize = 5
-const passiveBarCount = passiveRequestLimit / passiveRequestGroupSize
+const passiveBarCount = 60
 
 const windowDays = computed(() => Math.max(props.availability?.window_days ?? 7, 1))
 const bucketMinutes = computed(() => Math.max(props.availability?.bucket_minutes ?? 24 * 60, 1))
@@ -85,45 +82,18 @@ const normalizedBuckets = computed<MarketplaceGroupAvailabilityDay[]>(() => {
   ]
 })
 
-const normalizedRequests = computed<MarketplaceGroupAvailabilityRequest[]>(() => {
-  const requests = props.availability?.requests ?? []
+const passiveBuckets = computed<MarketplaceGroupAvailabilityDay[]>(() => {
+  const buckets = props.availability?.days ?? []
   return [
-    ...Array.from({ length: Math.max(passiveRequestLimit - requests.length, 0) }, () => ({
-      status: 'unknown' as const,
-      success: false,
-      created_at: '',
+    ...Array.from({ length: Math.max(passiveBarCount - buckets.length, 0) }, () => ({
+      date: '',
+      success_count: 0,
+      slow_stream_count: 0,
+      total_count: 0,
+      availability_rate: null,
     })),
-    ...requests.slice(-passiveRequestLimit),
+    ...buckets.slice(-passiveBarCount),
   ]
-})
-
-// 每根柱子汇总连续 5 次有效请求，孤立故障降级为黄色，同组至少 2 次明确上游故障才标红。
-const passiveRequestGroups = computed<MarketplaceGroupAvailabilityRequest[]>(() => {
-  const groups: MarketplaceGroupAvailabilityRequest[] = []
-  for (let start = 0; start < normalizedRequests.value.length; start += passiveRequestGroupSize) {
-    const requests = normalizedRequests.value.slice(start, start + passiveRequestGroupSize)
-    const actualRequests = requests.filter((request) => Boolean(request.created_at))
-    const upstreamErrors = actualRequests.filter((request) => request.status === 'upstream_error').length
-    const hasPressure = actualRequests.some((request) => request.status === 'pressure')
-    const allSuccess = actualRequests.length > 0 && actualRequests.every(
-      (request) => request.success || request.status === 'success',
-    )
-
-    let status = 'unknown'
-    if (upstreamErrors >= 2) {
-      status = 'upstream_error'
-    } else if (upstreamErrors > 0 || hasPressure) {
-      status = 'pressure'
-    } else if (allSuccess) {
-      status = 'success'
-    }
-    groups.push({
-      status,
-      success: status === 'success',
-      created_at: actualRequests.at(-1)?.created_at ?? '',
-    })
-  }
-  return groups
 })
 
 const passiveGridStyle = computed(() => ({
@@ -132,6 +102,9 @@ const passiveGridStyle = computed(() => ({
 }))
 
 const passiveBarWidth = computed(() => '100%')
+const passiveAriaLabel = computed(() => t('marketplace.passiveAvailabilityAriaLabel', {
+  minutes: bucketMinutes.value,
+}))
 
 const barGridStyle = computed(() => ({
   gap:
@@ -171,8 +144,8 @@ const tooltip = computed(() => {
     return t('marketplace.passiveAvailabilityHint', {
       rate: rateLabel.value,
       success: availability?.success_count ?? 0,
-      pressure: availability?.pressure_count ?? 0,
       total: availability?.total_count ?? 0,
+      minutes: bucketMinutes.value,
     })
   }
   if (!availability || typeof availability.availability_rate !== 'number') {
@@ -192,14 +165,24 @@ const ariaLabel = computed(
   () => `${t('marketplace.availabilityWindow', { days: windowDays.value })}: ${rateLabel.value}`,
 )
 
-function requestClass(status: string, success: boolean): string {
-  if (success || status === 'success') return 'bg-emerald-500'
-  if (status === 'pressure') return 'bg-amber-400'
-  if (status === 'upstream_error') return 'bg-rose-500'
-  return 'bg-gray-200 dark:bg-dark-700'
+function passiveBucketStatus(bucket: MarketplaceGroupAvailabilityDay): 'success' | 'slow_stream' | 'upstream_error' {
+	if (bucket.total_count <= 0) return 'success'
+	const upstreamErrors = Math.max(bucket.total_count - bucket.success_count, 0)
+	const issueScore = (upstreamErrors + (bucket.slow_stream_count ?? 0) * 0.25) / bucket.total_count
+	if (issueScore >= 0.6 && bucket.total_count >= 5 && upstreamErrors >= 3) return 'upstream_error'
+	if (issueScore >= 0.25) return 'slow_stream'
+	return 'success'
 }
 
-function requestTitle(status: string): string {
+function passiveBucketClass(bucket: MarketplaceGroupAvailabilityDay): string {
+  const status = passiveBucketStatus(bucket)
+  if (status === 'upstream_error') return 'bg-rose-500'
+  if (status === 'slow_stream') return 'bg-amber-400'
+  return 'bg-emerald-500'
+}
+
+function passiveBucketTitle(bucket: MarketplaceGroupAvailabilityDay): string {
+  const status = passiveBucketStatus(bucket)
   return t(`marketplace.passiveAvailabilityStatus.${status}`, {}, status)
 }
 

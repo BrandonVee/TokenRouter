@@ -285,23 +285,39 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 	return out, nil
 }
 
-// GetPassiveSummaryByGroupIDs 从真实请求日志构建最近 300 次有效请求的可用性摘要。
+// GetPassiveSummaryByGroupIDs 从真实请求日志构建固定 60 个时间桶的可用性摘要。
 func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx context.Context, groupIDs []int64, days int, bucketMinutes int, timezoneName string, now time.Time) (map[int64]*service.GroupAvailabilitySummary, error) {
 	out := make(map[int64]*service.GroupAvailabilitySummary, len(groupIDs))
 	if r == nil || r.db == nil || len(groupIDs) == 0 {
 		return out, nil
 	}
 	days, bucketMinutes = service.NormalizeMarketplaceAvailabilityWindow(days, bucketMinutes)
+	loc := time.UTC
+	if timezoneName != "" {
+		if parsed, err := time.LoadLocation(timezoneName); err == nil && parsed != nil {
+			loc = parsed
+		}
+	}
+	bucketDuration := time.Duration(bucketMinutes) * time.Minute
+	endLocal := nextLocalBucketBoundary(now.In(loc), bucketDuration)
+	startLocal := endLocal.Add(-service.PassiveAvailabilityBucketCount * bucketDuration)
+	startUTC := startLocal.UTC()
+	endUTC := endLocal.UTC()
 	for _, groupID := range groupIDs {
-		out[groupID] = &service.GroupAvailabilitySummary{
+		summary := &service.GroupAvailabilitySummary{
 			Mode:          service.MarketplaceAvailabilityModePassive,
 			WindowDays:    days,
 			BucketMinutes: bucketMinutes,
-			Requests:      make([]service.GroupAvailabilityRequest, 0, service.PassiveAvailabilitySampleLimit),
+			Days:          make([]service.GroupAvailabilityBucket, 0, service.PassiveAvailabilityBucketCount),
 		}
+		for i := 0; i < service.PassiveAvailabilityBucketCount; i++ {
+			summary.Days = append(summary.Days, service.GroupAvailabilityBucket{
+				Date: startLocal.Add(time.Duration(i) * bucketDuration).Format(time.RFC3339),
+			})
+		}
+		out[groupID] = summary
 	}
 
-	start := now.Add(-time.Duration(days) * 24 * time.Hour)
 	rows, err := r.db.QueryContext(ctx, `
 		WITH events AS (
 			SELECT
@@ -309,7 +325,14 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 				ul.group_id,
 				ul.request_id,
 				ul.created_at,
-				'success'::text AS status,
+				CASE
+					WHEN COALESCE(ul.stream, false)
+						AND COALESCE(ul.first_token_ms, 0) > 30000
+						AND LOWER(COALESCE(ul.billing_mode, '')) <> 'image'
+						AND COALESCE(ul.image_count, 0) = 0
+						THEN 'slow_stream'
+					ELSE 'success'
+				END::text AS status,
 				true AS success,
 				1 AS source_priority
 			FROM usage_logs ul
@@ -321,20 +344,16 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 				oe.request_id,
 				oe.created_at,
 				CASE
-					WHEN COALESCE(oe.status_code, 0) IN (429, 503, 529)
-						OR COALESCE(oe.upstream_status_code, 0) IN (429, 503, 529)
-						OR LOWER(COALESCE(oe.error_type, '') || ' ' || COALESCE(oe.error_message, '')) ~ '(rate.?limit|throttl|capacity|compute|overload|concurrency)'
-						THEN 'pressure'
-					WHEN LOWER(COALESCE(oe.error_owner, '')) = 'provider'
-						OR COALESCE(oe.upstream_status_code, 0) > 0
-						OR COALESCE(
-							CASE
-								WHEN jsonb_typeof(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb)) = 'array'
-									THEN jsonb_array_length(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb))
-								ELSE 0
-							END,
-							0
-						) > 0
+					WHEN COALESCE(oe.upstream_status_code, 0) BETWEEN 500 AND 599
+						OR (
+							COALESCE(oe.status_code, 0) BETWEEN 500 AND 599
+							AND (
+								LOWER(COALESCE(oe.error_owner, '')) = 'provider'
+								OR LOWER(COALESCE(oe.error_phase, '')) = 'upstream'
+								OR LOWER(COALESCE(oe.error_source, '')) = 'upstream_http'
+							)
+						)
+						OR LOWER(COALESCE(oe.error_message, '')) ~ 'upstream[[:space:]_-]+request[[:space:]_-]+failed'
 						THEN 'upstream_error'
 					ELSE 'unknown'
 				END AS status,
@@ -345,18 +364,20 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 			  AND oe.created_at >= $2 AND oe.created_at < $3
 			  AND NOT COALESCE(oe.is_business_limited, false)
 			  AND NOT COALESCE(oe.is_count_tokens, false)
+			  AND COALESCE(oe.status_code, 0) NOT IN (429, 529)
+			  AND COALESCE(oe.upstream_status_code, 0) NOT IN (429, 529)
+			  AND NOT (LOWER(COALESCE(oe.error_type, '') || ' ' || COALESCE(oe.error_message, '')) ~ '(rate.?limit|throttl|capacity|compute|overload|concurrency)')
 			  AND (
-				LOWER(COALESCE(oe.error_owner, '')) = 'provider'
-				OR COALESCE(oe.upstream_status_code, 0) IN (401, 403)
-				OR COALESCE(oe.upstream_status_code, 0) >= 500
-				OR COALESCE(
-					CASE
-						WHEN jsonb_typeof(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb)) = 'array'
-							THEN jsonb_array_length(COALESCE(NULLIF(oe.upstream_errors, 'null'::jsonb), '[]'::jsonb))
-						ELSE 0
-					END,
-					0
-				) > 0
+				COALESCE(oe.upstream_status_code, 0) BETWEEN 500 AND 599
+				OR (
+					COALESCE(oe.status_code, 0) BETWEEN 500 AND 599
+					AND (
+						LOWER(COALESCE(oe.error_owner, '')) = 'provider'
+						OR LOWER(COALESCE(oe.error_phase, '')) = 'upstream'
+						OR LOWER(COALESCE(oe.error_source, '')) = 'upstream_http'
+					)
+				)
+				OR LOWER(COALESCE(oe.error_message, '')) ~ 'upstream[[:space:]_-]+request[[:space:]_-]+failed'
 			  )
 		), deduplicated AS (
 			SELECT *, ROW_NUMBER() OVER (
@@ -364,39 +385,54 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 				ORDER BY source_priority DESC, created_at DESC, id DESC
 			) AS request_rank
 			FROM events
-		), recent AS (
-			SELECT *, ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY created_at DESC, id DESC) AS group_rank
+		), bucketed AS (
+			SELECT *, FLOOR(
+				(EXTRACT(EPOCH FROM created_at) - EXTRACT(EPOCH FROM $2::timestamptz)) /
+				($4::double precision * 60)
+			)::int AS bucket_index
 			FROM deduplicated
 			WHERE request_rank = 1
 		)
-		SELECT group_id, status, success, created_at
-		FROM recent
-		WHERE group_rank <= $4
-		ORDER BY group_id, created_at ASC, id ASC
-	`, pq.Array(groupIDs), start, now, service.PassiveAvailabilitySampleLimit)
+		SELECT
+			group_id,
+			bucket_index,
+			COUNT(*) FILTER (WHERE success = true) AS success_count,
+			COUNT(*) FILTER (WHERE status = 'slow_stream') AS slow_stream_count,
+			COUNT(*) AS total_count,
+			(ARRAY_AGG(status ORDER BY created_at DESC, id DESC))[1] AS last_status,
+			MAX(created_at) AS last_checked_at
+		FROM bucketed
+		WHERE bucket_index >= 0 AND bucket_index < 60
+		GROUP BY group_id, bucket_index
+		ORDER BY group_id, bucket_index
+	`, pq.Array(groupIDs), startUTC, endUTC, bucketMinutes)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var groupID int64
-		var request service.GroupAvailabilityRequest
-		if err := rows.Scan(&groupID, &request.Status, &request.Success, &request.CreatedAt); err != nil {
+		var bucketIndex int
+		var successCount, slowStreamCount, totalCount int64
+		var lastStatus string
+		var lastCheckedAt time.Time
+		if err := rows.Scan(&groupID, &bucketIndex, &successCount, &slowStreamCount, &totalCount, &lastStatus, &lastCheckedAt); err != nil {
 			return nil, err
 		}
 		summary, ok := out[groupID]
-		if !ok {
+		if !ok || bucketIndex < 0 || bucketIndex >= len(summary.Days) {
 			continue
 		}
-		summary.Requests = append(summary.Requests, request)
-		summary.TotalCount++
-		if request.Success {
-			summary.SuccessCount++
-		} else if request.Status == service.GroupAvailabilityRequestStatusPressure {
-			summary.PressureCount++
-		}
-		summary.LastStatus = request.Status
-		checkedAt := request.CreatedAt
+		bucket := &summary.Days[bucketIndex]
+		bucket.SuccessCount = successCount
+		bucket.SlowStreamCount = slowStreamCount
+		bucket.TotalCount = totalCount
+		bucket.AvailabilityRate = passiveWeightedAvailabilityRate(successCount, slowStreamCount, totalCount)
+		summary.SuccessCount += successCount
+		summary.SlowStreamCount += slowStreamCount
+		summary.TotalCount += totalCount
+		summary.LastStatus = lastStatus
+		checkedAt := lastCheckedAt
 		summary.LastCheckedAt = &checkedAt
 	}
 	if err := rows.Err(); err != nil {
@@ -404,7 +440,7 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 	}
 	for _, summary := range out {
 		summary.Mode = service.MarketplaceAvailabilityModePassive
-		summary.AvailabilityRate = passiveAvailabilityRate(summary.SuccessCount, summary.PressureCount, summary.TotalCount)
+		summary.AvailabilityRate = passiveWeightedAvailabilityRate(summary.SuccessCount, summary.SlowStreamCount, summary.TotalCount)
 	}
 	return out, nil
 }
@@ -441,12 +477,21 @@ func availabilityRate(successCount int64, totalCount int64) *float64 {
 	return &value
 }
 
-// passiveAvailabilityRate 对明确上游压力给予半分，并在样本不足时保持未知。
-func passiveAvailabilityRate(successCount int64, pressureCount int64, totalCount int64) *float64 {
-	if totalCount < service.PassiveAvailabilityMinimumSamples {
-		return nil
+// passiveWeightedAvailabilityRate 用上游故障全权重和慢首字四分之一权重计算健康分。
+func passiveWeightedAvailabilityRate(successCount int64, slowStreamCount int64, totalCount int64) *float64 {
+	if totalCount <= 0 {
+		value := 1.0
+		return &value
 	}
-	value := (float64(successCount) + float64(pressureCount)*0.5) / float64(totalCount)
+	upstreamErrorCount := totalCount - successCount
+	if upstreamErrorCount < 0 {
+		upstreamErrorCount = 0
+	}
+	issueScore := (float64(upstreamErrorCount) + float64(slowStreamCount)*service.PassiveAvailabilitySlowStreamWeight) / float64(totalCount)
+	value := 1 - issueScore
+	if value < 0 {
+		value = 0
+	}
 	return &value
 }
 

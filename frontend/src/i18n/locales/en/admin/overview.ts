@@ -1143,7 +1143,7 @@ affiliates: {
       availabilityProbe: {
         title: 'Group Availability Probe',
         hint: 'Send lightweight active probes to this group on a fixed interval. The marketplace shows availability using the configured public window.',
-        passiveModeHint: 'The system is using passive availability based on the latest 300 eligible requests, so no active probe requests are sent. Saved active probe settings are preserved and take effect again when active mode is restored.',
+        passiveModeHint: 'The system is using passive availability across the latest 60 configured minute buckets, so no active probe requests are sent. Saved active probe settings are preserved and take effect again when active mode is restored.',
         model: 'Probe Model',
         selectModel: 'Select probe model',
         interval: 'Probe Interval (minutes)',

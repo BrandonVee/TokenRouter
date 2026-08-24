@@ -10,29 +10,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPassiveAvailabilityRateUsesPressureWeightAndMinimumSamples(t *testing.T) {
-	require.Nil(t, passiveAvailabilityRate(9, 0, 9))
+func TestPassiveWeightedAvailabilityRateUsesErrorWeights(t *testing.T) {
+	noDataRate := passiveWeightedAvailabilityRate(0, 0, 0)
+	require.NotNil(t, noDataRate)
+	require.Equal(t, 1.0, *noDataRate)
 
-	rate := passiveAvailabilityRate(8, 1, 10)
+	rate := passiveWeightedAvailabilityRate(9, 1, 10)
 	require.NotNil(t, rate)
-	require.InDelta(t, 0.85, *rate, 1e-9)
+	require.InDelta(t, 0.875, *rate, 1e-9)
 }
 
-func TestGetPassiveSummaryFiltersNoiseAndUsesLatestThreeHundredSamples(t *testing.T) {
+func TestGetPassiveSummaryBuildsSixtyTimeBuckets(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
 	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
-	rows := sqlmock.NewRows([]string{"group_id", "status", "success", "created_at"})
-	for i := 0; i < 8; i++ {
-		rows.AddRow(int64(7), service.GroupAvailabilityProbeStatusSuccess, true, now.Add(time.Duration(i-10)*time.Minute))
-	}
-	rows.AddRow(int64(7), service.GroupAvailabilityRequestStatusPressure, false, now.Add(-2*time.Minute))
-	rows.AddRow(int64(7), service.GroupAvailabilityRequestStatusUpstreamError, false, now.Add(-time.Minute))
+	rows := sqlmock.NewRows([]string{
+		"group_id", "bucket_index", "success_count", "slow_stream_count",
+		"total_count", "last_status", "last_checked_at",
+	}).
+		AddRow(int64(7), 58, int64(9), int64(1), int64(10), service.GroupAvailabilityRequestStatusSlowStream, now.Add(-2*time.Hour)).
+		AddRow(int64(7), 59, int64(6), int64(0), int64(10), service.GroupAvailabilityRequestStatusUpstreamError, now.Add(-time.Hour))
 
-	mock.ExpectQuery(`(?s)WITH events AS .*NOT COALESCE\(oe\.is_business_limited, false\).*NOT COALESCE\(oe\.is_count_tokens, false\).*ORDER BY source_priority DESC, created_at DESC, id DESC.*WHERE group_rank <= \$4`).
-		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), service.PassiveAvailabilitySampleLimit).
+	mock.ExpectQuery(`(?s)WITH events AS .*first_token_ms.*30000.*billing_mode.*image.*image_count.*bucket_index.*COUNT.*slow_stream_count.*GROUP BY group_id, bucket_index`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 120).
 		WillReturnRows(rows)
 
 	repo := &groupAvailabilityProbeRepository{db: db}
@@ -42,10 +44,13 @@ func TestGetPassiveSummaryFiltersNoiseAndUsesLatestThreeHundredSamples(t *testin
 
 	summary := summaries[7]
 	require.NotNil(t, summary)
-	require.Equal(t, int64(8), summary.SuccessCount)
-	require.Equal(t, int64(1), summary.PressureCount)
-	require.Equal(t, int64(10), summary.TotalCount)
-	require.Len(t, summary.Requests, 10)
+	require.Equal(t, int64(15), summary.SuccessCount)
+	require.Equal(t, int64(0), summary.PressureCount)
+	require.Equal(t, int64(20), summary.TotalCount)
+	require.Len(t, summary.Days, service.PassiveAvailabilityBucketCount)
+	require.Equal(t, int64(1), summary.Days[58].SlowStreamCount)
+	require.InDelta(t, 0.875, *summary.Days[58].AvailabilityRate, 1e-9)
+	require.InDelta(t, 0.6, *summary.Days[59].AvailabilityRate, 1e-9)
 	require.NotNil(t, summary.AvailabilityRate)
-	require.InDelta(t, 0.85, *summary.AvailabilityRate, 1e-9)
+	require.InDelta(t, 0.7375, *summary.AvailabilityRate, 1e-9)
 }

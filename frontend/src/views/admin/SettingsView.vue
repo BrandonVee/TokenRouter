@@ -6089,7 +6089,7 @@
                     {{ t("admin.settings.marketplaceAvailability.modeHint") }}
                   </p>
                 </div>
-                <div>
+                <div v-if="form.marketplace_availability_mode !== 'passive'">
                   <label class="input-label">
                     {{ t("admin.settings.marketplaceAvailability.windowDays") }}
                   </label>
@@ -6111,7 +6111,7 @@
                   </p>
                 </div>
 
-                <div>
+                <div :class="form.marketplace_availability_mode === 'passive' ? 'md:col-span-2' : ''">
                   <label class="input-label">
                     {{ t("admin.settings.marketplaceAvailability.bucketMinutes") }}
                   </label>
@@ -6133,7 +6133,10 @@
                   </p>
                 </div>
               </div>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p
+                v-if="form.marketplace_availability_mode !== 'passive'"
+                class="text-xs text-gray-500 dark:text-gray-400"
+              >
                 {{ t("admin.settings.marketplaceAvailability.bucketLimitHint") }}
               </p>
             </div>

@@ -635,12 +635,13 @@ export interface MarketplaceGroupCapacity {
 export interface MarketplaceGroupAvailabilityDay {
   date: string
   success_count: number
+  slow_stream_count?: number
   total_count: number
   availability_rate?: number | null
 }
 
 export interface MarketplaceGroupAvailabilityRequest {
-  status: 'success' | 'pressure' | 'upstream_error' | 'unknown' | string
+  status: 'success' | 'pressure' | 'upstream_error' | 'slow_stream' | 'unknown' | string
   success: boolean
   created_at: string
 }
@@ -651,6 +652,7 @@ export interface MarketplaceGroupAvailability {
   bucket_minutes?: number
   success_count: number
   pressure_count?: number
+  slow_stream_count?: number
   total_count: number
   availability_rate?: number | null
   last_status?: string

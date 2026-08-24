@@ -34,12 +34,13 @@ marketplace: {
     availabilityNoData: 'No data',
     availabilityHint: '{days}-day active probe availability {rate} ({success} success / {total} total)',
     availabilityHintNoData: 'No active probe data in the last {days} days',
-    passiveAvailabilityAriaLabel: 'Latest 300 eligible requests, grouped into 60 bars of 5: green means success, yellow means pressure or an isolated failure, red means at least two confirmed upstream failures in a group, and gray means no data.',
-    passiveAvailabilityHint: 'Health score for the latest {total} eligible requests: {rate} ({success} success, {pressure} under pressure)',
+    passiveAvailabilityAriaLabel: 'Latest 60 time buckets of {minutes} minutes each: green means the weighted issue score is below 25% or there is no data, yellow means 25% to below 60%, and red means at least 60% with at least three upstream failures.',
+    passiveAvailabilityHint: 'Health across the latest 60 {minutes}-minute buckets: {rate} ({success} success / {total} eligible requests)',
     passiveAvailabilityStatus: {
       success: 'Success',
       pressure: 'Compute or rate-limit pressure',
       upstream_error: 'Confirmed upstream failure',
+      slow_stream: 'Streaming first token exceeded 30 seconds',
       unknown: 'Unknown or no data'
     },
     rateMultiplier: 'Group Multiplier',
