@@ -85,7 +85,8 @@ func TestOpenAIHTTP2KeepAlive_NegotiatesHTTP2WithTLSServer(t *testing.T) {
 	server.StartTLS()
 	defer server.Close()
 
-	serverTransport := server.Client().Transport.(*http.Transport)
+	serverTransport, ok := server.Client().Transport.(*http.Transport)
+	require.True(t, ok)
 	transport := &http.Transport{TLSClientConfig: serverTransport.TLSClientConfig.Clone()}
 	_, err := enableOpenAIHTTP2KeepAlive(transport)
 	require.NoError(t, err)
@@ -94,7 +95,9 @@ func TestOpenAIHTTP2KeepAlive_NegotiatesHTTP2WithTLSServer(t *testing.T) {
 
 	resp, err := client.Get(server.URL)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() {
+		require.NoError(t, resp.Body.Close())
+	}()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	require.Equal(t, "ok", string(body))

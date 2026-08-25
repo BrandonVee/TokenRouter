@@ -1140,6 +1140,7 @@ func (k oidcJWK) publicKey() (any, error) {
 		if !curve.IsOnCurve(x, y) {
 			return nil, errors.New("ec point is not on curve")
 		}
+		//nolint:staticcheck // SA1019：OIDC EC JWK 仍需按标准坐标构造 ECDSA 公钥以兼容 JWT 验签。
 		return &ecdsa.PublicKey{Curve: curve, X: x, Y: y}, nil
 	default:
 		return nil, fmt.Errorf("unsupported jwk kty: %s", k.Kty)
