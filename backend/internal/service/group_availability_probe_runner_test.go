@@ -8,6 +8,26 @@ import (
 	"time"
 )
 
+func TestIsUpstreamAvailabilityProbeFailure(t *testing.T) {
+	tests := []struct {
+		name    string
+		message string
+		want    bool
+	}{
+		{name: "transport failure", message: "Upstream request failed: timeout", want: true},
+		{name: "server status", message: "API returned 503: overloaded", want: true},
+		{name: "local account selection", message: "no available account for model", want: false},
+		{name: "auth failure", message: "API returned 401: unauthorized", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsUpstreamAvailabilityProbeFailure(tt.message); got != tt.want {
+				t.Fatalf("IsUpstreamAvailabilityProbeFailure(%q) = %v, want %v", tt.message, got, tt.want)
+			}
+		})
+	}
+}
+
 type groupAvailabilitySettingRepoStub struct {
 	SettingRepository
 	settings map[string]string

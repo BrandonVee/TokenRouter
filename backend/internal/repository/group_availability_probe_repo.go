@@ -210,7 +210,17 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 			group_id,
 			FLOOR((EXTRACT(EPOCH FROM started_at) - EXTRACT(EPOCH FROM $2::timestamptz)) / ($4::double precision * 60))::int AS bucket_index,
 			COUNT(*) FILTER (WHERE success = true) AS success_count,
-			COUNT(*) AS total_count
+			COUNT(*) FILTER (WHERE
+				success = true
+				OR status = 'upstream_error'
+				OR (
+					status = 'failed'
+					AND (
+						LOWER(COALESCE(error_message, '')) ~ 'upstream[[:space:]_-]+request[[:space:]_-]+failed'
+						OR LOWER(COALESCE(error_message, '')) ~ '(^|[^0-9])5[0-9]{2}([^0-9]|$)'
+					)
+				)
+			) AS total_count
 		FROM group_availability_probe_results
 		WHERE group_id = ANY($1)
 		  AND started_at >= $2
@@ -249,6 +259,7 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 	}
 
 	for _, summary := range out {
+		fillEmptyAvailabilityBucketsAsSuccess(summary)
 		summary.Mode = service.MarketplaceAvailabilityModeActive
 		summary.AvailabilityRate = availabilityRate(summary.SuccessCount, summary.TotalCount)
 	}
@@ -258,6 +269,17 @@ func (r *groupAvailabilityProbeRepository) GetSummaryByGroupIDs(ctx context.Cont
 			group_id, status, finished_at
 		FROM group_availability_probe_results
 		WHERE group_id = ANY($1)
+		  AND (
+			success = true
+			OR status = 'upstream_error'
+			OR (
+				status = 'failed'
+				AND (
+					LOWER(COALESCE(error_message, '')) ~ 'upstream[[:space:]_-]+request[[:space:]_-]+failed'
+					OR LOWER(COALESCE(error_message, '')) ~ '(^|[^0-9])5[0-9]{2}([^0-9]|$)'
+				)
+			)
+		  )
 		ORDER BY group_id, started_at DESC, id DESC
 	`, pq.Array(groupIDs))
 	if err != nil {
@@ -439,10 +461,30 @@ func (r *groupAvailabilityProbeRepository) GetPassiveSummaryByGroupIDs(ctx conte
 		return nil, err
 	}
 	for _, summary := range out {
+		fillEmptyAvailabilityBucketsAsSuccess(summary)
 		summary.Mode = service.MarketplaceAvailabilityModePassive
 		summary.AvailabilityRate = passiveWeightedAvailabilityRate(summary.SuccessCount, summary.SlowStreamCount, summary.TotalCount)
 	}
 	return out, nil
+}
+
+// fillEmptyAvailabilityBucketsAsSuccess 将没有观测的时间桶按用户约定视为成功。
+func fillEmptyAvailabilityBucketsAsSuccess(summary *service.GroupAvailabilitySummary) {
+	if summary == nil {
+		return
+	}
+	for i := range summary.Days {
+		bucket := &summary.Days[i]
+		if bucket.TotalCount > 0 {
+			continue
+		}
+		bucket.SuccessCount = 1
+		bucket.TotalCount = 1
+		value := 1.0
+		bucket.AvailabilityRate = &value
+		summary.SuccessCount++
+		summary.TotalCount++
+	}
 }
 
 func nextLocalBucketBoundary(t time.Time, bucketDuration time.Duration) time.Time {

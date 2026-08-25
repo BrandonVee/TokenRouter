@@ -2,6 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -28,7 +32,17 @@ const (
 	minMarketplaceAvailabilityBucketMinutes     = 5
 	maxMarketplaceAvailabilityBucketMinutes     = 1440
 	maxMarketplaceAvailabilityBuckets           = 720
+	marketplaceAvailabilityCacheTTL             = 30 * time.Second
 )
+
+// ErrMarketplaceAvailabilityCacheMiss 表示可用性摘要缓存不存在。
+var ErrMarketplaceAvailabilityCacheMiss = errors.New("模型广场可用性缓存未命中")
+
+// MarketplaceAvailabilityCache 定义跨实例共享的可用性摘要缓存。
+type MarketplaceAvailabilityCache interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value string, ttl time.Duration) error
+}
 
 // NormalizeMarketplaceAvailabilityMode 将系统设置限制为支持的数据来源。
 func NormalizeMarketplaceAvailabilityMode(value string) string {
@@ -65,13 +79,14 @@ type ModelMarketplaceModel struct {
 }
 
 type ModelMarketplaceService struct {
-	groupRepo        GroupRepository
-	settingRepo      SettingRepository
-	gatewayService   *GatewayService
-	billingService   *BillingService
-	capacityService  *GroupCapacityService
-	availabilityRepo GroupAvailabilityProbeRepository
-	cfg              *config.Config
+	groupRepo         GroupRepository
+	settingRepo       SettingRepository
+	gatewayService    *GatewayService
+	billingService    *BillingService
+	capacityService   *GroupCapacityService
+	availabilityRepo  GroupAvailabilityProbeRepository
+	availabilityCache MarketplaceAvailabilityCache
+	cfg               *config.Config
 }
 
 func NewModelMarketplaceService(
@@ -82,16 +97,36 @@ func NewModelMarketplaceService(
 	capacityService *GroupCapacityService,
 	availabilityRepo GroupAvailabilityProbeRepository,
 	cfg *config.Config,
+	caches ...MarketplaceAvailabilityCache,
 ) *ModelMarketplaceService {
-	return &ModelMarketplaceService{
-		groupRepo:        groupRepo,
-		settingRepo:      settingRepo,
-		gatewayService:   gatewayService,
-		billingService:   billingService,
-		capacityService:  capacityService,
-		availabilityRepo: availabilityRepo,
-		cfg:              cfg,
+	var availabilityCache MarketplaceAvailabilityCache
+	if len(caches) > 0 {
+		availabilityCache = caches[0]
 	}
+	return &ModelMarketplaceService{
+		groupRepo:         groupRepo,
+		settingRepo:       settingRepo,
+		gatewayService:    gatewayService,
+		billingService:    billingService,
+		capacityService:   capacityService,
+		availabilityRepo:  availabilityRepo,
+		availabilityCache: availabilityCache,
+		cfg:               cfg,
+	}
+}
+
+// NewModelMarketplaceServiceWithCache 为正式应用装配 Redis 共享缓存。
+func NewModelMarketplaceServiceWithCache(
+	groupRepo GroupRepository,
+	settingRepo SettingRepository,
+	gatewayService *GatewayService,
+	billingService *BillingService,
+	capacityService *GroupCapacityService,
+	availabilityRepo GroupAvailabilityProbeRepository,
+	cfg *config.Config,
+	availabilityCache MarketplaceAvailabilityCache,
+) *ModelMarketplaceService {
+	return NewModelMarketplaceService(groupRepo, settingRepo, gatewayService, billingService, capacityService, availabilityRepo, cfg, availabilityCache)
 }
 
 // @project-doc docs/interfaces/model_catalog_and_marketplace.md#model_catalog_resolution
@@ -260,6 +295,10 @@ func (s *ModelMarketplaceService) getPublicAvailabilityMap(ctx context.Context, 
 	}
 	// 可用性是模型广场的辅助信息，获取失败时不影响模型和价格展示。
 	windowDays, bucketMinutes := s.resolveMarketplaceAvailabilityWindow(ctx)
+	cacheKey := marketplaceAvailabilityCacheKey(mode, windowDays, bucketMinutes, timezone, groupIDs)
+	if cached := s.getCachedAvailability(ctx, cacheKey); cached != nil {
+		return cached
+	}
 	var availabilityMap map[int64]*GroupAvailabilitySummary
 	var err error
 	if mode == MarketplaceAvailabilityModePassive {
@@ -270,7 +309,49 @@ func (s *ModelMarketplaceService) getPublicAvailabilityMap(ctx context.Context, 
 	if err != nil {
 		return nil
 	}
+	s.cacheAvailability(ctx, cacheKey, availabilityMap)
 	return availabilityMap
+}
+
+func marketplaceAvailabilityCacheKey(mode string, windowDays, bucketMinutes int, timezone string, groupIDs []int64) string {
+	sortedIDs := append([]int64(nil), groupIDs...)
+	sort.Slice(sortedIDs, func(i, j int) bool { return sortedIDs[i] < sortedIDs[j] })
+	payload := fmt.Sprintf("%s|%d|%d|%s|%v", mode, windowDays, bucketMinutes, timezone, sortedIDs)
+	digest := sha256.Sum256([]byte(payload))
+	return "sub2api:model_marketplace:availability:v1:" + hex.EncodeToString(digest[:])
+}
+
+func (s *ModelMarketplaceService) getCachedAvailability(ctx context.Context, key string) map[int64]*GroupAvailabilitySummary {
+	if s == nil || s.availabilityCache == nil {
+		return nil
+	}
+	payload, err := s.availabilityCache.Get(ctx, key)
+	if err != nil {
+		if !errors.Is(err, ErrMarketplaceAvailabilityCacheMiss) {
+			slog.Warn("failed to read marketplace availability cache", "error", err)
+		}
+		return nil
+	}
+	var cached map[int64]*GroupAvailabilitySummary
+	if err := json.Unmarshal([]byte(payload), &cached); err != nil {
+		slog.Warn("failed to decode marketplace availability cache", "error", err)
+		return nil
+	}
+	return cached
+}
+
+func (s *ModelMarketplaceService) cacheAvailability(ctx context.Context, key string, availability map[int64]*GroupAvailabilitySummary) {
+	if s == nil || s.availabilityCache == nil {
+		return
+	}
+	payload, err := json.Marshal(availability)
+	if err != nil {
+		slog.Warn("failed to encode marketplace availability cache", "error", err)
+		return
+	}
+	if err := s.availabilityCache.Set(ctx, key, string(payload), marketplaceAvailabilityCacheTTL); err != nil {
+		slog.Warn("failed to write marketplace availability cache", "error", err)
+	}
 }
 
 func (s *ModelMarketplaceService) resolveMarketplaceAvailabilityMode(ctx context.Context) string {

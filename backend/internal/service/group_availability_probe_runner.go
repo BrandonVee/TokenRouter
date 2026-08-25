@@ -288,6 +288,9 @@ func (s *GroupAvailabilityProbeRunnerService) runProbeAttempt(ctx context.Contex
 			probeResult.ErrorMessage = err.Error()
 		}
 	}
+	if !probeResult.Success && IsUpstreamAvailabilityProbeFailure(probeResult.ErrorMessage) {
+		probeResult.Status = GroupAvailabilityRequestStatusUpstreamError
+	}
 	if ctx.Err() != nil && probeResult.Success {
 		probeResult.Status = GroupAvailabilityProbeStatusFailed
 		probeResult.Success = false

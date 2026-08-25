@@ -34,7 +34,7 @@ marketplace: {
     availabilityNoData: 'No data',
     availabilityHint: '{days}-day active probe availability {rate} ({success} success / {total} total)',
     availabilityHintNoData: 'No active probe data in the last {days} days',
-    passiveAvailabilityAriaLabel: 'Latest 60 time buckets of {minutes} minutes each: green means the weighted issue score is below 25% or there is no data, yellow means 25% to below 60%, and red means at least 60% with at least three upstream failures.',
+    passiveAvailabilityAriaLabel: 'Latest 60 time buckets of {minutes} minutes each: green means success or no data, yellow means 25% to below 60% weighted issues, and red means at least 60% with at least three upstream failures.',
     passiveAvailabilityHint: 'Health across the latest 60 {minutes}-minute buckets: {rate} ({success} success / {total} eligible requests)',
     passiveAvailabilityStatus: {
       success: 'Success',

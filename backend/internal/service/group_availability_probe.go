@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -38,6 +39,28 @@ type GroupAvailabilityProbeResult struct {
 	ErrorMessage string
 	StartedAt    time.Time
 	FinishedAt   time.Time
+}
+
+// IsUpstreamAvailabilityProbeFailure 判断主动探测失败是否属于可计入分母的上游故障。
+// 账号选择、权限、模型限制等本地失败不应降低模型广场可用率。
+func IsUpstreamAvailabilityProbeFailure(message string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	if normalized == "" {
+		return false
+	}
+	if strings.Contains(normalized, "upstream request failed") {
+		return true
+	}
+	for i := 0; i+2 < len(normalized); i++ {
+		if normalized[i] != '5' || normalized[i+1] < '0' || normalized[i+1] > '9' || normalized[i+2] < '0' || normalized[i+2] > '9' {
+			continue
+		}
+		if (i == 0 || normalized[i-1] < '0' || normalized[i-1] > '9') &&
+			(i+3 == len(normalized) || normalized[i+3] < '0' || normalized[i+3] > '9') {
+			return true
+		}
+	}
+	return false
 }
 
 // GroupAvailabilityRequest 是被动模式下最近一次真实请求的状态样本。

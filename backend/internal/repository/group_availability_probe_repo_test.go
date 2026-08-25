@@ -44,13 +44,46 @@ func TestGetPassiveSummaryBuildsSixtyTimeBuckets(t *testing.T) {
 
 	summary := summaries[7]
 	require.NotNil(t, summary)
-	require.Equal(t, int64(15), summary.SuccessCount)
+	require.Equal(t, int64(73), summary.SuccessCount)
 	require.Equal(t, int64(0), summary.PressureCount)
-	require.Equal(t, int64(20), summary.TotalCount)
+	require.Equal(t, int64(78), summary.TotalCount)
 	require.Len(t, summary.Days, service.PassiveAvailabilityBucketCount)
+	require.Equal(t, int64(1), summary.Days[0].SuccessCount)
+	require.Equal(t, int64(1), summary.Days[0].TotalCount)
+	require.InDelta(t, 1.0, *summary.Days[0].AvailabilityRate, 1e-9)
 	require.Equal(t, int64(1), summary.Days[58].SlowStreamCount)
 	require.InDelta(t, 0.875, *summary.Days[58].AvailabilityRate, 1e-9)
 	require.InDelta(t, 0.6, *summary.Days[59].AvailabilityRate, 1e-9)
 	require.NotNil(t, summary.AvailabilityRate)
-	require.InDelta(t, 0.7375, *summary.AvailabilityRate, 1e-9)
+	require.InDelta(t, 0.9326923077, *summary.AvailabilityRate, 1e-9)
+}
+
+func TestGetSummaryCountsOnlySuccessfulAndUpstreamFailures(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+	rows := sqlmock.NewRows([]string{"group_id", "bucket_index", "success_count", "total_count"}).
+		AddRow(int64(7), 0, int64(2), int64(3))
+	lastRows := sqlmock.NewRows([]string{"group_id", "status", "finished_at"}).
+		AddRow(int64(7), service.GroupAvailabilityRequestStatusUpstreamError, now)
+
+	mock.ExpectQuery(`(?s)SELECT.*success_count.*status = 'upstream_error'.*total_count.*FROM group_availability_probe_results`).
+		WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), 120).
+		WillReturnRows(rows)
+	mock.ExpectQuery(`(?s)SELECT DISTINCT ON \(group_id\).*FROM group_availability_probe_results.*status = 'upstream_error'`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnRows(lastRows)
+
+	repo := &groupAvailabilityProbeRepository{db: db}
+	summaries, err := repo.GetSummaryByGroupIDs(context.Background(), []int64{7}, 7, 120, "UTC", now)
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+
+	summary := summaries[7]
+	require.NotNil(t, summary)
+	require.Equal(t, int64(85), summary.SuccessCount)
+	require.Equal(t, int64(86), summary.TotalCount)
+	require.InDelta(t, 85.0/86.0, *summary.AvailabilityRate, 1e-9)
 }

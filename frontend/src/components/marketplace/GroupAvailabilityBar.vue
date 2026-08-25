@@ -165,7 +165,7 @@ const ariaLabel = computed(
   () => `${t('marketplace.availabilityWindow', { days: windowDays.value })}: ${rateLabel.value}`,
 )
 
-function passiveBucketStatus(bucket: MarketplaceGroupAvailabilityDay): 'success' | 'slow_stream' | 'upstream_error' {
+function passiveBucketStatus(bucket: MarketplaceGroupAvailabilityDay): 'success' | 'slow_stream' | 'upstream_error' | 'unknown' {
 	if (bucket.total_count <= 0) return 'success'
 	const upstreamErrors = Math.max(bucket.total_count - bucket.success_count, 0)
 	const issueScore = (upstreamErrors + (bucket.slow_stream_count ?? 0) * 0.25) / bucket.total_count
@@ -175,10 +175,10 @@ function passiveBucketStatus(bucket: MarketplaceGroupAvailabilityDay): 'success'
 }
 
 function passiveBucketClass(bucket: MarketplaceGroupAvailabilityDay): string {
-  const status = passiveBucketStatus(bucket)
-  if (status === 'upstream_error') return 'bg-rose-500'
-  if (status === 'slow_stream') return 'bg-amber-400'
-  return 'bg-emerald-500'
+	const status = passiveBucketStatus(bucket)
+	if (status === 'upstream_error') return 'bg-rose-500'
+	if (status === 'slow_stream') return 'bg-amber-400'
+	return 'bg-emerald-500'
 }
 
 function passiveBucketTitle(bucket: MarketplaceGroupAvailabilityDay): string {
@@ -188,7 +188,7 @@ function passiveBucketTitle(bucket: MarketplaceGroupAvailabilityDay): string {
 
 function bucketClass(rate?: number | null, totalCount?: number): string {
   if (!totalCount || typeof rate !== 'number') {
-    return 'bg-gray-200 dark:bg-dark-700'
+    return 'bg-emerald-500'
   }
   if (rate >= 0.995) {
     return 'bg-emerald-500'

@@ -58,6 +58,30 @@ describe('GroupAvailabilityBar passive time buckets', () => {
     expect(bars[4].classes()).toContain('bg-amber-400')
   })
 
+  it('renders empty active time buckets as successful bars', () => {
+    const wrapper = mount(GroupAvailabilityBar, {
+      props: {
+        availability: {
+          mode: 'active',
+          window_days: 1,
+          bucket_minutes: 120,
+          success_count: 1,
+          total_count: 1,
+          availability_rate: 1,
+          days: [{
+            date: new Date(Date.UTC(2026, 7, 24)).toISOString(),
+            success_count: 0,
+            total_count: 0,
+            availability_rate: null,
+          }],
+        },
+      },
+    })
+
+    const bars = wrapper.get('[role="img"]').findAll('span')
+    expect(bars[0].classes()).toContain('bg-emerald-500')
+  })
+
   it('fills missing time buckets as successful bars', () => {
     const wrapper = mount(GroupAvailabilityBar, {
       props: {
