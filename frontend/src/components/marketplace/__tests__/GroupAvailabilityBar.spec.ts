@@ -26,6 +26,24 @@ function bucket(index: number, overrides: Partial<MarketplaceGroupAvailabilityDa
 }
 
 describe('GroupAvailabilityBar passive time buckets', () => {
+  it('does not render the availability percentage as visible text', () => {
+    const wrapper = mount(GroupAvailabilityBar, {
+      props: {
+        availability: {
+          mode: 'active',
+          window_days: 7,
+          bucket_minutes: 1440,
+          success_count: 6,
+          total_count: 7,
+          availability_rate: 6 / 7,
+          days: [],
+        },
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('%')
+  })
+
   it('renders sixty time buckets with weighted color thresholds', () => {
     const days = Array.from({ length: 60 }, (_, index) => bucket(index))
     days[0] = bucket(0, { success_count: 0, total_count: 0, availability_rate: null })

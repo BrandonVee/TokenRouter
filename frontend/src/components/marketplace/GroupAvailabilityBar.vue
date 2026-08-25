@@ -35,11 +35,6 @@
         :style="{ width: bucketWidth }"
       />
     </div>
-    <div class="w-[96px] shrink-0 text-left">
-      <div class="text-base font-semibold leading-5 text-gray-900 dark:text-white">
-        {{ rateLabel }}
-      </div>
-    </div>
   </div>
 </template>
 

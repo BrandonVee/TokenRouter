@@ -163,7 +163,7 @@
                 class="w-full xl:ml-6 xl:w-[560px] xl:shrink-0"
                 data-testid="marketplace-group-availability"
               >
-                <!-- 用户侧只展示可用率，并利用释放出的空间将状态条靠右放置。 -->
+                <!-- 用户侧只展示可用性状态条，避免用百分比数字重复表达状态。 -->
                 <GroupAvailabilityBar
                   :availability="group.availability"
                   class="min-w-0"
