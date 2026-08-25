@@ -263,7 +263,8 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 			return true
 		}
 	}
-	return apiKey.Group.AllowMessagesDispatch
+	// 路由门禁和认证缓存都以新的协议集合为准，不能读取未随认证快照传递的旧镜像字段。
+	return apiKey.Group.AllowsClientProtocol(service.GroupClientProtocolAnthropicMessages)
 }
 
 // isResponsesWebSocketCompositePlatform 限定 composite 分组在 Responses WebSocket
