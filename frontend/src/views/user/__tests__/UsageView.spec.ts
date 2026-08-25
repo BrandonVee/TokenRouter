@@ -244,6 +244,14 @@ describe('user UsageView', () => {
     expect(getAvailable).toHaveBeenCalled()
   })
 
+  it('keeps the column settings layer above the sticky usage table', () => {
+    const wrapper = mountUsageView()
+
+    expect(wrapper.get('[data-testid="user-usage-filters-card"]').classes()).toEqual(
+      expect.arrayContaining(['relative', 'z-20']),
+    )
+  })
+
   it('loads team keys and aggregated member charts for a team owner', async () => {
     getCurrentTeam.mockResolvedValue({
       team: { id: 7, name: 'Demo team' },

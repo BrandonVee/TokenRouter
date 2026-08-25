@@ -457,6 +457,14 @@ describe('admin UsageView request ID column visibility', () => {
     )
   })
 
+  it('keeps the column settings layer above the sticky usage table', () => {
+    const wrapper = mountColumnView()
+
+    expect(wrapper.get('[data-testid="admin-usage-filters-card"]').classes()).toEqual(
+      expect.arrayContaining(['relative', 'z-20']),
+    )
+  })
+
   it('migrates an old preference without replacing existing hidden columns', async () => {
     vi.mocked(localStorage.getItem).mockImplementation((key: string) => {
       if (key === 'usage-hidden-columns') return JSON.stringify(['ip_address'])

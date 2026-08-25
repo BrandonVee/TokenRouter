@@ -72,7 +72,8 @@
         </div>
       </div>
 
-      <div class="card p-6">
+      <!-- 全局卡片的 backdrop-filter 会创建层叠上下文，筛选卡片需高于下方粘性表头。 -->
+      <div class="card relative z-20 p-6" data-testid="user-usage-filters-card">
         <div class="space-y-4">
           <div v-if="activeTab === 'errors'" class="flex flex-wrap items-end gap-4">
             <div class="w-full sm:w-auto sm:min-w-[220px]">

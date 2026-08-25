@@ -63,8 +63,8 @@
           <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
         </div>
       </div>
-      <!-- 标签和筛选保留在同一卡片，数据内容使用下方独立卡片。 -->
-      <div class="card" data-testid="admin-usage-filters-card">
+      <!-- 全局卡片的 backdrop-filter 会创建层叠上下文，筛选卡片需高于下方粘性表头。 -->
+      <div class="card relative z-20" data-testid="admin-usage-filters-card">
         <div class="flex flex-wrap items-center border-b border-gray-200 px-2 dark:border-dark-700 sm:px-4">
           <button
             v-for="tab in detailTabs"
