@@ -1136,7 +1136,7 @@ func (k oidcJWK) publicKey() (any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("decode ec y: %w", err)
 		}
-		//nolint:staticcheck // 这里需要生成 ecdsa.PublicKey，保留 elliptic 曲线检查兼容 JWT。
+		//nolint:staticcheck // SA1019：OIDC EC JWK 需要使用 elliptic 曲线校验兼容 JWT。
 		if !curve.IsOnCurve(x, y) {
 			return nil, errors.New("ec point is not on curve")
 		}

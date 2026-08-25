@@ -1337,11 +1337,11 @@ func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL, protocolMo
 		}
 	case upstreamProtocolModeOpenAIH1:
 		transport.ForceAttemptHTTP2 = false
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+		transport.Protocols = http1OnlyProtocols()
 	case upstreamProtocolModeOpenAIH1Fallback:
 		// 显式禁用 HTTP/2，确保代理不兼容场景回退到 HTTP/1.1。
 		transport.ForceAttemptHTTP2 = false
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+		transport.Protocols = http1OnlyProtocols()
 	}
 	if err := proxyutil.ConfigureTransportProxy(transport, proxyURL); err != nil {
 		return nil, err
@@ -1354,6 +1354,19 @@ func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL, protocolMo
 // 静默掐断的死连接。此处主动设置 ReadIdleTimeout/PingTimeout，让死连接被提前 PING
 // 出并关闭，请求得以重建连接而非挂到 TCP 重传超时。返回底层 *http2.Transport 便于测试。
 func enableOpenAIHTTP2KeepAlive(transport *http.Transport) (*http2.Transport, error) {
+	// Go 1.27 通过 Transport.Protocols 和 HTTP2Config 接管 HTTP/2 配置；
+	// 在 ConfigureTransports 前写入，确保每条新连接都继承 PING 超时。
+	if transport.Protocols == nil {
+		transport.Protocols = new(http.Protocols)
+	}
+	transport.Protocols.SetHTTP1(true)
+	transport.Protocols.SetHTTP2(true)
+	if transport.HTTP2 == nil {
+		transport.HTTP2 = new(http.HTTP2Config)
+	}
+	transport.HTTP2.SendPingTimeout = openAIHTTP2ReadIdleTimeout
+	transport.HTTP2.PingTimeout = openAIHTTP2PingTimeout
+
 	h2, err := http2.ConfigureTransports(transport)
 	if err != nil {
 		return nil, err
@@ -1363,6 +1376,13 @@ func enableOpenAIHTTP2KeepAlive(transport *http.Transport) (*http2.Transport, er
 		h2.PingTimeout = openAIHTTP2PingTimeout
 	}
 	return h2, nil
+}
+
+// http1OnlyProtocols 返回仅允许 HTTP/1 的协议集合，避免依赖旧的 HTTP/2 禁用配置。
+func http1OnlyProtocols() *http.Protocols {
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	return protocols
 }
 
 // buildUpstreamTransportWithTLSFingerprint 构建带 TLS 指纹伪装的 RoundTripper

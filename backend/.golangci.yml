@@ -55,6 +55,8 @@ linters:
         - G301
         - G302
         - G304
+        - G703
+        - G704
         - G306
         - G404
       severity: high

@@ -805,7 +805,8 @@ func (s *HTTPUpstreamSuite) TestOpenAIProfileHTTP2DisabledUsesHTTP1Transport() {
 	transport, ok := entry.client.Transport.(*http.Transport)
 	require.True(s.T(), ok, "expected *http.Transport")
 	require.False(s.T(), transport.ForceAttemptHTTP2, "OpenAI HTTP/2 disabled should not force H2")
-	require.NotNil(s.T(), transport.TLSNextProto, "HTTP/1 mode should disable automatic H2 negotiation")
+	require.NotNil(s.T(), transport.Protocols, "HTTP/1 mode should explicitly configure supported protocols")
+	require.False(s.T(), transport.Protocols.HTTP2(), "HTTP/1 mode should disable automatic H2 negotiation")
 	require.Equal(s.T(), upstreamProtocolModeOpenAIH1, entry.protocolMode)
 }
 
@@ -862,7 +863,8 @@ func (s *HTTPUpstreamSuite) TestOpenAIHTTP2ProxyCompatibilityErrorActivatesFallb
 	transport, ok := entry.client.Transport.(*http.Transport)
 	require.True(s.T(), ok, "expected *http.Transport")
 	require.False(s.T(), transport.ForceAttemptHTTP2)
-	require.NotNil(s.T(), transport.TLSNextProto)
+	require.NotNil(s.T(), transport.Protocols)
+	require.False(s.T(), transport.Protocols.HTTP2())
 	require.Equal(s.T(), upstreamProtocolModeOpenAIH1Fallback, entry.protocolMode)
 }
 

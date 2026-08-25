@@ -270,7 +270,7 @@ rm -rf data/ postgres_data/ redis_data/
 
 #### 前置条件
 
-- Go 1.21+
+- Go 1.27+
 - Node.js 18+
 - PostgreSQL 15+
 - Redis 7+

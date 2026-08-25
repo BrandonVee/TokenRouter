@@ -118,7 +118,8 @@ func TestBuildOpenAIWSHTTPTransport_TLSProfileForcesHTTP1(t *testing.T) {
 		transport, err := buildOpenAIWSHTTPTransport("", nil, &tlsfingerprint.Profile{Name: "h1"})
 		require.NoError(t, err)
 		require.False(t, transport.ForceAttemptHTTP2)
-		require.NotNil(t, transport.TLSNextProto)
+		require.NotNil(t, transport.Protocols)
+		require.False(t, transport.Protocols.HTTP2())
 	})
 
 	t.Run("with h2", func(t *testing.T) {
@@ -129,7 +130,8 @@ func TestBuildOpenAIWSHTTPTransport_TLSProfileForcesHTTP1(t *testing.T) {
 		transport, err := buildOpenAIWSHTTPTransport("", nil, profile)
 		require.NoError(t, err)
 		require.False(t, transport.ForceAttemptHTTP2)
-		require.NotNil(t, transport.TLSNextProto)
+		require.NotNil(t, transport.Protocols)
+		require.False(t, transport.Protocols.HTTP2())
 		require.False(t, tlsfingerprint.SupportsHTTP2(tlsfingerprint.HTTP1OnlyProfile(profile)))
 	})
 }

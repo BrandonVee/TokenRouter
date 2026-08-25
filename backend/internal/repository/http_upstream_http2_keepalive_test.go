@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -34,7 +36,11 @@ func TestEnableOpenAIHTTP2KeepAlive_EnablesPingHealthCheck(t *testing.T) {
 	require.Positive(t, h2.ReadIdleTimeout, "必须启用空闲 PING 探测以剔除死连接")
 	require.Equal(t, openAIHTTP2ReadIdleTimeout, h2.ReadIdleTimeout)
 	require.Equal(t, openAIHTTP2PingTimeout, h2.PingTimeout, "PING 无响应必须有超时判定")
-	require.NotNil(t, tr.TLSNextProto["h2"], "http2 必须已挂到底层 http.Transport 上")
+	require.NotNil(t, tr.Protocols)
+	require.True(t, tr.Protocols.HTTP2(), "HTTP/2 必须在 Transport.Protocols 中启用")
+	require.NotNil(t, tr.HTTP2)
+	require.Equal(t, openAIHTTP2ReadIdleTimeout, tr.HTTP2.SendPingTimeout)
+	require.Equal(t, openAIHTTP2PingTimeout, tr.HTTP2.PingTimeout)
 }
 
 // openai_h2 模式构建的 Transport 必须带上 H2 PING 健康探测，从源头剔除死连接。
@@ -42,15 +48,17 @@ func TestBuildUpstreamTransport_OpenAIH2_EnablesPingHealthCheck(t *testing.T) {
 	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), nil, upstreamProtocolModeOpenAIH2)
 	require.NoError(t, err)
 	require.True(t, tr.ForceAttemptHTTP2, "openai_h2 必须启用 HTTP/2")
-	require.NotNil(t, tr.TLSNextProto["h2"], "openai_h2 必须显式配置 http2 以启用 ReadIdleTimeout")
+	require.NotNil(t, tr.Protocols)
+	require.True(t, tr.Protocols.HTTP2())
+	require.Equal(t, openAIHTTP2ReadIdleTimeout, tr.HTTP2.SendPingTimeout)
+	require.Equal(t, openAIHTTP2PingTimeout, tr.HTTP2.PingTimeout)
 }
 
-// 非 H2 模式（default/h1）不应因本次改动被误配置：default 走 Go 自动 H2（惰性配置，
-// 构建时 TLSNextProto 仍为空），h1 模式显式禁用 H2。避免波及 Claude/Gemini 热路径。
+// 非 H2 模式（default/h1）不应因本次改动被误配置，h1 模式显式禁用 H2。
 func TestBuildUpstreamTransport_NonOpenAIH2_NotEagerlyConfigured(t *testing.T) {
 	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), nil, upstreamProtocolModeDefault)
 	require.NoError(t, err)
-	require.Nil(t, tr.TLSNextProto["h2"], "default 模式不应在构建期主动配置 http2 keepalive")
+	require.Nil(t, tr.Protocols, "default 模式不应在构建期主动配置 HTTP/2")
 }
 
 // 死连接在经 HTTP 代理（CONNECT 隧道）时最高发，这是带 proxy 账号的真实生产路径：
@@ -62,6 +70,34 @@ func TestBuildUpstreamTransport_OpenAIH2_WithHTTPProxy_EnablesKeepAlive(t *testi
 	tr, err := buildUpstreamTransport(http2KeepAliveTestPoolSettings(), proxyURL, upstreamProtocolModeOpenAIH2)
 	require.NoError(t, err)
 	require.True(t, tr.ForceAttemptHTTP2)
-	require.NotNil(t, tr.TLSNextProto["h2"], "经代理的 openai_h2 也必须启用 http2 keepalive")
+	require.NotNil(t, tr.Protocols)
+	require.True(t, tr.Protocols.HTTP2())
 	require.NotNil(t, tr.Proxy, "HTTP 代理仍须通过 Transport.Proxy 生效")
+}
+
+func TestOpenAIHTTP2KeepAlive_NegotiatesHTTP2WithTLSServer(t *testing.T) {
+	seenProtocol := make(chan int, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenProtocol <- r.ProtoMajor
+		_, _ = w.Write([]byte("ok"))
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	serverTransport := server.Client().Transport.(*http.Transport)
+	transport := &http.Transport{TLSClientConfig: serverTransport.TLSClientConfig.Clone()}
+	_, err := enableOpenAIHTTP2KeepAlive(transport)
+	require.NoError(t, err)
+	client := &http.Client{Transport: transport}
+	defer transport.CloseIdleConnections()
+
+	resp, err := client.Get(server.URL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, "ok", string(body))
+	require.Equal(t, 2, <-seenProtocol, "必须与支持 HTTP/2 的 TLS 服务端完成真实协商")
+	require.Equal(t, 2, resp.ProtoMajor)
 }

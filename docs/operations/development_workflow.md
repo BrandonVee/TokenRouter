@@ -16,16 +16,16 @@
 
 | 工具 | 当前来源 | 当前约束 |
 | --- | --- | --- |
-| Go | `backend/go.mod`、CI | `1.26.6` |
+| Go | `backend/go.mod`、CI | `1.27.0` |
 | Node.js | `.github/workflows/backend-ci.yml` | `20` |
 | pnpm | CI 与根 Makefile | `9`；根命令默认使用 `npx --yes pnpm@9` |
-| golangci-lint | CI | `v2.9`，配置在 `backend/.golangci.yml` |
+| golangci-lint | CI | `v2.13`，配置在 `backend/.golangci.yml` |
 | PostgreSQL、Redis | Compose 与集成测试 | 生产必需；测试可由 Testcontainers/Compose 提供 |
 
 本地应安装与 CI 相同的 lint 版本，避免规则集差异造成只在 CI 出现的结果：
 
 ```bash
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13
 ```
 
 升级 Go 时必须同时修改 `backend/go.mod`，以及 `backend-ci.yml`（两处）、`release.yml`（两处）和 `security-scan.yml` 中的 `go version` 硬断言；workflow 都通过 `go-version-file: backend/go.mod` 安装工具链，任一断言遗漏都会在版本校验步骤失败。

@@ -7,6 +7,7 @@
 
   <p>
     <a href="https://github.com/BrandonVee/TokenRouter/actions/workflows/backend-ci.yml"><img src="https://github.com/BrandonVee/TokenRouter/actions/workflows/backend-ci.yml/badge.svg" alt="CI" /></a>
+    <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.27.0-00ADD8?logo=go&logoColor=white" alt="Go 1.27.0" /></a>
     <a href="https://github.com/BrandonVee/TokenRouter/releases"><img src="https://img.shields.io/github/v/release/BrandonVee/TokenRouter?display_name=tag" alt="Release" /></a>
     <a href="https://github.com/BrandonVee/TokenRouter/pkgs/container/tokenrouter"><img src="https://img.shields.io/badge/container-ghcr.io%2Fbrandonvee%2Ftokenrouter-2496ED?logo=docker&logoColor=white" alt="Container" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-LGPL--3.0--or--later-4c1.svg" alt="License: LGPL-3.0-or-later" /></a>

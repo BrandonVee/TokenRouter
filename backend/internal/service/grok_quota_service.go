@@ -481,6 +481,7 @@ func preferSuccessfulBillingStatus(weeklyStatus, monthlyStatus int, weeklyOK, mo
 	return monthlyStatus
 }
 
+//nolint:staticcheck // SA4023：Grok OAuth 没有上游配额重置接口，成功路径按契约不存在。
 func (s *GrokQuotaService) ResetQuota(ctx context.Context, accountID int64) (*GrokQuotaResetResult, error) {
 	if _, err := s.loadGrokOAuthAccount(ctx, accountID); err != nil {
 		return nil, err

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -184,6 +183,8 @@ func (d *coderOpenAIWSClientDialer) proxyHTTPClient(proxy string, profile *tlsfi
 }
 
 func buildOpenAIWSHTTPTransport(normalizedProxy string, parsedProxyURL *url.URL, profile *tlsfingerprint.Profile) (*http.Transport, error) {
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
 	transport := &http.Transport{
 		MaxIdleConns:        openAIWSProxyTransportMaxIdleConns,
 		MaxIdleConnsPerHost: openAIWSProxyTransportMaxIdleConnsPerHost,
@@ -191,7 +192,7 @@ func buildOpenAIWSHTTPTransport(normalizedProxy string, parsedProxyURL *url.URL,
 		TLSHandshakeTimeout: 10 * time.Second,
 		ForceAttemptHTTP2:   false,
 		// WebSocket 建连固定是 HTTP/1.1 Upgrade，显式关闭自动 HTTP/2 协商。
-		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
+		Protocols: protocols,
 	}
 	profile = tlsfingerprint.HTTP1OnlyProfile(profile)
 	if profile == nil {
