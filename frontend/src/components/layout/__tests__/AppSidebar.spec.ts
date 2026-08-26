@@ -43,6 +43,12 @@ describe('AppSidebar custom menu opening modes', () => {
     expect(componentSource).toContain("target: item.openMode === 'new_tab' ? '_blank' : undefined")
     expect(componentSource).toContain("openMode: item.open_mode ?? 'iframe'")
   })
+
+  it('adds iframe parameters to external menus only when configured', () => {
+    // 参数开关关闭时保留原 URL，开启后复用 iframe 的参数构造规则。
+    expect(componentSource).toContain('if (!item.append_auth_params) return url')
+    expect(componentSource).toContain('return buildEmbeddedUrl(url, authStore.user?.id, authStore.token, detectTheme(), locale.value)')
+  })
 })
 
 describe('AppSidebar scroll position persistence', () => {

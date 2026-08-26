@@ -192,6 +192,7 @@ export interface CustomMenuItem {
   icon_svg: string
   url: string
   open_mode?: 'iframe' | 'new_tab' | 'same_tab'
+  append_auth_params?: boolean
   page_slug?: string
   visibility: 'user' | 'admin'
   sort_order: number

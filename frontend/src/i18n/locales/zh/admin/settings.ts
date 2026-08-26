@@ -711,6 +711,7 @@ dataSharing: {
         openModeIframe: 'iframe 嵌入',
         openModeNewTab: '新标签页',
         openModeSameTab: '当前标签页',
+        appendAuthParams: '携带 iframe 页面参数',
         iconSvg: 'SVG 图标',
         iconSvgPlaceholder: '<svg>...</svg>',
         iconPreview: '图标预览',

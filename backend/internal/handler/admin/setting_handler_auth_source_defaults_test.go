@@ -255,7 +255,7 @@ func TestSettingHandler_UpdateSettingsAcceptsCustomMenuOpenModes(t *testing.T) {
 		"promo_code_enabled": true,
 		"custom_menu_items": []map[string]any{
 			{"id": "iframe", "label": "Embedded", "url": "https://example.com/embed", "open_mode": "iframe", "visibility": "user"},
-			{"id": "new", "label": "New tab", "url": "https://example.com/new", "open_mode": "new_tab", "visibility": "user"},
+			{"id": "new", "label": "New tab", "url": "https://example.com/new", "open_mode": "new_tab", "append_auth_params": true, "visibility": "user"},
 			{"id": "same", "label": "Same tab", "url": "https://example.com/same", "open_mode": "same_tab", "visibility": "admin"},
 		},
 	}
@@ -271,7 +271,7 @@ func TestSettingHandler_UpdateSettingsAcceptsCustomMenuOpenModes(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.JSONEq(t, `[
 		{"id":"iframe","label":"Embedded","icon_svg":"","url":"https://example.com/embed","open_mode":"iframe","visibility":"user","sort_order":0},
-		{"id":"new","label":"New tab","icon_svg":"","url":"https://example.com/new","open_mode":"new_tab","visibility":"user","sort_order":0},
+		{"id":"new","label":"New tab","icon_svg":"","url":"https://example.com/new","open_mode":"new_tab","append_auth_params":true,"visibility":"user","sort_order":0},
 		{"id":"same","label":"Same tab","icon_svg":"","url":"https://example.com/same","open_mode":"same_tab","visibility":"admin","sort_order":0}
 	]`, repo.values[service.SettingKeyCustomMenuItems])
 }

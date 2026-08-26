@@ -718,6 +718,7 @@ dataSharing: {
         openModeIframe: 'Embed in iframe',
         openModeNewTab: 'New tab',
         openModeSameTab: 'Current tab',
+        appendAuthParams: 'Include iframe page parameters',
         iconSvg: 'SVG Icon',
         iconSvgPlaceholder: '<svg>...</svg>',
         iconPreview: 'Icon Preview',

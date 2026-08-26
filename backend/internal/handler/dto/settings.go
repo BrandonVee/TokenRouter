@@ -9,14 +9,15 @@ import (
 
 // CustomMenuItem represents a user-configured custom menu entry.
 type CustomMenuItem struct {
-	ID         string `json:"id"`
-	Label      string `json:"label"`
-	IconSVG    string `json:"icon_svg"`
-	URL        string `json:"url"`
-	OpenMode   string `json:"open_mode"` // iframe、new_tab 或 same_tab
-	PageSlug   string `json:"page_slug,omitempty"`
-	Visibility string `json:"visibility"` // "user" or "admin"
-	SortOrder  int    `json:"sort_order"`
+	ID               string `json:"id"`
+	Label            string `json:"label"`
+	IconSVG          string `json:"icon_svg"`
+	URL              string `json:"url"`
+	OpenMode         string `json:"open_mode"`                    // iframe、new_tab 或 same_tab
+	AppendAuthParams bool   `json:"append_auth_params,omitempty"` // 外部跳转时是否追加 iframe 页面参数
+	PageSlug         string `json:"page_slug,omitempty"`
+	Visibility       string `json:"visibility"` // "user" or "admin"
+	SortOrder        int    `json:"sort_order"`
 }
 
 // CustomEndpoint represents an admin-configured API endpoint for quick copy.

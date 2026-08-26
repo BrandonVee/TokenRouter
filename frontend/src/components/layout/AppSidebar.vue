@@ -189,6 +189,7 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
+import { buildEmbeddedUrl, detectTheme } from '@/utils/embedded-url'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import type { CustomMenuItem } from '@/types'
 
@@ -205,7 +206,7 @@ interface NavItem {
   externalUrl?: string
 }
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const route = useRoute()
 const appStore = useAppStore()
@@ -849,7 +850,10 @@ function customMenuExternalUrl(item: CustomMenuItem): string | undefined {
   if (mode !== 'new_tab' && mode !== 'same_tab') return undefined
   if (item.url?.startsWith('md:')) return `/custom/${item.id}`
   const url = sanitizeUrl(item.url || '')
-  return url || undefined
+  if (!url) return undefined
+  if (!item.append_auth_params) return url
+  // 与 iframe 页面保持相同的参数格式，供外部页面复用登录和界面上下文。
+  return buildEmbeddedUrl(url, authStore.user?.id, authStore.token, detectTheme(), locale.value)
 }
 
 function navigationComponent(item: NavItem) {

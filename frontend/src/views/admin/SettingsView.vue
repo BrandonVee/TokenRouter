@@ -6730,6 +6730,13 @@
                     <Select v-model="item.open_mode" :options="customMenuOpenModeOptions" class="text-sm" />
                   </div>
 
+                  <div v-if="item.open_mode !== 'iframe'" class="flex items-center justify-between gap-3 pt-5">
+                    <label class="text-xs font-medium text-gray-600 dark:text-gray-400">
+                      {{ t("admin.settings.customMenu.appendAuthParams") }}
+                    </label>
+                    <Toggle v-model="item.append_auth_params" />
+                  </div>
+
                   <!-- URL (full width) -->
                   <div class="sm:col-span-2">
                     <label
@@ -9265,6 +9272,7 @@ const form = reactive<SettingsForm>({
     icon_svg: string;
     url: string;
     open_mode: "iframe" | "new_tab" | "same_tab";
+    append_auth_params: boolean;
     visibility: "user" | "admin";
     sort_order: number;
   }>,
@@ -10384,6 +10392,7 @@ function addMenuItem() {
     icon_svg: "",
     url: "",
     open_mode: "iframe",
+    append_auth_params: false,
     visibility: "user",
     sort_order: form.custom_menu_items.length,
   });
@@ -10591,6 +10600,7 @@ async function loadSettings() {
     ).map((item) => ({
       ...item,
       open_mode: normalizeCustomMenuOpenMode(item.open_mode),
+      append_auth_params: item.append_auth_params === true,
     }));
     form.site_name_zh = form.site_name_zh || settings.site_name || "Sub2API";
     form.site_name_en = form.site_name_en || "";
