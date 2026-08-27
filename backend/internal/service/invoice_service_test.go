@@ -18,7 +18,7 @@ func TestValidateInvoiceOrdersUsesPayAmount(t *testing.T) {
 			OrderType: payment.OrderTypeBalance,
 			Amount:    100,
 			PayAmount: 88.5,
-			ProviderSnapshot: map[string]interface{}{
+			ProviderSnapshot: map[string]any{
 				"currency": "USD",
 			},
 		},
@@ -27,7 +27,7 @@ func TestValidateInvoiceOrdersUsesPayAmount(t *testing.T) {
 			OrderType: payment.OrderTypeSubscription,
 			Amount:    999,
 			PayAmount: 11.5,
-			ProviderSnapshot: map[string]interface{}{
+			ProviderSnapshot: map[string]any{
 				"currency": "USD",
 			},
 			PlanSnapshot: domain.SubscriptionPlanSnapshot{Name: "Pro", ValidityDays: 30, DailyLimitUSD: &dailyLimit},
@@ -50,7 +50,7 @@ func TestValidateInvoiceOrdersUsesPayAmount(t *testing.T) {
 // TestValidateInvoiceOrdersRejectsInvalidSources 验证状态、币种和订单类型边界。
 func TestValidateInvoiceOrdersRejectsInvalidSources(t *testing.T) {
 	completedBalance := &dbent.PaymentOrder{Status: OrderStatusCompleted, OrderType: payment.OrderTypeBalance, PayAmount: 10}
-	completedSubscription := &dbent.PaymentOrder{Status: OrderStatusCompleted, OrderType: payment.OrderTypeSubscription, PayAmount: 10, ProviderSnapshot: map[string]interface{}{"currency": "USD"}}
+	completedSubscription := &dbent.PaymentOrder{Status: OrderStatusCompleted, OrderType: payment.OrderTypeSubscription, PayAmount: 10, ProviderSnapshot: map[string]any{"currency": "USD"}}
 
 	_, _, err := validateInvoiceOrders([]*dbent.PaymentOrder{completedBalance, completedSubscription})
 	if infraerrors.Reason(err) != "INVOICE_CURRENCY_MISMATCH" {
