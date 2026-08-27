@@ -6734,7 +6734,10 @@
                     <label class="text-xs font-medium text-gray-600 dark:text-gray-400">
                       {{ t("admin.settings.customMenu.appendAuthParams") }}
                     </label>
-                    <Toggle v-model="item.append_auth_params" />
+                    <Toggle
+                      :model-value="item.append_auth_params ?? false"
+                      @update:model-value="item.append_auth_params = $event"
+                    />
                   </div>
 
                   <!-- URL (full width) -->

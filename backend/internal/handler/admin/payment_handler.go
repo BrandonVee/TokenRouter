@@ -17,6 +17,7 @@ import (
 type PaymentHandler struct {
 	paymentService *service.PaymentService
 	configService  *service.PaymentConfigService
+	invoiceService *service.InvoiceService
 }
 
 // NewPaymentHandler creates a new admin PaymentHandler.
@@ -25,6 +26,11 @@ func NewPaymentHandler(paymentService *service.PaymentService, configService *se
 		paymentService: paymentService,
 		configService:  configService,
 	}
+}
+
+// SetInvoiceService 注入独立的人工发票申请服务。
+func (h *PaymentHandler) SetInvoiceService(invoiceService *service.InvoiceService) {
+	h.invoiceService = invoiceService
 }
 
 // --- Dashboard ---

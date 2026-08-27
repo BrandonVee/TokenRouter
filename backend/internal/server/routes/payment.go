@@ -45,6 +45,16 @@ func RegisterPaymentRoutes(
 			orders.POST("/:id/refund-request", paymentHandler.RequestRefund)
 			orders.GET("/refund-eligible-providers", paymentHandler.GetRefundEligibleProviders)
 		}
+
+		// 人工发票申请与支付订单分开建模，避免混淆渠道账单接口。
+		invoices := authenticated.Group("/invoices")
+		{
+			invoices.GET("/eligible-orders", paymentHandler.GetEligibleInvoiceOrders)
+			invoices.GET("", paymentHandler.ListInvoiceRequests)
+			invoices.POST("", paymentHandler.CreateInvoiceRequest)
+			invoices.GET("/:id", paymentHandler.GetInvoiceRequest)
+			invoices.GET("/attachments/:attachment_id/download", paymentHandler.DownloadInvoiceAttachment)
+		}
 	}
 
 	// --- Public payment endpoints (no auth) ---
@@ -93,6 +103,18 @@ func RegisterPaymentRoutes(
 			adminOrders.POST("/:id/retry", adminPaymentHandler.RetryFulfillment)
 			adminOrders.POST("/:id/refund", adminPaymentHandler.ProcessRefund)
 			adminOrders.POST("/:id/refund/query", adminPaymentHandler.QueryAndFinalizeRefund)
+		}
+
+		invoices := adminGroup.Group("/invoices")
+		{
+			invoices.GET("", adminPaymentHandler.ListInvoices)
+			invoices.GET("/:id", adminPaymentHandler.GetInvoice)
+			invoices.POST("/:id/approve", adminPaymentHandler.ApproveInvoice)
+			invoices.POST("/:id/reject", adminPaymentHandler.RejectInvoice)
+			invoices.POST("/:id/attachments", adminPaymentHandler.UploadInvoiceAttachment)
+			invoices.POST("/:id/issue", adminPaymentHandler.IssueInvoice)
+			invoices.POST("/:id/send", adminPaymentHandler.SendInvoice)
+			invoices.GET("/attachments/:attachment_id/download", adminPaymentHandler.DownloadInvoiceAttachment)
 		}
 
 		// Subscription Plans

@@ -58,6 +58,12 @@
 
 本次上游同步在 fork 中新增迁移 `250_allow_cn_provider_user_platform_quotas.sql`、`251_add_usage_log_effective_model_indexes_notx.sql`、`252_channel_pricing_multipliers.sql`、`253_composite_model_routes.sql`。其中并发索引迁移必须在生产观察构建耗时；升级后先确认长上下文计费口径，再按需配置服务层级与区间倍率。`SYNC.md` 不属于发布内容。
 
+迁移 `254_invoice_requests.sql` 新增人工发票申请、订单快照、附件元数据和邮件投递记录。它只新增表、索引和约束，可按常规前向迁移执行；升级后应抽样验证余额与订阅订单的合并申请、审批、驳回释放订单占用、附件下载及退款限制。附件文件不在 PostgreSQL 中，保存在 `DATA_DIR/invoice-attachments/`（默认容器路径为 `/app/data/invoice-attachments/`）：所有生产部署必须为该目录提供持久且可备份的共享卷。多实例部署若不共享该卷，会导致其它实例无法下载或寄送附件。
+
+迁移 `255_add_invoice_type.sql` 为已部署的发票申请增加 `PERSONAL`/`ENTERPRISE` 类型快照，并把存量记录回填为个人类型。它是兼容的新增非空默认列；升级后应验证企业申请缺失税号会被拒绝、个人申请不保存税号，以及用户和管理员列表均显示冻结的发票类型。
+
+迁移 `256_add_invoice_enterprise_bank_info.sql` 为企业发票申请增加可空的开户行和银行账号字段。字段仅作为开票补充资料，不改变企业抬头和税号的必填规则；升级后应抽样验证个人申请不会写入企业字段，企业申请可正常保存并在管理员详情中查看。
+
 新增文件使用 `<递增数字>_<snake_case 描述>.sql`；并发索引使用 `<递增数字>_<描述>_notx.sql`。仓库历史上存在重复编号和字母后缀，不能据此复用编号。每次创建前都要扫描 `backend/migrations/` 的数字前缀，取当前最大值再加一，并确认按字典序排在预期位置。
 
 本 fork 同步上游时有额外硬约束：上游在 `backend/migrations/` 新增的迁移不能原名照搬。应按上游提交顺序逐个把数字前缀改为本 fork 当前最大编号加一；同时更新测试、runner 特例、文档或其它对原文件名的精确引用。已存在于 fork 的迁移保持原名，不为“整理顺序”重编号。

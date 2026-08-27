@@ -13,6 +13,8 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	dbent "github.com/BrandonVee/TokenRouter/ent"
+	"github.com/BrandonVee/TokenRouter/ent/invoicerequest"
+	"github.com/BrandonVee/TokenRouter/ent/invoicerequestitem"
 	"github.com/BrandonVee/TokenRouter/ent/paymentauditlog"
 	"github.com/BrandonVee/TokenRouter/ent/paymentorder"
 	"github.com/BrandonVee/TokenRouter/ent/paymentproviderinstance"
@@ -191,6 +193,13 @@ func (s *PaymentService) validateRefundRequest(ctx context.Context, oid, uid int
 	if o.Status != OrderStatusCompleted {
 		return nil, infraerrors.BadRequest("INVALID_STATUS", "only completed orders can request refund")
 	}
+	occupied, err := s.entClient.InvoiceRequestItem.Query().Where(invoicerequestitem.PaymentOrderIDEQ(oid), invoicerequestitem.ActiveEQ(true)).Exist(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("check invoice application: %w", err)
+	}
+	if occupied {
+		return nil, infraerrors.Conflict("INVOICE_REQUEST_ACTIVE", "an active invoice application must be resolved before requesting a refund")
+	}
 	// Check provider instance allows user refund
 	inst, err := s.getRefundOrderProviderInstance(ctx, o)
 	if err != nil || inst == nil {
@@ -210,6 +219,13 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 	ok := []string{OrderStatusCompleted, OrderStatusRefundRequested, OrderStatusRefundPending, OrderStatusRefundFailed}
 	if !psSliceContains(ok, o.Status) {
 		return nil, nil, infraerrors.BadRequest("INVALID_STATUS", "order status does not allow refund")
+	}
+	issuedInvoice, err := s.hasIssuedInvoiceOrder(ctx, oid)
+	if err != nil {
+		return nil, nil, fmt.Errorf("check issued invoice: %w", err)
+	}
+	if issuedInvoice {
+		return nil, nil, infraerrors.Conflict("INVOICE_ALREADY_ISSUED", "issued invoice must be voided or red-flushed before refunding")
 	}
 	// Check provider instance allows admin refund
 	inst, instErr := s.getRefundOrderProviderInstance(ctx, o)
@@ -249,6 +265,16 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 		}
 	}
 	return p, nil, nil
+}
+
+// hasIssuedInvoiceOrder 阻止管理员绕过已开票订单的线下作废或红冲流程。
+func (s *PaymentService) hasIssuedInvoiceOrder(ctx context.Context, orderID int64) (bool, error) {
+	var requestIDs []int64
+	err := s.entClient.InvoiceRequestItem.Query().Where(invoicerequestitem.PaymentOrderIDEQ(orderID), invoicerequestitem.ActiveEQ(true)).Select(invoicerequestitem.FieldInvoiceRequestID).Scan(ctx, &requestIDs)
+	if err != nil || len(requestIDs) == 0 {
+		return false, err
+	}
+	return s.entClient.InvoiceRequest.Query().Where(invoicerequest.IDIn(requestIDs...), invoicerequest.StatusIn(InvoiceStatusIssued, InvoiceStatusSent)).Exist(ctx)
 }
 
 func (s *PaymentService) prepDeduct(ctx context.Context, o *dbent.PaymentOrder, p *RefundPlan, force bool) *RefundResult {

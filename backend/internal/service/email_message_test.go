@@ -4,8 +4,10 @@ package service
 
 import (
 	"bytes"
+	"encoding/base64"
 	"io"
 	"mime"
+	"mime/multipart"
 	"mime/quotedprintable"
 	"net/mail"
 	"regexp"
@@ -114,4 +116,36 @@ func TestBuildSMTPMessageUsesUniqueMessageIDs(t *testing.T) {
 	secondParsed, err := mail.ReadMessage(bytes.NewReader(second.data))
 	require.NoError(t, err)
 	require.NotEqual(t, firstParsed.Header.Get("Message-ID"), secondParsed.Header.Get("Message-ID"))
+}
+
+// TestBuildSMTPMessageWithAttachments 验证发票邮件保留 HTML 正文和附件原始内容。
+func TestBuildSMTPMessageWithAttachments(t *testing.T) {
+	message, err := buildSMTPMessageWithAttachments(
+		&SMTPConfig{Host: "smtp.example.com", From: "reply@example.com"},
+		"user@example.net",
+		"Invoice",
+		"<p>Invoice body</p>",
+		[]EmailAttachment{{Name: "invoice.pdf", ContentType: "application/pdf", Data: []byte("%PDF-1.7\ninvoice")}},
+	)
+	require.NoError(t, err)
+
+	parsed, err := mail.ReadMessage(bytes.NewReader(message.data))
+	require.NoError(t, err)
+	mediaType, params, err := mime.ParseMediaType(parsed.Header.Get("Content-Type"))
+	require.NoError(t, err)
+	require.Equal(t, "multipart/mixed", mediaType)
+
+	reader := multipart.NewReader(parsed.Body, params["boundary"])
+	bodyPart, err := reader.NextPart()
+	require.NoError(t, err)
+	body, err := io.ReadAll(quotedprintable.NewReader(bodyPart))
+	require.NoError(t, err)
+	require.Equal(t, "<p>Invoice body</p>", string(body))
+
+	attachmentPart, err := reader.NextPart()
+	require.NoError(t, err)
+	require.Equal(t, "application/pdf", attachmentPart.Header.Get("Content-Type"))
+	attachment, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, attachmentPart))
+	require.NoError(t, err)
+	require.Equal(t, []byte("%PDF-1.7\ninvoice"), attachment)
 }

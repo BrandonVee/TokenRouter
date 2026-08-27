@@ -1131,6 +1131,139 @@ var (
 			},
 		},
 	}
+	// InvoiceAttachmentsColumns holds the columns for the "invoice_attachments" table.
+	InvoiceAttachmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "invoice_request_id", Type: field.TypeInt64},
+		{Name: "file_name", Type: field.TypeString, Size: 255},
+		{Name: "content_type", Type: field.TypeString, Size: 100},
+		{Name: "size_bytes", Type: field.TypeInt64},
+		{Name: "storage_key", Type: field.TypeString, Unique: true, Size: 255},
+		{Name: "sha256", Type: field.TypeString, Size: 64},
+		{Name: "uploaded_by", Type: field.TypeInt64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// InvoiceAttachmentsTable holds the schema information for the "invoice_attachments" table.
+	InvoiceAttachmentsTable = &schema.Table{
+		Name:       "invoice_attachments",
+		Columns:    InvoiceAttachmentsColumns,
+		PrimaryKey: []*schema.Column{InvoiceAttachmentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "invoiceattachment_invoice_request_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceAttachmentsColumns[1], InvoiceAttachmentsColumns[8]},
+			},
+		},
+	}
+	// InvoiceDeliveriesColumns holds the columns for the "invoice_deliveries" table.
+	InvoiceDeliveriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "invoice_request_id", Type: field.TypeInt64},
+		{Name: "recipient_email", Type: field.TypeString, Size: 255},
+		{Name: "status", Type: field.TypeString, Size: 20},
+		{Name: "message_id", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "attachment_summary", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "error_message", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "sent_by", Type: field.TypeInt64, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// InvoiceDeliveriesTable holds the schema information for the "invoice_deliveries" table.
+	InvoiceDeliveriesTable = &schema.Table{
+		Name:       "invoice_deliveries",
+		Columns:    InvoiceDeliveriesColumns,
+		PrimaryKey: []*schema.Column{InvoiceDeliveriesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "invoicedelivery_invoice_request_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceDeliveriesColumns[1], InvoiceDeliveriesColumns[8]},
+			},
+		},
+	}
+	// InvoiceRequestsColumns holds the columns for the "invoice_requests" table.
+	InvoiceRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "request_no", Type: field.TypeString, Unique: true, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "SUBMITTED"},
+		{Name: "currency", Type: field.TypeString, Size: 16},
+		{Name: "total_amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "invoice_type", Type: field.TypeString, Size: 20, Default: "PERSONAL"},
+		{Name: "invoice_title", Type: field.TypeString, Size: 255},
+		{Name: "tax_id", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "bank_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "bank_account", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "recipient_email", Type: field.TypeString, Size: 255},
+		{Name: "account_email", Type: field.TypeString, Size: 255},
+		{Name: "remark", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "rejection_reason", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "reviewed_by", Type: field.TypeInt64, Nullable: true},
+		{Name: "reviewed_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "invoice_number", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "issued_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "issue_remark", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "sent_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// InvoiceRequestsTable holds the schema information for the "invoice_requests" table.
+	InvoiceRequestsTable = &schema.Table{
+		Name:       "invoice_requests",
+		Columns:    InvoiceRequestsColumns,
+		PrimaryKey: []*schema.Column{InvoiceRequestsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "invoicerequest_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceRequestsColumns[1], InvoiceRequestsColumns[21]},
+			},
+			{
+				Name:    "invoicerequest_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceRequestsColumns[3], InvoiceRequestsColumns[21]},
+			},
+			{
+				Name:    "invoicerequest_invoice_number",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceRequestsColumns[17]},
+			},
+		},
+	}
+	// InvoiceRequestItemsColumns holds the columns for the "invoice_request_items" table.
+	InvoiceRequestItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "invoice_request_id", Type: field.TypeInt64},
+		{Name: "payment_order_id", Type: field.TypeInt64},
+		{Name: "active", Type: field.TypeBool, Default: true},
+		{Name: "order_no", Type: field.TypeString, Size: 64},
+		{Name: "order_type", Type: field.TypeString, Size: 20},
+		{Name: "currency", Type: field.TypeString, Size: 16},
+		{Name: "pay_amount", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "credited_amount", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
+		{Name: "recharge_code", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "product_snapshot", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "paid_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// InvoiceRequestItemsTable holds the schema information for the "invoice_request_items" table.
+	InvoiceRequestItemsTable = &schema.Table{
+		Name:       "invoice_request_items",
+		Columns:    InvoiceRequestItemsColumns,
+		PrimaryKey: []*schema.Column{InvoiceRequestItemsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "invoicerequestitem_invoice_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceRequestItemsColumns[1]},
+			},
+			{
+				Name:    "invoicerequestitem_payment_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{InvoiceRequestItemsColumns[2]},
+			},
+		},
+	}
 	// PaymentAuditLogsColumns holds the columns for the "payment_audit_logs" table.
 	PaymentAuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2461,6 +2594,10 @@ var (
 		GroupsTable,
 		IdempotencyRecordsTable,
 		IdentityAdoptionDecisionsTable,
+		InvoiceAttachmentsTable,
+		InvoiceDeliveriesTable,
+		InvoiceRequestsTable,
+		InvoiceRequestItemsTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,
@@ -2558,6 +2695,18 @@ func init() {
 	IdentityAdoptionDecisionsTable.ForeignKeys[1].RefTable = PendingAuthSessionsTable
 	IdentityAdoptionDecisionsTable.Annotation = &entsql.Annotation{
 		Table: "identity_adoption_decisions",
+	}
+	InvoiceAttachmentsTable.Annotation = &entsql.Annotation{
+		Table: "invoice_attachments",
+	}
+	InvoiceDeliveriesTable.Annotation = &entsql.Annotation{
+		Table: "invoice_deliveries",
+	}
+	InvoiceRequestsTable.Annotation = &entsql.Annotation{
+		Table: "invoice_requests",
+	}
+	InvoiceRequestItemsTable.Annotation = &entsql.Annotation{
+		Table: "invoice_request_items",
 	}
 	PaymentAuditLogsTable.Annotation = &entsql.Annotation{
 		Table: "payment_audit_logs",

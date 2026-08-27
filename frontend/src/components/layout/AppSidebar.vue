@@ -668,6 +668,12 @@ const userNavItems = computed((): NavItem[] => {
             icon: OrderListIcon,
             hideInSimpleMode: true
           },
+          {
+            path: '/invoices',
+            label: t('nav.invoiceRequests', '发票申请'),
+            icon: OrderListIcon,
+            hideInSimpleMode: true
+          },
         ]
       : []),
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
@@ -722,6 +728,12 @@ const personalNavItems = computed((): NavItem[] => {
           {
             path: '/orders',
             label: t('nav.myOrders'),
+            icon: OrderListIcon,
+            hideInSimpleMode: true
+          },
+          {
+            path: '/invoices',
+            label: t('nav.invoiceRequests', '发票申请'),
             icon: OrderListIcon,
             hideInSimpleMode: true
           },
@@ -815,6 +827,7 @@ const adminNavItems = computed((): NavItem[] => {
               { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
               { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
               { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
+              { path: '/admin/orders/invoices', label: t('nav.invoiceManagement', '发票管理'), icon: OrderIcon },
             ],
           },
         ]

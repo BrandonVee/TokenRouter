@@ -6,6 +6,7 @@
 
 - [全局入口](#全局入口)：理解所有请求共享的处理顺序。
 - [路由族](#路由族)：选择 URL、认证和拥有者。
+- [人工发票接口](#invoice_api)：实现合并开票申请、审批、附件与邮件交付时读取。
 - [API Key 结算策略接口](#api-key-结算策略接口)：配置资金来源、查询订阅和收窄分组。
 - [分组客户端协议](#分组客户端协议)：理解上游平台与客户端准入的独立契约。
 - [认证方式](#认证方式)：区分 JWT、管理密钥、API Key 和签名票据。
@@ -63,6 +64,13 @@ OAuth 登录 start 对 GitHub、Google、LinuxDo、DingTalk、WeChat 和 OIDC �
 账号高级调度评分诊断仅限管理员：`GET /api/v1/admin/accounts/:id/advanced-scheduler-score` 返回该账号所属高级分组摘要；携带 `group_id` 时返回指定高级分组的完整候选池、硬过滤、有效配置、指标原值/归一化值/贡献、Top-K 权重与实际活动池概率及平台策略提示。订阅优先启用且存在合格订阅账号时，普通账号标记为延后且不进入本轮概率；开启粘性加权时 previous-response 和 session 只影响 Top-K 权重，关闭时有效硬粘性账号按实际强制选择显示概率 1。`POST /api/v1/admin/accounts/:id/advanced-scheduler-score/preview` 接受 `group_id`、可选 `requested_model`、`sticky_account_id` 和 `previous_response_account_id`，用于无状态的评分模拟；previous-response 只对 OpenAI 分组有效，其它平台返回 `ignored`。请求体严格拒绝其它字段，尤其不得传入 session hash、响应正文或凭据。两个接口不分配并发槽、不写粘性，并且响应不包含凭据、代理认证、session hash 或上游响应内容。诊断复用请求信息足以判断的生产硬过滤；endpoint、transport、compact、media 等缺少请求上下文的能力以 `not_evaluated` 明示，不伪装成已通过。
 
 路由前缀不独自决定协议处理器。例如 `/v1/messages` 会根据分组平台分派到 Anthropic、OpenAI/Grok 或 Qoder handler；路由层拥有分派，handler/service 不能通过字符串猜测调用方已经具备某个平台能力。
+
+<a id="invoice_api"></a>
+## 人工发票接口
+
+人工开票统一位于支付路由族，并同时经过用户或管理员 JWT、面板限流和管理员审计中间件。用户接口为 `GET /api/v1/payment/invoices/eligible-orders`、`GET|POST /api/v1/payment/invoices`、`GET /api/v1/payment/invoices/:id` 与 `GET /api/v1/payment/invoices/attachments/:attachment_id/download`。可开票订单接口使用统一分页参数 `page`、`page_size`，返回订单的充值时间、支付方式和实付金额，前端支持当前页全选并跨页保留多选。创建请求提交订单 ID、`invoice_type`（`PERSONAL` 或 `ENTERPRISE`）、发票抬头、税号、可选开户行、可选银行账号、收件邮箱和备注；企业类型必须提供抬头和税号，省略类型按个人类型兼容。订单在服务端校验归属、完成状态、类型和同币种，不信任客户端金额。
+
+管理员接口为 `GET /api/v1/admin/payment/invoices`、`GET /api/v1/admin/payment/invoices/:id`、`POST /api/v1/admin/payment/invoices/:id/approve`、`POST /api/v1/admin/payment/invoices/:id/reject`、`POST /api/v1/admin/payment/invoices/:id/attachments`、`POST /api/v1/admin/payment/invoices/:id/issue`、`POST /api/v1/admin/payment/invoices/:id/send` 与 `GET /api/v1/admin/payment/invoices/attachments/:attachment_id/download`。附件上传使用 multipart 字段 `attachment`；下载由服务端鉴权并以附件形式响应，不返回存储路径或直链。状态和退款限制以 [发票申请](../domains/invoice_applications.md) 为准。
 
 ## API Key 结算策略接口
 

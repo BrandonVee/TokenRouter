@@ -130,6 +130,20 @@ func ProvideAdminSettingHandler(settingService *service.SettingService, emailSer
 	return h
 }
 
+// ProvidePaymentHandler 注入独立发票服务，同时保持支付处理器的既有构造参数兼容。
+func ProvidePaymentHandler(paymentService *service.PaymentService, configService *service.PaymentConfigService, invoiceService *service.InvoiceService) *PaymentHandler {
+	h := NewPaymentHandler(paymentService, configService)
+	h.SetInvoiceService(invoiceService)
+	return h
+}
+
+// ProvideAdminPaymentHandler 注入管理员发票处理能力。
+func ProvideAdminPaymentHandler(paymentService *service.PaymentService, configService *service.PaymentConfigService, invoiceService *service.InvoiceService) *admin.PaymentHandler {
+	h := admin.NewPaymentHandler(paymentService, configService)
+	h.SetInvoiceService(invoiceService)
+	return h
+}
+
 // ProvideTLSFingerprintProfileHandler 注入页面可控的 TLS 指纹收集器。
 func ProvideTLSFingerprintProfileHandler(profileService *service.TLSFingerprintProfileService, collector *service.TLSFingerprintCollectorService) *admin.TLSFingerprintProfileHandler {
 	return admin.NewTLSFingerprintProfileHandler(profileService, collector)
@@ -208,7 +222,7 @@ var ProviderSet = wire.NewSet(
 	NewTotpHandler,
 	NewPasskeyHandler,
 	ProvideSettingHandler,
-	NewPaymentHandler,
+	ProvidePaymentHandler,
 	NewPaymentWebhookHandler,
 	NewDataSharingHandler,
 	NewBatchImageHandler,
@@ -245,7 +259,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewScheduledTestHandler,
 	admin.NewChannelHandler,
 	admin.NewContentModerationHandler,
-	admin.NewPaymentHandler,
+	ProvideAdminPaymentHandler,
 	admin.NewAffiliateHandler,
 	admin.NewDataSharingHandler,
 	admin.NewCodexInviteResetHandler,

@@ -183,6 +183,15 @@ func (s *EmailService) SendEmail(ctx context.Context, to, subject, body string) 
 	return s.SendEmailWithConfig(config, to, subject, body)
 }
 
+// SendEmailWithAttachments 使用数据库 SMTP 配置发送包含附件的邮件并返回 Message-ID。
+func (s *EmailService) SendEmailWithAttachments(ctx context.Context, to, subject, body string, attachments []EmailAttachment) (string, error) {
+	config, err := s.GetSMTPConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+	return s.SendEmailWithConfigAndAttachments(config, to, subject, body, attachments)
+}
+
 const smtpDialTimeout = 10 * time.Second
 const smtpIOTimeout = 20 * time.Second
 
@@ -192,6 +201,22 @@ func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body
 	if err != nil {
 		return err
 	}
+	return s.sendSMTPMessage(config, message)
+}
+
+// SendEmailWithConfigAndAttachments 使用指定 SMTP 配置发送包含附件的邮件。
+func (s *EmailService) SendEmailWithConfigAndAttachments(config *SMTPConfig, to, subject, body string, attachments []EmailAttachment) (string, error) {
+	message, err := buildSMTPMessageWithAttachments(config, to, subject, body, attachments)
+	if err != nil {
+		return "", err
+	}
+	if err := s.sendSMTPMessage(config, message); err != nil {
+		return "", err
+	}
+	return message.messageID, nil
+}
+
+func (s *EmailService) sendSMTPMessage(config *SMTPConfig, message smtpMessage) error {
 
 	client, err := s.connectSMTP(config)
 	if err != nil {

@@ -30,6 +30,7 @@ import tlsFingerprintProfileAPI from './tlsFingerprintProfile'
 import tlsFingerprintRouterAPI from './tlsFingerprintRouter'
 import channelsAPI from './channels'
 import adminPaymentAPI from './payment'
+import { adminInvoiceAPI } from './invoice'
 import riskControlAPI from './riskControl'
 import adminDataSharingAPI from './dataSharing'
 import auditAPI from './audit'
@@ -67,6 +68,7 @@ export const adminAPI = {
   tlsFingerprintRouters: tlsFingerprintRouterAPI,
   channels: channelsAPI,
   payment: adminPaymentAPI,
+  invoice: adminInvoiceAPI,
   riskControl: riskControlAPI,
   dataSharing: adminDataSharingAPI,
   audit: auditAPI,
@@ -102,6 +104,7 @@ export {
   tlsFingerprintRouterAPI,
   channelsAPI,
   adminPaymentAPI,
+  adminInvoiceAPI,
   riskControlAPI,
   adminDataSharingAPI,
   auditAPI,

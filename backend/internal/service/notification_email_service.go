@@ -28,6 +28,7 @@ const (
 	NotificationEmailEventSubscriptionExpiryReminder  = "subscription.expiry_reminder"
 	NotificationEmailEventBalanceLow                  = "balance.low"
 	NotificationEmailEventBalanceRechargeSuccess      = "balance.recharge_success"
+	NotificationEmailEventInvoiceSent                 = "invoice.sent"
 	NotificationEmailEventAccountQuotaAlert           = "account.quota_alert"
 	NotificationEmailEventContentModerationViolation  = "content_moderation.violation_notice"
 	NotificationEmailEventContentModerationDisabled   = "content_moderation.account_disabled"
@@ -126,6 +127,7 @@ type NotificationEmailSendInput struct {
 	ReminderKey      string
 	Variables        map[string]string
 	RawHTMLVariables map[string]string
+	Attachments      []EmailAttachment
 }
 
 type NotificationEmailUnsubscribeResult struct {
@@ -373,22 +375,28 @@ func (s *NotificationEmailService) PreviewTemplate(ctx context.Context, input No
 }
 
 func (s *NotificationEmailService) Send(ctx context.Context, input NotificationEmailSendInput) error {
+	_, err := s.SendWithMessageID(ctx, input)
+	return err
+}
+
+// SendWithMessageID 发送事务邮件，并在 SMTP 可提供时返回投递 Message-ID。
+func (s *NotificationEmailService) SendWithMessageID(ctx context.Context, input NotificationEmailSendInput) (string, error) {
 	info, normalizedEvent, err := s.eventInfo(input.Event)
 	if err != nil {
-		return notificationEmailTemplateErr(err)
+		return "", notificationEmailTemplateErr(err)
 	}
 	recipient := strings.TrimSpace(input.RecipientEmail)
 	if recipient == "" {
-		return nil
+		return "", nil
 	}
 	if info.Optional {
 		unsubscribed, err := s.IsUnsubscribed(ctx, recipient, normalizedEvent)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if unsubscribed {
 			slog.Info("notification email suppressed by unsubscribe preference", "event", normalizedEvent, "recipient_hash", notificationEmailHash(recipient))
-			return nil
+			return "", nil
 		}
 	}
 
@@ -398,37 +406,43 @@ func (s *NotificationEmailService) Send(ctx context.Context, input NotificationE
 	}
 	tmpl, err := s.GetTemplate(ctx, normalizedEvent, locale)
 	if err != nil {
-		return notificationEmailTemplateErr(err)
+		return "", notificationEmailTemplateErr(err)
 	}
 	variables := s.runtimeVariables(ctx, normalizedEvent, locale, input)
 	rendered, err := renderNotificationEmail(normalizedEvent, tmpl.Subject, tmpl.HTML, variables, input.RawHTMLVariables)
 	if err != nil {
-		return notificationEmailTemplateErr(err)
+		return "", notificationEmailTemplateErr(err)
 	}
 
 	deliveryKey := notificationEmailDeliveryKey(normalizedEvent, input.SourceType, input.SourceID, recipient, input.ReminderKey)
 	if deliveryKey != "" {
 		sent, err := s.deliveryExists(ctx, deliveryKey, legacyNotificationEmailDeliveryKey(normalizedEvent, input.SourceType, input.SourceID, recipient, input.ReminderKey))
 		if err != nil {
-			return err
+			return "", err
 		}
 		if sent {
-			return nil
+			return "", nil
 		}
 	}
 
 	if s.emailService == nil {
-		return notificationEmailConfigErr(errors.New("email service is not configured"))
+		return "", notificationEmailConfigErr(errors.New("email service is not configured"))
 	}
-	if err := s.emailService.SendEmail(ctx, recipient, rendered.Subject, rendered.HTML); err != nil {
-		return notificationEmailDeliveryErr(err)
+	messageID := ""
+	if len(input.Attachments) > 0 {
+		messageID, err = s.emailService.SendEmailWithAttachments(ctx, recipient, rendered.Subject, rendered.HTML, input.Attachments)
+		if err != nil {
+			return "", notificationEmailDeliveryErr(err)
+		}
+	} else if err := s.emailService.SendEmail(ctx, recipient, rendered.Subject, rendered.HTML); err != nil {
+		return "", notificationEmailDeliveryErr(err)
 	}
 	if deliveryKey != "" {
 		if err := s.settingRepo.Set(ctx, deliveryKey, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
-			return err
+			return "", err
 		}
 	}
-	return nil
+	return messageID, nil
 }
 
 func (s *NotificationEmailService) RememberRecipientLocale(ctx context.Context, userID int64, email, acceptLanguage string) {
@@ -915,6 +929,13 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 			"recharge_url":        "https://example.com/recharge",
 			"recharge_amount":     "50.00",
 			"order_id":            "1024",
+			"invoice_request_no":  "INV-20260827-ABC123",
+			"invoice_number":      "INV-2026-0001",
+			"invoice_title":       "示例科技有限公司",
+			"invoice_amount":      "50.00",
+			"currency":            "CNY",
+			"payment_items":       "TR202608270001: 50.00 CNY",
+			"issued_at":           "2026-08-27 12:00",
 			"unsubscribe_url":     "https://example.com/unsubscribe",
 			"account_id":          "1001",
 			"account_name":        "openai-main",
@@ -966,6 +987,13 @@ func notificationEmailSampleVariables(locale string) map[string]string {
 		"recharge_url":        "https://example.com/recharge",
 		"recharge_amount":     "50.00",
 		"order_id":            "1024",
+		"invoice_request_no":  "INV-20260827-ABC123",
+		"invoice_number":      "INV-2026-0001",
+		"invoice_title":       "Example Technology Ltd.",
+		"invoice_amount":      "50.00",
+		"currency":            "USD",
+		"payment_items":       "TR202608270001: 50.00 USD",
+		"issued_at":           "2026-08-27 12:00",
 		"unsubscribe_url":     "https://example.com/unsubscribe",
 		"account_id":          "1001",
 		"account_name":        "openai-main",
@@ -1035,6 +1063,7 @@ var notificationEmailEventOrder = []string{
 	NotificationEmailEventSubscriptionExpiryReminder,
 	NotificationEmailEventBalanceLow,
 	NotificationEmailEventBalanceRechargeSuccess,
+	NotificationEmailEventInvoiceSent,
 	NotificationEmailEventAccountQuotaAlert,
 	NotificationEmailEventContentModerationViolation,
 	NotificationEmailEventContentModerationDisabled,
@@ -1106,6 +1135,15 @@ var notificationEmailEventDefinitions = map[string]NotificationEmailEventInfo{
 		Category:     "billing",
 		Optional:     false,
 		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...), "recharge_amount", "current_balance", "order_id"),
+	},
+	NotificationEmailEventInvoiceSent: {
+		Event:       NotificationEmailEventInvoiceSent,
+		Label:       "Invoice sent",
+		Description: "Sent after an administrator issues an invoice and attaches its documents.",
+		Category:    "billing",
+		Optional:    false,
+		Placeholders: append(append([]string{}, notificationEmailCommonPlaceholders...),
+			"invoice_request_no", "invoice_number", "invoice_title", "invoice_amount", "currency", "payment_items", "issued_at"),
 	},
 	NotificationEmailEventAccountQuotaAlert: {
 		Event:       NotificationEmailEventAccountQuotaAlert,
@@ -1317,6 +1355,36 @@ var notificationEmailOfficialTemplates = map[string]map[string]notificationEmail
 <p>您的余额充值 <strong>${{recharge_amount}}</strong> 已完成。</p>
 <p>当前余额：<strong>${{current_balance}}</strong></p>
 			<p>订单号：{{order_id}}</p>`),
+		},
+	},
+	NotificationEmailEventInvoiceSent: {
+		notificationEmailDefaultLocale: {
+			Subject: "[{{site_name}}] Invoice {{invoice_number}}",
+			HTML: notificationEmailCard("#2563eb", "Invoice issued", `
+<p>Hello {{recipient_name}},</p>
+<p>Your invoice has been issued and is attached to this email.</p>
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td>Request</td><td>{{invoice_request_no}}</td></tr>
+  <tr><td>Invoice number</td><td>{{invoice_number}}</td></tr>
+  <tr><td>Title</td><td>{{invoice_title}}</td></tr>
+  <tr><td>Amount</td><td>{{invoice_amount}} {{currency}}</td></tr>
+  <tr><td>Issued at</td><td>{{issued_at}}</td></tr>
+  <tr><td>Orders</td><td>{{payment_items}}</td></tr>
+</table>`),
+		},
+		notificationEmailLocaleChinese: {
+			Subject: "[{{site_name}}] 发票 {{invoice_number}}",
+			HTML: notificationEmailCard("#2563eb", "发票已开具", `
+<p>{{recipient_name}}，您好：</p>
+<p>您的发票已开具，附件已随邮件发送。</p>
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td>申请编号</td><td>{{invoice_request_no}}</td></tr>
+  <tr><td>发票号码</td><td>{{invoice_number}}</td></tr>
+  <tr><td>发票抬头</td><td>{{invoice_title}}</td></tr>
+  <tr><td>金额</td><td>{{invoice_amount}} {{currency}}</td></tr>
+  <tr><td>开票时间</td><td>{{issued_at}}</td></tr>
+  <tr><td>订单明细</td><td>{{payment_items}}</td></tr>
+</table>`),
 		},
 	},
 	NotificationEmailEventAccountQuotaAlert: {

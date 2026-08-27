@@ -29,6 +29,10 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/group"
 	"github.com/BrandonVee/TokenRouter/ent/idempotencyrecord"
 	"github.com/BrandonVee/TokenRouter/ent/identityadoptiondecision"
+	"github.com/BrandonVee/TokenRouter/ent/invoiceattachment"
+	"github.com/BrandonVee/TokenRouter/ent/invoicedelivery"
+	"github.com/BrandonVee/TokenRouter/ent/invoicerequest"
+	"github.com/BrandonVee/TokenRouter/ent/invoicerequestitem"
 	"github.com/BrandonVee/TokenRouter/ent/paymentauditlog"
 	"github.com/BrandonVee/TokenRouter/ent/paymentorder"
 	"github.com/BrandonVee/TokenRouter/ent/paymentproviderinstance"
@@ -133,6 +137,10 @@ func checkColumn(t, c string) error {
 			group.Table:                    group.ValidColumn,
 			idempotencyrecord.Table:        idempotencyrecord.ValidColumn,
 			identityadoptiondecision.Table: identityadoptiondecision.ValidColumn,
+			invoiceattachment.Table:        invoiceattachment.ValidColumn,
+			invoicedelivery.Table:          invoicedelivery.ValidColumn,
+			invoicerequest.Table:           invoicerequest.ValidColumn,
+			invoicerequestitem.Table:       invoicerequestitem.ValidColumn,
 			paymentauditlog.Table:          paymentauditlog.ValidColumn,
 			paymentorder.Table:             paymentorder.ValidColumn,
 			paymentproviderinstance.Table:  paymentproviderinstance.ValidColumn,
