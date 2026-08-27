@@ -3,7 +3,7 @@ import type { BasePaginationResponse } from '@/types'
 import type { InvoiceAttachment, InvoiceRequest, InvoiceRequestDetail } from '@/types/invoice'
 
 export const adminInvoiceAPI = {
-  list(params?: { page?: number; page_size?: number; status?: string }) {
+  list(params?: { page?: number; page_size?: number; status?: string; keyword?: string }) {
     return apiClient.get<BasePaginationResponse<InvoiceRequest>>('/admin/payment/invoices', { params })
   },
   get(id: number) {
@@ -26,7 +26,7 @@ export const adminInvoiceAPI = {
   send(id: number) {
     return apiClient.post<InvoiceRequest>(`/admin/payment/invoices/${id}/send`)
   },
-  downloadAttachment(id: number) {
-    return apiClient.get(`/admin/payment/invoices/attachments/${id}/download`, { responseType: 'blob' })
+  downloadAttachment(id: number, preview = false) {
+    return apiClient.get(`/admin/payment/invoices/attachments/${id}/download`, { responseType: 'blob', params: preview ? { preview: '1' } : undefined })
   }
 }

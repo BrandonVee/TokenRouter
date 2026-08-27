@@ -30,7 +30,7 @@ func (h *PaymentHandler) ListInvoices(c *gin.Context) {
 		return
 	}
 	page, pageSize := response.ParsePagination(c)
-	requests, total, err := h.invoiceService.ListAdminRequests(c.Request.Context(), c.Query("status"), page, pageSize)
+	requests, total, err := h.invoiceService.ListAdminRequests(c.Request.Context(), c.Query("status"), c.Query("keyword"), page, pageSize)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -197,7 +197,12 @@ func (h *PaymentHandler) DownloadInvoiceAttachment(c *gin.Context) {
 	}
 	defer func() { _ = file.Close() }()
 	c.Header("Content-Type", attachment.ContentType)
-	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.FileName}))
+	// 预览请求以内联方式返回，普通下载仍保持附件响应。
+	disposition := "attachment"
+	if c.Query("preview") == "1" {
+		disposition = "inline"
+	}
+	c.Header("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.FileName}))
 	http.ServeContent(c.Writer, c.Request, attachment.FileName, attachment.CreatedAt, file)
 }
 
@@ -224,7 +229,7 @@ func adminUserID(c *gin.Context) int64 {
 }
 
 func adminInvoiceRequestToDTO(request *dbent.InvoiceRequest) dto.InvoiceRequestResponse {
-	return dto.InvoiceRequestResponse{ID: request.ID, UserID: request.UserID, RequestNo: request.RequestNo, Status: request.Status, Currency: request.Currency, TotalAmount: request.TotalAmount, InvoiceType: request.InvoiceType, InvoiceTitle: request.InvoiceTitle, TaxID: request.TaxID, BankName: request.BankName, BankAccount: request.BankAccount, RecipientEmail: request.RecipientEmail, AccountEmail: request.AccountEmail, Remark: request.Remark, RejectionReason: request.RejectionReason, ReviewedBy: request.ReviewedBy, ReviewedAt: request.ReviewedAt, InvoiceNumber: request.InvoiceNumber, IssuedAt: request.IssuedAt, IssueRemark: request.IssueRemark, SentAt: request.SentAt, CreatedAt: request.CreatedAt, UpdatedAt: request.UpdatedAt}
+	return dto.InvoiceRequestResponse{ID: request.ID, UserID: request.UserID, UserEmail: request.AccountEmail, RequestNo: request.RequestNo, Status: request.Status, Currency: request.Currency, TotalAmount: request.TotalAmount, InvoiceType: request.InvoiceType, InvoiceTitle: request.InvoiceTitle, TaxID: request.TaxID, BankName: request.BankName, BankAccount: request.BankAccount, RecipientEmail: request.RecipientEmail, AccountEmail: request.AccountEmail, Remark: request.Remark, RejectionReason: request.RejectionReason, ReviewedBy: request.ReviewedBy, ReviewedAt: request.ReviewedAt, InvoiceNumber: request.InvoiceNumber, IssuedAt: request.IssuedAt, IssueRemark: request.IssueRemark, SentAt: request.SentAt, CreatedAt: request.CreatedAt, UpdatedAt: request.UpdatedAt}
 }
 func adminInvoiceRequestsToDTO(requests []*dbent.InvoiceRequest) []dto.InvoiceRequestResponse {
 	result := make([]dto.InvoiceRequestResponse, 0, len(requests))

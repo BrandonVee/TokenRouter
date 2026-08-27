@@ -12,6 +12,7 @@ import (
 	"net/mail"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -259,10 +260,17 @@ func (s *InvoiceService) ListUserRequests(ctx context.Context, userID int64, pag
 }
 
 // ListAdminRequests 返回管理员可筛选的发票申请。
-func (s *InvoiceService) ListAdminRequests(ctx context.Context, status string, page, pageSize int) ([]*dbent.InvoiceRequest, int, error) {
+func (s *InvoiceService) ListAdminRequests(ctx context.Context, status, keyword string, page, pageSize int) ([]*dbent.InvoiceRequest, int, error) {
 	query := s.entClient.InvoiceRequest.Query()
 	if status = strings.TrimSpace(status); status != "" {
 		query = query.Where(invoicerequest.StatusEQ(status))
+	}
+	if keyword = strings.TrimSpace(keyword); keyword != "" {
+		if userID, parseErr := strconv.ParseInt(keyword, 10, 64); parseErr == nil && userID > 0 {
+			query = query.Where(invoicerequest.UserIDEQ(userID))
+		} else {
+			query = query.Where(invoicerequest.AccountEmailContainsFold(keyword))
+		}
 	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {

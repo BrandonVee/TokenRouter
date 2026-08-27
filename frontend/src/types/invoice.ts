@@ -4,6 +4,7 @@ export type InvoiceType = 'PERSONAL' | 'ENTERPRISE'
 export interface InvoiceRequest {
   id: number
   user_id?: number
+	user_email?: string
   request_no: string
   status: InvoiceRequestStatus
   currency: string

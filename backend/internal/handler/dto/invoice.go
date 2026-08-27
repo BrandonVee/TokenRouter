@@ -6,6 +6,7 @@ import "time"
 type InvoiceRequestResponse struct {
 	ID              int64      `json:"id"`
 	UserID          int64      `json:"user_id,omitempty"`
+	UserEmail       string     `json:"user_email,omitempty"`
 	RequestNo       string     `json:"request_no"`
 	Status          string     `json:"status"`
 	Currency        string     `json:"currency"`
