@@ -110,6 +110,27 @@ describe('API Client', () => {
       expect(config.params?.timezone).toBeUndefined()
     })
 
+    it('FormData 请求移除 JSON Content-Type 以保留 multipart boundary', async () => {
+      const adapter = vi.fn().mockResolvedValue({
+        status: 200,
+        data: { code: 0, data: {} },
+        headers: {},
+        config: {},
+        statusText: 'OK',
+      })
+      apiClient.defaults.adapter = adapter
+
+      // 使用 Axios 运行时所在 realm 的 FormData，模拟浏览器请求对象。
+      const data = new globalThis.FormData()
+      data.append('attachment', 'invoice')
+      await apiClient.post('/admin/payment/invoices/1/attachments', data)
+
+      const config = adapter.mock.calls[0][0]
+      expect(config.data).toBe(data)
+      // 自定义 adapter 不经过浏览器适配器的最终 header 清理，但不能再是 JSON。
+      expect(config.headers.get('Content-Type')).not.toBe('application/json')
+    })
+
     it('请求默认带 withCredentials 以支持跨域 cookie', async () => {
       const adapter = vi.fn().mockResolvedValue({
         status: 200,

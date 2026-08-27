@@ -67,6 +67,11 @@ apiClient.interceptors.request.use(
       if (shouldMarkUserUIRequest(requestURL)) {
         config.headers[USER_UI_REQUEST_HEADER] = '1'
       }
+
+      // FormData 必须让浏览器自动生成 multipart boundary，不能沿用全局 JSON 请求头。
+      if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+        config.headers.delete('Content-Type')
+      }
     }
 
     return config
