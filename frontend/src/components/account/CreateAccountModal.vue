@@ -4143,6 +4143,7 @@ const apiKeyHint = computed(() => {
   }
   if (form.platform === 'gemini') return t('admin.accounts.gemini.apiKeyHint')
   if (form.platform === 'grok') return ''
+  if (isCNPlatform.value) return t('admin.accounts.cnProviders.apiKeyHint')
   return t('admin.accounts.apiKeyHint')
 })
 

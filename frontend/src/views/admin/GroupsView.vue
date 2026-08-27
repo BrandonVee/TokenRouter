@@ -150,7 +150,7 @@
               ]"
             >
               <PlatformIcon :platform="value" size="xs" />
-              {{ t("admin.groups.platforms." + value) }}
+              {{ formatGroupPlatform(value) }}
             </span>
           </template>
 
@@ -4077,7 +4077,7 @@
                             : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
                   ]"
                 >
-                  {{ t("admin.groups.platforms." + group.platform) }}
+                  {{ formatGroupPlatform(group.platform) }}
                 </span>
               </div>
             </div>
@@ -4861,19 +4861,7 @@ const statusOptions = computed(() => [
   { value: "inactive", label: t("admin.accounts.status.inactive") },
 ]);
 
-const platformOptions = computed(() => [
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "qoder", label: "Qoder" },
-  { value: "grok", label: "Grok" },
-  { value: "kimi", label: "Kimi" },
-  { value: "zhipu", label: "智谱 GLM" },
-  { value: "deepseek", label: "DeepSeek" },
-  { value: "composite", label: "Composite" },
-  ...GROUP_PLATFORM_OPTIONS,
-]);
+const platformOptions = computed(() => [...GROUP_PLATFORM_OPTIONS]);
 
 const schedulerTypeOptions = computed(() => [
   { value: "basic", label: t("admin.groups.scheduler.basic") },
@@ -4920,25 +4908,10 @@ const saveAdvancedSchedulerOverrides = (value: GroupAdvancedSchedulerOverrides) 
 const platformFilterOptions = computed(() => [
   { value: "", label: t("admin.groups.allPlatforms") },
   ...GROUP_PLATFORM_OPTIONS,
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "qoder", label: "Qoder" },
-  { value: "grok", label: "Grok" },
-  { value: "composite", label: "Composite" },
 ]);
 
 const compositeRoutePlatformOptions = computed(() => [
   ...CONCRETE_PLATFORM_OPTIONS,
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "grok", label: "Grok" },
-  { value: "kimi", label: "Kimi" },
-  { value: "zhipu", label: "Zhipu GLM" },
-  { value: "deepseek", label: "DeepSeek" },
 ]);
 
 const compositeRouteEndpointOptions = computed(() => [
@@ -5086,7 +5059,7 @@ const canCopyAccountsFromGroup = (targetPlatform: GroupPlatform, sourcePlatform:
 
 const copyAccountsGroupLabel = (g: AdminGroup) => {
   const count = g.account_count || 0;
-  const platform = t("admin.groups.platforms." + g.platform);
+  const platform = formatGroupPlatform(g.platform);
   return `${g.name} - ${platform} (${t("admin.groups.accountsCount", { count })})`;
 };
 
@@ -6714,9 +6687,14 @@ const formatCompositeEndpoint = (endpoint: CompositeRouteEndpoint) =>
   compositeRouteEndpointOptions.value.find((option) => option.value === endpoint)
     ?.label || endpoint;
 
+const formatGroupPlatform = (platform: string) => {
+  if (!platform) return "—";
+  return t(`admin.groups.platforms.${platform}`, platform);
+};
+
 const formatCompositePlatform = (platform: string) => {
   if (!platform) return "—";
-  return t(`admin.groups.platforms.${platform}`);
+  return t(`admin.groups.platforms.${platform}`, platform);
 };
 
 const compositeRouteSourceLabel = (source: string) => {

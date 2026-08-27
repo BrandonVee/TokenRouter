@@ -486,15 +486,7 @@ const matchModeOptions = computed(() => [
   { value: 'all', label: t('admin.errorPassthrough.matchMode.all'), description: t('admin.errorPassthrough.matchMode.allHint') }
 ])
 
-const platformOptions = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'antigravity', label: 'Antigravity' },
-  { value: 'qoder', label: 'Qoder' },
-  { value: 'grok', label: 'Grok' },
-  ...CONCRETE_PLATFORM_OPTIONS,
-]
+const platformOptions = [...CONCRETE_PLATFORM_OPTIONS]
 
 // Load rules when dialog opens
 watch(() => props.show, (newVal) => {

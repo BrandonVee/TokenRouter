@@ -117,24 +117,42 @@
                 v-for="option in cnAccountModeOptions"
                 :key="option.value"
                 type="button"
-                :class="['rounded-lg border-2 p-3 text-left text-sm transition-all', editAccountMode === option.value ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-600']"
+                :class="[
+                  'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
+                  editAccountMode === option.value
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-gray-200 hover:border-gray-400 dark:border-dark-600 dark:hover:border-gray-600'
+                ]"
                 @click="editAccountMode = option.value"
               >
-                {{ t(`admin.accounts.cnProviders.accountMode.${option.value}`) }}
+                <Icon :name="option.value === 'coding' ? 'bolt' : 'creditCard'" size="sm" />
+                <span>
+                  <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ t(`admin.accounts.cnProviders.accountMode.${option.value}`) }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ t(`admin.accounts.cnProviders.accountMode.${option.value}Desc`) }}</span>
+                </span>
               </button>
             </div>
           </div>
           <div>
             <label class="input-label">{{ t('admin.accounts.cnProviders.apiProtocol.title') }}</label>
-            <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-4">
               <button
                 v-for="option in cnProtocolOptions"
                 :key="option.value"
                 type="button"
-                :class="['rounded-lg border-2 p-3 text-left text-sm transition-all', editApiProtocol === option.value ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-600']"
+                :class="[
+                  'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
+                  editApiProtocol === option.value
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-gray-200 hover:border-gray-400 dark:border-dark-600 dark:hover:border-gray-600'
+                ]"
                 @click="editApiProtocol = option.value"
               >
-                {{ t(`admin.accounts.cnProviders.apiProtocol.${option.labelKey}`) }}
+                <Icon :name="option.value === 'adaptive' ? 'swap' : option.value === 'anthropic' ? 'sparkles' : option.value === 'responses' ? 'terminal' : 'chat'" size="sm" />
+                <span>
+                  <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ t(`admin.accounts.cnProviders.apiProtocol.${option.labelKey}`) }}</span>
+                  <span class="text-xs text-gray-500 dark:text-gray-400">{{ t(`admin.accounts.cnProviders.apiProtocol.${option.labelKey}Desc`) }}</span>
+                </span>
               </button>
             </div>
           </div>

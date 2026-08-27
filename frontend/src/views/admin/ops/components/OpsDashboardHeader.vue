@@ -11,7 +11,6 @@ import { useAdminSettingsStore } from '@/stores'
 import { formatBytes, formatNumber } from '@/utils/format'
 import { buildOpsPlatformOptions } from '../platformOptions'
 import { formatMemorySizeMB } from '../utils/opsFormatters'
-import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'
 
 type RealtimeWindow = '1min' | '5min' | '30min' | '1h'
 
@@ -105,7 +104,7 @@ function formatCustomTimeRangeLabel(startTime: string, endTime: string): string 
   return `${formatDate(start)} ~ ${formatDate(end)}`
 }
 
-const platformOptions = computed(() => [...CONCRETE_PLATFORM_OPTIONS, ...buildOpsPlatformOptions(props.groups ?? [], t('common.all'))])
+const platformOptions = computed(() => buildOpsPlatformOptions(props.groups ?? [], t('common.all')))
 
 const timeRangeOptions = computed(() => [
   { value: '5m', label: t('admin.ops.timeRange.5m') },

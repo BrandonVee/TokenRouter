@@ -23,11 +23,11 @@ describe('admin platform filters', () => {
     for (const path of [
       'src/components/admin/account/AccountTableFilters.vue',
       'src/components/admin/ErrorPassthroughRulesModal.vue',
-      'src/views/admin/ops/components/OpsDashboardHeader.vue'
+      'src/views/admin/ops/platformOptions.ts'
     ]) {
       const source = readSource(path)
       expect(source).toContain("import { CONCRETE_PLATFORM_OPTIONS } from '@/constants/platforms'")
-      expect(source).toMatch(/platformOptions\s*=.*CONCRETE_PLATFORM_OPTIONS|pOpts.*\.\.\.CONCRETE_PLATFORM_OPTIONS/s)
+      expect(source).toContain('...CONCRETE_PLATFORM_OPTIONS')
     }
   })
 })

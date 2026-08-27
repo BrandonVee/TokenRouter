@@ -682,6 +682,7 @@ export default {
           responses: 'OpenAI Responses',
           responsesDesc: '适用于 Codex 客户端的 DeepSeek Responses 接口。'
         },
+        apiKeyHint: '请输入对应上游平台的 API Key。',
         balance: '余额',
         window5h: '5 小时',
         windowWeekly: '每周',

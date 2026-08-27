@@ -180,11 +180,3 @@ func invoiceAttachmentsToDTO(attachments []*dbent.InvoiceAttachment) []dto.Invoi
 	}
 	return result
 }
-
-func invoiceDeliveriesToDTO(deliveries []*dbent.InvoiceDelivery) []dto.InvoiceDeliveryResponse {
-	result := make([]dto.InvoiceDeliveryResponse, 0, len(deliveries))
-	for _, delivery := range deliveries {
-		result = append(result, dto.InvoiceDeliveryResponse{ID: delivery.ID, RecipientEmail: delivery.RecipientEmail, Status: delivery.Status, MessageID: delivery.MessageID, ErrorMessage: delivery.ErrorMessage, SentBy: delivery.SentBy, CreatedAt: delivery.CreatedAt})
-	}
-	return result
-}

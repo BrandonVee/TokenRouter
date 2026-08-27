@@ -608,6 +608,7 @@ export default {
           responses: 'OpenAI Responses',
           responsesDesc: 'DeepSeek Responses endpoint for Codex clients.'
         },
+        apiKeyHint: 'Enter the API Key for the selected upstream platform.',
         balance: 'Balance',
         window5h: '5h',
         windowWeekly: 'Weekly',

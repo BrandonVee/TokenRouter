@@ -88,10 +88,15 @@ const props = defineProps<Props>()
 const platformLabel = computed(() => {
   if (props.platform === 'anthropic') return 'Anthropic'
   if (props.platform === 'openai') return 'OpenAI'
+  if (props.platform === 'gemini') return 'Gemini'
   if (props.platform === 'antigravity') return 'Antigravity'
   if (props.platform === 'qoder') return 'Qoder'
   if (props.platform === 'grok') return 'Grok'
-  return 'Gemini'
+  if (props.platform === 'kimi') return 'Kimi'
+  if (props.platform === 'zhipu') return '智谱 GLM'
+  if (props.platform === 'deepseek') return 'DeepSeek'
+  if (props.platform === 'composite') return 'Composite'
+  return props.platform
 })
 
 const normalizedAuthMode = computed(() =>

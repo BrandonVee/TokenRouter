@@ -1049,6 +1049,9 @@ affiliates: {
         antigravity: 'Antigravity',
         qoder: 'Qoder',
         grok: 'Grok',
+        kimi: 'Kimi',
+        zhipu: 'Zhipu GLM',
+        deepseek: 'DeepSeek',
         composite: 'Composite',
       },
       deleteConfirm:
