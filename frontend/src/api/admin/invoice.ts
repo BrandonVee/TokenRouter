@@ -20,8 +20,11 @@ export const adminInvoiceAPI = {
     data.append('attachment', attachment)
     return apiClient.post<InvoiceAttachment>(`/admin/payment/invoices/${id}/attachments`, data)
   },
-  issue(id: number, data: { invoice_number: string; issued_at?: string; remark?: string }) {
+  issue(id: number, data: { invoice_number?: string; issued_at?: string; remark?: string }) {
     return apiClient.post<InvoiceRequest>(`/admin/payment/invoices/${id}/issue`, data)
+  },
+  deleteAttachment(id: number) {
+    return apiClient.delete<{ message: string }>(`/admin/payment/invoices/attachments/${id}`)
   },
   send(id: number) {
     return apiClient.post<InvoiceRequest>(`/admin/payment/invoices/${id}/send`)

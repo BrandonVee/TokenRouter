@@ -114,6 +114,7 @@ func RegisterPaymentRoutes(
 			invoices.POST("/:id/attachments", adminPaymentHandler.UploadInvoiceAttachment)
 			invoices.POST("/:id/issue", adminPaymentHandler.IssueInvoice)
 			invoices.POST("/:id/send", adminPaymentHandler.SendInvoice)
+			invoices.DELETE("/attachments/:attachment_id", adminPaymentHandler.DeleteInvoiceAttachment)
 			invoices.GET("/attachments/:attachment_id/download", adminPaymentHandler.DownloadInvoiceAttachment)
 		}
 

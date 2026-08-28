@@ -19,9 +19,25 @@ type invoiceRejectBody struct {
 	Reason string `json:"reason" binding:"required"`
 }
 type invoiceIssueBody struct {
-	InvoiceNumber string     `json:"invoice_number" binding:"required"`
+	InvoiceNumber string     `json:"invoice_number"`
 	IssuedAt      *time.Time `json:"issued_at"`
 	Remark        string     `json:"remark"`
+}
+
+// DeleteInvoiceAttachment 删除尚未发送的发票附件。
+func (h *PaymentHandler) DeleteInvoiceAttachment(c *gin.Context) {
+	if !h.requireInvoiceService(c) {
+		return
+	}
+	id, ok := parseInvoiceID(c, "attachment_id")
+	if !ok {
+		return
+	}
+	if err := h.invoiceService.DeleteAttachment(c.Request.Context(), id, adminUserID(c)); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "invoice attachment deleted"})
 }
 
 // ListInvoices 返回管理员可筛选的人工发票申请。

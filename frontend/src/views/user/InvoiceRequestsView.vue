@@ -1,8 +1,8 @@
 <template>
   <div class="space-y-5">
     <div>
-      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">发票申请</h1>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">选择已完成的订单后，填写对应的开票信息。</p>
+      <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('admin.invoices.userTitle') }}</h1>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.invoices.userSubtitle') }}</p>
     </div>
 
     <section class="card overflow-hidden">
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { invoiceAPI } from '@/api/invoice'
 import { useAppStore } from '@/stores'
 import type { PaymentOrder } from '@/types/payment'
@@ -67,6 +68,7 @@ import Pagination from '@/components/common/Pagination.vue'
 import { formatPaymentAmount } from '@/components/payment/currency'
 
 const appStore = useAppStore()
+const { t } = useI18n()
 const loading = ref(false)
 const eligibleLoading = ref(false)
 const submitting = ref(false)

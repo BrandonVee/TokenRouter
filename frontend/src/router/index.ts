@@ -378,6 +378,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Invoice Requests',
+      titleKey: 'admin.invoices.userTitle',
       requiresPayment: true
     }
   },
@@ -758,6 +759,7 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: true,
       title: 'Invoice Management',
+      titleKey: 'admin.invoices.title',
       requiresPayment: true
     }
   },

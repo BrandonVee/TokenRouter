@@ -361,9 +361,6 @@ func (s *InvoiceService) Reject(ctx context.Context, requestID, adminID int64, r
 func (s *InvoiceService) Issue(ctx context.Context, requestID, adminID int64, input InvoiceIssueInput) (*dbent.InvoiceRequest, error) {
 	input.InvoiceNumber = strings.TrimSpace(input.InvoiceNumber)
 	input.Remark = strings.TrimSpace(input.Remark)
-	if input.InvoiceNumber == "" {
-		return nil, infraerrors.BadRequest("INVOICE_NUMBER_REQUIRED", "invoice number is required")
-	}
 	attachments, err := s.GetAttachments(ctx, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("list invoice attachments: %w", err)
@@ -375,8 +372,14 @@ func (s *InvoiceService) Issue(ctx context.Context, requestID, adminID int64, in
 	if issuedAt.IsZero() {
 		issuedAt = time.Now().UTC()
 	}
-	updated, err := s.entClient.InvoiceRequest.Update().Where(invoicerequest.IDEQ(requestID), invoicerequest.StatusEQ(InvoiceStatusApproved)).
-		SetStatus(InvoiceStatusIssued).SetInvoiceNumber(input.InvoiceNumber).SetIssuedAt(issuedAt).SetIssueRemark(input.Remark).SetReviewedBy(adminID).Save(ctx)
+	update := s.entClient.InvoiceRequest.Update().Where(invoicerequest.IDEQ(requestID), invoicerequest.StatusEQ(InvoiceStatusApproved)).
+		SetStatus(InvoiceStatusIssued).SetIssuedAt(issuedAt).SetIssueRemark(input.Remark).SetReviewedBy(adminID)
+	if input.InvoiceNumber != "" {
+		update.SetInvoiceNumber(input.InvoiceNumber)
+	} else {
+		update.ClearInvoiceNumber()
+	}
+	updated, err := update.Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("issue invoice request: %w", err)
 	}
@@ -384,6 +387,30 @@ func (s *InvoiceService) Issue(ctx context.Context, requestID, adminID int64, in
 		return nil, infraerrors.Conflict("INVOICE_REQUEST_STATE_INVALID", "invoice request must be approved before issuing")
 	}
 	return s.entClient.InvoiceRequest.Get(ctx, requestID)
+}
+
+// DeleteAttachment 删除尚未发送的管理员发票附件，并清理对应存储文件。
+func (s *InvoiceService) DeleteAttachment(ctx context.Context, attachmentID, adminID int64) error {
+	attachment, err := s.entClient.InvoiceAttachment.Get(ctx, attachmentID)
+	if err != nil {
+		return infraerrors.NotFound("INVOICE_ATTACHMENT_NOT_FOUND", "invoice attachment not found")
+	}
+	request, err := s.entClient.InvoiceRequest.Get(ctx, attachment.InvoiceRequestID)
+	if err != nil {
+		return infraerrors.NotFound("INVOICE_REQUEST_NOT_FOUND", "invoice request not found")
+	}
+	if request.Status != InvoiceStatusApproved && request.Status != InvoiceStatusIssued {
+		return infraerrors.Conflict("INVOICE_ATTACHMENT_DELETE_INVALID", "attachments cannot be deleted after invoice delivery")
+	}
+	if err := s.entClient.InvoiceAttachment.DeleteOneID(attachmentID).Exec(ctx); err != nil {
+		return fmt.Errorf("delete invoice attachment: %w", err)
+	}
+	if filepath.Base(attachment.StorageKey) == attachment.StorageKey {
+		if err := os.Remove(filepath.Join(s.storageRoot, attachment.StorageKey)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove invoice attachment file: %w", err)
+		}
+	}
+	return nil
 }
 
 // Send 将已开具发票和当前附件发送到申请时冻结的收件邮箱。
