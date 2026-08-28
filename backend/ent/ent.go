@@ -24,6 +24,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/batchimageitem"
 	"github.com/BrandonVee/TokenRouter/ent/batchimagejob"
 	"github.com/BrandonVee/TokenRouter/ent/compositemodelroute"
+	"github.com/BrandonVee/TokenRouter/ent/dashboardad"
 	"github.com/BrandonVee/TokenRouter/ent/datasharesession"
 	"github.com/BrandonVee/TokenRouter/ent/errorpassthroughrule"
 	"github.com/BrandonVee/TokenRouter/ent/group"
@@ -132,6 +133,7 @@ func checkColumn(t, c string) error {
 			batchimageitem.Table:           batchimageitem.ValidColumn,
 			batchimagejob.Table:            batchimagejob.ValidColumn,
 			compositemodelroute.Table:      compositemodelroute.ValidColumn,
+			dashboardad.Table:              dashboardad.ValidColumn,
 			datasharesession.Table:         datasharesession.ValidColumn,
 			errorpassthroughrule.Table:     errorpassthroughrule.ValidColumn,
 			group.Table:                    group.ValidColumn,

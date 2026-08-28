@@ -2,6 +2,7 @@
     <div class="space-y-6">
       <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
       <template v-else-if="stats">
+        <UserDashboardAds :ads="dashboardAds" />
         <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" />
         <UserDashboardCharts v-model:startDate="startDate" v-model:endDate="endDate" v-model:granularity="granularity" :loading="loadingCharts" :trend="trendData" :models="modelStats" @dateRangeChange="onDateRangeChange" @granularityChange="loadCharts" @refresh="refreshAll" />
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -22,10 +23,14 @@ import UserDashboardStats from '@/components/user/dashboard/UserDashboardStats.v
 import UserDashboardCharts from '@/components/user/dashboard/UserDashboardCharts.vue'
 import UserDashboardAnnouncements from '@/components/user/dashboard/UserDashboardAnnouncements.vue'
 import UserDashboardQuickActions from '@/components/user/dashboard/UserDashboardQuickActions.vue'
+import UserDashboardAds from '@/components/user/dashboard/UserDashboardAds.vue'
+import type { DashboardAd } from '@/types/dashboardAd'
 import type { ModelStat, TrendDataPoint } from '@/types'
 import { formatDateLocalInput } from '@/utils/format'
+import { useAppStore } from '@/stores/app'
 
 const authStore = useAuthStore()
+const appStore = useAppStore()
 const announcementStore = useAnnouncementStore()
 const user = computed(() => authStore.user)
 const stats = ref<UserStatsType | null>(null)
@@ -33,6 +38,8 @@ const loading = ref(false)
 const loadingCharts = ref(false)
 const trendData = ref<TrendDataPoint[]>([])
 const modelStats = ref<ModelStat[]>([])
+// 广告由公开设置注入，未配置时保持空数组。
+const dashboardAds = computed<DashboardAd[]>(() => appStore.cachedPublicSettings?.dashboard_ads || [])
 
 const startDate = ref(formatDateLocalInput(new Date(Date.now() - 6 * 86400000)))
 const endDate = ref(formatDateLocalInput(new Date()))
@@ -99,6 +106,8 @@ const refreshAll = () => {
 }
 
 onMounted(() => {
+  // 仪表盘进入时确保获取最新广告配置，避免登录后缓存尚未初始化。
+  void appStore.fetchPublicSettings(true)
   void loadStats()
   void loadCharts()
 })

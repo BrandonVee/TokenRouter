@@ -272,6 +272,8 @@ func parseForwardedClientIPHeadersSetting(value string) ([]string, error) {
 
 // parseSettings 解析设置到结构体
 func (s *SettingService) parseSettings(settings map[string]string) *SystemSettings {
+	var dashboardAds []DashboardAd
+	_ = json.Unmarshal([]byte(settings[SettingKeyDashboardAds]), &dashboardAds)
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
 	balanceUnitName := strings.TrimSpace(settings[SettingKeyBalanceUnitName])
 	if balanceUnitName == "" {
@@ -308,6 +310,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 	// 页面开关缺少旧版本尚未写入的键时按开启处理，避免升级后入口消失。
 	result := &SystemSettings{
+		DashboardAds:                           dashboardAds,
 		RegistrationEnabled:                    settings[SettingKeyRegistrationEnabled] == "true",
 		EmailVerifyEnabled:                     emailVerifyEnabled,
 		RegistrationEmailSuffixWhitelist:       ParseRegistrationEmailSuffixWhitelist(settings[SettingKeyRegistrationEmailSuffixWhitelist]),

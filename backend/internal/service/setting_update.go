@@ -369,6 +369,14 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyContactInfo] = settings.ContactInfo
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
+	if s.dashboardAdRepo == nil {
+		// 未注入独立仓储时保留旧实例/测试的兼容写入路径。
+		dashboardAdsJSON, err := json.Marshal(settings.DashboardAds)
+		if err != nil {
+			return nil, fmt.Errorf("marshal legacy dashboard ads: %w", err)
+		}
+		updates[SettingKeyDashboardAds] = string(dashboardAdsJSON)
+	}
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
 	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
 	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)

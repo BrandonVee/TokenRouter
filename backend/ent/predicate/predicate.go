@@ -42,6 +42,9 @@ type BatchImageJob func(*sql.Selector)
 // CompositeModelRoute is the predicate function for compositemodelroute builders.
 type CompositeModelRoute func(*sql.Selector)
 
+// DashboardAd is the predicate function for dashboardad builders.
+type DashboardAd func(*sql.Selector)
+
 // DataShareSession is the predicate function for datasharesession builders.
 type DataShareSession func(*sql.Selector)
 

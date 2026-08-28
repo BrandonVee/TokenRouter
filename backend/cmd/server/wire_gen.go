@@ -56,7 +56,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	}
 	paymentConfigService := service.ProvidePaymentConfigService(client, settingRepository, encryptionKey)
 	proxyRepository := repository.NewProxyRepository(client, db)
-	settingService := service.ProvideSettingService(settingRepository, paymentConfigService, proxyRepository, configConfig)
+	dashboardAdRepository := repository.NewDashboardAdRepository(client)
+	settingService := service.ProvideSettingService(settingRepository, dashboardAdRepository, paymentConfigService, proxyRepository, configConfig)
 	emailCache := repository.NewEmailCache(redisClient)
 	emailService := service.NewEmailService(settingRepository, emailCache)
 	turnstileVerifier := repository.NewTurnstileVerifier()

@@ -140,6 +140,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	}
 
 	payload := dto.SystemSettings{
+		DashboardAds:                                     settings.DashboardAds,
 		RegistrationEnabled:                              settings.RegistrationEnabled,
 		EmailVerifyEnabled:                               settings.EmailVerifyEnabled,
 		RegistrationEmailSuffixWhitelist:                 settings.RegistrationEmailSuffixWhitelist,

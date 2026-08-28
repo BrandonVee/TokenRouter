@@ -471,6 +471,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/dashboard-ads',
+    name: 'AdminDashboardAds',
+    component: () => import('@/views/admin/DashboardAdsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Dashboard Ads', titleKey: 'nav.dashboardAds' }
+  },
+  {
     path: '/admin/ops',
     name: 'AdminOps',
     component: () => import('@/views/admin/ops/OpsDashboard.vue'),

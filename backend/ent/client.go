@@ -27,6 +27,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/batchimageitem"
 	"github.com/BrandonVee/TokenRouter/ent/batchimagejob"
 	"github.com/BrandonVee/TokenRouter/ent/compositemodelroute"
+	"github.com/BrandonVee/TokenRouter/ent/dashboardad"
 	"github.com/BrandonVee/TokenRouter/ent/datasharesession"
 	"github.com/BrandonVee/TokenRouter/ent/errorpassthroughrule"
 	"github.com/BrandonVee/TokenRouter/ent/group"
@@ -96,6 +97,8 @@ type Client struct {
 	BatchImageJob *BatchImageJobClient
 	// CompositeModelRoute is the client for interacting with the CompositeModelRoute builders.
 	CompositeModelRoute *CompositeModelRouteClient
+	// DashboardAd is the client for interacting with the DashboardAd builders.
+	DashboardAd *DashboardAdClient
 	// DataShareSession is the client for interacting with the DataShareSession builders.
 	DataShareSession *DataShareSessionClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
@@ -191,6 +194,7 @@ func (c *Client) init() {
 	c.BatchImageItem = NewBatchImageItemClient(c.config)
 	c.BatchImageJob = NewBatchImageJobClient(c.config)
 	c.CompositeModelRoute = NewCompositeModelRouteClient(c.config)
+	c.DashboardAd = NewDashboardAdClient(c.config)
 	c.DataShareSession = NewDataShareSessionClient(c.config)
 	c.ErrorPassthroughRule = NewErrorPassthroughRuleClient(c.config)
 	c.Group = NewGroupClient(c.config)
@@ -331,6 +335,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BatchImageItem:           NewBatchImageItemClient(cfg),
 		BatchImageJob:            NewBatchImageJobClient(cfg),
 		CompositeModelRoute:      NewCompositeModelRouteClient(cfg),
+		DashboardAd:              NewDashboardAdClient(cfg),
 		DataShareSession:         NewDataShareSessionClient(cfg),
 		ErrorPassthroughRule:     NewErrorPassthroughRuleClient(cfg),
 		Group:                    NewGroupClient(cfg),
@@ -398,6 +403,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BatchImageItem:           NewBatchImageItemClient(cfg),
 		BatchImageJob:            NewBatchImageJobClient(cfg),
 		CompositeModelRoute:      NewCompositeModelRouteClient(cfg),
+		DashboardAd:              NewDashboardAdClient(cfg),
 		DataShareSession:         NewDataShareSessionClient(cfg),
 		ErrorPassthroughRule:     NewErrorPassthroughRuleClient(cfg),
 		Group:                    NewGroupClient(cfg),
@@ -465,8 +471,8 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.APIKey, c.APIKeyCompositeGroup, c.Account, c.AccountGroup, c.Announcement,
 		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
-		c.BatchImageItem, c.BatchImageJob, c.CompositeModelRoute, c.DataShareSession,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.BatchImageItem, c.BatchImageJob, c.CompositeModelRoute, c.DashboardAd,
+		c.DataShareSession, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
 		c.IdentityAdoptionDecision, c.InvoiceAttachment, c.InvoiceDelivery,
 		c.InvoiceRequest, c.InvoiceRequestItem, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
@@ -487,8 +493,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.APIKey, c.APIKeyCompositeGroup, c.Account, c.AccountGroup, c.Announcement,
 		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
-		c.BatchImageItem, c.BatchImageJob, c.CompositeModelRoute, c.DataShareSession,
-		c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
+		c.BatchImageItem, c.BatchImageJob, c.CompositeModelRoute, c.DashboardAd,
+		c.DataShareSession, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
 		c.IdentityAdoptionDecision, c.InvoiceAttachment, c.InvoiceDelivery,
 		c.InvoiceRequest, c.InvoiceRequestItem, c.PaymentAuditLog, c.PaymentOrder,
 		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
@@ -530,6 +536,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BatchImageJob.mutate(ctx, m)
 	case *CompositeModelRouteMutation:
 		return c.CompositeModelRoute.mutate(ctx, m)
+	case *DashboardAdMutation:
+		return c.DashboardAd.mutate(ctx, m)
 	case *DataShareSessionMutation:
 		return c.DataShareSession.mutate(ctx, m)
 	case *ErrorPassthroughRuleMutation:
@@ -2525,6 +2533,139 @@ func (c *CompositeModelRouteClient) mutate(ctx context.Context, m *CompositeMode
 		return (&CompositeModelRouteDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CompositeModelRoute mutation op: %q", m.Op())
+	}
+}
+
+// DashboardAdClient is a client for the DashboardAd schema.
+type DashboardAdClient struct {
+	config
+}
+
+// NewDashboardAdClient returns a client for the DashboardAd from the given config.
+func NewDashboardAdClient(c config) *DashboardAdClient {
+	return &DashboardAdClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `dashboardad.Hooks(f(g(h())))`.
+func (c *DashboardAdClient) Use(hooks ...Hook) {
+	c.hooks.DashboardAd = append(c.hooks.DashboardAd, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `dashboardad.Intercept(f(g(h())))`.
+func (c *DashboardAdClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DashboardAd = append(c.inters.DashboardAd, interceptors...)
+}
+
+// Create returns a builder for creating a DashboardAd entity.
+func (c *DashboardAdClient) Create() *DashboardAdCreate {
+	mutation := newDashboardAdMutation(c.config, OpCreate)
+	return &DashboardAdCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DashboardAd entities.
+func (c *DashboardAdClient) CreateBulk(builders ...*DashboardAdCreate) *DashboardAdCreateBulk {
+	return &DashboardAdCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DashboardAdClient) MapCreateBulk(slice any, setFunc func(*DashboardAdCreate, int)) *DashboardAdCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DashboardAdCreateBulk{err: fmt.Errorf("calling to DashboardAdClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DashboardAdCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DashboardAdCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DashboardAd.
+func (c *DashboardAdClient) Update() *DashboardAdUpdate {
+	mutation := newDashboardAdMutation(c.config, OpUpdate)
+	return &DashboardAdUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DashboardAdClient) UpdateOne(_m *DashboardAd) *DashboardAdUpdateOne {
+	mutation := newDashboardAdMutation(c.config, OpUpdateOne, withDashboardAd(_m))
+	return &DashboardAdUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DashboardAdClient) UpdateOneID(id string) *DashboardAdUpdateOne {
+	mutation := newDashboardAdMutation(c.config, OpUpdateOne, withDashboardAdID(id))
+	return &DashboardAdUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DashboardAd.
+func (c *DashboardAdClient) Delete() *DashboardAdDelete {
+	mutation := newDashboardAdMutation(c.config, OpDelete)
+	return &DashboardAdDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DashboardAdClient) DeleteOne(_m *DashboardAd) *DashboardAdDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DashboardAdClient) DeleteOneID(id string) *DashboardAdDeleteOne {
+	builder := c.Delete().Where(dashboardad.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DashboardAdDeleteOne{builder}
+}
+
+// Query returns a query builder for DashboardAd.
+func (c *DashboardAdClient) Query() *DashboardAdQuery {
+	return &DashboardAdQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDashboardAd},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DashboardAd entity by its id.
+func (c *DashboardAdClient) Get(ctx context.Context, id string) (*DashboardAd, error) {
+	return c.Query().Where(dashboardad.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DashboardAdClient) GetX(ctx context.Context, id string) *DashboardAd {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DashboardAdClient) Hooks() []Hook {
+	return c.hooks.DashboardAd
+}
+
+// Interceptors returns the client interceptors.
+func (c *DashboardAdClient) Interceptors() []Interceptor {
+	return c.inters.DashboardAd
+}
+
+func (c *DashboardAdClient) mutate(ctx context.Context, m *DashboardAdMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DashboardAdCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DashboardAdUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DashboardAdUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DashboardAdDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DashboardAd mutation op: %q", m.Op())
 	}
 }
 
@@ -8373,27 +8514,29 @@ type (
 	hooks struct {
 		APIKey, APIKeyCompositeGroup, Account, AccountGroup, Announcement,
 		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
-		BatchImageItem, BatchImageJob, CompositeModelRoute, DataShareSession,
-		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
-		InvoiceAttachment, InvoiceDelivery, InvoiceRequest, InvoiceRequestItem,
-		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
-		PromoCode, PromoCodeUsage, Proxy, RedeemCode, RedeemCodeUsage, SecuritySecret,
-		Setting, SubscriptionPlan, TLSFingerprintProfile, TLSFingerprintRouter, Team,
-		TeamInvitation, TeamMembership, TeamOwnershipTransfer, UsageCleanupTask,
-		UsageLog, User, UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
+		BatchImageItem, BatchImageJob, CompositeModelRoute, DashboardAd,
+		DataShareSession, ErrorPassthroughRule, Group, IdempotencyRecord,
+		IdentityAdoptionDecision, InvoiceAttachment, InvoiceDelivery, InvoiceRequest,
+		InvoiceRequestItem, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
+		PendingAuthSession, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
+		RedeemCodeUsage, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, TLSFingerprintRouter, Team, TeamInvitation,
+		TeamMembership, TeamOwnershipTransfer, UsageCleanupTask, UsageLog, User,
+		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
 		UserDisabledPublicGroup, UserPlatformQuota, UserSubscription []ent.Hook
 	}
 	inters struct {
 		APIKey, APIKeyCompositeGroup, Account, AccountGroup, Announcement,
 		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
-		BatchImageItem, BatchImageJob, CompositeModelRoute, DataShareSession,
-		ErrorPassthroughRule, Group, IdempotencyRecord, IdentityAdoptionDecision,
-		InvoiceAttachment, InvoiceDelivery, InvoiceRequest, InvoiceRequestItem,
-		PaymentAuditLog, PaymentOrder, PaymentProviderInstance, PendingAuthSession,
-		PromoCode, PromoCodeUsage, Proxy, RedeemCode, RedeemCodeUsage, SecuritySecret,
-		Setting, SubscriptionPlan, TLSFingerprintProfile, TLSFingerprintRouter, Team,
-		TeamInvitation, TeamMembership, TeamOwnershipTransfer, UsageCleanupTask,
-		UsageLog, User, UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
+		BatchImageItem, BatchImageJob, CompositeModelRoute, DashboardAd,
+		DataShareSession, ErrorPassthroughRule, Group, IdempotencyRecord,
+		IdentityAdoptionDecision, InvoiceAttachment, InvoiceDelivery, InvoiceRequest,
+		InvoiceRequestItem, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
+		PendingAuthSession, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
+		RedeemCodeUsage, SecuritySecret, Setting, SubscriptionPlan,
+		TLSFingerprintProfile, TLSFingerprintRouter, Team, TeamInvitation,
+		TeamMembership, TeamOwnershipTransfer, UsageCleanupTask, UsageLog, User,
+		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
 		UserDisabledPublicGroup, UserPlatformQuota, UserSubscription []ent.Interceptor
 	}
 )

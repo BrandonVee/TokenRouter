@@ -780,6 +780,36 @@ var (
 			},
 		},
 	}
+	// DashboardAdsColumns holds the columns for the "dashboard_ads" table.
+	DashboardAdsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 100},
+		{Name: "image_url", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "link_url", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "starts_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "ends_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// DashboardAdsTable holds the schema information for the "dashboard_ads" table.
+	DashboardAdsTable = &schema.Table{
+		Name:       "dashboard_ads",
+		Columns:    DashboardAdsColumns,
+		PrimaryKey: []*schema.Column{DashboardAdsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "dashboardad_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{DashboardAdsColumns[6]},
+			},
+			{
+				Name:    "dashboardad_enabled",
+				Unique:  false,
+				Columns: []*schema.Column{DashboardAdsColumns[5]},
+			},
+		},
+	}
 	// DataShareSessionsColumns holds the columns for the "data_share_sessions" table.
 	DataShareSessionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2589,6 +2619,7 @@ var (
 		BatchImageItemsTable,
 		BatchImageJobsTable,
 		CompositeModelRoutesTable,
+		DashboardAdsTable,
 		DataShareSessionsTable,
 		ErrorPassthroughRulesTable,
 		GroupsTable,
@@ -2678,6 +2709,9 @@ func init() {
 	CompositeModelRoutesTable.ForeignKeys[0].RefTable = GroupsTable
 	CompositeModelRoutesTable.Annotation = &entsql.Annotation{
 		Table: "composite_model_routes",
+	}
+	DashboardAdsTable.Annotation = &entsql.Annotation{
+		Table: "dashboard_ads",
 	}
 	DataShareSessionsTable.Annotation = &entsql.Annotation{
 		Table: "data_share_sessions",

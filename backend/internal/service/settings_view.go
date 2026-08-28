@@ -1,6 +1,9 @@
 package service
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
@@ -12,6 +15,7 @@ func firstNonEmpty(values ...string) string {
 }
 
 type SystemSettings struct {
+	DashboardAds                        []DashboardAd `json:"dashboard_ads"`
 	RegistrationEnabled                 bool
 	EmailVerifyEnabled                  bool
 	RegistrationEmailSuffixWhitelist    []string
@@ -308,11 +312,22 @@ type SystemSettings struct {
 	AllowUserViewErrorRequests bool
 }
 
+// DashboardAd 是独立的仪表盘广告配置。
+type DashboardAd struct {
+	ID       string     `json:"id"`
+	ImageURL string     `json:"image_url"`
+	LinkURL  string     `json:"link_url"`
+	StartsAt *time.Time `json:"starts_at,omitempty"`
+	EndsAt   *time.Time `json:"ends_at,omitempty"`
+	Enabled  bool       `json:"enabled"`
+}
+
 type DefaultSubscriptionSetting struct {
 	PlanID int64 `json:"plan_id"`
 }
 
 type PublicSettings struct {
+	DashboardAds                        []DashboardAd
 	RegistrationEnabled                 bool
 	EmailVerifyEnabled                  bool
 	ForceEmailOnThirdPartySignup        bool

@@ -24,6 +24,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/batchimageitem"
 	"github.com/BrandonVee/TokenRouter/ent/batchimagejob"
 	"github.com/BrandonVee/TokenRouter/ent/compositemodelroute"
+	"github.com/BrandonVee/TokenRouter/ent/dashboardad"
 	"github.com/BrandonVee/TokenRouter/ent/datasharesession"
 	"github.com/BrandonVee/TokenRouter/ent/errorpassthroughrule"
 	"github.com/BrandonVee/TokenRouter/ent/group"
@@ -86,6 +87,7 @@ const (
 	TypeBatchImageItem           = "BatchImageItem"
 	TypeBatchImageJob            = "BatchImageJob"
 	TypeCompositeModelRoute      = "CompositeModelRoute"
+	TypeDashboardAd              = "DashboardAd"
 	TypeDataShareSession         = "DataShareSession"
 	TypeErrorPassthroughRule     = "ErrorPassthroughRule"
 	TypeGroup                    = "Group"
@@ -18632,6 +18634,793 @@ func (m *CompositeModelRouteMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown CompositeModelRoute edge %s", name)
+}
+
+// DashboardAdMutation represents an operation that mutates the DashboardAd nodes in the graph.
+type DashboardAdMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	image_url     *string
+	link_url      *string
+	starts_at     *time.Time
+	ends_at       *time.Time
+	enabled       *bool
+	sort_order    *int
+	addsort_order *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*DashboardAd, error)
+	predicates    []predicate.DashboardAd
+}
+
+var _ ent.Mutation = (*DashboardAdMutation)(nil)
+
+// dashboardadOption allows management of the mutation configuration using functional options.
+type dashboardadOption func(*DashboardAdMutation)
+
+// newDashboardAdMutation creates new mutation for the DashboardAd entity.
+func newDashboardAdMutation(c config, op Op, opts ...dashboardadOption) *DashboardAdMutation {
+	m := &DashboardAdMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDashboardAd,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDashboardAdID sets the ID field of the mutation.
+func withDashboardAdID(id string) dashboardadOption {
+	return func(m *DashboardAdMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DashboardAd
+		)
+		m.oldValue = func(ctx context.Context) (*DashboardAd, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DashboardAd.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDashboardAd sets the old DashboardAd of the mutation.
+func withDashboardAd(node *DashboardAd) dashboardadOption {
+	return func(m *DashboardAdMutation) {
+		m.oldValue = func(context.Context) (*DashboardAd, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DashboardAdMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DashboardAdMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DashboardAd entities.
+func (m *DashboardAdMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DashboardAdMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DashboardAdMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DashboardAd.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetImageURL sets the "image_url" field.
+func (m *DashboardAdMutation) SetImageURL(s string) {
+	m.image_url = &s
+}
+
+// ImageURL returns the value of the "image_url" field in the mutation.
+func (m *DashboardAdMutation) ImageURL() (r string, exists bool) {
+	v := m.image_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldImageURL returns the old "image_url" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldImageURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldImageURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldImageURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldImageURL: %w", err)
+	}
+	return oldValue.ImageURL, nil
+}
+
+// ResetImageURL resets all changes to the "image_url" field.
+func (m *DashboardAdMutation) ResetImageURL() {
+	m.image_url = nil
+}
+
+// SetLinkURL sets the "link_url" field.
+func (m *DashboardAdMutation) SetLinkURL(s string) {
+	m.link_url = &s
+}
+
+// LinkURL returns the value of the "link_url" field in the mutation.
+func (m *DashboardAdMutation) LinkURL() (r string, exists bool) {
+	v := m.link_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLinkURL returns the old "link_url" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldLinkURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLinkURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLinkURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLinkURL: %w", err)
+	}
+	return oldValue.LinkURL, nil
+}
+
+// ResetLinkURL resets all changes to the "link_url" field.
+func (m *DashboardAdMutation) ResetLinkURL() {
+	m.link_url = nil
+}
+
+// SetStartsAt sets the "starts_at" field.
+func (m *DashboardAdMutation) SetStartsAt(t time.Time) {
+	m.starts_at = &t
+}
+
+// StartsAt returns the value of the "starts_at" field in the mutation.
+func (m *DashboardAdMutation) StartsAt() (r time.Time, exists bool) {
+	v := m.starts_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartsAt returns the old "starts_at" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldStartsAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartsAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartsAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartsAt: %w", err)
+	}
+	return oldValue.StartsAt, nil
+}
+
+// ClearStartsAt clears the value of the "starts_at" field.
+func (m *DashboardAdMutation) ClearStartsAt() {
+	m.starts_at = nil
+	m.clearedFields[dashboardad.FieldStartsAt] = struct{}{}
+}
+
+// StartsAtCleared returns if the "starts_at" field was cleared in this mutation.
+func (m *DashboardAdMutation) StartsAtCleared() bool {
+	_, ok := m.clearedFields[dashboardad.FieldStartsAt]
+	return ok
+}
+
+// ResetStartsAt resets all changes to the "starts_at" field.
+func (m *DashboardAdMutation) ResetStartsAt() {
+	m.starts_at = nil
+	delete(m.clearedFields, dashboardad.FieldStartsAt)
+}
+
+// SetEndsAt sets the "ends_at" field.
+func (m *DashboardAdMutation) SetEndsAt(t time.Time) {
+	m.ends_at = &t
+}
+
+// EndsAt returns the value of the "ends_at" field in the mutation.
+func (m *DashboardAdMutation) EndsAt() (r time.Time, exists bool) {
+	v := m.ends_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEndsAt returns the old "ends_at" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldEndsAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEndsAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEndsAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEndsAt: %w", err)
+	}
+	return oldValue.EndsAt, nil
+}
+
+// ClearEndsAt clears the value of the "ends_at" field.
+func (m *DashboardAdMutation) ClearEndsAt() {
+	m.ends_at = nil
+	m.clearedFields[dashboardad.FieldEndsAt] = struct{}{}
+}
+
+// EndsAtCleared returns if the "ends_at" field was cleared in this mutation.
+func (m *DashboardAdMutation) EndsAtCleared() bool {
+	_, ok := m.clearedFields[dashboardad.FieldEndsAt]
+	return ok
+}
+
+// ResetEndsAt resets all changes to the "ends_at" field.
+func (m *DashboardAdMutation) ResetEndsAt() {
+	m.ends_at = nil
+	delete(m.clearedFields, dashboardad.FieldEndsAt)
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *DashboardAdMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *DashboardAdMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *DashboardAdMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (m *DashboardAdMutation) SetSortOrder(i int) {
+	m.sort_order = &i
+	m.addsort_order = nil
+}
+
+// SortOrder returns the value of the "sort_order" field in the mutation.
+func (m *DashboardAdMutation) SortOrder() (r int, exists bool) {
+	v := m.sort_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSortOrder returns the old "sort_order" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldSortOrder(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSortOrder is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSortOrder requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSortOrder: %w", err)
+	}
+	return oldValue.SortOrder, nil
+}
+
+// AddSortOrder adds i to the "sort_order" field.
+func (m *DashboardAdMutation) AddSortOrder(i int) {
+	if m.addsort_order != nil {
+		*m.addsort_order += i
+	} else {
+		m.addsort_order = &i
+	}
+}
+
+// AddedSortOrder returns the value that was added to the "sort_order" field in this mutation.
+func (m *DashboardAdMutation) AddedSortOrder() (r int, exists bool) {
+	v := m.addsort_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSortOrder resets all changes to the "sort_order" field.
+func (m *DashboardAdMutation) ResetSortOrder() {
+	m.sort_order = nil
+	m.addsort_order = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DashboardAdMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DashboardAdMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DashboardAdMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *DashboardAdMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *DashboardAdMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *DashboardAdMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the DashboardAdMutation builder.
+func (m *DashboardAdMutation) Where(ps ...predicate.DashboardAd) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DashboardAdMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DashboardAdMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DashboardAd, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DashboardAdMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DashboardAdMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DashboardAd).
+func (m *DashboardAdMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DashboardAdMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.image_url != nil {
+		fields = append(fields, dashboardad.FieldImageURL)
+	}
+	if m.link_url != nil {
+		fields = append(fields, dashboardad.FieldLinkURL)
+	}
+	if m.starts_at != nil {
+		fields = append(fields, dashboardad.FieldStartsAt)
+	}
+	if m.ends_at != nil {
+		fields = append(fields, dashboardad.FieldEndsAt)
+	}
+	if m.enabled != nil {
+		fields = append(fields, dashboardad.FieldEnabled)
+	}
+	if m.sort_order != nil {
+		fields = append(fields, dashboardad.FieldSortOrder)
+	}
+	if m.created_at != nil {
+		fields = append(fields, dashboardad.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, dashboardad.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DashboardAdMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case dashboardad.FieldImageURL:
+		return m.ImageURL()
+	case dashboardad.FieldLinkURL:
+		return m.LinkURL()
+	case dashboardad.FieldStartsAt:
+		return m.StartsAt()
+	case dashboardad.FieldEndsAt:
+		return m.EndsAt()
+	case dashboardad.FieldEnabled:
+		return m.Enabled()
+	case dashboardad.FieldSortOrder:
+		return m.SortOrder()
+	case dashboardad.FieldCreatedAt:
+		return m.CreatedAt()
+	case dashboardad.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DashboardAdMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case dashboardad.FieldImageURL:
+		return m.OldImageURL(ctx)
+	case dashboardad.FieldLinkURL:
+		return m.OldLinkURL(ctx)
+	case dashboardad.FieldStartsAt:
+		return m.OldStartsAt(ctx)
+	case dashboardad.FieldEndsAt:
+		return m.OldEndsAt(ctx)
+	case dashboardad.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case dashboardad.FieldSortOrder:
+		return m.OldSortOrder(ctx)
+	case dashboardad.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case dashboardad.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DashboardAd field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DashboardAdMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case dashboardad.FieldImageURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetImageURL(v)
+		return nil
+	case dashboardad.FieldLinkURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLinkURL(v)
+		return nil
+	case dashboardad.FieldStartsAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartsAt(v)
+		return nil
+	case dashboardad.FieldEndsAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEndsAt(v)
+		return nil
+	case dashboardad.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case dashboardad.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSortOrder(v)
+		return nil
+	case dashboardad.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case dashboardad.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DashboardAd field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DashboardAdMutation) AddedFields() []string {
+	var fields []string
+	if m.addsort_order != nil {
+		fields = append(fields, dashboardad.FieldSortOrder)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DashboardAdMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case dashboardad.FieldSortOrder:
+		return m.AddedSortOrder()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DashboardAdMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case dashboardad.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSortOrder(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DashboardAd numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DashboardAdMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(dashboardad.FieldStartsAt) {
+		fields = append(fields, dashboardad.FieldStartsAt)
+	}
+	if m.FieldCleared(dashboardad.FieldEndsAt) {
+		fields = append(fields, dashboardad.FieldEndsAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DashboardAdMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DashboardAdMutation) ClearField(name string) error {
+	switch name {
+	case dashboardad.FieldStartsAt:
+		m.ClearStartsAt()
+		return nil
+	case dashboardad.FieldEndsAt:
+		m.ClearEndsAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DashboardAd nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DashboardAdMutation) ResetField(name string) error {
+	switch name {
+	case dashboardad.FieldImageURL:
+		m.ResetImageURL()
+		return nil
+	case dashboardad.FieldLinkURL:
+		m.ResetLinkURL()
+		return nil
+	case dashboardad.FieldStartsAt:
+		m.ResetStartsAt()
+		return nil
+	case dashboardad.FieldEndsAt:
+		m.ResetEndsAt()
+		return nil
+	case dashboardad.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case dashboardad.FieldSortOrder:
+		m.ResetSortOrder()
+		return nil
+	case dashboardad.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case dashboardad.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DashboardAd field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DashboardAdMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DashboardAdMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DashboardAdMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DashboardAdMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DashboardAdMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DashboardAdMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DashboardAdMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DashboardAd unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DashboardAdMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DashboardAd edge %s", name)
 }
 
 // DataShareSessionMutation represents an operation that mutates the DataShareSession nodes in the graph.

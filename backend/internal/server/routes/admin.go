@@ -73,6 +73,8 @@ func RegisterAdminRoutes(
 
 		// 系统设置
 		registerSettingsRoutes(admin, h)
+		admin.GET("/dashboard-ads", h.Admin.Setting.GetDashboardAds)
+		admin.PUT("/dashboard-ads", h.Admin.Setting.UpdateDashboardAds)
 
 		// 数据管理
 		registerDataManagementRoutes(admin, h, stepUpAuth)

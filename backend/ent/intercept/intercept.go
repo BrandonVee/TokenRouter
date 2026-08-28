@@ -20,6 +20,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/batchimageitem"
 	"github.com/BrandonVee/TokenRouter/ent/batchimagejob"
 	"github.com/BrandonVee/TokenRouter/ent/compositemodelroute"
+	"github.com/BrandonVee/TokenRouter/ent/dashboardad"
 	"github.com/BrandonVee/TokenRouter/ent/datasharesession"
 	"github.com/BrandonVee/TokenRouter/ent/errorpassthroughrule"
 	"github.com/BrandonVee/TokenRouter/ent/group"
@@ -437,6 +438,33 @@ func (f TraverseCompositeModelRoute) Traverse(ctx context.Context, q ent.Query) 
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.CompositeModelRouteQuery", q)
+}
+
+// The DashboardAdFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DashboardAdFunc func(context.Context, *ent.DashboardAdQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DashboardAdFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DashboardAdQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DashboardAdQuery", q)
+}
+
+// The TraverseDashboardAd type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDashboardAd func(context.Context, *ent.DashboardAdQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDashboardAd) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDashboardAd) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DashboardAdQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DashboardAdQuery", q)
 }
 
 // The DataShareSessionFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1438,6 +1466,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.BatchImageJobQuery, predicate.BatchImageJob, batchimagejob.OrderOption]{typ: ent.TypeBatchImageJob, tq: q}, nil
 	case *ent.CompositeModelRouteQuery:
 		return &query[*ent.CompositeModelRouteQuery, predicate.CompositeModelRoute, compositemodelroute.OrderOption]{typ: ent.TypeCompositeModelRoute, tq: q}, nil
+	case *ent.DashboardAdQuery:
+		return &query[*ent.DashboardAdQuery, predicate.DashboardAd, dashboardad.OrderOption]{typ: ent.TypeDashboardAd, tq: q}, nil
 	case *ent.DataShareSessionQuery:
 		return &query[*ent.DataShareSessionQuery, predicate.DataShareSession, datasharesession.OrderOption]{typ: ent.TypeDataShareSession, tq: q}, nil
 	case *ent.ErrorPassthroughRuleQuery:

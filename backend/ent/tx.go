@@ -38,6 +38,8 @@ type Tx struct {
 	BatchImageJob *BatchImageJobClient
 	// CompositeModelRoute is the client for interacting with the CompositeModelRoute builders.
 	CompositeModelRoute *CompositeModelRouteClient
+	// DashboardAd is the client for interacting with the DashboardAd builders.
+	DashboardAd *DashboardAdClient
 	// DataShareSession is the client for interacting with the DataShareSession builders.
 	DataShareSession *DataShareSessionClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
@@ -253,6 +255,7 @@ func (tx *Tx) init() {
 	tx.BatchImageItem = NewBatchImageItemClient(tx.config)
 	tx.BatchImageJob = NewBatchImageJobClient(tx.config)
 	tx.CompositeModelRoute = NewCompositeModelRouteClient(tx.config)
+	tx.DashboardAd = NewDashboardAdClient(tx.config)
 	tx.DataShareSession = NewDataShareSessionClient(tx.config)
 	tx.ErrorPassthroughRule = NewErrorPassthroughRuleClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)

@@ -29,6 +29,7 @@ type CustomEndpoint struct {
 
 // SystemSettings represents the admin settings API response payload.
 type SystemSettings struct {
+	DashboardAds                        []service.DashboardAd    `json:"dashboard_ads"`
 	RegistrationEnabled                 bool                     `json:"registration_enabled"`
 	EmailVerifyEnabled                  bool                     `json:"email_verify_enabled"`
 	RegistrationEmailSuffixWhitelist    []string                 `json:"registration_email_suffix_whitelist"`
@@ -336,6 +337,7 @@ type DefaultSubscriptionSetting struct {
 }
 
 type PublicSettings struct {
+	DashboardAds                        []service.DashboardAd    `json:"dashboard_ads"`
 	RegistrationEnabled                 bool                     `json:"registration_enabled"`
 	EmailVerifyEnabled                  bool                     `json:"email_verify_enabled"`
 	ForceEmailOnThirdPartySignup        bool                     `json:"force_email_on_third_party_signup"`

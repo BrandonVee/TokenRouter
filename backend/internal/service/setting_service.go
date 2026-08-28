@@ -115,6 +115,7 @@ type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[i
 // SettingService 系统设置服务
 type SettingService struct {
 	settingRepo                 SettingRepository
+	dashboardAdRepo             DashboardAdRepository
 	defaultSubPlanReader        DefaultSubscriptionPlanReader
 	proxyRepo                   ProxyRepository // for resolving websearch provider proxy URLs
 	cfg                         *config.Config
@@ -351,7 +352,15 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (*SystemSettings, e
 		return nil, fmt.Errorf("get all settings: %w", err)
 	}
 
-	return s.parseSettings(settings), nil
+	parsed := s.parseSettings(settings)
+	if s.dashboardAdRepo != nil {
+		ads, err := s.loadDashboardAds(ctx, settings[SettingKeyDashboardAds])
+		if err != nil {
+			return nil, fmt.Errorf("get dashboard ads: %w", err)
+		}
+		parsed.DashboardAds = ads
+	}
+	return parsed, nil
 }
 
 // SetOnUpdateCallback sets a callback function to be called when settings are updated

@@ -221,6 +221,7 @@ export interface LoginAgreementDocument {
 }
 
 export interface PublicSettings {
+  dashboard_ads?: import('./dashboardAd').DashboardAd[]
   registration_enabled: boolean
   email_verify_enabled: boolean
   force_email_on_third_party_signup: boolean

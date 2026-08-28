@@ -141,8 +141,28 @@ function handleUpload(event: Event) {
       input.value = ''
       return
     }
-    reader.onload = (e) => {
-      emit('update:modelValue', e.target?.result as string)
+    reader.onload = async (e) => {
+      const source = e.target?.result as string
+      if (!source) return
+      // 大图先缩放并转为 JPEG，避免设置 JSON 过大；小图保持原格式。
+      try {
+        const image = new Image()
+        image.onload = () => {
+          const maxDimension = 1600
+          const scale = Math.min(1, maxDimension / Math.max(image.width, image.height))
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.max(1, Math.round(image.width * scale))
+          canvas.height = Math.max(1, Math.round(image.height * scale))
+          const context = canvas.getContext('2d')
+          if (!context) return emit('update:modelValue', source)
+          context.drawImage(image, 0, 0, canvas.width, canvas.height)
+          emit('update:modelValue', canvas.toDataURL('image/jpeg', 0.82))
+        }
+        image.onerror = () => emit('update:modelValue', source)
+        image.src = source
+      } catch {
+        emit('update:modelValue', source)
+      }
     }
     reader.readAsDataURL(file)
   }

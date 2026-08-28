@@ -22,6 +22,8 @@ import (
 
 // UpdateSettingsRequest 更新设置请求
 type UpdateSettingsRequest struct {
+	// DashboardAds 仅为旧客户端兼容保留，广告现由独立接口写入 dashboard_ads 表。
+	DashboardAds []service.DashboardAd `json:"dashboard_ads"`
 	// 注册设置
 	RegistrationEnabled                 bool                         `json:"registration_enabled"`
 	EmailVerifyEnabled                  bool                         `json:"email_verify_enabled"`
@@ -1735,6 +1737,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ContactInfo:                            req.ContactInfo,
 		DocURL:                                 req.DocURL,
 		HomeContent:                            req.HomeContent,
+		// 广告已独立存储，普通设置保存只回传保存前读取的独立表快照。
+		DashboardAds:                           previousSettings.DashboardAds,
 		HideCcsImportButton:                    req.HideCcsImportButton,
 		PurchaseSubscriptionEnabled:            purchaseEnabled,
 		PurchaseSubscriptionURL:                purchaseURL,

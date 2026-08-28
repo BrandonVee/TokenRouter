@@ -51,6 +51,8 @@ RequestLogger
 | `/backend-api/codex/*` | TokenRouter API Key | Codex Responses、Realtime 与 sideband 兼容入口 |
 | `/api/v1/pages/*` 等 page routes | 按页面类型为用户或管理员 JWT | 服务端生成/读取的 pricing、账单或管理页面数据 |
 
+仪表盘广告使用独立管理接口 `GET|PUT /api/v1/admin/dashboard-ads`，请求体为 `{ "ads": [...] }`，列表顺序由数组顺序决定。广告不再由普通 `PUT /api/v1/admin/settings` 写入；用户端通过公开设置响应获得广告列表，并按启用状态和时间窗口筛选展示。
+
 OAuth 登录 start 对 GitHub、Google、LinuxDo、DingTalk、WeChat 和 OIDC 同时保留 `GET` 与 `POST`。未启用腾讯天御或阿里云验证码时，`GET` 继续以 `302` 跳转保持兼容；任一动作验证码启用后，匿名登录必须用 `POST`，腾讯票据使用 `tencent_captcha_ticket` 与 `tencent_captcha_randstr`，阿里云的 `captchaVerifyParam` 复用 `turnstile_token` 字段，成功响应的 `data.authorize_url` 由前端再导航。`*/bind/start` 是当前用户绑定入口，不消费匿名登录验证码。Passkey 登录的 `/auth/passkey/login/begin` 使用相同的提供方字段映射，`finish` 只接受 ceremony session 和 WebAuthn credential。
 
 `POST /api/v1/auth/oauth/google/one-tap` 接受浏览器 GIS 返回的 `credential`、本地 `redirect` 及可选 `aff_code`/`promo_code`。credential 上限为 16 KiB，入口按客户端 IP 使用 Redis `20 次/分钟` fail-close 限流；不接收 Client Secret，也不能记录 token 或未验证 claims。验证和已有用户登录成功时，统一 envelope 的 `data` 返回 `status=authenticated` 与标准 `access_token`、`refresh_token`、`expires_in`、`token_type`；新用户只返回 `status=registration_required` 与本地 redirect，并通过 HttpOnly pending cookies 继续 `/auth/oauth/callback` 的既有补全状态机。One Tap 设置或 Google OAuth 配置无效、backend mode、腾讯/阿里云动作验证码启用、注册关闭、token 无效或用户状态不可登录时拒绝。Turnstile 单独开启时不新增该入口的校验范围。

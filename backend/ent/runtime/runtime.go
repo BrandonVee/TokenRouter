@@ -17,6 +17,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/batchimageitem"
 	"github.com/BrandonVee/TokenRouter/ent/batchimagejob"
 	"github.com/BrandonVee/TokenRouter/ent/compositemodelroute"
+	"github.com/BrandonVee/TokenRouter/ent/dashboardad"
 	"github.com/BrandonVee/TokenRouter/ent/datasharesession"
 	"github.com/BrandonVee/TokenRouter/ent/errorpassthroughrule"
 	"github.com/BrandonVee/TokenRouter/ent/group"
@@ -815,6 +816,30 @@ func init() {
 	compositemodelrouteDescEnabled := compositemodelrouteFields[7].Descriptor()
 	// compositemodelroute.DefaultEnabled holds the default value on creation for the enabled field.
 	compositemodelroute.DefaultEnabled = compositemodelrouteDescEnabled.Default.(bool)
+	dashboardadFields := schema.DashboardAd{}.Fields()
+	_ = dashboardadFields
+	// dashboardadDescEnabled is the schema descriptor for enabled field.
+	dashboardadDescEnabled := dashboardadFields[5].Descriptor()
+	// dashboardad.DefaultEnabled holds the default value on creation for the enabled field.
+	dashboardad.DefaultEnabled = dashboardadDescEnabled.Default.(bool)
+	// dashboardadDescSortOrder is the schema descriptor for sort_order field.
+	dashboardadDescSortOrder := dashboardadFields[6].Descriptor()
+	// dashboardad.DefaultSortOrder holds the default value on creation for the sort_order field.
+	dashboardad.DefaultSortOrder = dashboardadDescSortOrder.Default.(int)
+	// dashboardadDescCreatedAt is the schema descriptor for created_at field.
+	dashboardadDescCreatedAt := dashboardadFields[7].Descriptor()
+	// dashboardad.DefaultCreatedAt holds the default value on creation for the created_at field.
+	dashboardad.DefaultCreatedAt = dashboardadDescCreatedAt.Default.(func() time.Time)
+	// dashboardadDescUpdatedAt is the schema descriptor for updated_at field.
+	dashboardadDescUpdatedAt := dashboardadFields[8].Descriptor()
+	// dashboardad.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	dashboardad.DefaultUpdatedAt = dashboardadDescUpdatedAt.Default.(func() time.Time)
+	// dashboardad.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	dashboardad.UpdateDefaultUpdatedAt = dashboardadDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// dashboardadDescID is the schema descriptor for id field.
+	dashboardadDescID := dashboardadFields[0].Descriptor()
+	// dashboardad.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	dashboardad.IDValidator = dashboardadDescID.Validators[0].(func(string) error)
 	datasharesessionFields := schema.DataShareSession{}.Fields()
 	_ = datasharesessionFields
 	// datasharesessionDescTrajectoryID is the schema descriptor for trajectory_id field.

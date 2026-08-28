@@ -122,6 +122,7 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		BalanceLowNotifyThreshold:           settings.BalanceLowNotifyThreshold,
 		BalanceLowNotifyRechargeURL:         settings.BalanceLowNotifyRechargeURL,
 		AllowUserViewErrorRequests:          settings.AllowUserViewErrorRequests,
+		DashboardAds:                        settings.DashboardAds,
 	})
 }
 

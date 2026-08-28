@@ -11624,7 +11624,8 @@ function copyNewKey() {
     .writeText(newAdminApiKey.value)
     .then(() => {
       appStore.showSuccess(t("admin.settings.adminApiKey.keyCopied"));
-    })
+})
+
     .catch(() => {
       appStore.showError(t("common.copyFailed"));
     });

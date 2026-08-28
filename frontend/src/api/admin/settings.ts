@@ -11,6 +11,7 @@ import type {
   LoginAgreementDocument,
   NotifyEmailEntry,
 } from "@/types";
+import type { DashboardAd } from "@/types/dashboardAd";
 
 export interface PaymentMethodFeeConfig {
   enabled: boolean;
@@ -426,6 +427,7 @@ export function deriveWeChatConnectStoredMode(
  * System settings interface
  */
 export interface SystemSettings {
+	dashboard_ads?: DashboardAd[];
   // Registration settings
   registration_enabled: boolean;
   email_verify_enabled: boolean;
@@ -1071,6 +1073,18 @@ export async function updateSettings(
   return data;
 }
 
+/** 读取独立存储的仪表盘广告。 */
+export async function getDashboardAds(): Promise<DashboardAd[]> {
+  const { data } = await apiClient.get<DashboardAd[]>('/admin/dashboard-ads')
+  return data
+}
+
+/** 整体保存仪表盘广告列表。 */
+export async function updateDashboardAds(ads: DashboardAd[]): Promise<DashboardAd[]> {
+  const { data } = await apiClient.put<DashboardAd[]>('/admin/dashboard-ads', { ads })
+  return data
+}
+
 /**
  * Test SMTP connection request
  */
@@ -1695,6 +1709,8 @@ export async function backfillPreAggregation(days: number): Promise<{ status: st
 export const settingsAPI = {
   getSettings,
   updateSettings,
+  getDashboardAds,
+  updateDashboardAds,
   testSmtpConnection,
   sendTestEmail,
   getEmailTemplates,

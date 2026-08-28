@@ -153,6 +153,18 @@ func (f CompositeModelRouteFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CompositeModelRouteMutation", m)
 }
 
+// The DashboardAdFunc type is an adapter to allow the use of ordinary
+// function as DashboardAd mutator.
+type DashboardAdFunc func(context.Context, *ent.DashboardAdMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DashboardAdFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DashboardAdMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DashboardAdMutation", m)
+}
+
 // The DataShareSessionFunc type is an adapter to allow the use of ordinary
 // function as DataShareSession mutator.
 type DataShareSessionFunc func(context.Context, *ent.DataShareSessionMutation) (ent.Value, error)

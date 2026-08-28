@@ -791,7 +791,6 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/channels', label: t('nav.channels', '渠道管理'), icon: ChannelIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
-    { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     {
       path: '/admin/risk-control',
@@ -833,6 +832,15 @@ const adminNavItems = computed((): NavItem[] => {
         ]
       : []),
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
+    {
+      path: '/admin/content',
+      label: t('nav.contentManagement', '内容管理'),
+      icon: BellIcon,
+      children: [
+        { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
+        { path: '/admin/dashboard-ads', label: t('nav.dashboardAds', '仪表盘广告'), icon: BellIcon },
+      ],
+    },
     { path: '/admin/data-sharing', label: t('nav.dataSharing'), icon: DatabaseIcon, hideInSimpleMode: true, featureFlag: flagDataSharingAccess },
     { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
   ]

@@ -202,6 +202,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyUsageRankingEnabled,
 		SettingKeyUsageRankingDataVisible,
 		SettingKeyCustomMenuItems,
+		SettingKeyDashboardAds,
 		SettingKeyCustomEndpoints,
 		SettingKeyFooterLinks,
 		SettingKeyFooterText,
@@ -254,6 +255,13 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf("get public settings: %w", err)
+	}
+	dashboardAds := parseDashboardAds(settings[SettingKeyDashboardAds])
+	if s.dashboardAdRepo != nil {
+		dashboardAds, err = s.loadDashboardAds(ctx, settings[SettingKeyDashboardAds])
+		if err != nil {
+			return nil, fmt.Errorf("get public dashboard ads: %w", err)
+		}
 	}
 
 	linuxDoEnabled := false
@@ -373,6 +381,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		UsageRankingEnabled:                 settings[SettingKeyUsageRankingEnabled] != "false",
 		UsageRankingDataVisible:             settings[SettingKeyUsageRankingDataVisible] != "false",
 		CustomMenuItems:                     settings[SettingKeyCustomMenuItems],
+		DashboardAds:                        dashboardAds,
 		CustomEndpoints:                     settings[SettingKeyCustomEndpoints],
 		FooterLinks:                         settings[SettingKeyFooterLinks],
 		FooterText:                          settings[SettingKeyFooterText],
@@ -402,6 +411,26 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	}, nil
 }
 
+// parseDashboardAds 解析广告配置，异常数据按空列表处理以保证公共设置可用。
+func parseDashboardAds(raw string) []DashboardAd {
+	var items []json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return []DashboardAd{}
+	}
+	if len(items) == 0 {
+		return []DashboardAd{}
+	}
+	ads := make([]DashboardAd, 0, len(items))
+	for _, item := range items {
+		var ad DashboardAd
+		if err := json.Unmarshal(item, &ad); err != nil {
+			continue
+		}
+		ads = append(ads, ad)
+	}
+	return ads
+}
+
 // IsUserErrorViewAllowed 读取用户侧失败请求展示开关。
 // 读取失败时默认关闭，避免公开未确认的错误日志数据。
 func (s *SettingService) IsUserErrorViewAllowed(ctx context.Context) bool {
@@ -423,6 +452,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 
 	// Return a struct that matches the frontend's expected format
 	return &struct {
+		DashboardAds                        []DashboardAd            `json:"dashboard_ads"`
 		RegistrationEnabled                 bool                     `json:"registration_enabled"`
 		EmailVerifyEnabled                  bool                     `json:"email_verify_enabled"`
 		ForceEmailOnThirdPartySignup        bool                     `json:"force_email_on_third_party_signup"`
@@ -504,6 +534,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		BalanceLowNotifyRechargeURL string  `json:"balance_low_notify_recharge_url"`
 		AllowUserViewErrorRequests  bool    `json:"allow_user_view_error_requests"`
 	}{
+		DashboardAds:                        settings.DashboardAds,
 		RegistrationEnabled:                 settings.RegistrationEnabled,
 		EmailVerifyEnabled:                  settings.EmailVerifyEnabled,
 		ForceEmailOnThirdPartySignup:        settings.ForceEmailOnThirdPartySignup,
