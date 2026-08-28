@@ -725,6 +725,53 @@ describe('user KeysView column settings', () => {
     }))
   })
 
+  it('切换分组时会丢弃已删除或不可用的旧候选分组', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [{ ...createApiKey(), group_id: 99, group_ids: [99] }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+    getAvailableGroups.mockResolvedValueOnce([
+      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
+    ])
+    const wrapper = await mountView()
+
+    await wrapper.get('[title="keys.clickToChangeGroup"]').trigger('click')
+    await nextTick()
+    await wrapper.findAll('button').find((button) => button.text().includes('OpenAI'))!.trigger('click')
+    await wrapper.get('[data-test="quick-routing-save"]').trigger('click')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ group_ids: [42] }))
+  })
+
+  it('编辑失效分组的 Key 时不会再次提交旧分组 ID', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [{ ...createApiKey(), group_id: 99, group_ids: [99] }],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+    getAvailableGroups.mockResolvedValueOnce([
+      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
+    ])
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Edit').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-tour="key-form-name"]').setValue('renamed-key')
+    await wrapper.get('form#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
+      name: 'renamed-key',
+      group_ids: [],
+    }))
+  })
+
   it('指定订阅后仅保留套餐允许的表单分组', async () => {
     listKeys.mockResolvedValueOnce({
       items: [{ ...createApiKey(), group_id: 43 }],

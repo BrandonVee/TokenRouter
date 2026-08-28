@@ -89,6 +89,7 @@ export default {
     group: '分组',
     currentConcurrency: '当前并发',
     noGroup: '无分组',
+    groupUnavailable: '分组已失效（#{id}）',
     searchGroup: '搜索分组...',
     noGroupFound: '未找到匹配的分组',
     created: '创建时间',

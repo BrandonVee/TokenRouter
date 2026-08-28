@@ -89,6 +89,7 @@ export default {
     group: 'Group',
     currentConcurrency: 'Current Concurrency',
     noGroup: 'No group',
+    groupUnavailable: 'Group unavailable (#{id})',
     searchGroup: 'Search groups...',
     noGroupFound: 'No groups found',
     created: 'Created',

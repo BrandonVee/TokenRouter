@@ -158,24 +158,27 @@
                 :title="t('keys.clickToChangeGroup')"
               >
                 <GroupBadge
-                  v-if="row.group"
-                  :name="row.group.name"
-                  :platform="row.group.platform"
-                  :display-brand="row.group.display_brand"
-                  :rate-multiplier="row.group.rate_multiplier"
-                  :user-rate-multiplier="userGroupRates[row.group.id]"
-                  :peak-rate-enabled="row.group.peak_rate_enabled"
-                  :peak-start="row.group.peak_start"
-                  :peak-end="row.group.peak_end"
-                  :peak-rate-multiplier="row.group.peak_rate_multiplier"
+                  v-if="displayGroup(row)"
+                  :name="displayGroup(row)!.name"
+                  :platform="displayGroup(row)!.platform"
+                  :display-brand="displayGroup(row)!.display_brand"
+                  :rate-multiplier="displayGroup(row)!.rate_multiplier"
+                  :user-rate-multiplier="userGroupRates[displayGroup(row)!.id]"
+                  :peak-rate-enabled="displayGroup(row)!.peak_rate_enabled"
+                  :peak-start="displayGroup(row)!.peak_start"
+                  :peak-end="displayGroup(row)!.peak_end"
+                  :peak-rate-multiplier="displayGroup(row)!.peak_rate_multiplier"
                 />
-                <span v-if="(row.group_ids?.length ?? 0) > 1" class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-dark-700 dark:text-dark-300">
-                  +{{ row.group_ids!.length - 1 }}
+                <span v-else-if="row.group_id" class="text-sm text-amber-600 dark:text-amber-400">
+                  {{ t('keys.groupUnavailable', { id: row.group_id }) }}
+                </span>
+                <span v-if="availableGroupCount(row) > 1" class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-dark-700 dark:text-dark-300">
+                  +{{ availableGroupCount(row) - 1 }}
                 </span>
                 <span v-if="row.routing_strategy && row.routing_strategy !== 'manual'" class="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                   {{ t('keys.smartRouting.shortSmart') }}
                 </span>
-                <span v-if="!row.group" class="text-sm text-gray-400 dark:text-dark-500">{{
+                <span v-if="!displayGroup(row) && !row.group_id" class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
                 }}</span>
                 <svg
@@ -2085,6 +2088,16 @@ const groupFilterOptions = computed(() => [
   ...groups.value.map((g) => ({ value: g.id, label: g.name }))
 ])
 
+// 已删除或禁用的分组不会出现在可用分组快照中，但旧 Key 仍可能保留其 ID。
+const availableGroupCount = (key: ApiKey) => {
+  const availableIDs = new Set(groups.value.map((group) => group.id))
+  return (key.group_ids?.length ? key.group_ids : (key.group_id ? [key.group_id] : []))
+    .filter((groupID) => availableIDs.has(groupID)).length
+}
+
+// 列表关系未展开时，从当前可用分组快照补齐展示信息。
+const displayGroup = (key: ApiKey) => key.group ?? groups.value.find((group) => group.id === key.group_id) ?? null
+
 const statusFilterOptions = computed(() => [
   { value: '', label: t('keys.allStatus') },
   { value: 'active', label: t('keys.status.active') },
@@ -2229,15 +2242,17 @@ const filteredGroupOptions = computed(() => {
 })
 
 // 指定订阅切换后，普通 Key 与复合 Key 都不能继续保留套餐未覆盖的分组。
-const pruneFormGroupBindings = (allowedGroupIDs: Set<number>) => {
-  if (formData.value.group_id !== null && !allowedGroupIDs.has(formData.value.group_id)) {
-    formData.value.group_id = null
-  }
+const pruneFormGroupBindings = (allowedGroupIDs: Set<number>, pruneComposite = true) => {
   formData.value.group_ids = formData.value.group_ids.filter((groupId) => allowedGroupIDs.has(groupId))
-  formData.value.group_id = formData.value.group_ids[0] ?? formData.value.group_id
-  formData.value.composite_groups = formData.value.composite_groups.filter((binding) =>
-    binding.group_id !== null && allowedGroupIDs.has(binding.group_id)
-  )
+  if (formData.value.group_id !== null && allowedGroupIDs.has(formData.value.group_id) && formData.value.group_ids.length === 0) {
+    formData.value.group_ids = [formData.value.group_id]
+  }
+  formData.value.group_id = formData.value.group_ids[0] ?? null
+  if (pruneComposite) {
+    formData.value.composite_groups = formData.value.composite_groups.filter((binding) =>
+      binding.group_id !== null && allowedGroupIDs.has(binding.group_id)
+    )
+  }
 }
 
 const onBillingModeChange = (value: string | number | boolean | null) => {
@@ -2363,6 +2378,7 @@ const loadGroups = async () => {
     // 自动与余额模式沿用用户原有分组，避免表单打开时的重复请求清空已有选择。
     if (formData.value.billing_mode !== 'subscription') {
       formGroups.value = available
+      pruneFormGroupBindings(new Set(available.map((group) => group.id)), false)
     }
   } catch (error) {
     console.error('Failed to load groups:', error)
@@ -2374,6 +2390,7 @@ const loadFormGroups = async () => {
   const requestID = ++formGroupsRequestID
   if (formData.value.billing_mode !== 'subscription') {
     formGroups.value = groups.value
+    pruneFormGroupBindings(new Set(groups.value.map((group) => group.id)), false)
     formGroupsLoading.value = false
     return
   }
@@ -2593,7 +2610,11 @@ const openGroupSelector = (key: ApiKey) => {
       }
     }
     groupSelectorKeyId.value = key.id
-    quickGroupIDs.value = key.group_ids?.length ? [...key.group_ids] : (key.group_id ? [key.group_id] : [])
+    const existingGroupIDs = key.group_ids?.length ? [...key.group_ids] : (key.group_id ? [key.group_id] : [])
+    // 分组快照尚未加载时保留旧值，避免用户过早打开下拉框导致候选被误清空。
+    quickGroupIDs.value = groups.value.length > 0
+      ? existingGroupIDs.filter((groupID) => allGroupOptions.value.some((option) => option.value === groupID))
+      : existingGroupIDs
     quickRoutingStrategy.value = key.routing_strategy ?? 'manual'
     groupSearchQuery.value = ''
   }
