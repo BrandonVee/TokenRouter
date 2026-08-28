@@ -272,7 +272,8 @@ func parseForwardedClientIPHeadersSetting(value string) ([]string, error) {
 
 // parseSettings 解析设置到结构体
 func (s *SettingService) parseSettings(settings map[string]string) *SystemSettings {
-	var dashboardAds []DashboardAd
+	// 列表字段统一返回空数组，避免缺省配置序列化为 null 破坏 API 合约。
+	dashboardAds := make([]DashboardAd, 0)
 	_ = json.Unmarshal([]byte(settings[SettingKeyDashboardAds]), &dashboardAds)
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
 	balanceUnitName := strings.TrimSpace(settings[SettingKeyBalanceUnitName])
