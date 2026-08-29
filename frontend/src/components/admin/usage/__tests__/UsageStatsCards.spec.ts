@@ -72,4 +72,19 @@ describe('UsageStatsCards', () => {
     expect(text).toContain('Cache Read')
     expect(text).toContain('22')
   })
+
+  it('keeps the cache breakdown card above adjacent cards for its tooltip', () => {
+    const wrapper = mount(UsageStatsCards, {
+      props: { stats },
+      global: {
+        stubs: {
+          BalanceIcon: true,
+          Icon: true,
+        },
+      },
+    })
+
+    const tokenCard = wrapper.findAll('.card')[1]
+    expect(tokenCard.classes()).toEqual(expect.arrayContaining(['relative', 'z-40']))
+  })
 })
