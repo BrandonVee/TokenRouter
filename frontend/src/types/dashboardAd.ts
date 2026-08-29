@@ -26,7 +26,20 @@ export function isDashboardAdActive(ad: DashboardAd, now = Date.now()): boolean 
   return now >= startsAt && now < endsAt
 }
 
-/** 关闭状态按广告周期生成，广告更新周期后自动重新展示。 */
+/** 旧版关闭状态按广告周期生成，广告更新周期后自动重新展示。 */
 export function dashboardAdDismissKey(ad: DashboardAd): string {
   return `dashboard-ad-dismissed:${ad.id}:${ad.starts_at || ''}:${ad.ends_at || ''}`
+}
+
+/** 生成当天关闭键，日期使用浏览器本地日历，广告周期变化后自动重新展示。 */
+export function dashboardAdDismissTodayKey(ad: DashboardAd, date = new Date()): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `dashboard-ad-dismissed-today:${ad.id}:${ad.starts_at || ''}:${ad.ends_at || ''}:${year}-${month}-${day}`
+}
+
+/** 生成永久关闭键，广告 ID 不变时持续隐藏广告。 */
+export function dashboardAdDismissPermanentKey(ad: DashboardAd): string {
+  return `dashboard-ad-dismissed-permanent:${ad.id}`
 }

@@ -58,7 +58,13 @@ export default {
     checkDetailedLogs: '查看详细的使用日志',
     purchasePlanOrRecharge: '购买套餐或充值余额',
     redeemCode: '兑换码',
-    addBalanceWithCode: '使用兑换码充值'
+    addBalanceWithCode: '使用兑换码充值',
+    ads: {
+      dismissTitle: '关闭广告',
+      dismissMessage: '要隐藏此广告多久？',
+      dismissToday: '关闭今天',
+      dismissPermanently: '永久关闭'
+    }
   },
 // Groups (shared)
   groups: {

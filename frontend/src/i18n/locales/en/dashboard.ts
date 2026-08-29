@@ -58,7 +58,13 @@ export default {
     checkDetailedLogs: 'Check detailed usage logs',
     purchasePlanOrRecharge: 'Purchase a plan or add balance',
     redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code'
+    addBalanceWithCode: 'Add balance with a code',
+    ads: {
+      dismissTitle: 'Close advertisement',
+      dismissMessage: 'How long would you like to hide this advertisement?',
+      dismissToday: 'Close today',
+      dismissPermanently: 'Close permanently'
+    }
   },
 // Groups (shared)
   groups: {
