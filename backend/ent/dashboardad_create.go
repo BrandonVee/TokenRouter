@@ -35,6 +35,20 @@ func (_c *DashboardAdCreate) SetLinkURL(v string) *DashboardAdCreate {
 	return _c
 }
 
+// SetFitMode sets the "fit_mode" field.
+func (_c *DashboardAdCreate) SetFitMode(v dashboardad.FitMode) *DashboardAdCreate {
+	_c.mutation.SetFitMode(v)
+	return _c
+}
+
+// SetNillableFitMode sets the "fit_mode" field if the given value is not nil.
+func (_c *DashboardAdCreate) SetNillableFitMode(v *dashboardad.FitMode) *DashboardAdCreate {
+	if v != nil {
+		_c.SetFitMode(*v)
+	}
+	return _c
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_c *DashboardAdCreate) SetStartsAt(v time.Time) *DashboardAdCreate {
 	_c.mutation.SetStartsAt(v)
@@ -160,6 +174,10 @@ func (_c *DashboardAdCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *DashboardAdCreate) defaults() {
+	if _, ok := _c.mutation.FitMode(); !ok {
+		v := dashboardad.DefaultFitMode
+		_c.mutation.SetFitMode(v)
+	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		v := dashboardad.DefaultEnabled
 		_c.mutation.SetEnabled(v)
@@ -185,6 +203,14 @@ func (_c *DashboardAdCreate) check() error {
 	}
 	if _, ok := _c.mutation.LinkURL(); !ok {
 		return &ValidationError{Name: "link_url", err: errors.New(`ent: missing required field "DashboardAd.link_url"`)}
+	}
+	if _, ok := _c.mutation.FitMode(); !ok {
+		return &ValidationError{Name: "fit_mode", err: errors.New(`ent: missing required field "DashboardAd.fit_mode"`)}
+	}
+	if v, ok := _c.mutation.FitMode(); ok {
+		if err := dashboardad.FitModeValidator(v); err != nil {
+			return &ValidationError{Name: "fit_mode", err: fmt.Errorf(`ent: validator failed for field "DashboardAd.fit_mode": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "DashboardAd.enabled"`)}
@@ -246,6 +272,10 @@ func (_c *DashboardAdCreate) createSpec() (*DashboardAd, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.LinkURL(); ok {
 		_spec.SetField(dashboardad.FieldLinkURL, field.TypeString, value)
 		_node.LinkURL = value
+	}
+	if value, ok := _c.mutation.FitMode(); ok {
+		_spec.SetField(dashboardad.FieldFitMode, field.TypeEnum, value)
+		_node.FitMode = value
 	}
 	if value, ok := _c.mutation.StartsAt(); ok {
 		_spec.SetField(dashboardad.FieldStartsAt, field.TypeTime, value)
@@ -344,6 +374,18 @@ func (u *DashboardAdUpsert) SetLinkURL(v string) *DashboardAdUpsert {
 // UpdateLinkURL sets the "link_url" field to the value that was provided on create.
 func (u *DashboardAdUpsert) UpdateLinkURL() *DashboardAdUpsert {
 	u.SetExcluded(dashboardad.FieldLinkURL)
+	return u
+}
+
+// SetFitMode sets the "fit_mode" field.
+func (u *DashboardAdUpsert) SetFitMode(v dashboardad.FitMode) *DashboardAdUpsert {
+	u.Set(dashboardad.FieldFitMode, v)
+	return u
+}
+
+// UpdateFitMode sets the "fit_mode" field to the value that was provided on create.
+func (u *DashboardAdUpsert) UpdateFitMode() *DashboardAdUpsert {
+	u.SetExcluded(dashboardad.FieldFitMode)
 	return u
 }
 
@@ -501,6 +543,20 @@ func (u *DashboardAdUpsertOne) SetLinkURL(v string) *DashboardAdUpsertOne {
 func (u *DashboardAdUpsertOne) UpdateLinkURL() *DashboardAdUpsertOne {
 	return u.Update(func(s *DashboardAdUpsert) {
 		s.UpdateLinkURL()
+	})
+}
+
+// SetFitMode sets the "fit_mode" field.
+func (u *DashboardAdUpsertOne) SetFitMode(v dashboardad.FitMode) *DashboardAdUpsertOne {
+	return u.Update(func(s *DashboardAdUpsert) {
+		s.SetFitMode(v)
+	})
+}
+
+// UpdateFitMode sets the "fit_mode" field to the value that was provided on create.
+func (u *DashboardAdUpsertOne) UpdateFitMode() *DashboardAdUpsertOne {
+	return u.Update(func(s *DashboardAdUpsert) {
+		s.UpdateFitMode()
 	})
 }
 
@@ -838,6 +894,20 @@ func (u *DashboardAdUpsertBulk) SetLinkURL(v string) *DashboardAdUpsertBulk {
 func (u *DashboardAdUpsertBulk) UpdateLinkURL() *DashboardAdUpsertBulk {
 	return u.Update(func(s *DashboardAdUpsert) {
 		s.UpdateLinkURL()
+	})
+}
+
+// SetFitMode sets the "fit_mode" field.
+func (u *DashboardAdUpsertBulk) SetFitMode(v dashboardad.FitMode) *DashboardAdUpsertBulk {
+	return u.Update(func(s *DashboardAdUpsert) {
+		s.SetFitMode(v)
+	})
+}
+
+// UpdateFitMode sets the "fit_mode" field to the value that was provided on create.
+func (u *DashboardAdUpsertBulk) UpdateFitMode() *DashboardAdUpsertBulk {
+	return u.Update(func(s *DashboardAdUpsert) {
+		s.UpdateFitMode()
 	})
 }
 

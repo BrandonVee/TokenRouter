@@ -30,6 +30,10 @@
           </div>
           <div class="grid content-start gap-4 sm:grid-cols-2">
             <label class="sm:col-span-2"><span class="input-label">跳转链接</span><input v-model.trim="ad.link_url" class="input" type="url" placeholder="https://example.com" /></label>
+            <label>
+              <span class="input-label">图片适应方式</span>
+              <Select v-model="ad.fit_mode" :options="fitModeOptions" aria-label="图片适应方式" />
+            </label>
             <label><span class="input-label">开始时间</span><input v-model="ad.starts_at" class="input" type="datetime-local" /></label>
             <label><span class="input-label">过期时间</span><input v-model="ad.ends_at" class="input" type="datetime-local" /></label>
             <button type="button" class="flex items-center gap-3 sm:col-span-2" @click="ad.enabled = !ad.enabled">
@@ -49,12 +53,19 @@
 import { onMounted, ref } from 'vue'
 import { adminAPI } from '@/api'
 import ImageUpload from '@/components/common/ImageUpload.vue'
-import type { DashboardAd } from '@/types/dashboardAd'
+import Select from '@/components/common/Select.vue'
+import type { SelectOption } from '@/components/common/Select.vue'
+import { normalizeDashboardAdFitMode, type DashboardAd, type DashboardAdFitMode } from '@/types/dashboardAd'
 
 const ads = ref<DashboardAd[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const loadFailed = ref(false)
+const fitModeOptions: SelectOption[] = [
+  { value: 'adaptive', label: '自适应（保持比例）' },
+  { value: 'cover', label: '填充（裁剪超出部分）' },
+  { value: 'fill', label: '拉伸（铺满区域）' },
+]
 
 function localDateTimeNow() {
   const date = new Date()
@@ -62,7 +73,7 @@ function localDateTimeNow() {
   return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16)
 }
 function add() {
-  ads.value.push({ id: crypto.randomUUID(), image_url: '', link_url: '', starts_at: localDateTimeNow(), ends_at: null, enabled: true })
+  ads.value.push({ id: crypto.randomUUID(), image_url: '', link_url: '', fit_mode: 'adaptive', starts_at: localDateTimeNow(), ends_at: null, enabled: true })
 }
 function remove(index: number) { ads.value.splice(index, 1) }
 function move(index: number, offset: number) {
@@ -76,7 +87,12 @@ async function load() {
   loadFailed.value = false
   try {
     const storedAds = await adminAPI.settings.getDashboardAds()
-    ads.value = (storedAds || []).map((ad) => ({ ...ad, starts_at: ad.starts_at ? ad.starts_at.slice(0, 16) : null, ends_at: ad.ends_at ? ad.ends_at.slice(0, 16) : null }))
+    ads.value = (storedAds || []).map((ad) => ({
+      ...ad,
+      fit_mode: normalizeDashboardAdFitMode(ad.fit_mode),
+      starts_at: ad.starts_at ? ad.starts_at.slice(0, 16) : null,
+      ends_at: ad.ends_at ? ad.ends_at.slice(0, 16) : null,
+    }))
   } catch {
     // 加载失败时保留空编辑态不可保存，避免误清空数据库中的广告。
     loadFailed.value = true
@@ -85,8 +101,18 @@ async function load() {
 async function save() {
   saving.value = true
   try {
-    const saved = await adminAPI.settings.updateDashboardAds(ads.value.map((ad) => ({ ...ad, starts_at: ad.starts_at ? new Date(ad.starts_at).toISOString() : null, ends_at: ad.ends_at ? new Date(ad.ends_at).toISOString() : null })))
-    ads.value = saved.map((ad) => ({ ...ad, starts_at: ad.starts_at ? ad.starts_at.slice(0, 16) : null, ends_at: ad.ends_at ? ad.ends_at.slice(0, 16) : null }))
+    const saved = await adminAPI.settings.updateDashboardAds(ads.value.map((ad) => ({
+      ...ad,
+      fit_mode: normalizeDashboardAdFitMode(ad.fit_mode) as DashboardAdFitMode,
+      starts_at: ad.starts_at ? new Date(ad.starts_at).toISOString() : null,
+      ends_at: ad.ends_at ? new Date(ad.ends_at).toISOString() : null,
+    })))
+    ads.value = saved.map((ad) => ({
+      ...ad,
+      fit_mode: normalizeDashboardAdFitMode(ad.fit_mode),
+      starts_at: ad.starts_at ? ad.starts_at.slice(0, 16) : null,
+      ends_at: ad.ends_at ? ad.ends_at.slice(0, 16) : null,
+    }))
   } finally { saving.value = false }
 }
 onMounted(load)

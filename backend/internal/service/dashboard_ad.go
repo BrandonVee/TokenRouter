@@ -13,6 +13,27 @@ import (
 // ErrDashboardAdInvalid 表示广告列表存在重复 ID 或非法时间范围。
 var ErrDashboardAdInvalid = infraerrors.BadRequest("DASHBOARD_AD_INVALID", "dashboard ad configuration is invalid")
 
+const (
+	// DashboardAdFitModeAdaptive 保持图片比例并根据容器宽度自适应。
+	DashboardAdFitModeAdaptive = "adaptive"
+	// DashboardAdFitModeCover 填满展示区域，超出部分裁剪。
+	DashboardAdFitModeCover = "cover"
+	// DashboardAdFitModeFill 拉伸图片填满展示区域。
+	DashboardAdFitModeFill = "fill"
+)
+
+// normalizeDashboardAdFitMode 兼容历史广告数据，并将非法值回退为自适应。
+func normalizeDashboardAdFitMode(mode string) string {
+	switch strings.TrimSpace(strings.ToLower(mode)) {
+	case DashboardAdFitModeCover:
+		return DashboardAdFitModeCover
+	case DashboardAdFitModeFill:
+		return DashboardAdFitModeFill
+	default:
+		return DashboardAdFitModeAdaptive
+	}
+}
+
 // DashboardAdRepository 负责独立广告表的查询和整体替换。
 type DashboardAdRepository interface {
 	List(ctx context.Context) ([]DashboardAd, error)
@@ -139,6 +160,7 @@ func normalizeDashboardAds(ads []DashboardAd) ([]DashboardAd, error) {
 		seen[ad.ID] = struct{}{}
 		ad.ImageURL = strings.TrimSpace(ad.ImageURL)
 		ad.LinkURL = strings.TrimSpace(ad.LinkURL)
+		ad.FitMode = normalizeDashboardAdFitMode(ad.FitMode)
 		if ad.StartsAt != nil && ad.EndsAt != nil && !ad.StartsAt.Before(*ad.EndsAt) {
 			return nil, fmt.Errorf("%w: ad %d has invalid schedule", ErrDashboardAdInvalid, i)
 		}

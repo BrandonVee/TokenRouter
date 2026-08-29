@@ -27,6 +27,7 @@ func (DashboardAd) Fields() []ent.Field {
 		field.String("id").MaxLen(100),
 		field.String("image_url").SchemaType(map[string]string{dialect.Postgres: "text"}),
 		field.String("link_url").SchemaType(map[string]string{dialect.Postgres: "text"}),
+		field.Enum("fit_mode").Values("adaptive", "cover", "fill").Default("adaptive"),
 		field.Time("starts_at").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Time("ends_at").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Bool("enabled").Default(true),

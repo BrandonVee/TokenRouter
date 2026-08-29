@@ -50,6 +50,7 @@ func (r *dashboardAdRepository) Replace(ctx context.Context, ads []service.Dashb
 			SetID(ad.ID).
 			SetImageURL(ad.ImageURL).
 			SetLinkURL(ad.LinkURL).
+			SetFitMode(dashboardad.FitMode(normalizeDashboardAdFitModeForRepository(ad.FitMode))).
 			SetEnabled(ad.Enabled).
 			SetSortOrder(i)
 		if ad.StartsAt != nil {
@@ -71,8 +72,19 @@ func dashboardAdEntityToService(item *dbent.DashboardAd) service.DashboardAd {
 		ID:       item.ID,
 		ImageURL: item.ImageURL,
 		LinkURL:  item.LinkURL,
+		FitMode:  string(item.FitMode),
 		StartsAt: item.StartsAt,
 		EndsAt:   item.EndsAt,
 		Enabled:  item.Enabled,
+	}
+}
+
+// normalizeDashboardAdFitModeForRepository 保证仓储写入值符合 Ent 枚举约束。
+func normalizeDashboardAdFitModeForRepository(mode string) string {
+	switch mode {
+	case service.DashboardAdFitModeCover, service.DashboardAdFitModeFill:
+		return mode
+	default:
+		return service.DashboardAdFitModeAdaptive
 	}
 }

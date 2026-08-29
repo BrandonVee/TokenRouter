@@ -234,6 +234,26 @@ func LinkURLContainsFold(v string) predicate.DashboardAd {
 	return predicate.DashboardAd(sql.FieldContainsFold(FieldLinkURL, v))
 }
 
+// FitModeEQ applies the EQ predicate on the "fit_mode" field.
+func FitModeEQ(v FitMode) predicate.DashboardAd {
+	return predicate.DashboardAd(sql.FieldEQ(FieldFitMode, v))
+}
+
+// FitModeNEQ applies the NEQ predicate on the "fit_mode" field.
+func FitModeNEQ(v FitMode) predicate.DashboardAd {
+	return predicate.DashboardAd(sql.FieldNEQ(FieldFitMode, v))
+}
+
+// FitModeIn applies the In predicate on the "fit_mode" field.
+func FitModeIn(vs ...FitMode) predicate.DashboardAd {
+	return predicate.DashboardAd(sql.FieldIn(FieldFitMode, vs...))
+}
+
+// FitModeNotIn applies the NotIn predicate on the "fit_mode" field.
+func FitModeNotIn(vs ...FitMode) predicate.DashboardAd {
+	return predicate.DashboardAd(sql.FieldNotIn(FieldFitMode, vs...))
+}
+
 // StartsAtEQ applies the EQ predicate on the "starts_at" field.
 func StartsAtEQ(v time.Time) predicate.DashboardAd {
 	return predicate.DashboardAd(sql.FieldEQ(FieldStartsAt, v))

@@ -3,6 +3,7 @@
 package dashboardad
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -17,6 +18,8 @@ const (
 	FieldImageURL = "image_url"
 	// FieldLinkURL holds the string denoting the link_url field in the database.
 	FieldLinkURL = "link_url"
+	// FieldFitMode holds the string denoting the fit_mode field in the database.
+	FieldFitMode = "fit_mode"
 	// FieldStartsAt holds the string denoting the starts_at field in the database.
 	FieldStartsAt = "starts_at"
 	// FieldEndsAt holds the string denoting the ends_at field in the database.
@@ -38,6 +41,7 @@ var Columns = []string{
 	FieldID,
 	FieldImageURL,
 	FieldLinkURL,
+	FieldFitMode,
 	FieldStartsAt,
 	FieldEndsAt,
 	FieldEnabled,
@@ -71,6 +75,33 @@ var (
 	IDValidator func(string) error
 )
 
+// FitMode defines the type for the "fit_mode" enum field.
+type FitMode string
+
+// FitModeAdaptive is the default value of the FitMode enum.
+const DefaultFitMode = FitModeAdaptive
+
+// FitMode values.
+const (
+	FitModeAdaptive FitMode = "adaptive"
+	FitModeCover    FitMode = "cover"
+	FitModeFill     FitMode = "fill"
+)
+
+func (fm FitMode) String() string {
+	return string(fm)
+}
+
+// FitModeValidator is a validator for the "fit_mode" field enum values. It is called by the builders before save.
+func FitModeValidator(fm FitMode) error {
+	switch fm {
+	case FitModeAdaptive, FitModeCover, FitModeFill:
+		return nil
+	default:
+		return fmt.Errorf("dashboardad: invalid enum value for fit_mode field: %q", fm)
+	}
+}
+
 // OrderOption defines the ordering options for the DashboardAd queries.
 type OrderOption func(*sql.Selector)
 
@@ -87,6 +118,11 @@ func ByImageURL(opts ...sql.OrderTermOption) OrderOption {
 // ByLinkURL orders the results by the link_url field.
 func ByLinkURL(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLinkURL, opts...).ToFunc()
+}
+
+// ByFitMode orders the results by the fit_mode field.
+func ByFitMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFitMode, opts...).ToFunc()
 }
 
 // ByStartsAt orders the results by the starts_at field.

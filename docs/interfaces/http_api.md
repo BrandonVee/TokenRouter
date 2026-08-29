@@ -51,7 +51,7 @@ RequestLogger
 | `/backend-api/codex/*` | TokenRouter API Key | Codex Responses、Realtime 与 sideband 兼容入口 |
 | `/api/v1/pages/*` 等 page routes | 按页面类型为用户或管理员 JWT | 服务端生成/读取的 pricing、账单或管理页面数据 |
 
-仪表盘广告使用独立管理接口 `GET|PUT /api/v1/admin/dashboard-ads`，请求体为 `{ "ads": [...] }`，列表顺序由数组顺序决定。广告不再由普通 `PUT /api/v1/admin/settings` 写入；用户端通过公开设置响应获得广告列表，并按启用状态和时间窗口筛选展示。
+仪表盘广告使用独立管理接口 `GET|PUT /api/v1/admin/dashboard-ads`，请求体为 `{ "ads": [...] }`，列表顺序由数组顺序决定。每项的 `fit_mode` 可为 `adaptive`（保持比例自适应，缺省兼容值）、`cover`（填充并裁剪超出部分）或 `fill`（拉伸铺满区域）。广告不再由普通 `PUT /api/v1/admin/settings` 写入；用户端通过公开设置响应获得广告列表，并按启用状态和时间窗口筛选展示。
 
 OAuth 登录 start 对 GitHub、Google、LinuxDo、DingTalk、WeChat 和 OIDC 同时保留 `GET` 与 `POST`。未启用腾讯天御或阿里云验证码时，`GET` 继续以 `302` 跳转保持兼容；任一动作验证码启用后，匿名登录必须用 `POST`，腾讯票据使用 `tencent_captcha_ticket` 与 `tencent_captcha_randstr`，阿里云的 `captchaVerifyParam` 复用 `turnstile_token` 字段，成功响应的 `data.authorize_url` 由前端再导航。`*/bind/start` 是当前用户绑定入口，不消费匿名登录验证码。Passkey 登录的 `/auth/passkey/login/begin` 使用相同的提供方字段映射，`finish` 只接受 ceremony session 和 WebAuthn credential。
 

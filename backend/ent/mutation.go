@@ -18644,6 +18644,7 @@ type DashboardAdMutation struct {
 	id            *string
 	image_url     *string
 	link_url      *string
+	fit_mode      *dashboardad.FitMode
 	starts_at     *time.Time
 	ends_at       *time.Time
 	enabled       *bool
@@ -18831,6 +18832,42 @@ func (m *DashboardAdMutation) OldLinkURL(ctx context.Context) (v string, err err
 // ResetLinkURL resets all changes to the "link_url" field.
 func (m *DashboardAdMutation) ResetLinkURL() {
 	m.link_url = nil
+}
+
+// SetFitMode sets the "fit_mode" field.
+func (m *DashboardAdMutation) SetFitMode(dm dashboardad.FitMode) {
+	m.fit_mode = &dm
+}
+
+// FitMode returns the value of the "fit_mode" field in the mutation.
+func (m *DashboardAdMutation) FitMode() (r dashboardad.FitMode, exists bool) {
+	v := m.fit_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFitMode returns the old "fit_mode" field's value of the DashboardAd entity.
+// If the DashboardAd object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DashboardAdMutation) OldFitMode(ctx context.Context) (v dashboardad.FitMode, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFitMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFitMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFitMode: %w", err)
+	}
+	return oldValue.FitMode, nil
+}
+
+// ResetFitMode resets all changes to the "fit_mode" field.
+func (m *DashboardAdMutation) ResetFitMode() {
+	m.fit_mode = nil
 }
 
 // SetStartsAt sets the "starts_at" field.
@@ -19129,12 +19166,15 @@ func (m *DashboardAdMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DashboardAdMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.image_url != nil {
 		fields = append(fields, dashboardad.FieldImageURL)
 	}
 	if m.link_url != nil {
 		fields = append(fields, dashboardad.FieldLinkURL)
+	}
+	if m.fit_mode != nil {
+		fields = append(fields, dashboardad.FieldFitMode)
 	}
 	if m.starts_at != nil {
 		fields = append(fields, dashboardad.FieldStartsAt)
@@ -19166,6 +19206,8 @@ func (m *DashboardAdMutation) Field(name string) (ent.Value, bool) {
 		return m.ImageURL()
 	case dashboardad.FieldLinkURL:
 		return m.LinkURL()
+	case dashboardad.FieldFitMode:
+		return m.FitMode()
 	case dashboardad.FieldStartsAt:
 		return m.StartsAt()
 	case dashboardad.FieldEndsAt:
@@ -19191,6 +19233,8 @@ func (m *DashboardAdMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldImageURL(ctx)
 	case dashboardad.FieldLinkURL:
 		return m.OldLinkURL(ctx)
+	case dashboardad.FieldFitMode:
+		return m.OldFitMode(ctx)
 	case dashboardad.FieldStartsAt:
 		return m.OldStartsAt(ctx)
 	case dashboardad.FieldEndsAt:
@@ -19225,6 +19269,13 @@ func (m *DashboardAdMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLinkURL(v)
+		return nil
+	case dashboardad.FieldFitMode:
+		v, ok := value.(dashboardad.FitMode)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFitMode(v)
 		return nil
 	case dashboardad.FieldStartsAt:
 		v, ok := value.(time.Time)
@@ -19352,6 +19403,9 @@ func (m *DashboardAdMutation) ResetField(name string) error {
 		return nil
 	case dashboardad.FieldLinkURL:
 		m.ResetLinkURL()
+		return nil
+	case dashboardad.FieldFitMode:
+		m.ResetFitMode()
 		return nil
 	case dashboardad.FieldStartsAt:
 		m.ResetStartsAt()

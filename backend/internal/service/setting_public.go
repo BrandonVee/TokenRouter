@@ -426,6 +426,7 @@ func parseDashboardAds(raw string) []DashboardAd {
 		if err := json.Unmarshal(item, &ad); err != nil {
 			continue
 		}
+		ad.FitMode = normalizeDashboardAdFitMode(ad.FitMode)
 		ads = append(ads, ad)
 	}
 	return ads

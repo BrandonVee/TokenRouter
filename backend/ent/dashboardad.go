@@ -21,6 +21,8 @@ type DashboardAd struct {
 	ImageURL string `json:"image_url,omitempty"`
 	// LinkURL holds the value of the "link_url" field.
 	LinkURL string `json:"link_url,omitempty"`
+	// FitMode holds the value of the "fit_mode" field.
+	FitMode dashboardad.FitMode `json:"fit_mode,omitempty"`
 	// StartsAt holds the value of the "starts_at" field.
 	StartsAt *time.Time `json:"starts_at,omitempty"`
 	// EndsAt holds the value of the "ends_at" field.
@@ -45,7 +47,7 @@ func (*DashboardAd) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case dashboardad.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
-		case dashboardad.FieldID, dashboardad.FieldImageURL, dashboardad.FieldLinkURL:
+		case dashboardad.FieldID, dashboardad.FieldImageURL, dashboardad.FieldLinkURL, dashboardad.FieldFitMode:
 			values[i] = new(sql.NullString)
 		case dashboardad.FieldStartsAt, dashboardad.FieldEndsAt, dashboardad.FieldCreatedAt, dashboardad.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -81,6 +83,12 @@ func (_m *DashboardAd) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field link_url", values[i])
 			} else if value.Valid {
 				_m.LinkURL = value.String
+			}
+		case dashboardad.FieldFitMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field fit_mode", values[i])
+			} else if value.Valid {
+				_m.FitMode = dashboardad.FitMode(value.String)
 			}
 		case dashboardad.FieldStartsAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -161,6 +169,9 @@ func (_m *DashboardAd) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("link_url=")
 	builder.WriteString(_m.LinkURL)
+	builder.WriteString(", ")
+	builder.WriteString("fit_mode=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FitMode))
 	builder.WriteString(", ")
 	if v := _m.StartsAt; v != nil {
 		builder.WriteString("starts_at=")

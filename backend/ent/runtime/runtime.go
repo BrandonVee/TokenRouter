@@ -819,19 +819,19 @@ func init() {
 	dashboardadFields := schema.DashboardAd{}.Fields()
 	_ = dashboardadFields
 	// dashboardadDescEnabled is the schema descriptor for enabled field.
-	dashboardadDescEnabled := dashboardadFields[5].Descriptor()
+	dashboardadDescEnabled := dashboardadFields[6].Descriptor()
 	// dashboardad.DefaultEnabled holds the default value on creation for the enabled field.
 	dashboardad.DefaultEnabled = dashboardadDescEnabled.Default.(bool)
 	// dashboardadDescSortOrder is the schema descriptor for sort_order field.
-	dashboardadDescSortOrder := dashboardadFields[6].Descriptor()
+	dashboardadDescSortOrder := dashboardadFields[7].Descriptor()
 	// dashboardad.DefaultSortOrder holds the default value on creation for the sort_order field.
 	dashboardad.DefaultSortOrder = dashboardadDescSortOrder.Default.(int)
 	// dashboardadDescCreatedAt is the schema descriptor for created_at field.
-	dashboardadDescCreatedAt := dashboardadFields[7].Descriptor()
+	dashboardadDescCreatedAt := dashboardadFields[8].Descriptor()
 	// dashboardad.DefaultCreatedAt holds the default value on creation for the created_at field.
 	dashboardad.DefaultCreatedAt = dashboardadDescCreatedAt.Default.(func() time.Time)
 	// dashboardadDescUpdatedAt is the schema descriptor for updated_at field.
-	dashboardadDescUpdatedAt := dashboardadFields[8].Descriptor()
+	dashboardadDescUpdatedAt := dashboardadFields[9].Descriptor()
 	// dashboardad.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	dashboardad.DefaultUpdatedAt = dashboardadDescUpdatedAt.Default.(func() time.Time)
 	// dashboardad.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

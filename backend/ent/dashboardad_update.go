@@ -56,6 +56,20 @@ func (_u *DashboardAdUpdate) SetNillableLinkURL(v *string) *DashboardAdUpdate {
 	return _u
 }
 
+// SetFitMode sets the "fit_mode" field.
+func (_u *DashboardAdUpdate) SetFitMode(v dashboardad.FitMode) *DashboardAdUpdate {
+	_u.mutation.SetFitMode(v)
+	return _u
+}
+
+// SetNillableFitMode sets the "fit_mode" field if the given value is not nil.
+func (_u *DashboardAdUpdate) SetNillableFitMode(v *dashboardad.FitMode) *DashboardAdUpdate {
+	if v != nil {
+		_u.SetFitMode(*v)
+	}
+	return _u
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_u *DashboardAdUpdate) SetStartsAt(v time.Time) *DashboardAdUpdate {
 	_u.mutation.SetStartsAt(v)
@@ -178,7 +192,20 @@ func (_u *DashboardAdUpdate) defaults() {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (_u *DashboardAdUpdate) check() error {
+	if v, ok := _u.mutation.FitMode(); ok {
+		if err := dashboardad.FitModeValidator(v); err != nil {
+			return &ValidationError{Name: "fit_mode", err: fmt.Errorf(`ent: validator failed for field "DashboardAd.fit_mode": %w`, err)}
+		}
+	}
+	return nil
+}
+
 func (_u *DashboardAdUpdate) sqlSave(ctx context.Context) (_node int, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(dashboardad.Table, dashboardad.Columns, sqlgraph.NewFieldSpec(dashboardad.FieldID, field.TypeString))
 	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
@@ -192,6 +219,9 @@ func (_u *DashboardAdUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if value, ok := _u.mutation.LinkURL(); ok {
 		_spec.SetField(dashboardad.FieldLinkURL, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FitMode(); ok {
+		_spec.SetField(dashboardad.FieldFitMode, field.TypeEnum, value)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(dashboardad.FieldStartsAt, field.TypeTime, value)
@@ -261,6 +291,20 @@ func (_u *DashboardAdUpdateOne) SetLinkURL(v string) *DashboardAdUpdateOne {
 func (_u *DashboardAdUpdateOne) SetNillableLinkURL(v *string) *DashboardAdUpdateOne {
 	if v != nil {
 		_u.SetLinkURL(*v)
+	}
+	return _u
+}
+
+// SetFitMode sets the "fit_mode" field.
+func (_u *DashboardAdUpdateOne) SetFitMode(v dashboardad.FitMode) *DashboardAdUpdateOne {
+	_u.mutation.SetFitMode(v)
+	return _u
+}
+
+// SetNillableFitMode sets the "fit_mode" field if the given value is not nil.
+func (_u *DashboardAdUpdateOne) SetNillableFitMode(v *dashboardad.FitMode) *DashboardAdUpdateOne {
+	if v != nil {
+		_u.SetFitMode(*v)
 	}
 	return _u
 }
@@ -400,7 +444,20 @@ func (_u *DashboardAdUpdateOne) defaults() {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (_u *DashboardAdUpdateOne) check() error {
+	if v, ok := _u.mutation.FitMode(); ok {
+		if err := dashboardad.FitModeValidator(v); err != nil {
+			return &ValidationError{Name: "fit_mode", err: fmt.Errorf(`ent: validator failed for field "DashboardAd.fit_mode": %w`, err)}
+		}
+	}
+	return nil
+}
+
 func (_u *DashboardAdUpdateOne) sqlSave(ctx context.Context) (_node *DashboardAd, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(dashboardad.Table, dashboardad.Columns, sqlgraph.NewFieldSpec(dashboardad.FieldID, field.TypeString))
 	id, ok := _u.mutation.ID()
 	if !ok {
@@ -431,6 +488,9 @@ func (_u *DashboardAdUpdateOne) sqlSave(ctx context.Context) (_node *DashboardAd
 	}
 	if value, ok := _u.mutation.LinkURL(); ok {
 		_spec.SetField(dashboardad.FieldLinkURL, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FitMode(); ok {
+		_spec.SetField(dashboardad.FieldFitMode, field.TypeEnum, value)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(dashboardad.FieldStartsAt, field.TypeTime, value)

@@ -785,6 +785,7 @@ var (
 		{Name: "id", Type: field.TypeString, Size: 100},
 		{Name: "image_url", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "link_url", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "fit_mode", Type: field.TypeEnum, Enums: []string{"adaptive", "cover", "fill"}, Default: "adaptive"},
 		{Name: "starts_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "ends_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "enabled", Type: field.TypeBool, Default: true},
@@ -801,12 +802,12 @@ var (
 			{
 				Name:    "dashboardad_sort_order",
 				Unique:  false,
-				Columns: []*schema.Column{DashboardAdsColumns[6]},
+				Columns: []*schema.Column{DashboardAdsColumns[7]},
 			},
 			{
 				Name:    "dashboardad_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{DashboardAdsColumns[5]},
+				Columns: []*schema.Column{DashboardAdsColumns[6]},
 			},
 		},
 	}

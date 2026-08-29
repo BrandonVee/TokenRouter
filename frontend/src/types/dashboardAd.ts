@@ -1,11 +1,21 @@
+/** 广告图片在展示区域内的适应方式。 */
+export type DashboardAdFitMode = 'adaptive' | 'cover' | 'fill'
+
 /** 仪表盘广告数据契约。 */
 export interface DashboardAd {
   id: string
   image_url: string
   link_url: string
+  fit_mode?: DashboardAdFitMode | string | null
   starts_at?: string | null
   ends_at?: string | null
   enabled: boolean
+}
+
+/** 将历史或非法配置统一映射为可用的图片适应方式。 */
+export function normalizeDashboardAdFitMode(mode: unknown): DashboardAdFitMode {
+  if (mode === 'cover' || mode === 'fill') return mode
+  return 'adaptive'
 }
 
 /** 判断广告当前是否处于有效展示周期。 */

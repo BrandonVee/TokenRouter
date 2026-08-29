@@ -317,6 +317,7 @@ type DashboardAd struct {
 	ID       string     `json:"id"`
 	ImageURL string     `json:"image_url"`
 	LinkURL  string     `json:"link_url"`
+	FitMode  string     `json:"fit_mode"`
 	StartsAt *time.Time `json:"starts_at,omitempty"`
 	EndsAt   *time.Time `json:"ends_at,omitempty"`
 	Enabled  bool       `json:"enabled"`

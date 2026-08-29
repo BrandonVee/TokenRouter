@@ -29,6 +29,20 @@ func TestNormalizeDashboardAdsAssignsIDsAndKeepsOrder(t *testing.T) {
 	require.Equal(t, "second", ads[1].ID)
 	require.Equal(t, "https://cdn.example/ad.png", ads[0].ImageURL)
 	require.Equal(t, "https://example.com", ads[0].LinkURL)
+	require.Equal(t, DashboardAdFitModeAdaptive, ads[0].FitMode)
+}
+
+func TestNormalizeDashboardAdsNormalizesFitMode(t *testing.T) {
+	ads, err := normalizeDashboardAds([]DashboardAd{
+		{ID: "cover", FitMode: " COVER "},
+		{ID: "fill", FitMode: DashboardAdFitModeFill},
+		{ID: "legacy", FitMode: "unknown"},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, DashboardAdFitModeCover, ads[0].FitMode)
+	require.Equal(t, DashboardAdFitModeFill, ads[1].FitMode)
+	require.Equal(t, DashboardAdFitModeAdaptive, ads[2].FitMode)
 }
 
 func TestNormalizeDashboardAdsRejectsDuplicateAndInvalidSchedule(t *testing.T) {
@@ -62,4 +76,5 @@ func TestParseDashboardAdsSkipsMalformedItems(t *testing.T) {
 
 	require.Len(t, ads, 1)
 	require.Equal(t, "valid", ads[0].ID)
+	require.Equal(t, DashboardAdFitModeAdaptive, ads[0].FitMode)
 }
