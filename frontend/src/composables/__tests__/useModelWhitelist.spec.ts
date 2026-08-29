@@ -70,6 +70,14 @@ describe('useModelWhitelist', () => {
     expect(models).not.toContain('claude-opus-4-6')
   })
 
+  it('DeepSeek 模型列表包含 V4 Flash Vision', () => {
+    expect(getModelsByPlatform('deepseek')).toEqual([
+      'deepseek-v4-pro',
+      'deepseek-v4-flash',
+      'deepseek-v4-flash-vision-exp'
+    ])
+  })
+
   it('qoder 模型列表提供创建账号快捷候选且不暴露旧 route key', () => {
     const models = getModelsByPlatform('qoder')
 
