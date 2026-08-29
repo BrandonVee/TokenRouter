@@ -43,6 +43,18 @@ func TestApplyCodexOAuthTransform_ToolContinuationPreservesInput(t *testing.T) {
 	require.Equal(t, "fc_1", second["call_id"])
 }
 
+func TestApplyCodexOAuthTransform_DefaultInstructionsRequireCodexClient(t *testing.T) {
+	// 非 Codex 请求即使使用 Codex 模型，也不得注入内置基础提示词。
+	nonCodexBody := map[string]any{"model": "gpt-5.5"}
+	applyCodexOAuthTransformWithOptions(nonCodexBody, codexOAuthTransformOptions{})
+	require.NotContains(t, nonCodexBody, "instructions")
+
+	codexBody := map[string]any{"model": "gpt-5.5"}
+	result := applyCodexOAuthTransformWithOptions(codexBody, codexOAuthTransformOptions{IsCodexCLI: true})
+	require.True(t, result.Modified)
+	require.Equal(t, defaultCodexSynthInstructions("gpt-5.5"), codexBody["instructions"])
+}
+
 func TestApplyCodexOAuthTransform_MessagesBridgePromptCacheKeyIsHeaderOnly(t *testing.T) {
 	reqBody := map[string]any{
 		"model":            "gpt-5.5",

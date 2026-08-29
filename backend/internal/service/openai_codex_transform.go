@@ -261,7 +261,7 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 		result.Modified = true
 	}
 
-	// instructions 处理逻辑：根据是否是 Codex CLI 分别调用不同方法
+	// instructions 仅对 Codex CLI 请求补入内置基础提示词，其他客户端保持原请求语义。
 	if !opts.SkipDefaultInstructions && applyInstructions(reqBody, opts.IsCodexCLI) {
 		result.Modified = true
 	}
@@ -1374,8 +1374,11 @@ func applyCodexClientMetadata(reqBody map[string]any, account *Account) bool {
 	}
 }
 
-// applyInstructions 处理 instructions 字段：仅在 instructions 为空时填充默认值。
+// applyInstructions 仅为 Codex CLI 请求处理 instructions 字段：在字段为空时填充默认值。
 func applyInstructions(reqBody map[string]any, isCodexCLI bool) bool {
+	if !isCodexCLI {
+		return false
+	}
 	if !isInstructionsEmpty(reqBody) {
 		return false
 	}

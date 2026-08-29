@@ -55,6 +55,8 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	}
 
 	if account != nil && account.Type == AccountTypeOAuth {
+		isCodexCLI := openai.IsCodexOfficialClientByHeaders(c.GetHeader("User-Agent"), c.GetHeader("originator")) ||
+			(s.cfg != nil && s.cfg.Gateway.ForceCodexCLI)
 		if rejectReason := detectOpenAIPassthroughInstructionsRejectReason(reqModel, body); rejectReason != "" {
 			rejectMsg := "OpenAI codex passthrough requires a non-empty instructions field"
 			MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
@@ -68,7 +70,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			return nil, fmt.Errorf("openai passthrough rejected before upstream: %s", rejectReason)
 		}
 		// Codex passthrough 允许省略 instructions，但仍拒绝显式的非法值。
-		if isOpenAICodexModel(reqModel) && !gjson.GetBytes(body, "instructions").Exists() {
+		if isCodexCLI && isOpenAICodexModel(reqModel) && !gjson.GetBytes(body, "instructions").Exists() {
 			nextBody, setErr := sjson.SetBytes(body, "instructions", defaultCodexSynthInstructions(reqModel))
 			if setErr != nil {
 				return nil, fmt.Errorf("set passthrough codex instructions: %w", setErr)

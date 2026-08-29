@@ -45,14 +45,14 @@ func DefaultModelIDs() []string {
 // DefaultTestModel 是测试 OpenAI 账号时使用的默认模型。
 const DefaultTestModel = "gpt-5.4"
 
-// DefaultInstructions 是非 Codex CLI 请求的默认 instructions。
+// DefaultInstructions 是 Codex CLI 请求缺少 instructions 时使用的默认提示词。
 // 内容为真实 Codex CLI 的 GPT-5-Codex base prompt（codex 系模型默认）。
 //
 //go:embed instructions.txt
 var DefaultInstructions string
 
 // instructionsGPT51 / instructionsGPT52 / instructionsGPT55 为 gpt-5.1 / gpt-5.2 / gpt-5.5
-// 非 codex 模型对应的真实 Codex 编码 agent base prompt，用于模型感知的 instructions 选择。
+// 非 codex 模型对应的真实 Codex 编码 agent base prompt，仅供 Codex 请求按模型选择。
 // GPT-5.5 同时作为最新版本的 fallback（覆盖 5.3 / 5.4 等未单独维护 prompt 的版本）。
 //
 //go:embed instructions_gpt5_1.txt

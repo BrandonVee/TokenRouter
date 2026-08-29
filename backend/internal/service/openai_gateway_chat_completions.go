@@ -15,6 +15,7 @@ import (
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/apicompat"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/logger"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/openai_compat"
 	"github.com/BrandonVee/TokenRouter/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
@@ -191,13 +192,16 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	logger.L().Debug("openai chat_completions: model mapping applied", logFields...)
 
 	if account.Type == AccountTypeOAuth {
+		isCodexCLI := openai.IsCodexOfficialClientByHeaders(c.GetHeader("User-Agent"), c.GetHeader("originator")) ||
+			(s.cfg != nil && s.cfg.Gateway.ForceCodexCLI)
 		var reqBody map[string]any
 		if err := json.Unmarshal(responsesBody, &reqBody); err != nil {
 			return nil, fmt.Errorf("unmarshal for codex transform: %w", err)
 		}
 		isJSONObjectFormat := strings.EqualFold(strings.TrimSpace(gjson.GetBytes(responsesBody, "text.format.type").String()), "json_object")
 		codexResult := applyCodexOAuthTransformWithOptions(reqBody, codexOAuthTransformOptions{
-			SkipDefaultInstructions:             !isResponsesShape,
+			IsCodexCLI:                          isCodexCLI,
+			SkipDefaultInstructions:             !isResponsesShape && !isCodexCLI,
 			OmitPromotedSystemMessagesFromInput: !isResponsesShape && !isJSONObjectFormat,
 		})
 		if !isResponsesShape {

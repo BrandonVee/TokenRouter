@@ -319,7 +319,13 @@ func TestForwardAsChatCompletions_OAuthDoesNotInjectDefaultInstructions(t *testi
 	require.NotContains(t, string(upstream.lastBody), "Communicate with the user by streaming thinking")
 }
 
-func forwardOAuthChatCompletionsForUpstreamBody(t *testing.T, body []byte) []byte {
+func TestForwardAsChatCompletions_OAuthCodexClientInjectsDefaultInstructions(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}],"stream":false}`)
+	upstreamBody := forwardOAuthChatCompletionsForUpstreamBody(t, body, "codex_cli_rs/0.98.0")
+	require.Equal(t, defaultCodexSynthInstructions("gpt-5.4"), gjson.GetBytes(upstreamBody, "instructions").String())
+}
+
+func forwardOAuthChatCompletionsForUpstreamBody(t *testing.T, body []byte, userAgent ...string) []byte {
 	t.Helper()
 
 	gin.SetMode(gin.TestMode)
@@ -327,6 +333,10 @@ func forwardOAuthChatCompletionsForUpstreamBody(t *testing.T, body []byte) []byt
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
+	if len(userAgent) > 0 {
+		// 通过官方 Codex UA 模拟触发内置 instructions 注入的请求。
+		c.Request.Header.Set("User-Agent", userAgent[0])
+	}
 
 	upstream := &httpUpstreamRecorder{resp: &http.Response{
 		StatusCode: http.StatusBadRequest,

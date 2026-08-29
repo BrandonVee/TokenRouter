@@ -73,7 +73,7 @@ Responses WebSocket 的 TTFT 只从实际 token delta 计算；若上游没有 d
 
 Responses HTTP/SSE 同样区分结构进度与可见输出：`response.created`、空 reasoning item 等进度可以提交当前 attempt、解除首输出超时并关闭 pre-output failover 窗口，但不记录 TTFT；非空文本/工具 delta、完整文本或工具参数、图片结果以及终态内实际 output 才开始 TTFT。只携带 usage 的终态必须保持 TTFT 未观测。
 
-OAuth passthrough 的 Codex 请求可以省略 `instructions`，网关会按请求模型补入内置 Codex 基础指令；显式提供的非空字符串保持不变，空白或非字符串值仍在本地拒绝。该规则同时适用于 Responses SSE 与旧版 Compact 请求。
+Responses 合成、OAuth 转换和 OAuth passthrough 的内置 Codex 基础指令仅在请求头识别为官方 Codex 客户端（或启用 `force_codex_cli`）时按请求模型补入；其它客户端不注入该提示词。OAuth passthrough 的 Codex 请求仍可省略 `instructions`，显式提供的非空字符串保持不变，空白或非字符串值在本地拒绝。该规则同时适用于 Responses SSE 与旧版 Compact 请求。
 
 Responses Lite 通道由 HTTP `X-OpenAI-Internal-Codex-Responses-Lite: true` 或 WebSocket `client_metadata` 中的对应标记识别，不根据模型名称推断。未携带 `input.additional_tools` 的请求统一补齐顶层 `parallel_tool_calls=false`；客户端在 `additional_tools` 请求中显式提供的该字段和值必须保留。OAuth 账号还会统一设置 `reasoning.context=all_turns`，并把私有 namespace 工具声明迁入 `input.additional_tools`；API Key 账号保留除此之外的标准 Responses 请求语义。未携带 Lite 标记的普通 Responses、Grok 和专用 Images 请求不应用这些约束。
 
