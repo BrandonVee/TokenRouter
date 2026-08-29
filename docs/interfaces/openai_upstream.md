@@ -44,6 +44,8 @@ OpenAI 兼容非流式响应的 usage 按 `usage`、`response.usage`、`data.usa
 
 `/backend-api/codex` 和无 `/v1` 别名服务特定客户端兼容，但仍经过 TokenRouter Key 鉴权、分组准入、调度和结算。Responses WebSocket 不支持 Qoder；其它平台是否可进入 OpenAI 兼容处理器由路由和平台专题共同决定，不能仅凭 URL 推断。
 
+管理员账号连接测试按账号协议构造最小请求：OAuth/Codex 测试保留 ChatGPT 所需的内置 `instructions`，API Key 测试不注入 Codex 基础提示词；国产供应商的 Chat Completions 测试同样只发送用户消息，避免把网关内部提示词转发给第三方上游。
+
 ### 远程压缩协议
 
 TokenRouter 同时兼容原生 Remote Compaction V2 和旧版 Compact 端点。两者共享 compaction 输出语义，但请求路径、传输方式、账号能力设置和模型改写边界不同：

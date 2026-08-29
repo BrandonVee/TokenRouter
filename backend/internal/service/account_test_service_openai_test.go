@@ -172,6 +172,32 @@ func TestAccountTestService_OpenAIOAuthTestNormalizesGPT56Alias(t *testing.T) {
 	require.Equal(t, "connection probe", gjson.GetBytes(body, "input.0.content.0.text").String())
 }
 
+func TestAccountTestService_OpenAIAPIKeyResponsesDoesNotInjectInstructions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := newTestContext()
+
+	resp := newJSONResponse(http.StatusOK, "")
+	resp.Body = io.NopCloser(strings.NewReader(`data: {"type":"response.completed"}
+
+`))
+	upstream := &queuedHTTPUpstream{responses: []*http.Response{resp}}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: &config.Config{}}
+	account := &Account{
+		ID:          91,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "test-api-key", "base_url": "https://api.example.test/v1"},
+	}
+
+	err := svc.testOpenAIAccountConnection(ctx, account, "qwen3.8-flash", "hi", "")
+	require.NoError(t, err)
+	require.Len(t, upstream.requests, 1)
+	body, err := io.ReadAll(upstream.requests[0].Body)
+	require.NoError(t, err)
+	require.False(t, gjson.GetBytes(body, "instructions").Exists())
+}
+
 func TestAccountTestService_OpenAIOAuthUsesConfiguredUserAgent(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := newTestContext()

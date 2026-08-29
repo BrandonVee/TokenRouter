@@ -2046,8 +2046,10 @@ func createOpenAITestPayload(modelID string, prompt string, isOAuth bool) map[st
 		payload["store"] = false
 	}
 
-	// All accounts require instructions for Responses API
-	payload["instructions"] = openai.DefaultInstructions
+	// 只有 OAuth/Codex 测试需要 ChatGPT 内置提示词，API Key 上游应保持客户端请求语义。
+	if isOAuth {
+		payload["instructions"] = openai.DefaultInstructions
+	}
 
 	return payload
 }
