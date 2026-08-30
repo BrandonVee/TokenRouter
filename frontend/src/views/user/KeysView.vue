@@ -3152,7 +3152,10 @@ const executeCcsImport = (row: ApiKey, clientType: CcSwitchClientType) => {
   const platform = row.group?.platform || 'anthropic'
 
   const usageScript = buildCcSwitchUsageScript(balanceUnitName.value)
-  const providerName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
+  // CCS 供应商名称同时标识站点和当前 API Key，便于在客户端区分多个密钥。
+  const siteName = (publicSettings.value?.site_name || 'sub2api').trim() || 'sub2api'
+  const keyName = row.name.trim()
+  const providerName = keyName ? `${siteName} - ${keyName}` : siteName
   const deeplink = buildCcSwitchImportDeeplink({
     baseUrl,
     platform,

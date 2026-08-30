@@ -473,6 +473,22 @@ describe('user KeysView column settings', () => {
     expect(actionButtons.some((button) => button.text().includes('More'))).toBe(true)
   })
 
+  it('includes the API key name in the CCS provider name', async () => {
+    getPublicSettings.mockResolvedValueOnce({
+      site_name: 'Acme AI',
+      api_base_url: 'https://api.example.com',
+    })
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Import to CCS').trigger('click')
+
+    const deeplink = openSpy.mock.calls[0]?.[0]
+    expect(deeplink).toBeTypeOf('string')
+    expect(new URLSearchParams(String(deeplink).split('?')[1]).get('name')).toBe('Acme AI - test-key')
+    openSpy.mockRestore()
+  })
+
   it('hides the inline CCS import action when public settings disable it', async () => {
     getPublicSettings.mockResolvedValueOnce({ hide_ccs_import_button: true })
     const wrapper = await mountView()
