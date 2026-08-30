@@ -240,6 +240,9 @@
                   <p class="mt-0.5 text-xs text-gray-400 dark:text-dark-400">
                     {{ t('admin.channels.form.peakRateWindowsSummary', { count: (entry.peak_rate_windows || []).length }) }}
                   </p>
+                  <p v-if="serverTimezoneDisplay" class="mt-1 inline-flex items-center rounded-md border border-amber-200/80 bg-white/70 px-2 py-0.5 font-mono text-[10px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-dark-800/70 dark:text-amber-300">
+                    {{ serverTimezoneDisplay }}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -294,7 +297,7 @@
                       </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[8.75rem_8.75rem_minmax(7rem,9rem)]">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_minmax(7rem,9rem)]">
                       <div>
                         <label class="peak-rate-field-label">{{ t('admin.channels.form.peakStart', '高峰开始') }}</label>
                         <TimePicker
@@ -449,8 +452,10 @@ import type { PricingFormEntry, IntervalFormEntry, PeakRateWindowFormEntry } fro
 import { perTokenToMTok, getPlatformTagClass } from './types'
 import type { BillingMode } from '@/api/admin/channels'
 import channelsAPI from '@/api/admin/channels'
+import { currentServerTimezoneDisplay } from '@/utils/peak-rate'
 
 const { t } = useI18n()
+const serverTimezoneDisplay = currentServerTimezoneDisplay()
 
 const props = withDefaults(defineProps<{
   entry: PricingFormEntry

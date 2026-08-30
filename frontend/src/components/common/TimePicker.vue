@@ -1,30 +1,19 @@
 <template>
   <div class="time-picker" :class="disabled && 'time-picker-disabled'" :data-testid="testId">
-    <Select
-      :model-value="hourValue"
-      :options="hourOptions"
+    <input
+      :value="inputValue"
+      type="time"
+      step="60"
       :disabled="disabled"
-      :searchable="false"
-      :aria-label="hourAriaLabel"
-      class="time-picker-part"
-      @update:model-value="onHourChange"
-    />
-    <span class="time-picker-separator" aria-hidden="true">:</span>
-    <Select
-      :model-value="minuteValue"
-      :options="minuteOptions"
-      :disabled="disabled"
-      :searchable="false"
-      :aria-label="minuteAriaLabel"
-      class="time-picker-part"
-      @update:model-value="onMinuteChange"
+      :aria-label="ariaLabel"
+      class="input time-picker-input"
+      @input="onInput"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import Select from './Select.vue'
 
 interface Props {
   modelValue: string
@@ -55,77 +44,31 @@ const parseTime = (value: string): { hour: number; minute: number } | null => {
   return { hour, minute }
 }
 
-const parsedTime = computed(() => parseTime(props.modelValue))
-const hourValue = computed(() => parsedTime.value?.hour ?? null)
-const minuteValue = computed(() => parsedTime.value?.minute ?? null)
+const inputValue = computed(() => {
+  const parsed = parseTime(props.modelValue)
+  return parsed ? `${pad(parsed.hour)}:${pad(parsed.minute)}` : ''
+})
 
-const hourOptions = computed(() => Array.from({ length: 24 }, (_, hour) => ({
-  value: hour,
-  label: pad(hour),
-})))
-
-const minuteOptions = computed(() => Array.from({ length: 60 }, (_, minute) => ({
-  value: minute,
-  label: pad(minute),
-})))
-
-const hourAriaLabel = computed(() => `${props.ariaLabel}小时`)
-const minuteAriaLabel = computed(() => `${props.ariaLabel}分钟`)
-
-const emitTime = (hour: number | null, minute: number | null) => {
-  if (hour === null || minute === null) {
-    emit('update:modelValue', '')
-    return
-  }
-  emit('update:modelValue', `${pad(hour)}:${pad(minute)}`)
-}
-
-const onHourChange = (value: string | number | boolean | null) => {
-  const hour = value === null ? Number.NaN : Number(value)
-  const validHour = Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null
-  emitTime(validHour, parsedTime.value?.minute ?? 0)
-}
-
-const onMinuteChange = (value: string | number | boolean | null) => {
-  const minute = value === null ? Number.NaN : Number(value)
-  const validMinute = Number.isInteger(minute) && minute >= 0 && minute <= 59 ? minute : null
-  emitTime(parsedTime.value?.hour ?? 0, validMinute)
+// 原生时间输入一次完成小时和分钟选择，避免两个下拉分别打开造成状态残留。
+const onInput = (event: Event) => {
+  const value = (event.target as HTMLInputElement).value
+  const parsed = parseTime(value)
+  emit('update:modelValue', parsed ? `${pad(parsed.hour)}:${pad(parsed.minute)}` : '')
 }
 </script>
 
 <style scoped>
 .time-picker {
-  @apply flex items-center gap-1;
-  width: 100%;
+  @apply flex w-full;
 }
 
-.time-picker-part {
-  /* 每个下拉至少保留足够空间显示两位数字和箭头。 */
-  min-width: 4.25rem;
-  flex: 1 1 0;
+.time-picker-input {
+  @apply h-10 w-full min-w-0 rounded-lg px-3 font-mono text-base tabular-nums;
+  color-scheme: light dark;
 }
 
-.time-picker-part :deep(.select-trigger) {
-  @apply rounded-lg px-2.5 py-2 font-mono text-sm tabular-nums;
-  min-height: 2.5rem;
-}
-
-@media (max-width: 639px) {
-  .time-picker-part {
-    min-width: 0;
-  }
-}
-
-.time-picker-part :deep(.select-value) {
-  @apply text-center;
-}
-
-.time-picker-part :deep(.select-icon) {
-  @apply ml-1;
-}
-
-.time-picker-separator {
-  @apply shrink-0 text-sm font-semibold text-gray-400 dark:text-dark-400;
+.time-picker-input::-webkit-calendar-picker-indicator {
+  @apply cursor-pointer opacity-60;
 }
 
 .time-picker-disabled {

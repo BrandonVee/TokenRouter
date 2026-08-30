@@ -26,6 +26,15 @@ export function currentServerTimezoneLabel(): string {
   return serverTimezoneLabel(settings?.server_utc_offset)
 }
 
+/** 返回服务器时区名称和 UTC 偏移，供定价表单明确提示时间解释口径。 */
+export function currentServerTimezoneDisplay(): string {
+  const settings = typeof window !== 'undefined' ? window.__APP_CONFIG__ : undefined
+  const name = settings?.server_timezone?.trim()
+  const offset = serverTimezoneLabel(settings?.server_utc_offset)
+  if (name && offset) return `${name} · ${offset}`
+  return name || offset
+}
+
 /** 生成 "14:00-18:00 ×2 (UTC+08:00)"，无时区标签时省略括号。 */
 export function formatPeakRateWindow(fields: PeakRateFields | null | undefined, tzLabel?: string): string {
   if (!hasPeakRate(fields) || !fields) return ''

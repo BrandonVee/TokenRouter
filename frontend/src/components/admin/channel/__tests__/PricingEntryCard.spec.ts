@@ -83,7 +83,7 @@ describe('PricingEntryCard', () => {
     })
   })
 
-  it('使用自研时间选择器更新峰谷开始时间', async () => {
+  it('使用完整时间输入更新峰谷开始时间', async () => {
     const wrapper = mount(PricingEntryCard, {
       props: {
         entry: makeEntry({
@@ -98,16 +98,12 @@ describe('PricingEntryCard', () => {
           IntervalRow: true,
           ModelTagInput: true,
           Select: true,
-          TimePicker: {
-            props: ['modelValue', 'testId'],
-            template: '<button :data-testid="testId" @click="$emit(\'update:modelValue\', \'10:15\')">{{ modelValue }}</button>',
-          },
         },
       },
     })
 
-    expect(wrapper.findAll('input[type="time"]')).toHaveLength(0)
-    await wrapper.get('[data-testid="peak-start-0"]').trigger('click')
+    const input = wrapper.get('[data-testid="peak-start-0"] input[type="time"]')
+    await input.setValue('10:15')
 
     expect(wrapper.emitted('update')?.[0]?.[0]).toMatchObject({
       peak_rate_windows: [{ start: '10:15' }],
