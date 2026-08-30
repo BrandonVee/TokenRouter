@@ -24,6 +24,14 @@ export interface PricingInterval {
   sort_order: number
 }
 
+/** 每周重复的模型峰谷定价时段，周一为 0，周日为 6。 */
+export interface PeakRateWindow {
+  weekdays: number[]
+  start: string
+  end: string
+  multiplier: number
+}
+
 export interface ChannelModelPricing {
   id?: number
   platform: string
@@ -36,6 +44,12 @@ export interface ChannelModelPricing {
   // 通用服务层级倍率，应用到最终标准渠道价。
   fast_multiplier?: number | null
   flex_multiplier?: number | null
+  // 模型 token 价格的峰谷时段配置。
+  peak_rate_enabled?: boolean
+  peak_start?: string
+  peak_end?: string
+  peak_rate_multiplier?: number | null
+  peak_rate_windows?: PeakRateWindow[]
   input_price: number | null
   output_price: number | null
   cache_write_price: number | null

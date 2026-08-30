@@ -49,11 +49,15 @@ func TestChannelToResponse_FullChannel(t *testing.T) {
 				BillingMode:        service.BillingModeToken,
 				PriceMultiplier:    float64Ptr(1.5),
 				FastModeMultiplier: float64Ptr(2),
-				InputPrice:         float64Ptr(0.01),
-				OutputPrice:        float64Ptr(0.03),
-				CacheWritePrice:    float64Ptr(0.005),
-				CacheReadPrice:     float64Ptr(0.002),
-				PerRequestPrice:    float64Ptr(0.5),
+				PeakRateEnabled:    true,
+				PeakRateWindows: []service.PeakRateWindow{
+					{Weekdays: []int{0, 1, 2, 3, 4}, Start: "09:00", End: "18:00", Multiplier: 1.5},
+				},
+				InputPrice:      float64Ptr(0.01),
+				OutputPrice:     float64Ptr(0.03),
+				CacheWritePrice: float64Ptr(0.005),
+				CacheReadPrice:  float64Ptr(0.002),
+				PerRequestPrice: float64Ptr(0.5),
 			},
 		},
 		ModelMapping: map[string]map[string]string{
@@ -86,6 +90,10 @@ func TestChannelToResponse_FullChannel(t *testing.T) {
 	require.Equal(t, "token", p.BillingMode)
 	require.Equal(t, float64Ptr(1.5), p.PriceMultiplier)
 	require.Equal(t, float64Ptr(2), p.FastModeMultiplier)
+	require.True(t, p.PeakRateEnabled)
+	require.Equal(t, []service.PeakRateWindow{
+		{Weekdays: []int{0, 1, 2, 3, 4}, Start: "09:00", End: "18:00", Multiplier: 1.5},
+	}, p.PeakRateWindows)
 	require.Equal(t, float64Ptr(0.01), p.InputPrice)
 	require.Equal(t, float64Ptr(0.03), p.OutputPrice)
 	require.Equal(t, float64Ptr(0.005), p.CacheWritePrice)
@@ -348,6 +356,32 @@ func TestPricingRequestToService_WithFastModeMultiplier(t *testing.T) {
 	result := pricingRequestToService(reqs)
 	require.Len(t, result, 1)
 	require.Equal(t, float64Ptr(2), result[0].FastModeMultiplier)
+}
+
+func TestPricingRequestToService_WithPeakRate(t *testing.T) {
+	result := pricingRequestToService([]channelModelPricingRequest{{
+		Platform:           service.PlatformOpenAI,
+		Models:             []string{"gpt-5.4"},
+		BillingMode:        string(service.BillingModeToken),
+		PeakRateEnabled:    true,
+		PeakStart:          "09:00",
+		PeakEnd:            "18:00",
+		PeakRateMultiplier: float64Ptr(1.8),
+		PeakRateWindows: []peakRateWindowRequest{
+			{Weekdays: []int{0, 2, 4}, Start: "09:00", End: "18:00", Multiplier: float64Ptr(1.8)},
+			{Weekdays: []int{5}, Start: "22:00", End: "02:00", Multiplier: float64Ptr(2.2)},
+		},
+	}})
+
+	require.Len(t, result, 1)
+	require.True(t, result[0].PeakRateEnabled)
+	require.Equal(t, "09:00", result[0].PeakStart)
+	require.Equal(t, "18:00", result[0].PeakEnd)
+	require.Equal(t, 1.8, result[0].PeakRateMultiplier)
+	require.Equal(t, []service.PeakRateWindow{
+		{Weekdays: []int{0, 2, 4}, Start: "09:00", End: "18:00", Multiplier: 1.8},
+		{Weekdays: []int{5}, Start: "22:00", End: "02:00", Multiplier: 2.2},
+	}, result[0].PeakRateWindows)
 }
 
 func TestPricingRequestToService_WithIntervals(t *testing.T) {

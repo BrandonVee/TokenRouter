@@ -710,6 +710,27 @@ func validatePricingBillingMode(pricing []ChannelModelPricing) error {
 }
 
 func checkBillingModeRequirements(p ChannelModelPricing) error {
+	mode := p.BillingMode
+	if mode == "" {
+		mode = BillingModeToken
+	}
+	if p.PeakRateEnabled {
+		if mode != BillingModeToken {
+			return infraerrors.BadRequest(
+				"PEAK_RATE_UNSUPPORTED_BILLING_MODE",
+				"peak rate is only supported for token billing mode",
+			)
+		}
+		var err error
+		if len(p.PeakRateWindows) > 0 {
+			err = ValidatePeakRateWindows(p.PeakRateWindows)
+		} else {
+			err = ValidatePeakRateConfig(true, p.PeakStart, p.PeakEnd, p.PeakRateMultiplier)
+		}
+		if err != nil {
+			return infraerrors.BadRequest("INVALID_PEAK_RATE_CONFIG", err.Error())
+		}
+	}
 	if p.BillingMode == BillingModePerRequest || p.BillingMode == BillingModeImage || p.BillingMode == BillingModeVideo {
 		if p.PerRequestPrice == nil && len(p.Intervals) == 0 {
 			return infraerrors.BadRequest(
@@ -718,7 +739,7 @@ func checkBillingModeRequirements(p ChannelModelPricing) error {
 			)
 		}
 	}
-	if p.PriceMultiplier != nil && !p.HasEffectivePricing() {
+	if p.PriceMultiplier != nil && !p.HasExplicitPriceFields() {
 		return infraerrors.BadRequest(
 			"PRICE_MULTIPLIER_MISSING_PRICE",
 			"price_multiplier requires at least one explicit price",
@@ -741,7 +762,7 @@ func checkBillingModeRequirements(p ChannelModelPricing) error {
 				"fast_mode_multiplier is only supported for token billing mode",
 			)
 		}
-		if !p.HasEffectivePricing() {
+		if !p.HasExplicitPriceFields() {
 			return infraerrors.BadRequest(
 				"FAST_MODE_MULTIPLIER_MISSING_PRICE",
 				"fast_mode_multiplier requires at least one explicit price",
@@ -752,6 +773,14 @@ func checkBillingModeRequirements(p ChannelModelPricing) error {
 }
 
 func checkPricesNotNegative(p ChannelModelPricing) error {
+	if p.PeakRateMultiplier < 0 {
+		return infraerrors.BadRequest("NEGATIVE_PRICE", "peak_rate_multiplier must be >= 0")
+	}
+	for _, window := range p.PeakRateWindows {
+		if window.Multiplier < 0 {
+			return infraerrors.BadRequest("NEGATIVE_PRICE", "peak_rate_windows multiplier must be >= 0")
+		}
+	}
 	checks := []struct {
 		field string
 		val   *float64

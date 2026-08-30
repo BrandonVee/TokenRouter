@@ -128,6 +128,161 @@ func TestValidatePeakRateConfig(t *testing.T) {
 	}
 }
 
+func TestChannelModelPricingPeakMultiplierAt(t *testing.T) {
+	pricing := &ChannelModelPricing{
+		PeakRateEnabled:    true,
+		PeakStart:          "14:00",
+		PeakEnd:            "18:00",
+		PeakRateMultiplier: 2.5,
+	}
+	if got := pricing.PeakMultiplierAt(at(14, 0)); got != 2.5 {
+		t.Fatalf("高峰开始时倍率 = %v，期望 2.5", got)
+	}
+	if got := pricing.PeakMultiplierAt(at(18, 0)); got != 1.0 {
+		t.Fatalf("高峰结束时倍率 = %v，期望 1.0", got)
+	}
+	if pricing.HasExplicitPriceFields() {
+		t.Fatal("仅峰谷配置不能被视为显式基础价格")
+	}
+}
+
+func TestChannelModelPricingPeakMultiplierAt_WeeklyWindows(t *testing.T) {
+	pricing := &ChannelModelPricing{
+		PeakRateEnabled: true,
+		PeakRateWindows: []PeakRateWindow{
+			{Weekdays: []int{0, 2}, Start: "09:00", End: "12:00", Multiplier: 1.8},
+			{Weekdays: []int{4}, Start: "22:00", End: "02:00", Multiplier: 2.5},
+		},
+	}
+	cases := []struct {
+		name string
+		at   time.Time
+		want float64
+	}{
+		{"monday configured", time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC), 1.8},
+		{"tuesday excluded", time.Date(2026, 6, 30, 10, 0, 0, 0, time.UTC), 1.0},
+		{"wednesday configured", time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC), 1.8},
+		{"friday before midnight", time.Date(2026, 7, 3, 23, 0, 0, 0, time.UTC), 2.5},
+		{"saturday after midnight", time.Date(2026, 7, 4, 1, 0, 0, 0, time.UTC), 2.5},
+		{"saturday end boundary", time.Date(2026, 7, 4, 2, 0, 0, 0, time.UTC), 1.0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := pricing.PeakMultiplierAt(tc.at); got != tc.want {
+				t.Fatalf("倍率 = %v，期望 %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidatePeakRateWindows(t *testing.T) {
+	validWindows := []PeakRateWindow{
+		{Weekdays: []int{0, 1, 2, 3, 4}, Start: "09:00", End: "18:00", Multiplier: 1.5},
+		{Weekdays: []int{5, 6}, Start: "22:00", End: "02:00", Multiplier: 0.8},
+	}
+	if err := ValidatePeakRateWindows(validWindows); err != nil {
+		t.Fatalf("有效配置返回错误: %v", err)
+	}
+
+	cases := []struct {
+		name    string
+		windows []PeakRateWindow
+	}{
+		{"empty", nil},
+		{"no weekday", []PeakRateWindow{{Start: "09:00", End: "18:00", Multiplier: 1}}},
+		{"duplicate weekday", []PeakRateWindow{{Weekdays: []int{0, 0}, Start: "09:00", End: "18:00", Multiplier: 1}}},
+		{"invalid weekday", []PeakRateWindow{{Weekdays: []int{7}, Start: "09:00", End: "18:00", Multiplier: 1}}},
+		{"same time", []PeakRateWindow{{Weekdays: []int{0}, Start: "09:00", End: "09:00", Multiplier: 1}}},
+		{"same day overlap", []PeakRateWindow{
+			{Weekdays: []int{0}, Start: "09:00", End: "12:00", Multiplier: 1},
+			{Weekdays: []int{0}, Start: "11:00", End: "13:00", Multiplier: 1},
+		}},
+		{"overnight overlap", []PeakRateWindow{
+			{Weekdays: []int{6}, Start: "22:00", End: "02:00", Multiplier: 1},
+			{Weekdays: []int{0}, Start: "01:00", End: "03:00", Multiplier: 1},
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ValidatePeakRateWindows(tc.windows); err == nil {
+				t.Fatal("期望校验错误")
+			}
+		})
+	}
+}
+
+func TestChannelModelPeakRateDoesNotSatisfyPriceMultiplierValidation(t *testing.T) {
+	priceMultiplier := 1.2
+	err := validatePricingBillingMode([]ChannelModelPricing{{
+		BillingMode:        BillingModeToken,
+		PeakRateEnabled:    true,
+		PeakStart:          "14:00",
+		PeakEnd:            "18:00",
+		PeakRateMultiplier: 2,
+		PriceMultiplier:    &priceMultiplier,
+	}})
+	if err == nil {
+		t.Fatal("仅峰谷配置不应满足普通价格倍率的显式价格校验")
+	}
+}
+
+func TestChannelModelPeakRateAffectsOnlyTokenCost(t *testing.T) {
+	billing := NewBillingService(nil, nil)
+	resolver := NewModelPricingResolver(nil, billing)
+	pricing := &ChannelModelPricing{
+		PeakRateEnabled:    true,
+		PeakStart:          "14:00",
+		PeakEnd:            "18:00",
+		PeakRateMultiplier: 2,
+	}
+	resolved := &ResolvedPricing{
+		Mode:           BillingModeToken,
+		Source:         PricingSourceChannel,
+		BasePricing:    &ModelPricing{InputPricePerToken: 1e-6, OutputPricePerToken: 2e-6},
+		channelPricing: pricing,
+	}
+	baseInput := CostInput{
+		Ctx:            context.Background(),
+		Model:          "test-model",
+		Tokens:         UsageTokens{InputTokens: 100, OutputTokens: 50},
+		RateMultiplier: 1,
+		Resolver:       resolver,
+		Resolved:       resolved,
+	}
+	lowInput := baseInput
+	lowInput.PricingAt = at(13, 59)
+	low, err := billing.CalculateCostUnified(lowInput)
+	if err != nil {
+		t.Fatalf("计算低谷价格失败: %v", err)
+	}
+	peakInput := baseInput
+	peakInput.PricingAt = at(14, 0)
+	peak, err := billing.CalculateCostUnified(peakInput)
+	if err != nil {
+		t.Fatalf("计算高峰价格失败: %v", err)
+	}
+	if math.Abs(peak.TotalCost-low.TotalCost*2) > 1e-12 {
+		t.Fatalf("高峰 token 价格 = %v，期望低谷价格 %v 的 2 倍", peak.TotalCost, low.TotalCost)
+	}
+
+	perRequest := &ResolvedPricing{
+		Mode:                   BillingModePerRequest,
+		Source:                 PricingSourceChannel,
+		DefaultPerRequestPrice: 3,
+		channelPricing:         pricing,
+	}
+	requestCost, err := billing.CalculateCostUnified(CostInput{
+		Ctx: context.Background(), Model: "test-model", RequestCount: 1, RateMultiplier: 1,
+		PricingAt: at(14, 0), Resolver: resolver, Resolved: perRequest,
+	})
+	if err != nil {
+		t.Fatalf("计算按次价格失败: %v", err)
+	}
+	if math.Abs(requestCost.TotalCost-3) > 1e-12 {
+		t.Fatalf("按次价格 = %v，期望 3", requestCost.TotalCost)
+	}
+}
+
 func TestParseMinutesMatchesLegacyTimeParseShape(t *testing.T) {
 	cases := []struct {
 		value string

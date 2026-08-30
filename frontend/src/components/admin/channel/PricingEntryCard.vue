@@ -195,6 +195,87 @@
             </div>
           </div>
 
+          <!-- 单模型峰谷价格，仅对 token 计费生效。 -->
+          <div v-if="showPeakRate" class="mt-3 rounded border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-800 dark:bg-amber-900/10">
+            <div class="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                @click="togglePeakRate"
+                data-testid="peak-rate-toggle"
+                class="inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors"
+                :class="entry.peak_rate_enabled
+                  ? 'border-amber-500 bg-amber-100 text-amber-800 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-200'
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-amber-400 dark:border-dark-500 dark:bg-dark-700 dark:text-gray-300'"
+                :aria-pressed="!!entry.peak_rate_enabled"
+              >
+                <Icon :name="entry.peak_rate_enabled ? 'check' : 'clock'" size="xs" />
+                {{ t('admin.channels.form.peakRateEnabled', '启用该模型峰谷价格') }}
+              </button>
+              <button
+                v-if="entry.peak_rate_enabled"
+                type="button"
+                @click="addPeakRateWindow"
+                class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700"
+              >
+                <Icon name="plus" size="xs" />
+                {{ t('admin.channels.form.addPeakRateWindow', '添加价格时段') }}
+              </button>
+            </div>
+            <div v-if="entry.peak_rate_enabled" class="mt-2 space-y-2">
+              <div
+                v-for="(window, windowIndex) in entry.peak_rate_windows || []"
+                :key="windowIndex"
+                class="rounded border border-amber-200/80 bg-white/70 p-2 dark:border-amber-900/70 dark:bg-dark-800/50"
+              >
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(13rem,1fr)_7rem_7rem_7rem_auto] sm:items-end">
+                  <div>
+                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakRateWeekdays', '适用日期') }}</label>
+                    <div class="mt-0.5 flex flex-wrap gap-1">
+                      <button
+                        v-for="day in peakRateWeekdays"
+                        :key="day.value"
+                        type="button"
+                        @click="togglePeakRateWeekday(windowIndex, day.value)"
+                        class="min-w-7 rounded border px-1.5 py-1 text-xs transition-colors"
+                        :class="window.weekdays.includes(day.value)
+                          ? 'border-primary-500 bg-primary-100 text-primary-700 dark:border-primary-500 dark:bg-primary-900/40 dark:text-primary-200'
+                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-400 dark:border-dark-500 dark:bg-dark-700 dark:text-gray-400'"
+                        :aria-pressed="window.weekdays.includes(day.value)"
+                      >
+                        {{ day.label }}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakStart', '高峰开始') }}</label>
+                    <input :value="window.start" @input="updatePeakRateWindow(windowIndex, 'start', ($event.target as HTMLInputElement).value)"
+                      type="time" step="60" class="input mt-0.5 text-sm" :data-testid="`peak-start-${windowIndex}`" />
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakEnd', '高峰结束') }}</label>
+                    <input :value="window.end" @input="updatePeakRateWindow(windowIndex, 'end', ($event.target as HTMLInputElement).value)"
+                      type="time" step="60" class="input mt-0.5 text-sm" :data-testid="`peak-end-${windowIndex}`" />
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakRateMultiplier', '高峰价格倍率') }}</label>
+                    <input :value="window.multiplier" @input="updatePeakRateWindow(windowIndex, 'multiplier', ($event.target as HTMLInputElement).value)"
+                      type="number" step="any" min="0" class="input mt-0.5 text-sm" :data-testid="`peak-rate-multiplier-${windowIndex}`" placeholder="1" />
+                  </div>
+                  <button
+                    type="button"
+                    @click="removePeakRateWindow(windowIndex)"
+                    class="mb-0.5 rounded p-1 text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    :disabled="(entry.peak_rate_windows || []).length <= 1"
+                    :title="t('admin.channels.form.removePeakRateWindow', '删除价格时段')"
+                  >
+                    <Icon name="trash" size="sm" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p v-if="entry.peak_rate_enabled" class="mt-1 text-xs text-gray-400">{{ t('admin.channels.form.peakRateHint', '按服务器时区计算；可添加多个时段，并支持跨天') }}</p>
+          </div>
+
           <!-- token 区间仅用于渠道；分组长上下文价格使用内置模型规则。 -->
           <div v-if="!hideTokenIntervals" class="mt-3">
             <div class="flex items-center justify-between">
@@ -304,7 +385,7 @@ import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import IntervalRow from './IntervalRow.vue'
 import ModelTagInput from './ModelTagInput.vue'
-import type { PricingFormEntry, IntervalFormEntry } from './types'
+import type { PricingFormEntry, IntervalFormEntry, PeakRateWindowFormEntry } from './types'
 import { perTokenToMTok, getPlatformTagClass } from './types'
 import type { BillingMode } from '@/api/admin/channels'
 import channelsAPI from '@/api/admin/channels'
@@ -317,10 +398,12 @@ const props = withDefaults(defineProps<{
   showFastModeMultiplier?: boolean
   enableTierMultipliers?: boolean
   hideTokenIntervals?: boolean
+  showPeakRate?: boolean
 }>(), {
   showFastModeMultiplier: false,
   enableTierMultipliers: false,
   hideTokenIntervals: false,
+  showPeakRate: true,
 })
 
 const emit = defineEmits<{
@@ -338,6 +421,16 @@ const billingModeOptions = computed(() => [
   { value: 'video', label: t('admin.channels.billingMode.video', '视频') }
 ])
 
+const peakRateWeekdays = computed(() => [
+  { value: 0, label: t('admin.channels.form.weekdayMon', '一') },
+  { value: 1, label: t('admin.channels.form.weekdayTue', '二') },
+  { value: 2, label: t('admin.channels.form.weekdayWed', '三') },
+  { value: 3, label: t('admin.channels.form.weekdayThu', '四') },
+  { value: 4, label: t('admin.channels.form.weekdayFri', '五') },
+  { value: 5, label: t('admin.channels.form.weekdaySat', '六') },
+  { value: 6, label: t('admin.channels.form.weekdaySun', '日') },
+])
+
 const billingModeLabel = computed(() => {
   const opt = billingModeOptions.value.find(o => o.value === props.entry.billing_mode)
   return opt ? opt.label : props.entry.billing_mode
@@ -345,6 +438,58 @@ const billingModeLabel = computed(() => {
 
 function emitField(field: keyof PricingFormEntry, value: string) {
   emit('update', { ...props.entry, [field]: value === '' ? null : value })
+}
+
+function defaultPeakRateWindow(): PeakRateWindowFormEntry {
+  return { weekdays: [0, 1, 2, 3, 4, 5, 6], start: '09:00', end: '18:00', multiplier: 1 }
+}
+
+function togglePeakRate() {
+  const enabled = !props.entry.peak_rate_enabled
+  const windows = props.entry.peak_rate_windows || []
+  emit('update', {
+    ...props.entry,
+    peak_rate_enabled: enabled,
+    peak_rate_windows: enabled && windows.length === 0 ? [defaultPeakRateWindow()] : windows,
+  })
+}
+
+function addPeakRateWindow() {
+  emit('update', {
+    ...props.entry,
+    peak_rate_windows: [...(props.entry.peak_rate_windows || []), defaultPeakRateWindow()],
+  })
+}
+
+function updatePeakRateWindow(
+  index: number,
+  field: keyof Omit<PeakRateWindowFormEntry, 'weekdays'>,
+  value: string,
+) {
+  const windows = [...(props.entry.peak_rate_windows || [])]
+  windows[index] = { ...windows[index], [field]: value === '' ? null : value }
+  emit('update', { ...props.entry, peak_rate_windows: windows })
+}
+
+function togglePeakRateWeekday(index: number, weekday: number) {
+  const windows = [...(props.entry.peak_rate_windows || [])]
+  const weekdays = [...windows[index].weekdays]
+  const weekdayIndex = weekdays.indexOf(weekday)
+  if (weekdayIndex === -1) {
+    weekdays.push(weekday)
+    weekdays.sort((a, b) => a - b)
+  } else {
+    weekdays.splice(weekdayIndex, 1)
+  }
+  windows[index] = { ...windows[index], weekdays }
+  emit('update', { ...props.entry, peak_rate_windows: windows })
+}
+
+function removePeakRateWindow(index: number) {
+  const windows = [...(props.entry.peak_rate_windows || [])]
+  if (windows.length <= 1) return
+  windows.splice(index, 1)
+  emit('update', { ...props.entry, peak_rate_windows: windows })
 }
 
 // Fast 倍率只适用于 token 计费，切换模式时清除隐藏字段，避免提交无效配置。
@@ -355,6 +500,11 @@ function onBillingModeUpdate(billingMode: BillingMode) {
     fast_mode_multiplier: billingMode === 'token' ? props.entry.fast_mode_multiplier : null,
     fast_multiplier: billingMode === 'token' ? props.entry.fast_multiplier : null,
     flex_multiplier: billingMode === 'token' ? props.entry.flex_multiplier : null,
+    peak_rate_enabled: billingMode === 'token' ? props.entry.peak_rate_enabled : false,
+    peak_start: billingMode === 'token' ? props.entry.peak_start : '',
+    peak_end: billingMode === 'token' ? props.entry.peak_end : '',
+    peak_rate_multiplier: billingMode === 'token' ? props.entry.peak_rate_multiplier : 1,
+    peak_rate_windows: billingMode === 'token' ? props.entry.peak_rate_windows : [],
     intervals: [],
   })
 }

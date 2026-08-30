@@ -1073,6 +1073,9 @@ func (s *BillingService) GetModelPricingWithChannel(model string, channelPricing
 	cloned := *pricing
 	pricing = &cloned
 	applyChannelTokenPriceOverrides(pricing, channelPricing)
+	if channelPricing.HasOnlyPeakRateConfig() {
+		return pricing, nil
+	}
 	if channelPricing.ImageOutputPrice != nil {
 		pricing.ImageOutputPricePerToken = *channelPricing.ImageOutputPrice
 	} else {
@@ -1215,6 +1218,30 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 			cloned.InputPricePerToken *= multiplier
 			cloned.OutputPricePerToken *= multiplier
 			cloned.CacheReadPricePerToken *= multiplier
+			pricing = &cloned
+		}
+	}
+
+	// 渠道/分组模型条目可定义独立峰谷窗口；该倍率只缩放 token 价格，按次计费保持不变。
+	if resolved.channelPricing != nil {
+		pricingAt := input.PricingAt
+		if pricingAt.IsZero() {
+			pricingAt = timezone.Now()
+		}
+		if multiplier := resolved.channelPricing.PeakMultiplierAt(pricingAt); multiplier != 1.0 {
+			cloned := *pricing
+			cloned.InputPricePerToken *= multiplier
+			cloned.InputPricePerTokenPriority *= multiplier
+			cloned.ImageInputPricePerToken *= multiplier
+			cloned.OutputPricePerToken *= multiplier
+			cloned.OutputPricePerTokenPriority *= multiplier
+			cloned.ImageOutputPricePerToken *= multiplier
+			cloned.CacheCreationPricePerToken *= multiplier
+			cloned.CacheCreationPricePerTokenPriority *= multiplier
+			cloned.CacheReadPricePerToken *= multiplier
+			cloned.CacheReadPricePerTokenPriority *= multiplier
+			cloned.CacheCreation5mPrice *= multiplier
+			cloned.CacheCreation1hPrice *= multiplier
 			pricing = &cloned
 		}
 	}

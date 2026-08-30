@@ -2,9 +2,12 @@ package service
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/BrandonVee/TokenRouter/internal/pkg/timezone"
 )
 
 // BillingMode 计费模式
@@ -83,15 +86,21 @@ type AccountStatsPricingRule struct {
 
 // ChannelModelPricing 渠道模型定价条目
 type ChannelModelPricing struct {
-	ID                 int64             `json:"id,omitempty"`
-	ChannelID          int64             `json:"channel_id,omitempty"`
-	Platform           string            `json:"platform"` // 所属平台（anthropic/openai/gemini/...）
-	Models             []string          `json:"models"`
-	BillingMode        BillingMode       `json:"billing_mode"`
-	PriceMultiplier    *float64          `json:"price_multiplier"`     // 最终定价倍率；nil 表示不调整价格
-	FastModeMultiplier *float64          `json:"fast_mode_multiplier"` // OpenAI Fast 模式收费倍率；nil 表示沿用模型默认 Fast 定价
-	FastMultiplier     *float64          `json:"fast_multiplier"`      // Fast/priority 服务层级倍率；nil 表示沿用模型默认值
-	FlexMultiplier     *float64          `json:"flex_multiplier"`      // Flex 服务层级倍率；nil 表示沿用模型默认值
+	ID                 int64       `json:"id,omitempty"`
+	ChannelID          int64       `json:"channel_id,omitempty"`
+	Platform           string      `json:"platform"` // 所属平台（anthropic/openai/gemini/...）
+	Models             []string    `json:"models"`
+	BillingMode        BillingMode `json:"billing_mode"`
+	PriceMultiplier    *float64    `json:"price_multiplier"`     // 最终定价倍率；nil 表示不调整价格
+	FastModeMultiplier *float64    `json:"fast_mode_multiplier"` // OpenAI Fast 模式收费倍率；nil 表示沿用模型默认 Fast 定价
+	FastMultiplier     *float64    `json:"fast_multiplier"`      // Fast/priority 服务层级倍率；nil 表示沿用模型默认值
+	FlexMultiplier     *float64    `json:"flex_multiplier"`      // Flex 服务层级倍率；nil 表示沿用模型默认值
+	// 峰谷时段仅作用于 token 计费；时间按服务器时区解释。
+	PeakRateEnabled    bool              `json:"peak_rate_enabled"`
+	PeakStart          string            `json:"peak_start"`
+	PeakEnd            string            `json:"peak_end"`
+	PeakRateMultiplier float64           `json:"peak_rate_multiplier"`
+	PeakRateWindows    []PeakRateWindow  `json:"peak_rate_windows"`
 	InputPrice         *float64          `json:"input_price"`
 	OutputPrice        *float64          `json:"output_price"`
 	CacheWritePrice    *float64          `json:"cache_write_price"`
@@ -102,6 +111,132 @@ type ChannelModelPricing struct {
 	Intervals          []PricingInterval `json:"intervals"`
 	CreatedAt          time.Time         `json:"created_at,omitempty"`
 	UpdatedAt          time.Time         `json:"updated_at,omitempty"`
+}
+
+// PeakRateWindow 表示一条按星期重复的峰谷价格时段。
+// Weekdays 使用周一=0 至周日=6；时间按服务器时区解释，区间为 [Start, End)。
+type PeakRateWindow struct {
+	Weekdays   []int   `json:"weekdays"`
+	Start      string  `json:"start"`
+	End        string  `json:"end"`
+	Multiplier float64 `json:"multiplier"`
+}
+
+// PeakMultiplierAt 返回模型条目在指定时刻的峰谷倍率。
+// 新版多时段配置优先于旧版单时段字段；非法或未启用配置安全降级为 1 倍。
+func (p *ChannelModelPricing) PeakMultiplierAt(now time.Time) float64 {
+	if p == nil || !p.PeakRateEnabled {
+		return 1.0
+	}
+	local := now.In(timezone.Location())
+	if len(p.PeakRateWindows) > 0 {
+		for _, window := range p.PeakRateWindows {
+			if peakRateWindowMatches(local, window) {
+				return window.Multiplier
+			}
+		}
+		return 1.0
+	}
+	if p.PeakStart == "" || p.PeakEnd == "" {
+		return 1.0
+	}
+	start, okStart := parseMinutes(p.PeakStart)
+	end, okEnd := parseMinutes(p.PeakEnd)
+	if !okStart || !okEnd || start >= end || p.PeakRateMultiplier < 0 {
+		return 1.0
+	}
+	minute := local.Hour()*60 + local.Minute()
+	if minute >= start && minute < end {
+		return p.PeakRateMultiplier
+	}
+	return 1.0
+}
+
+// peakRateWindowMatches 判断本地时刻是否命中一个按周重复的价格时段。
+func peakRateWindowMatches(local time.Time, window PeakRateWindow) bool {
+	start, okStart := parseMinutes(window.Start)
+	end, okEnd := parseMinutes(window.End)
+	if !okStart || !okEnd || start == end || window.Multiplier < 0 || math.IsNaN(window.Multiplier) || math.IsInf(window.Multiplier, 0) {
+		return false
+	}
+	weekday := (int(local.Weekday()) + 6) % 7
+	minute := local.Hour()*60 + local.Minute()
+	for _, configuredWeekday := range window.Weekdays {
+		if configuredWeekday < 0 || configuredWeekday > 6 {
+			continue
+		}
+		if start < end && weekday == configuredWeekday && minute >= start && minute < end {
+			return true
+		}
+		if start > end {
+			if weekday == configuredWeekday && minute >= start {
+				return true
+			}
+			if weekday == (configuredWeekday+1)%7 && minute < end {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ValidatePeakRateWindows 校验多时段峰谷配置，并拒绝周内任意重叠时段。
+// 跨天窗口被拆分到相邻日期检查，因此周日跨到周一也受同一规则约束。
+func ValidatePeakRateWindows(windows []PeakRateWindow) error {
+	if len(windows) == 0 {
+		return fmt.Errorf("peak_rate_windows 至少需要一个定价区间")
+	}
+	if len(windows) > 32 {
+		return fmt.Errorf("peak_rate_windows 最多允许 32 个定价区间")
+	}
+
+	var occupied [7][24 * 60]bool
+	for index, window := range windows {
+		start, okStart := parseMinutes(window.Start)
+		if !okStart {
+			return fmt.Errorf("peak_rate_windows[%d].start 格式应为 HH:MM，got %q", index, window.Start)
+		}
+		end, okEnd := parseMinutes(window.End)
+		if !okEnd {
+			return fmt.Errorf("peak_rate_windows[%d].end 格式应为 HH:MM，got %q", index, window.End)
+		}
+		if start == end {
+			return fmt.Errorf("peak_rate_windows[%d] 的开始与结束时间不能相同", index)
+		}
+		if window.Multiplier < 0 || math.IsNaN(window.Multiplier) || math.IsInf(window.Multiplier, 0) {
+			return fmt.Errorf("peak_rate_windows[%d].multiplier 必须是非负有限数", index)
+		}
+		if len(window.Weekdays) == 0 {
+			return fmt.Errorf("peak_rate_windows[%d].weekdays 至少需要选择一天", index)
+		}
+
+		seenWeekdays := [7]bool{}
+		for _, weekday := range window.Weekdays {
+			if weekday < 0 || weekday > 6 {
+				return fmt.Errorf("peak_rate_windows[%d].weekdays 包含无效星期 %d", index, weekday)
+			}
+			if seenWeekdays[weekday] {
+				return fmt.Errorf("peak_rate_windows[%d].weekdays 包含重复星期 %d", index, weekday)
+			}
+			seenWeekdays[weekday] = true
+
+			duration := end - start
+			if duration < 0 {
+				duration += 24 * 60
+			}
+			for offset := 0; offset < duration; offset++ {
+				absoluteMinute := start + offset
+				day := weekday + absoluteMinute/(24*60)
+				minute := absoluteMinute % (24 * 60)
+				day %= 7
+				if occupied[day][minute] {
+					return fmt.Errorf("peak_rate_windows[%d] 与已有定价区间重叠", index)
+				}
+				occupied[day][minute] = true
+			}
+		}
+	}
+	return nil
 }
 
 // PricingInterval 定价区间（token 区间 / 按次分层 / 图片分辨率分层）
@@ -176,7 +311,7 @@ func (p *ChannelModelPricing) GetTierByLabel(label string) *PricingInterval {
 	return nil
 }
 
-// HasEffectivePricing 判断该行是否配置了明确价格。
+// HasEffectivePricing 判断该行是否配置了实际参与计费的规则。
 // nil 价格指针表示“未配置”；指向 0 的指针表示显式免费价格，因此仍然有效。
 func (p *ChannelModelPricing) HasEffectivePricing() bool {
 	if p == nil {
@@ -185,6 +320,9 @@ func (p *ChannelModelPricing) HasEffectivePricing() bool {
 	mode := p.BillingMode
 	if mode == "" {
 		mode = BillingModeToken
+	}
+	if mode == BillingModeToken && p.PeakRateEnabled {
+		return true
 	}
 	switch mode {
 	case BillingModePerRequest, BillingModeImage, BillingModeVideo:
@@ -225,6 +363,63 @@ func (p *ChannelModelPricing) HasEffectivePricing() bool {
 	return false
 }
 
+// HasExplicitPriceFields 判断条目是否填写了至少一个基础价格、区间价格或区间价格倍率。
+// 该判断不把峰谷或服务层级配置当作基础价格，用于校验需要显式价格作为基数的倍率。
+func (p *ChannelModelPricing) HasExplicitPriceFields() bool {
+	if p == nil {
+		return false
+	}
+	mode := p.BillingMode
+	if mode == "" {
+		mode = BillingModeToken
+	}
+	if mode == BillingModePerRequest || mode == BillingModeImage || mode == BillingModeVideo {
+		if p.PerRequestPrice != nil {
+			return true
+		}
+		for i := range p.Intervals {
+			if p.Intervals[i].PerRequestPrice != nil {
+				return true
+			}
+		}
+		return false
+	}
+	if p.InputPrice != nil || p.OutputPrice != nil || p.CacheWritePrice != nil || p.CacheReadPrice != nil ||
+		p.ImageInputPrice != nil || p.ImageOutputPrice != nil {
+		return true
+	}
+	for i := range p.Intervals {
+		interval := p.Intervals[i]
+		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil ||
+			interval.CacheReadPrice != nil || interval.InputMultiplier != nil || interval.OutputMultiplier != nil ||
+			interval.CacheWriteMultiplier != nil || interval.CacheReadMultiplier != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// HasOnlyPeakRateConfig 判断条目是否仅配置了 token 峰谷倍率。
+// 这种配置需要继承模型目录的所有基础价格，不能把未填写的图片价格误判为显式免费。
+func (p *ChannelModelPricing) HasOnlyPeakRateConfig() bool {
+	if p == nil || !p.PeakRateEnabled || (p.BillingMode != "" && p.BillingMode != BillingModeToken) {
+		return false
+	}
+	if p.PriceMultiplier != nil || p.FastModeMultiplier != nil || p.FastMultiplier != nil || p.FlexMultiplier != nil ||
+		p.InputPrice != nil || p.OutputPrice != nil || p.CacheWritePrice != nil || p.CacheReadPrice != nil ||
+		p.ImageInputPrice != nil || p.ImageOutputPrice != nil || p.PerRequestPrice != nil {
+		return false
+	}
+	for _, interval := range p.Intervals {
+		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil ||
+			interval.CacheReadPrice != nil || interval.InputMultiplier != nil || interval.OutputMultiplier != nil ||
+			interval.CacheWriteMultiplier != nil || interval.CacheReadMultiplier != nil || interval.PerRequestPrice != nil {
+			return false
+		}
+	}
+	return true
+}
+
 // Clone 返回 ChannelModelPricing 的拷贝（切片独立，指针字段共享，调用方只读安全）
 func (p ChannelModelPricing) Clone() ChannelModelPricing {
 	cp := p
@@ -235,6 +430,16 @@ func (p ChannelModelPricing) Clone() ChannelModelPricing {
 	if p.Intervals != nil {
 		cp.Intervals = make([]PricingInterval, len(p.Intervals))
 		copy(cp.Intervals, p.Intervals)
+	}
+	if p.PeakRateWindows != nil {
+		cp.PeakRateWindows = make([]PeakRateWindow, len(p.PeakRateWindows))
+		for i := range p.PeakRateWindows {
+			cp.PeakRateWindows[i] = p.PeakRateWindows[i]
+			if p.PeakRateWindows[i].Weekdays != nil {
+				cp.PeakRateWindows[i].Weekdays = make([]int, len(p.PeakRateWindows[i].Weekdays))
+				copy(cp.PeakRateWindows[i].Weekdays, p.PeakRateWindows[i].Weekdays)
+			}
+		}
 	}
 	return cp
 }

@@ -18,6 +18,14 @@ export interface IntervalFormEntry {
   sort_order: number
 }
 
+/** 每周重复的模型峰谷定价时段，周一为 0，周日为 6。 */
+export interface PeakRateWindowFormEntry {
+  weekdays: number[]
+  start: string
+  end: string
+  multiplier: number | string | null
+}
+
 export interface PricingFormEntry {
   models: string[]
   billing_mode: BillingMode
@@ -28,6 +36,12 @@ export interface PricingFormEntry {
   // 通用 Fast/priority 与 Flex 服务层级倍率。
   fast_multiplier?: number | string | null
   flex_multiplier?: number | string | null
+  // 模型 token 价格的峰谷时段配置。
+  peak_rate_enabled?: boolean
+  peak_start?: string
+  peak_end?: string
+  peak_rate_multiplier?: number | string | null
+  peak_rate_windows?: PeakRateWindowFormEntry[]
   input_price: number | string | null
   output_price: number | string | null
   cache_write_price: number | string | null
@@ -51,6 +65,57 @@ export function isValidPositiveMultiplier(val: number | string | null | undefine
   if (val === null || val === undefined || val === '') return true
   const multiplier = Number(val)
   return Number.isFinite(multiplier) && multiplier > 0
+}
+
+/** 校验按星期重复的峰谷时段，跨天时段会同时占用次日时间。 */
+export function validatePeakRateWindows(
+  windows: PeakRateWindowFormEntry[],
+  t: TranslateFn,
+): string | null {
+  if (!windows || windows.length === 0) {
+    return t('admin.channels.form.peakRateWindowsRequired')
+  }
+  if (windows.length > 32) {
+    return t('admin.channels.form.peakRateWindowsLimit')
+  }
+
+  const occupied = Array.from({ length: 7 }, () => Array<boolean>(24 * 60).fill(false))
+  for (let index = 0; index < windows.length; index++) {
+    const window = windows[index]
+    const start = peakRateTimeToMinutes(window.start)
+    const end = peakRateTimeToMinutes(window.end)
+    const multiplier = toNullableNumber(window.multiplier)
+    if (start === null || end === null || start === end || multiplier === null || !Number.isFinite(multiplier) || multiplier < 0) {
+      return t('admin.channels.form.peakRateInvalid', { models: '' })
+    }
+    if (!window.weekdays?.length || new Set(window.weekdays).size !== window.weekdays.length ||
+      window.weekdays.some(day => !Number.isInteger(day) || day < 0 || day > 6)) {
+      return t('admin.channels.form.peakRateWeekdaysInvalid')
+    }
+
+    const duration = end >= start ? end - start : end - start + 24 * 60
+    for (const weekday of window.weekdays) {
+      for (let offset = 0; offset < duration; offset++) {
+        const absoluteMinute = start + offset
+        const day = (weekday + Math.floor(absoluteMinute / (24 * 60))) % 7
+        const minute = absoluteMinute % (24 * 60)
+        if (occupied[day][minute]) {
+          return t('admin.channels.form.peakRateOverlap')
+        }
+        occupied[day][minute] = true
+      }
+    }
+  }
+  return null
+}
+
+function peakRateTimeToMinutes(value: string | undefined): number | null {
+  const match = /^(\d{2}):(\d{2})$/.exec(value || '')
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+  return hours * 60 + minutes
 }
 
 /** 前端显示值($/MTok) → 后端存储值(per-token) */

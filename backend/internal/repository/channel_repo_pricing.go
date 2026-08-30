@@ -16,7 +16,7 @@ import (
 
 func (r *channelRepository) ListModelPricing(ctx context.Context, channelID int64) ([]service.ChannelModelPricing, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, channel_id, platform, models, billing_mode, price_multiplier, fast_mode_multiplier, fast_multiplier, flex_multiplier, input_price, output_price, cache_write_price, cache_read_price, image_input_price, image_output_price, per_request_price, created_at, updated_at
+		`SELECT id, channel_id, platform, models, billing_mode, price_multiplier, fast_mode_multiplier, fast_multiplier, flex_multiplier, peak_rate_enabled, peak_start, peak_end, peak_rate_multiplier, peak_rate_windows, input_price, output_price, cache_write_price, cache_read_price, image_input_price, image_output_price, per_request_price, created_at, updated_at
 		 FROM channel_model_pricing WHERE channel_id = $1 ORDER BY id`, channelID,
 	)
 	if err != nil {
@@ -55,11 +55,16 @@ func (r *channelRepository) UpdateModelPricing(ctx context.Context, pricing *ser
 	if billingMode == "" {
 		billingMode = service.BillingModeToken
 	}
+	peakRateWindowsJSON, err := marshalPeakRateWindows(pricing.PeakRateWindows)
+	if err != nil {
+		return err
+	}
 	result, err := r.db.ExecContext(ctx,
 		`UPDATE channel_model_pricing
-		 SET models = $1, billing_mode = $2, price_multiplier = $3, fast_mode_multiplier = $4, fast_multiplier = $5, flex_multiplier = $6, input_price = $7, output_price = $8, cache_write_price = $9, cache_read_price = $10, image_input_price = $11, image_output_price = $12, per_request_price = $13, platform = $14, updated_at = NOW()
-		 WHERE id = $15`,
+			 SET models = $1, billing_mode = $2, price_multiplier = $3, fast_mode_multiplier = $4, fast_multiplier = $5, flex_multiplier = $6, peak_rate_enabled = $7, peak_start = $8, peak_end = $9, peak_rate_multiplier = $10, peak_rate_windows = $11, input_price = $12, output_price = $13, cache_write_price = $14, cache_read_price = $15, image_input_price = $16, image_output_price = $17, per_request_price = $18, platform = $19, updated_at = NOW()
+			 WHERE id = $20`,
 		modelsJSON, billingMode, pricing.PriceMultiplier, pricing.FastModeMultiplier, pricing.FastMultiplier, pricing.FlexMultiplier,
+		pricing.PeakRateEnabled, pricing.PeakStart, pricing.PeakEnd, pricing.PeakRateMultiplier, peakRateWindowsJSON,
 		pricing.InputPrice, pricing.OutputPrice, pricing.CacheWritePrice, pricing.CacheReadPrice,
 		pricing.ImageInputPrice, pricing.ImageOutputPrice, pricing.PerRequestPrice, pricing.Platform, pricing.ID,
 	)
@@ -92,7 +97,7 @@ func (r *channelRepository) ReplaceModelPricing(ctx context.Context, channelID i
 // batchLoadModelPricing 批量加载多个渠道的模型定价（含区间）
 func (r *channelRepository) batchLoadModelPricing(ctx context.Context, channelIDs []int64) (map[int64][]service.ChannelModelPricing, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, channel_id, platform, models, billing_mode, price_multiplier, fast_mode_multiplier, fast_multiplier, flex_multiplier, input_price, output_price, cache_write_price, cache_read_price, image_input_price, image_output_price, per_request_price, created_at, updated_at
+		`SELECT id, channel_id, platform, models, billing_mode, price_multiplier, fast_mode_multiplier, fast_multiplier, flex_multiplier, peak_rate_enabled, peak_start, peak_end, peak_rate_multiplier, peak_rate_windows, input_price, output_price, cache_write_price, cache_read_price, image_input_price, image_output_price, per_request_price, created_at, updated_at
 		 FROM channel_model_pricing WHERE channel_id = ANY($1) ORDER BY channel_id, id`,
 		pq.Array(channelIDs),
 	)
@@ -172,9 +177,11 @@ func scanModelPricingRows(rows *sql.Rows) ([]service.ChannelModelPricing, []int6
 	for rows.Next() {
 		var p service.ChannelModelPricing
 		var modelsJSON []byte
+		var peakRateWindowsJSON []byte
 		if err := rows.Scan(
 			&p.ID, &p.ChannelID, &p.Platform, &modelsJSON, &p.BillingMode, &p.PriceMultiplier, &p.FastModeMultiplier,
-			&p.FastMultiplier, &p.FlexMultiplier,
+			&p.FastMultiplier, &p.FlexMultiplier, &p.PeakRateEnabled, &p.PeakStart, &p.PeakEnd, &p.PeakRateMultiplier,
+			&peakRateWindowsJSON,
 			&p.InputPrice, &p.OutputPrice, &p.CacheWritePrice, &p.CacheReadPrice,
 			&p.ImageInputPrice, &p.ImageOutputPrice, &p.PerRequestPrice, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
@@ -182,6 +189,9 @@ func scanModelPricingRows(rows *sql.Rows) ([]service.ChannelModelPricing, []int6
 		}
 		if err := json.Unmarshal(modelsJSON, &p.Models); err != nil {
 			p.Models = []string{}
+		}
+		if err := json.Unmarshal(peakRateWindowsJSON, &p.PeakRateWindows); err != nil {
+			return nil, nil, fmt.Errorf("unmarshal peak rate windows for pricing %d: %w", p.ID, err)
 		}
 		pricingIDs = append(pricingIDs, p.ID)
 		result = append(result, p)
@@ -232,11 +242,16 @@ func createModelPricingExec(ctx context.Context, exec dbExec, pricing *service.C
 	if platform == "" {
 		platform = "anthropic"
 	}
+	peakRateWindowsJSON, err := marshalPeakRateWindows(pricing.PeakRateWindows)
+	if err != nil {
+		return err
+	}
 	err = exec.QueryRowContext(ctx,
-		`INSERT INTO channel_model_pricing (channel_id, platform, models, billing_mode, price_multiplier, fast_mode_multiplier, fast_multiplier, flex_multiplier, input_price, output_price, cache_write_price, cache_read_price, image_input_price, image_output_price, per_request_price)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id, created_at, updated_at`,
+		`INSERT INTO channel_model_pricing (channel_id, platform, models, billing_mode, price_multiplier, fast_mode_multiplier, fast_multiplier, flex_multiplier, peak_rate_enabled, peak_start, peak_end, peak_rate_multiplier, peak_rate_windows, input_price, output_price, cache_write_price, cache_read_price, image_input_price, image_output_price, per_request_price)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id, created_at, updated_at`,
 		pricing.ChannelID, platform, modelsJSON, billingMode,
 		pricing.PriceMultiplier, pricing.FastModeMultiplier, pricing.FastMultiplier, pricing.FlexMultiplier,
+		pricing.PeakRateEnabled, pricing.PeakStart, pricing.PeakEnd, pricing.PeakRateMultiplier, peakRateWindowsJSON,
 		pricing.InputPrice, pricing.OutputPrice, pricing.CacheWritePrice, pricing.CacheReadPrice,
 		pricing.ImageInputPrice, pricing.ImageOutputPrice, pricing.PerRequestPrice,
 	).Scan(&pricing.ID, &pricing.CreatedAt, &pricing.UpdatedAt)
@@ -252,6 +267,18 @@ func createModelPricingExec(ctx context.Context, exec dbExec, pricing *service.C
 	}
 
 	return nil
+}
+
+// marshalPeakRateWindows 保证 JSONB 列始终写入数组而非 null。
+func marshalPeakRateWindows(windows []service.PeakRateWindow) ([]byte, error) {
+	if windows == nil {
+		windows = []service.PeakRateWindow{}
+	}
+	encoded, err := json.Marshal(windows)
+	if err != nil {
+		return nil, fmt.Errorf("marshal peak rate windows: %w", err)
+	}
+	return encoded, nil
 }
 
 func createIntervalExec(ctx context.Context, exec dbExec, iv *service.PricingInterval) error {

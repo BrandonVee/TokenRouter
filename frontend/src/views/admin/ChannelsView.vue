@@ -581,6 +581,7 @@
                       :key="pIdx"
                       :entry="entry"
                       :platform="section.platform"
+                      :show-peak-rate="false"
                       @update="rule.pricing.splice(pIdx, 1, $event)"
                       @remove="removeRulePricingEntry(sIdx, ruleIndex, pIdx)"
                     />
@@ -635,7 +636,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
 import type { PricingFormEntry } from '@/components/admin/channel/types'
-import { mTokToPerToken, perTokenToMTok, toNullableNumber, hasExplicitPricing, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, isValidPositiveMultiplier, validateIntervals } from '@/components/admin/channel/types'
+import { mTokToPerToken, perTokenToMTok, toNullableNumber, hasExplicitPricing, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, isValidPositiveMultiplier, validateIntervals, validatePeakRateWindows } from '@/components/admin/channel/types'
 import type { AdminGroup, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
@@ -869,6 +870,11 @@ function addPricingEntry(sectionIdx: number) {
     fast_mode_multiplier: null,
     fast_multiplier: null,
     flex_multiplier: null,
+    peak_rate_enabled: false,
+    peak_start: '',
+    peak_end: '',
+    peak_rate_multiplier: 1,
+    peak_rate_windows: [],
     input_price: null,
     output_price: null,
     cache_write_price: null,
@@ -931,6 +937,11 @@ async function syncLatestModels(sectionIdx: number) {
       fast_mode_multiplier: null,
       fast_multiplier: null,
       flex_multiplier: null,
+      peak_rate_enabled: false,
+      peak_start: '',
+      peak_end: '',
+      peak_rate_multiplier: 1,
+      peak_rate_windows: [],
       input_price: defaultPricing.input_price,
       output_price: defaultPricing.output_price,
       cache_write_price: defaultPricing.cache_write_price,
@@ -1000,6 +1011,11 @@ function addRulePricingEntry(sectionIdx: number, ruleIndex: number) {
     fast_mode_multiplier: null,
     fast_multiplier: null,
     flex_multiplier: null,
+    peak_rate_enabled: false,
+    peak_start: '',
+    peak_end: '',
+    peak_rate_multiplier: 1,
+    peak_rate_windows: [],
     input_price: null,
     output_price: null,
     cache_write_price: null,
@@ -1162,6 +1178,16 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
         fast_mode_multiplier: toNullableNumber(entry.fast_mode_multiplier),
         fast_multiplier: toNullableNumber(entry.fast_multiplier),
         flex_multiplier: toNullableNumber(entry.flex_multiplier),
+        peak_rate_enabled: !!entry.peak_rate_enabled,
+        peak_start: entry.peak_start || '',
+        peak_end: entry.peak_end || '',
+        peak_rate_multiplier: toNullableNumber(entry.peak_rate_multiplier) ?? 1,
+        peak_rate_windows: (entry.peak_rate_windows || []).map(window => ({
+          weekdays: [...window.weekdays],
+          start: window.start || '',
+          end: window.end || '',
+          multiplier: toNullableNumber(window.multiplier) ?? 1,
+        })),
         input_price: mTokToPerToken(entry.input_price),
         output_price: mTokToPerToken(entry.output_price),
         cache_write_price: mTokToPerToken(entry.cache_write_price),
@@ -1256,6 +1282,25 @@ function apiToForm(channel: Channel): PlatformSection[] {
         fast_mode_multiplier: p.fast_mode_multiplier ?? null,
         fast_multiplier: p.fast_multiplier ?? null,
         flex_multiplier: p.flex_multiplier ?? null,
+        peak_rate_enabled: p.peak_rate_enabled ?? false,
+        peak_start: p.peak_start ?? '',
+        peak_end: p.peak_end ?? '',
+        peak_rate_multiplier: p.peak_rate_multiplier ?? 1,
+        peak_rate_windows: p.peak_rate_windows?.length
+          ? p.peak_rate_windows.map(window => ({
+            weekdays: [...window.weekdays],
+            start: window.start,
+            end: window.end,
+            multiplier: window.multiplier,
+          }))
+          : p.peak_rate_enabled && p.peak_start && p.peak_end
+            ? [{
+              weekdays: [0, 1, 2, 3, 4, 5, 6],
+              start: p.peak_start,
+              end: p.peak_end,
+              multiplier: p.peak_rate_multiplier ?? 1,
+            }]
+            : [],
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
@@ -1449,6 +1494,10 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         fast_mode_multiplier: null,
         fast_multiplier: null,
         flex_multiplier: null,
+        peak_rate_enabled: false,
+        peak_start: '',
+        peak_end: '',
+        peak_rate_multiplier: 1,
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
@@ -1597,6 +1646,24 @@ async function handleSubmit() {
           'admin.channels.form.fastModeMultiplierRequiresPrice',
           { models },
           `模型 ${models} 配置 Fast 模式倍率时，必须至少填写一项价格`,
+        ))
+        activeTab.value = section.platform
+        return
+      }
+    }
+  }
+
+  // 单模型峰谷价格按服务器时区解释，支持多时段和跨天配置。
+  for (const section of form.platforms.filter(s => s.enabled)) {
+    for (const entry of section.model_pricing) {
+      if (entry.models.length === 0 || !entry.peak_rate_enabled) continue
+      const peakRateError = validatePeakRateWindows(entry.peak_rate_windows || [], t)
+      if (peakRateError) {
+        const modelLabel = entry.models.join(', ')
+        appStore.showError(t(
+          'admin.channels.form.peakRateInvalid',
+          { models: modelLabel },
+          `模型 ${modelLabel} 的峰谷价格配置无效：${peakRateError}`,
         ))
         activeTab.value = section.platform
         return

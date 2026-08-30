@@ -70,4 +70,16 @@ describe('PricingEntryCard', () => {
       intervals: [],
     })
   })
+
+  it('通过按钮启用峰谷价格并创建默认定价时段', async () => {
+    const wrapper = mountCard(false)
+    await wrapper.get('[data-testid="peak-rate-toggle"]').trigger('click')
+
+    const updates = wrapper.emitted('update')
+    expect(updates).toHaveLength(1)
+    expect(updates?.[0]?.[0]).toMatchObject({
+      peak_rate_enabled: true,
+      peak_rate_windows: [{ weekdays: [0, 1, 2, 3, 4, 5, 6], start: '09:00', end: '18:00', multiplier: 1 }],
+    })
+  })
 })

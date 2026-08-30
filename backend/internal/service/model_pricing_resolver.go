@@ -288,6 +288,9 @@ func (r *ModelPricingResolver) applyTokenOverrides(chPricing *ChannelModelPricin
 	applyChannelTokenPriceOverrides(resolved.BasePricing, chPricing)
 	resolved.BasePricing.FastMultiplier = chPricing.FastMultiplier
 	resolved.BasePricing.FlexMultiplier = chPricing.FlexMultiplier
+	if chPricing.HasOnlyPeakRateConfig() {
+		return
+	}
 	// 图片输出价格与 token 价格不同：nil 表示该渠道未启用图片 token 计费，
 	// 因此显式归零，避免意外回退到模型默认图片价格。
 	if chPricing.ImageOutputPrice != nil {

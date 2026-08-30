@@ -60,11 +60,16 @@ type updateChannelRequest struct {
 type channelModelPricingRequest struct {
 	Platform           string                   `json:"platform" binding:"omitempty,max=50"`
 	Models             []string                 `json:"models" binding:"required,min=1,max=100"`
-	BillingMode        string                   `json:"billing_mode" binding:"omitempty,oneof=token per_request image"`
+	BillingMode        string                   `json:"billing_mode" binding:"omitempty,oneof=token per_request image video"`
 	PriceMultiplier    *float64                 `json:"price_multiplier" binding:"omitempty,min=0"`
 	FastModeMultiplier *float64                 `json:"fast_mode_multiplier" binding:"omitempty,min=0"`
 	FastMultiplier     *float64                 `json:"fast_multiplier" binding:"omitempty,gt=0"`
 	FlexMultiplier     *float64                 `json:"flex_multiplier" binding:"omitempty,gt=0"`
+	PeakRateEnabled    bool                     `json:"peak_rate_enabled"`
+	PeakStart          string                   `json:"peak_start"`
+	PeakEnd            string                   `json:"peak_end"`
+	PeakRateMultiplier *float64                 `json:"peak_rate_multiplier" binding:"omitempty,min=0"`
+	PeakRateWindows    []peakRateWindowRequest  `json:"peak_rate_windows" binding:"max=32"`
 	InputPrice         *float64                 `json:"input_price" binding:"omitempty,min=0"`
 	OutputPrice        *float64                 `json:"output_price" binding:"omitempty,min=0"`
 	CacheWritePrice    *float64                 `json:"cache_write_price" binding:"omitempty,min=0"`
@@ -73,6 +78,13 @@ type channelModelPricingRequest struct {
 	ImageOutputPrice   *float64                 `json:"image_output_price" binding:"omitempty,min=0"`
 	PerRequestPrice    *float64                 `json:"per_request_price" binding:"omitempty,min=0"`
 	Intervals          []pricingIntervalRequest `json:"intervals"`
+}
+
+type peakRateWindowRequest struct {
+	Weekdays   []int    `json:"weekdays"`
+	Start      string   `json:"start"`
+	End        string   `json:"end"`
+	Multiplier *float64 `json:"multiplier" binding:"omitempty,min=0"`
 }
 
 type pricingIntervalRequest struct {
@@ -125,6 +137,11 @@ type channelModelPricingResponse struct {
 	FastModeMultiplier *float64                  `json:"fast_mode_multiplier"`
 	FastMultiplier     *float64                  `json:"fast_multiplier"`
 	FlexMultiplier     *float64                  `json:"flex_multiplier"`
+	PeakRateEnabled    bool                      `json:"peak_rate_enabled"`
+	PeakStart          string                    `json:"peak_start"`
+	PeakEnd            string                    `json:"peak_end"`
+	PeakRateMultiplier float64                   `json:"peak_rate_multiplier"`
+	PeakRateWindows    []service.PeakRateWindow  `json:"peak_rate_windows"`
 	InputPrice         *float64                  `json:"input_price"`
 	OutputPrice        *float64                  `json:"output_price"`
 	CacheWritePrice    *float64                  `json:"cache_write_price"`
@@ -235,6 +252,10 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 	for _, iv := range p.Intervals {
 		intervals = append(intervals, intervalToResponse(iv))
 	}
+	peakRateWindows := p.PeakRateWindows
+	if peakRateWindows == nil {
+		peakRateWindows = []service.PeakRateWindow{}
+	}
 	return channelModelPricingResponse{
 		ID:                 p.ID,
 		Platform:           platform,
@@ -244,6 +265,11 @@ func pricingToResponse(p *service.ChannelModelPricing) channelModelPricingRespon
 		FastModeMultiplier: p.FastModeMultiplier,
 		FastMultiplier:     p.FastMultiplier,
 		FlexMultiplier:     p.FlexMultiplier,
+		PeakRateEnabled:    p.PeakRateEnabled,
+		PeakStart:          p.PeakStart,
+		PeakEnd:            p.PeakEnd,
+		PeakRateMultiplier: p.PeakRateMultiplier,
+		PeakRateWindows:    peakRateWindows,
 		InputPrice:         p.InputPrice,
 		OutputPrice:        p.OutputPrice,
 		CacheWritePrice:    p.CacheWritePrice,
@@ -309,9 +335,34 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			})
 		}
 		var fastMultiplier, flexMultiplier *float64
+		peakRateEnabled := false
+		peakStart, peakEnd := "", ""
+		peakRateMultiplier := 1.0
+		var peakRateWindows []service.PeakRateWindow
 		if allowMultipliers {
 			fastMultiplier = r.FastMultiplier
 			flexMultiplier = r.FlexMultiplier
+			peakRateEnabled = r.PeakRateEnabled
+			peakStart = strings.TrimSpace(r.PeakStart)
+			peakEnd = strings.TrimSpace(r.PeakEnd)
+			if r.PeakRateMultiplier != nil {
+				peakRateMultiplier = *r.PeakRateMultiplier
+			}
+			if r.PeakRateWindows != nil {
+				peakRateWindows = make([]service.PeakRateWindow, 0, len(r.PeakRateWindows))
+				for _, window := range r.PeakRateWindows {
+					multiplier := 1.0
+					if window.Multiplier != nil {
+						multiplier = *window.Multiplier
+					}
+					peakRateWindows = append(peakRateWindows, service.PeakRateWindow{
+						Weekdays:   window.Weekdays,
+						Start:      strings.TrimSpace(window.Start),
+						End:        strings.TrimSpace(window.End),
+						Multiplier: multiplier,
+					})
+				}
+			}
 		}
 		result = append(result, service.ChannelModelPricing{
 			Platform:           platform,
@@ -321,6 +372,11 @@ func pricingRequestToService(reqs []channelModelPricingRequest, allowChannelMult
 			FastModeMultiplier: r.FastModeMultiplier,
 			FastMultiplier:     fastMultiplier,
 			FlexMultiplier:     flexMultiplier,
+			PeakRateEnabled:    peakRateEnabled,
+			PeakStart:          peakStart,
+			PeakEnd:            peakEnd,
+			PeakRateMultiplier: peakRateMultiplier,
+			PeakRateWindows:    peakRateWindows,
 			InputPrice:         r.InputPrice,
 			OutputPrice:        r.OutputPrice,
 			CacheWritePrice:    r.CacheWritePrice,
