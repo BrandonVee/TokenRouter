@@ -96,16 +96,24 @@ const onMinuteChange = (value: string | number | boolean | null) => {
 <style scoped>
 .time-picker {
   @apply flex items-center gap-1;
+  width: 100%;
 }
 
 .time-picker-part {
-  min-width: 0;
+  /* 每个下拉至少保留足够空间显示两位数字和箭头。 */
+  min-width: 4.25rem;
   flex: 1 1 0;
 }
 
 .time-picker-part :deep(.select-trigger) {
   @apply rounded-lg px-2.5 py-2 font-mono text-sm tabular-nums;
   min-height: 2.5rem;
+}
+
+@media (max-width: 639px) {
+  .time-picker-part {
+    min-width: 0;
+  }
 }
 
 .time-picker-part :deep(.select-value) {

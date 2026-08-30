@@ -294,7 +294,7 @@
                       </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-[7.5rem_7.5rem_minmax(7rem,9rem)]">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-[8.75rem_8.75rem_minmax(7rem,9rem)]">
                       <div>
                         <label class="peak-rate-field-label">{{ t('admin.channels.form.peakStart', '高峰开始') }}</label>
                         <TimePicker
@@ -315,7 +315,7 @@
                           @update:model-value="updatePeakRateWindow(windowIndex, 'end', $event)"
                         />
                       </div>
-                      <div class="col-span-2 sm:col-span-1">
+                      <div>
                         <label class="peak-rate-field-label">{{ t('admin.channels.form.peakRateMultiplier', '高峰价格倍率') }}</label>
                         <div class="relative mt-1.5">
                           <input :value="window.multiplier" @input="updatePeakRateWindow(windowIndex, 'multiplier', ($event.target as HTMLInputElement).value)"
