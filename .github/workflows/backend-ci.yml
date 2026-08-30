@@ -11,7 +11,8 @@ jobs:
   shell:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      # macOS-15 Runner 使用 Node 20 版 checkout，避免 v6 的 action manifest 解析异常。
+      - uses: actions/checkout@v4
       - name: Check deployment scripts
         run: |
           /bin/bash -n deploy/apple-container.sh
