@@ -82,4 +82,35 @@ describe('PricingEntryCard', () => {
       peak_rate_windows: [{ weekdays: [0, 1, 2, 3, 4, 5, 6], start: '09:00', end: '18:00', multiplier: 1 }],
     })
   })
+
+  it('使用自研时间选择器更新峰谷开始时间', async () => {
+    const wrapper = mount(PricingEntryCard, {
+      props: {
+        entry: makeEntry({
+          peak_rate_enabled: true,
+          peak_rate_windows: [{ weekdays: [0, 1, 2, 3, 4, 5, 6], start: '09:00', end: '18:00', multiplier: 1 }],
+        }),
+        platform: 'openai',
+      },
+      global: {
+        stubs: {
+          Icon: true,
+          IntervalRow: true,
+          ModelTagInput: true,
+          Select: true,
+          TimePicker: {
+            props: ['modelValue', 'testId'],
+            template: '<button :data-testid="testId" @click="$emit(\'update:modelValue\', \'10:15\')">{{ modelValue }}</button>',
+          },
+        },
+      },
+    })
+
+    expect(wrapper.findAll('input[type="time"]')).toHaveLength(0)
+    await wrapper.get('[data-testid="peak-start-0"]').trigger('click')
+
+    expect(wrapper.emitted('update')?.[0]?.[0]).toMatchObject({
+      peak_rate_windows: [{ start: '10:15' }],
+    })
+  })
 })

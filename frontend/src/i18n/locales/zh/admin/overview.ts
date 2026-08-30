@@ -1128,10 +1128,15 @@ affiliates: {
         finalPricePreview: '应用当前倍率后的单次价格：{price}'
       },
       peakRate: {
+        title: '峰谷倍率',
+        statusEnabled: '已启用',
+        statusDisabled: '未启用',
+        description: '按服务器时区，在指定时段叠加分组 Token 价格倍率',
         enable: '启用高峰倍率',
         peakStart: '高峰开始',
         peakEnd: '高峰结束',
         peakMultiplier: '高峰倍率',
+        hint: '按服务器时区计算；支持跨午夜时段，0 表示该时段 Token 按 0 倍计费',
         multiplierHint: '作用于 token 计费倍率；token 计费的图片 token 同样适用，0 表示高峰 token 请求按 0 倍计费'
       },
       modelsList: {

@@ -1131,10 +1131,15 @@ affiliates: {
         finalPricePreview: 'Per-call price after current multiplier: {price}'
       },
       peakRate: {
+        title: 'Peak multiplier',
+        statusEnabled: 'Enabled',
+        statusDisabled: 'Disabled',
+        description: 'Apply a group Token price multiplier during selected server-time windows',
         enable: 'Enable peak rate multiplier',
         peakStart: 'Peak start',
         peakEnd: 'Peak end',
         peakMultiplier: 'Peak multiplier',
+        hint: 'Uses the server timezone and supports overnight windows; 0 bills Token usage at 0x during the window.',
         multiplierHint: 'Applies to token billing multiplier; image tokens in token billing are also affected. 0 means peak token requests are billed at 0x.'
       },
       modelsList: {

@@ -196,85 +196,144 @@
           </div>
 
           <!-- 单模型峰谷价格，仅对 token 计费生效。 -->
-          <div v-if="showPeakRate" class="mt-3 rounded border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-800 dark:bg-amber-900/10">
-            <div class="flex items-center justify-between gap-2">
+          <section v-if="showPeakRate" class="peak-rate-panel mt-4">
+            <div class="peak-rate-panel__header">
+              <div class="flex min-w-0 items-start gap-3">
+                <span class="peak-rate-panel__icon">
+                  <Icon name="clock" size="sm" :stroke-width="2" />
+                </span>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                      {{ t('admin.channels.form.peakRateTitle', '峰谷价格') }}
+                    </h3>
+                    <span class="peak-rate-panel__badge">
+                      {{ entry.peak_rate_enabled
+                        ? t('admin.channels.form.peakRateStatusOn', '已启用')
+                        : t('admin.channels.form.peakRateStatusOff', '未启用') }}
+                    </span>
+                  </div>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.channels.form.peakRateDescription', '按服务器时区，在指定时段叠加模型 Token 价格倍率') }}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 @click="togglePeakRate"
                 data-testid="peak-rate-toggle"
-                class="inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium transition-colors"
-                :class="entry.peak_rate_enabled
-                  ? 'border-amber-500 bg-amber-100 text-amber-800 dark:border-amber-500 dark:bg-amber-900/40 dark:text-amber-200'
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-amber-400 dark:border-dark-500 dark:bg-dark-700 dark:text-gray-300'"
+                class="peak-rate-switch"
+                :class="entry.peak_rate_enabled && 'peak-rate-switch--active'"
                 :aria-pressed="!!entry.peak_rate_enabled"
               >
-                <Icon :name="entry.peak_rate_enabled ? 'check' : 'clock'" size="xs" />
-                {{ t('admin.channels.form.peakRateEnabled', '启用该模型峰谷价格') }}
-              </button>
-              <button
-                v-if="entry.peak_rate_enabled"
-                type="button"
-                @click="addPeakRateWindow"
-                class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700"
-              >
-                <Icon name="plus" size="xs" />
-                {{ t('admin.channels.form.addPeakRateWindow', '添加价格时段') }}
+                <span class="peak-rate-switch__track"><span class="peak-rate-switch__thumb" /></span>
+                <span class="sr-only">{{ t('admin.channels.form.peakRateEnabled', '启用该模型峰谷价格') }}</span>
               </button>
             </div>
-            <div v-if="entry.peak_rate_enabled" class="mt-2 space-y-2">
-              <div
-                v-for="(window, windowIndex) in entry.peak_rate_windows || []"
-                :key="windowIndex"
-                class="rounded border border-amber-200/80 bg-white/70 p-2 dark:border-amber-900/70 dark:bg-dark-800/50"
-              >
-                <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(13rem,1fr)_7rem_7rem_7rem_auto] sm:items-end">
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakRateWeekdays', '适用日期') }}</label>
-                    <div class="mt-0.5 flex flex-wrap gap-1">
-                      <button
-                        v-for="day in peakRateWeekdays"
-                        :key="day.value"
-                        type="button"
-                        @click="togglePeakRateWeekday(windowIndex, day.value)"
-                        class="min-w-7 rounded border px-1.5 py-1 text-xs transition-colors"
-                        :class="window.weekdays.includes(day.value)
-                          ? 'border-primary-500 bg-primary-100 text-primary-700 dark:border-primary-500 dark:bg-primary-900/40 dark:text-primary-200'
-                          : 'border-gray-200 bg-white text-gray-500 hover:border-gray-400 dark:border-dark-500 dark:bg-dark-700 dark:text-gray-400'"
-                        :aria-pressed="window.weekdays.includes(day.value)"
-                      >
-                        {{ day.label }}
-                      </button>
+
+            <div v-if="entry.peak_rate_enabled" class="peak-rate-panel__body">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {{ t('admin.channels.form.peakRateWindowsTitle', '价格时段') }}
+                  </p>
+                  <p class="mt-0.5 text-xs text-gray-400 dark:text-dark-400">
+                    {{ t('admin.channels.form.peakRateWindowsSummary', { count: (entry.peak_rate_windows || []).length }) }}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  @click="addPeakRateWindow"
+                  class="inline-flex items-center gap-1.5 rounded-lg border border-primary-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-400 hover:bg-primary-50 dark:border-primary-800 dark:bg-dark-800 dark:text-primary-300 dark:hover:bg-primary-900/20"
+                >
+                  <Icon name="plus" size="xs" :stroke-width="2" />
+                  {{ t('admin.channels.form.addPeakRateWindow', '添加价格时段') }}
+                </button>
+              </div>
+
+              <div class="mt-3 space-y-3">
+                <div
+                  v-for="(window, windowIndex) in entry.peak_rate_windows || []"
+                  :key="windowIndex"
+                  class="peak-rate-window"
+                >
+                  <div class="peak-rate-window__header">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <span class="peak-rate-window__index">{{ String(windowIndex + 1).padStart(2, '0') }}</span>
+                      <span class="truncate text-xs font-semibold text-gray-700 dark:text-gray-200">
+                        {{ t('admin.channels.form.peakRateWindowLabel', { index: windowIndex + 1 }) }}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      @click="removePeakRateWindow(windowIndex)"
+                      class="peak-rate-window__remove"
+                      :disabled="(entry.peak_rate_windows || []).length <= 1"
+                      :title="t('admin.channels.form.removePeakRateWindow', '删除价格时段')"
+                      :aria-label="t('admin.channels.form.removePeakRateWindow', '删除价格时段')"
+                    >
+                      <Icon name="trash" size="sm" />
+                    </button>
+                  </div>
+
+                  <div class="peak-rate-window__content">
+                    <div>
+                      <label class="peak-rate-field-label">{{ t('admin.channels.form.peakRateWeekdays', '适用日期') }}</label>
+                      <div class="mt-1.5 flex flex-wrap gap-1.5">
+                        <button
+                          v-for="day in peakRateWeekdays"
+                          :key="day.value"
+                          type="button"
+                          @click="togglePeakRateWeekday(windowIndex, day.value)"
+                          class="peak-rate-day"
+                          :class="window.weekdays.includes(day.value) && 'peak-rate-day--active'"
+                          :aria-pressed="window.weekdays.includes(day.value)"
+                        >
+                          {{ day.label }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-[7.5rem_7.5rem_minmax(7rem,9rem)]">
+                      <div>
+                        <label class="peak-rate-field-label">{{ t('admin.channels.form.peakStart', '高峰开始') }}</label>
+                        <TimePicker
+                          :model-value="window.start"
+                          :aria-label="t('admin.channels.form.peakStart', '高峰开始')"
+                          :test-id="`peak-start-${windowIndex}`"
+                          class="mt-1.5"
+                          @update:model-value="updatePeakRateWindow(windowIndex, 'start', $event)"
+                        />
+                      </div>
+                      <div>
+                        <label class="peak-rate-field-label">{{ t('admin.channels.form.peakEnd', '高峰结束') }}</label>
+                        <TimePicker
+                          :model-value="window.end"
+                          :aria-label="t('admin.channels.form.peakEnd', '高峰结束')"
+                          :test-id="`peak-end-${windowIndex}`"
+                          class="mt-1.5"
+                          @update:model-value="updatePeakRateWindow(windowIndex, 'end', $event)"
+                        />
+                      </div>
+                      <div class="col-span-2 sm:col-span-1">
+                        <label class="peak-rate-field-label">{{ t('admin.channels.form.peakRateMultiplier', '高峰价格倍率') }}</label>
+                        <div class="relative mt-1.5">
+                          <input :value="window.multiplier" @input="updatePeakRateWindow(windowIndex, 'multiplier', ($event.target as HTMLInputElement).value)"
+                            type="number" step="any" min="0" class="input peak-rate-multiplier-input pr-8 text-sm" :data-testid="`peak-rate-multiplier-${windowIndex}`" placeholder="1" />
+                          <span class="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs font-semibold text-gray-400">×</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakStart', '高峰开始') }}</label>
-                    <input :value="window.start" @input="updatePeakRateWindow(windowIndex, 'start', ($event.target as HTMLInputElement).value)"
-                      type="time" step="60" class="input mt-0.5 text-sm" :data-testid="`peak-start-${windowIndex}`" />
-                  </div>
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakEnd', '高峰结束') }}</label>
-                    <input :value="window.end" @input="updatePeakRateWindow(windowIndex, 'end', ($event.target as HTMLInputElement).value)"
-                      type="time" step="60" class="input mt-0.5 text-sm" :data-testid="`peak-end-${windowIndex}`" />
-                  </div>
-                  <div>
-                    <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.peakRateMultiplier', '高峰价格倍率') }}</label>
-                    <input :value="window.multiplier" @input="updatePeakRateWindow(windowIndex, 'multiplier', ($event.target as HTMLInputElement).value)"
-                      type="number" step="any" min="0" class="input mt-0.5 text-sm" :data-testid="`peak-rate-multiplier-${windowIndex}`" placeholder="1" />
-                  </div>
-                  <button
-                    type="button"
-                    @click="removePeakRateWindow(windowIndex)"
-                    class="mb-0.5 rounded p-1 text-gray-400 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-40"
-                    :disabled="(entry.peak_rate_windows || []).length <= 1"
-                    :title="t('admin.channels.form.removePeakRateWindow', '删除价格时段')"
-                  >
-                    <Icon name="trash" size="sm" />
-                  </button>
                 </div>
               </div>
+
+              <p class="mt-3 flex items-start gap-1.5 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                <Icon name="infoCircle" size="xs" class="mt-0.5 shrink-0 text-amber-500" />
+                <span>{{ t('admin.channels.form.peakRateHint', '按服务器时区计算；可设置多个时段并支持跨天') }}</span>
+              </p>
             </div>
-            <p v-if="entry.peak_rate_enabled" class="mt-1 text-xs text-gray-400">{{ t('admin.channels.form.peakRateHint', '按服务器时区计算；可添加多个时段，并支持跨天') }}</p>
-          </div>
+          </section>
 
           <!-- token 区间仅用于渠道；分组长上下文价格使用内置模型规则。 -->
           <div v-if="!hideTokenIntervals" class="mt-3">
@@ -382,6 +441,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
+import TimePicker from '@/components/common/TimePicker.vue'
 import Icon from '@/components/icons/Icon.vue'
 import IntervalRow from './IntervalRow.vue'
 import ModelTagInput from './ModelTagInput.vue'
@@ -597,5 +657,81 @@ async function onModelsUpdate(newModels: string[]) {
 
 .collapsible-inner {
   overflow: hidden;
+}
+
+.peak-rate-panel {
+  @apply overflow-hidden rounded-xl border border-amber-200/80 bg-amber-50/50 dark:border-amber-900/70 dark:bg-amber-950/10;
+}
+
+.peak-rate-panel__header {
+  @apply flex items-start justify-between gap-4 px-3 py-3 sm:px-4;
+}
+
+.peak-rate-panel__icon {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300;
+}
+
+.peak-rate-panel__badge {
+  @apply rounded-full border border-amber-200 bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-dark-800/70 dark:text-amber-300;
+}
+
+.peak-rate-switch {
+  @apply shrink-0 rounded-full p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-500/40;
+}
+
+.peak-rate-switch__track {
+  @apply relative block h-5 w-9 rounded-full bg-gray-300 transition-colors dark:bg-dark-600;
+}
+
+.peak-rate-switch--active .peak-rate-switch__track {
+  @apply bg-amber-500;
+}
+
+.peak-rate-switch__thumb {
+  @apply absolute left-0.5 top-0.5 block h-4 w-4 rounded-full bg-white shadow-sm transition-transform;
+}
+
+.peak-rate-switch--active .peak-rate-switch__thumb {
+  @apply translate-x-4;
+}
+
+.peak-rate-panel__body {
+  @apply border-t border-amber-200/80 px-3 py-3 dark:border-amber-900/70 sm:px-4;
+}
+
+.peak-rate-window {
+  @apply overflow-hidden rounded-lg border border-amber-200/80 bg-white/80 dark:border-amber-900/70 dark:bg-dark-900/45;
+}
+
+.peak-rate-window__header {
+  @apply flex items-center justify-between gap-3 border-b border-amber-100 px-3 py-2 dark:border-amber-950/70;
+}
+
+.peak-rate-window__index {
+  @apply inline-flex h-5 min-w-5 items-center justify-center rounded bg-amber-100 px-1 font-mono text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300;
+}
+
+.peak-rate-window__remove {
+  @apply rounded-md p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-35 dark:hover:bg-red-950/30;
+}
+
+.peak-rate-window__content {
+  @apply grid gap-3 px-3 py-3 lg:grid-cols-[minmax(13rem,1fr)_minmax(22rem,1.1fr)];
+}
+
+.peak-rate-field-label {
+  @apply text-xs font-medium text-gray-500 dark:text-gray-400;
+}
+
+.peak-rate-day {
+  @apply min-w-8 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:border-amber-300 hover:text-amber-700 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-400 dark:hover:border-amber-700 dark:hover:text-amber-300;
+}
+
+.peak-rate-day--active {
+  @apply border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-900/30 dark:text-primary-200;
+}
+
+.peak-rate-multiplier-input {
+  @apply rounded-lg py-2;
 }
 </style>
