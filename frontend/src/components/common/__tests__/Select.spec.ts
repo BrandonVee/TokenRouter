@@ -67,4 +67,34 @@ describe('Select dropdown viewport constraints', () => {
 
     wrapper.unmount()
   })
+
+  it('打开另一个选择器时关闭之前的下拉菜单', async () => {
+    const first = mount(Select, {
+      props: {
+        modelValue: null,
+        options: [{ value: 'first', label: 'First' }]
+      }
+    })
+    const second = mount(Select, {
+      props: {
+        modelValue: null,
+        options: [{ value: 'second', label: 'Second' }]
+      }
+    })
+
+    await first.get('button').trigger('click')
+    await nextTick()
+    expect(first.get('button').attributes('aria-expanded')).toBe('true')
+
+    await second.get('button').trigger('click')
+    await nextTick()
+
+    expect(first.get('button').attributes('aria-expanded')).toBe('false')
+    expect(second.get('button').attributes('aria-expanded')).toBe('true')
+    await new Promise(resolve => setTimeout(resolve, 250))
+    expect(document.body.querySelectorAll('.select-dropdown-portal')).toHaveLength(1)
+
+    first.unmount()
+    second.unmount()
+  })
 })

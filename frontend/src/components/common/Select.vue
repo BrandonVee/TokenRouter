@@ -129,6 +129,7 @@ const { t } = useI18n()
 
 // Instance ID for unique click-outside detection
 const instanceId = `select-${Math.random().toString(36).substring(2, 9)}`
+const SELECT_OPEN_EVENT = 'tokenrouter:select-open'
 
 export interface SelectOption {
   value: string | number | boolean | null
@@ -369,8 +370,15 @@ const toggle = () => {
   isOpen.value = !isOpen.value
 }
 
+// 通过窗口事件协调不同组件实例，避免 Teleport 菜单在相邻选择器之间重叠。
+const handleOtherSelectOpen = (event: Event) => {
+  const openedInstanceId = (event as CustomEvent<string>).detail
+  if (openedInstanceId !== instanceId) isOpen.value = false
+}
+
 watch(isOpen, (open) => {
   if (open) {
+    window.dispatchEvent(new CustomEvent(SELECT_OPEN_EVENT, { detail: instanceId }))
     calculateDropdownPosition()
     // Reset focused index to current selection or first item
     if (filteredOptions.value.length === 0) {
@@ -476,10 +484,12 @@ const handleClickOutside = (event: MouseEvent) => {
 }
 
 onMounted(() => {
+  window.addEventListener(SELECT_OPEN_EVENT, handleOtherSelectOpen)
   document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
+  window.removeEventListener(SELECT_OPEN_EVENT, handleOtherSelectOpen)
   document.removeEventListener('click', handleClickOutside)
   window.removeEventListener('scroll', updateTriggerRect, { capture: true })
   window.removeEventListener('resize', calculateDropdownPosition)
