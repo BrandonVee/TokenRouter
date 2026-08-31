@@ -10,7 +10,6 @@ const messages: Record<string, string> = {
   'usage.in': 'In',
   'usage.out': 'Out',
   'usage.cacheTotal': 'Cache',
-  'usage.cacheBreakdown': 'Cache Token Breakdown',
   'usage.cacheCreationTokensLabel': 'Cache Creation',
   'usage.cacheReadTokensLabel': 'Cache Read',
   'usage.totalCost': 'Total Cost',
@@ -65,15 +64,11 @@ describe('UsageStatsCards', () => {
     })
 
     const text = wrapper.text()
-    expect(text).toContain('Cache: 34')
-    expect(text).toContain('Cache Token Breakdown')
-    expect(text).toContain('Cache Creation')
-    expect(text).toContain('12')
-    expect(text).toContain('Cache Read')
-    expect(text).toContain('22')
+    expect(text).toContain('Cache: 34 (Cache Creation: 12, Cache Read: 22)')
+    expect(text).not.toContain('Cache Token Breakdown')
   })
 
-  it('keeps the cache breakdown card above adjacent cards for its tooltip', () => {
+  it('does not create a stacking context for cache details', () => {
     const wrapper = mount(UsageStatsCards, {
       props: { stats },
       global: {
@@ -85,6 +80,6 @@ describe('UsageStatsCards', () => {
     })
 
     const tokenCard = wrapper.findAll('.card')[1]
-    expect(tokenCard.classes()).toEqual(expect.arrayContaining(['relative', 'z-40']))
+    expect(tokenCard.classes()).not.toEqual(expect.arrayContaining(['relative', 'z-40']))
   })
 })
