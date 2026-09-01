@@ -44,9 +44,13 @@ export const imageHistoryAPI = {
     return data
   },
 
-  async list(page: number, pageSize: number): Promise<ImageHistoryList> {
+  async list(page: number, pageSize: number, search = ''): Promise<ImageHistoryList> {
+    // 搜索词为空时保持原有分页请求形状，便于兼容旧客户端和缓存键。
+    const params: { page: number; page_size: number; search?: string } = { page, page_size: pageSize }
+    const normalizedSearch = search.trim()
+    if (normalizedSearch) params.search = normalizedSearch
     const { data } = await apiClient.get<ImageHistoryList>('/user/image-history', {
-      params: { page, page_size: pageSize },
+      params,
     })
     return data
   },

@@ -65,9 +65,12 @@ func (h *ImageHistoryHandler) List(c *gin.Context) {
 		return
 	}
 	page, pageSize := response.ParsePagination(c)
-	result, err := h.service.List(c.Request.Context(), subject.UserID, pagination.PaginationParams{
-		Page:     page,
-		PageSize: pageSize,
+	result, err := h.service.List(c.Request.Context(), subject.UserID, service.ImageHistoryListParams{
+		PaginationParams: pagination.PaginationParams{
+			Page:     page,
+			PageSize: pageSize,
+		},
+		Search: strings.TrimSpace(c.Query("search")),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

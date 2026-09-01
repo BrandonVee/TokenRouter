@@ -42,6 +42,16 @@ describe('image history api', () => {
     })
   })
 
+  it('includes a non-empty search query in the history list request', async () => {
+    get.mockResolvedValue({ data: { items: [], total: 0, page: 1, page_size: 12, pages: 0 } })
+
+    await imageHistoryAPI.list(1, 12, '  lighthouse  ')
+
+    expect(get).toHaveBeenCalledWith('/user/image-history', {
+      params: { page: 1, page_size: 12, search: 'lighthouse' },
+    })
+  })
+
   it('downloads private content as a blob and deletes through the backend', async () => {
     const blob = new Blob(['image'], { type: 'image/png' })
     get.mockResolvedValue({ data: blob })

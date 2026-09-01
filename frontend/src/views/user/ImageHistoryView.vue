@@ -36,11 +36,21 @@
       </div>
     </section>
 
-    <div v-if="loadingHistory" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-      <div v-for="index in 8" :key="index" class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900">
+    <div v-if="settings.available" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <!-- 搜索交给服务端处理，确保分页之外的历史记录也能命中。 -->
+      <SearchInput
+        v-model="searchQuery"
+        :placeholder="t('imageHistory.searchPlaceholder')"
+        class="w-full sm:max-w-xl"
+        @search="applySearch"
+      />
+    </div>
+
+    <div v-if="loadingHistory" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      <div v-for="index in 10" :key="index" class="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-900">
         <div class="aspect-square animate-pulse bg-gray-100 dark:bg-dark-800"></div>
-        <div class="space-y-2 p-4">
-          <div class="h-4 w-2/3 animate-pulse rounded bg-gray-100 dark:bg-dark-800"></div>
+        <div class="space-y-2 p-3">
+          <div class="h-3.5 w-2/3 animate-pulse rounded bg-gray-100 dark:bg-dark-800"></div>
           <div class="h-3 w-full animate-pulse rounded bg-gray-100 dark:bg-dark-800"></div>
         </div>
       </div>
@@ -53,6 +63,19 @@
       <Icon name="cloud" size="xl" class="text-gray-400 dark:text-dark-500" />
       <p class="mt-3 text-sm font-medium text-gray-800 dark:text-gray-200">
         {{ t('imageHistory.unavailable') }}
+      </p>
+    </div>
+
+    <div
+      v-else-if="records.length === 0 && searchQuery.trim()"
+      class="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 px-5 text-center dark:border-dark-600"
+    >
+      <Icon name="search" size="xl" class="text-gray-400 dark:text-dark-500" />
+      <p class="mt-3 text-sm font-semibold text-gray-900 dark:text-white">
+        {{ t('imageHistory.noResults') }}
+      </p>
+      <p class="mt-1 max-w-md text-xs text-gray-500 dark:text-gray-400">
+        {{ t('imageHistory.noResultsHint') }}
       </p>
     </div>
 
@@ -70,7 +93,7 @@
     </div>
 
     <template v-else>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
         <article
           v-for="record in records"
           :key="record.id"
@@ -101,7 +124,7 @@
             <div class="absolute right-2 top-2 flex gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
               <button
                 type="button"
-                class="flex h-9 w-9 items-center justify-center rounded-md bg-white/95 text-gray-700 shadow-sm transition-colors hover:bg-white hover:text-gray-950 dark:bg-dark-900/95 dark:text-gray-200 dark:hover:bg-dark-800 dark:hover:text-white"
+                class="flex h-8 w-8 items-center justify-center rounded-md bg-white/95 text-gray-700 shadow-sm transition-colors hover:bg-white hover:text-gray-950 dark:bg-dark-900/95 dark:text-gray-200 dark:hover:bg-dark-800 dark:hover:text-white"
                 :title="t('imageHistory.download')"
                 :aria-label="t('imageHistory.download')"
                 :disabled="downloadingId === record.id"
@@ -111,7 +134,7 @@
               </button>
               <button
                 type="button"
-                class="flex h-9 w-9 items-center justify-center rounded-md bg-white/95 text-gray-700 shadow-sm transition-colors hover:bg-red-50 hover:text-red-600 dark:bg-dark-900/95 dark:text-gray-200 dark:hover:bg-red-950/70 dark:hover:text-red-300"
+                class="flex h-8 w-8 items-center justify-center rounded-md bg-white/95 text-gray-700 shadow-sm transition-colors hover:bg-red-50 hover:text-red-600 dark:bg-dark-900/95 dark:text-gray-200 dark:hover:bg-red-950/70 dark:hover:text-red-300"
                 :title="t('imageHistory.delete')"
                 :aria-label="t('imageHistory.delete')"
                 @click="pendingDelete = record"
@@ -121,16 +144,16 @@
             </div>
           </div>
 
-          <div class="space-y-3 p-4">
+          <div class="space-y-2 p-3">
             <div class="flex min-w-0 items-center justify-between gap-3">
-              <p class="truncate text-sm font-semibold text-gray-900 dark:text-white" :title="record.model">
+              <p class="truncate text-xs font-semibold text-gray-900 dark:text-white" :title="record.model">
                 {{ record.model || t('imageHistory.unknownModel') }}
               </p>
-              <span class="flex-none rounded-md bg-gray-100 px-2 py-1 text-[11px] font-medium uppercase text-gray-600 dark:bg-dark-800 dark:text-gray-300">
+              <span class="flex-none rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-gray-600 dark:bg-dark-800 dark:text-gray-300">
                 {{ record.source }}
               </span>
             </div>
-            <p class="min-h-10 line-clamp-2 text-sm leading-5 text-gray-600 dark:text-gray-400" :title="record.prompt">
+            <p class="min-h-8 line-clamp-2 text-xs leading-4 text-gray-600 dark:text-gray-400" :title="record.prompt">
               {{ record.prompt || '-' }}
             </p>
             <div class="flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
@@ -239,6 +262,7 @@ import { imageHistoryAPI, type ImageHistoryRecord, type ImageHistorySettings } f
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Pagination from '@/components/common/Pagination.vue'
+import SearchInput from '@/components/common/SearchInput.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAppStore } from '@/stores/app'
@@ -256,6 +280,7 @@ const deletingId = ref('')
 const selectedRecord = ref<ImageHistoryRecord | null>(null)
 const pendingDelete = ref<ImageHistoryRecord | null>(null)
 const previewErrors = ref<Record<string, boolean>>({})
+const searchQuery = ref('')
 const pagination = ref({ page: 1, pageSize: 12, total: 0, pages: 0 })
 
 const loading = computed(() => loadingSettings.value || loadingHistory.value)
@@ -296,7 +321,10 @@ async function refreshAll() {
 async function loadRecords() {
   loadingHistory.value = true
   try {
-    const result = await imageHistoryAPI.list(pagination.value.page, pagination.value.pageSize)
+    const search = searchQuery.value.trim()
+    const result = search
+      ? await imageHistoryAPI.list(pagination.value.page, pagination.value.pageSize, search)
+      : await imageHistoryAPI.list(pagination.value.page, pagination.value.pageSize)
     records.value = result.items || []
     pagination.value.total = result.total
     pagination.value.pages = result.pages
@@ -376,6 +404,12 @@ async function changePage(page: number) {
 
 async function changePageSize(pageSize: number) {
   pagination.value.pageSize = pageSize
+  pagination.value.page = 1
+  await loadRecords()
+}
+
+async function applySearch(search: string) {
+  searchQuery.value = search
   pagination.value.page = 1
   await loadRecords()
 }

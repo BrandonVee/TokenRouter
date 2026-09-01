@@ -71,6 +71,13 @@ const ToggleStub = {
     '<button data-testid="history-toggle" :disabled="disabled" @click="$emit(\'update:modelValue\', !modelValue)" />',
 }
 
+const SearchInputStub = {
+  name: 'SearchInput',
+  props: ['modelValue', 'placeholder'],
+  emits: ['update:modelValue', 'search'],
+  template: '<input data-testid="history-search" :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
+}
+
 function mountView() {
   return mount(ImageHistoryView, {
     global: {
@@ -79,6 +86,7 @@ function mountView() {
         ConfirmDialog: true,
         Pagination: true,
         Toggle: ToggleStub,
+        SearchInput: SearchInputStub,
         Icon: true,
       },
     },
@@ -121,6 +129,18 @@ describe('ImageHistoryView', () => {
 
     expect(updateSettings).toHaveBeenCalledWith(false)
     expect(showSuccess).toHaveBeenCalledWith('imageHistory.settingsSaved')
+  })
+
+  it('searches image history from the first page', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const searchInput = wrapper.findComponent({ name: 'SearchInput' })
+    searchInput.vm.$emit('update:modelValue', 'lighthouse')
+    searchInput.vm.$emit('search', 'lighthouse')
+    await flushPromises()
+
+    expect(list).toHaveBeenLastCalledWith(1, 12, 'lighthouse')
   })
 
   it('does not request history when storage is unavailable', async () => {

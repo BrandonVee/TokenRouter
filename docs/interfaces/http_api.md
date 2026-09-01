@@ -76,7 +76,7 @@ OAuth 登录 start 对 GitHub、Google、LinuxDo、DingTalk、WeChat 和 OIDC �
 | --- | --- |
 | `GET /settings` | 返回 `{ available, enabled }`；`available` 表示部署者已启用完整存储，`enabled` 是可用性与用户选择共同生效后的值 |
 | `PUT /settings` | 接受 `{ "enabled": boolean }`；全局不可用时拒绝开启，允许关闭 |
-| `GET /` | 使用通用 `page`、`page_size` 分页，单页最多 100，返回元数据和短期 `preview_url`，不返回对象键 |
+| `GET /` | 使用通用 `page`、`page_size` 分页，单页最多 100；可选 `search` 对模型、提示词、来源、接口或请求 ID 做不区分大小写的模糊筛选；返回元数据和短期 `preview_url`，不返回对象键 |
 | `GET /:id/content` | 校验当前用户归属后代理私有对象并以附件形式下载 |
 | `DELETE /:id` | 校验当前用户归属后删除私有对象和元数据 |
 

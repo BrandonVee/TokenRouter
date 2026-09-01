@@ -2,11 +2,11 @@ package repository
 
 import (
 	"context"
+	"strings"
 
 	dbent "github.com/BrandonVee/TokenRouter/ent"
 	"github.com/BrandonVee/TokenRouter/ent/imagehistory"
 	"github.com/BrandonVee/TokenRouter/ent/user"
-	"github.com/BrandonVee/TokenRouter/internal/pkg/pagination"
 	"github.com/BrandonVee/TokenRouter/internal/service"
 )
 
@@ -58,9 +58,21 @@ func (r *imageHistoryRepository) Create(ctx context.Context, record service.Imag
 		Exec(ctx)
 }
 
-func (r *imageHistoryRepository) List(ctx context.Context, userID int64, params pagination.PaginationParams) ([]service.ImageHistoryRecord, int64, error) {
+func (r *imageHistoryRepository) List(ctx context.Context, userID int64, params service.ImageHistoryListParams) ([]service.ImageHistoryRecord, int64, error) {
 	client := clientFromContext(ctx, r.client)
 	filter := imagehistory.UserIDEQ(userID)
+	if search := strings.TrimSpace(params.Search); search != "" {
+		// 搜索只作用于当前用户，并覆盖列表中可见的主要元数据字段。
+		filter = imagehistory.And(filter, imagehistory.Or(
+			imagehistory.IDContainsFold(search),
+			imagehistory.RequestIDContainsFold(search),
+			imagehistory.SourceContainsFold(search),
+			imagehistory.EndpointContainsFold(search),
+			imagehistory.ModelContainsFold(search),
+			imagehistory.PromptContainsFold(search),
+			imagehistory.RevisedPromptContainsFold(search),
+		))
+	}
 	total, err := client.ImageHistory.Query().Where(filter).Count(ctx)
 	if err != nil {
 		return nil, 0, err

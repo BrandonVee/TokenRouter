@@ -19,15 +19,16 @@ import (
 const imageHistoryValidPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Z8dZAAAAAElFTkSuQmCC"
 
 type fakeImageHistoryRepository struct {
-	mu           sync.Mutex
-	enabled      bool
-	setUserID    int64
-	setEnabled   bool
-	createErr    error
-	onCreate     func()
-	records      []ImageHistoryRecord
-	deletedIDs   []string
-	lastListUser int64
+	mu             sync.Mutex
+	enabled        bool
+	setUserID      int64
+	setEnabled     bool
+	createErr      error
+	onCreate       func()
+	records        []ImageHistoryRecord
+	deletedIDs     []string
+	lastListUser   int64
+	lastListSearch string
 }
 
 func (r *fakeImageHistoryRepository) GetSavingEnabled(context.Context, int64) (bool, error) {
@@ -58,10 +59,11 @@ func (r *fakeImageHistoryRepository) Create(_ context.Context, record ImageHisto
 	return nil
 }
 
-func (r *fakeImageHistoryRepository) List(_ context.Context, userID int64, params pagination.PaginationParams) ([]ImageHistoryRecord, int64, error) {
+func (r *fakeImageHistoryRepository) List(_ context.Context, userID int64, params ImageHistoryListParams) ([]ImageHistoryRecord, int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.lastListUser = userID
+	r.lastListSearch = params.Search
 	items := append([]ImageHistoryRecord(nil), r.records...)
 	return items, int64(len(items)), nil
 }
@@ -262,11 +264,15 @@ func TestImageHistoryServiceListOpenAndDeleteKeepUserScope(t *testing.T) {
 	store.objects[record.ObjectKey] = []byte("png")
 	svc := newTestImageHistoryService(repo, store)
 
-	list, err := svc.List(context.Background(), 7, pagination.PaginationParams{Page: 1, PageSize: 20})
+	list, err := svc.List(context.Background(), 7, ImageHistoryListParams{
+		PaginationParams: pagination.PaginationParams{Page: 1, PageSize: 20},
+		Search:           "  lighthouse  ",
+	})
 	require.NoError(t, err)
 	require.Len(t, list.Items, 1)
 	require.Contains(t, list.Items[0].PreviewURL, record.ObjectKey)
 	require.Equal(t, int64(7), repo.lastListUser)
+	require.Equal(t, "lighthouse", repo.lastListSearch)
 
 	content, err := svc.OpenContent(context.Background(), 8, record.ID)
 	require.Nil(t, content)

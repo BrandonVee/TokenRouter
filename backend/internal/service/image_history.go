@@ -30,6 +30,7 @@ import (
 
 const (
 	imageHistoryRequestIDMaxRunes     = 255
+	imageHistorySearchMaxRunes        = 255
 	imageHistorySourceMaxRunes        = 32
 	imageHistoryEndpointMaxRunes      = 64
 	imageHistoryModelMaxRunes         = 255
@@ -81,6 +82,12 @@ type ImageHistoryList struct {
 	Pages    int                  `json:"pages"`
 }
 
+// ImageHistoryListParams 描述生图历史的分页和可选搜索条件。
+type ImageHistoryListParams struct {
+	pagination.PaginationParams
+	Search string
+}
+
 // SaveImageHistoryInput 描述一次成功生图请求及其最终图片。
 type SaveImageHistoryInput struct {
 	UserID     int64
@@ -99,7 +106,7 @@ type ImageHistoryRepository interface {
 	GetSavingEnabled(ctx context.Context, userID int64) (bool, error)
 	SetSavingEnabled(ctx context.Context, userID int64, enabled bool) error
 	Create(ctx context.Context, record ImageHistoryRecord) error
-	List(ctx context.Context, userID int64, params pagination.PaginationParams) ([]ImageHistoryRecord, int64, error)
+	List(ctx context.Context, userID int64, params ImageHistoryListParams) ([]ImageHistoryRecord, int64, error)
 	Get(ctx context.Context, userID int64, id string) (*ImageHistoryRecord, error)
 	Delete(ctx context.Context, userID int64, id string) error
 }
@@ -223,7 +230,7 @@ func (s *ImageHistoryService) SaveCapturedImages(ctx context.Context, input Save
 }
 
 // List 返回当前用户的历史，并为每个私有对象生成短期预览地址。
-func (s *ImageHistoryService) List(ctx context.Context, userID int64, params pagination.PaginationParams) (*ImageHistoryList, error) {
+func (s *ImageHistoryService) List(ctx context.Context, userID int64, params ImageHistoryListParams) (*ImageHistoryList, error) {
 	if s == nil || s.repo == nil {
 		return nil, ErrImageHistoryUnavailable
 	}
@@ -240,6 +247,8 @@ func (s *ImageHistoryService) List(ctx context.Context, userID int64, params pag
 	if params.PageSize > 100 {
 		params.PageSize = 100
 	}
+	// 限制搜索词长度，避免异常长查询拖慢历史列表。
+	params.Search = truncateImageHistoryText(strings.TrimSpace(params.Search), imageHistorySearchMaxRunes)
 	items, total, err := s.repo.List(ctx, userID, params)
 	if err != nil {
 		return nil, err
