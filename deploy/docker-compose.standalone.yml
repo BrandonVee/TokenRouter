@@ -105,6 +105,16 @@ services:
       # =======================================================================
       - TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY:-}
 
+      # 生图历史对象存储配置。
+      - IMAGE_HISTORY_ENABLED=${IMAGE_HISTORY_ENABLED:-false}
+      - IMAGE_HISTORY_ENDPOINT=${IMAGE_HISTORY_ENDPOINT:-}
+      - IMAGE_HISTORY_REGION=${IMAGE_HISTORY_REGION:-auto}
+      - IMAGE_HISTORY_BUCKET=${IMAGE_HISTORY_BUCKET:-}
+      - IMAGE_HISTORY_ACCESS_KEY_ID=${IMAGE_HISTORY_ACCESS_KEY_ID:-}
+      - IMAGE_HISTORY_SECRET_ACCESS_KEY=${IMAGE_HISTORY_SECRET_ACCESS_KEY:-}
+      - IMAGE_HISTORY_PREFIX=${IMAGE_HISTORY_PREFIX:-image-history}
+      - IMAGE_HISTORY_FORCE_PATH_STYLE=${IMAGE_HISTORY_FORCE_PATH_STYLE:-false}
+
       # =======================================================================
       # Timezone Configuration
       # =======================================================================
