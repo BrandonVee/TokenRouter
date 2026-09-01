@@ -178,14 +178,14 @@ func TestImageHistoryStorageConfigLoadsPersistedOverrideAndPreservesSecret(t *te
 	require.Equal(t, int64(2048), created[len(created)-1].MaxObjectBytes)
 }
 
-func TestImageHistoryStorageConfigRequiresStableEncryptionKey(t *testing.T) {
+func TestImageHistoryStorageConfigRequiresStableEncryptionKeyBeforeSave(t *testing.T) {
 	repo := newImageHistoryStorageSettingRepo()
 	created := make([]config.ImageHistoryConfig, 0)
 	svc, err := ProvideImageHistoryService(&fakeImageHistoryRepository{}, repo, &config.Config{}, imageHistoryStorageEncryptor{}, imageHistoryStorageTestFactory(&created))
 	require.NoError(t, err)
 
 	_, err = svc.UpdateStorageConfig(context.Background(), ImageHistoryStorageConfig{
-		Enabled:         true,
+		Enabled:         false,
 		Region:          "auto",
 		Bucket:          "bucket",
 		AccessKeyID:     "key",
@@ -193,12 +193,14 @@ func TestImageHistoryStorageConfigRequiresStableEncryptionKey(t *testing.T) {
 		Prefix:          "images",
 	})
 	require.ErrorIs(t, err, ErrImageHistoryStorageKeyRequired)
+	_, exists := repo.values[settingKeyImageHistoryStorageConfig]
+	require.False(t, exists)
 }
 
 func TestImageHistoryStorageConnectionUsesSavedSecret(t *testing.T) {
 	repo := newImageHistoryStorageSettingRepo()
 	created := make([]config.ImageHistoryConfig, 0)
-	cfg := &config.Config{ImageHistory: config.ImageHistoryConfig{
+	cfg := &config.Config{Totp: config.TotpConfig{EncryptionKeyConfigured: false}, ImageHistory: config.ImageHistoryConfig{
 		Enabled:         true,
 		Region:          "auto",
 		Bucket:          "bucket",

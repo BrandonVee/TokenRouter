@@ -139,7 +139,8 @@ func (s *ImageHistoryService) UpdateStorageConfig(ctx context.Context, input Ima
 		_, current := s.storageSnapshot()
 		runtimeCfg.SecretAccessKey = current.SecretAccessKey
 	}
-	if runtimeCfg.Enabled && !s.encryptionKeyConfigured {
+	// 页面覆盖会持久化对象存储凭据，必须使用可跨重启解密的固定密钥。
+	if !s.encryptionKeyConfigured {
 		return ImageHistoryStorageConfig{}, ErrImageHistoryStorageKeyRequired
 	}
 	if err := validateImageHistoryRuntimeStorageConfig(runtimeCfg); err != nil {
@@ -152,15 +153,9 @@ func (s *ImageHistoryService) UpdateStorageConfig(ctx context.Context, input Ima
 	}
 	stored := imageHistoryStoredStorageConfigFromRuntime(runtimeCfg)
 	if strings.TrimSpace(runtimeCfg.SecretAccessKey) != "" {
-		if !s.encryptionKeyConfigured {
-			// 关闭状态允许清空凭据，但不会把临时密钥加密的值写入数据库。
-			stored.SecretAccessKey = ""
-			runtimeCfg.SecretAccessKey = ""
-		} else {
-			stored.SecretAccessKey, err = s.encryptor.Encrypt(runtimeCfg.SecretAccessKey)
-			if err != nil {
-				return ImageHistoryStorageConfig{}, fmt.Errorf("encrypt image history storage secret: %w", err)
-			}
+		stored.SecretAccessKey, err = s.encryptor.Encrypt(runtimeCfg.SecretAccessKey)
+		if err != nil {
+			return ImageHistoryStorageConfig{}, fmt.Errorf("encrypt image history storage secret: %w", err)
 		}
 	}
 	data, err := json.Marshal(stored)

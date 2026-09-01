@@ -69,7 +69,7 @@
             </div>
 
             <div
-              v-if="form.enabled && !form.encryption_key_ready"
+              v-if="!form.encryption_key_ready"
               class="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
               data-testid="image-history-encryption-warning"
             >
@@ -268,7 +268,7 @@ const hasConnectionFields = computed(() =>
   Boolean(form.bucket.trim() && form.access_key_id.trim() && (form.secret_access_key?.trim() || form.secret_configured)),
 )
 const canSave = computed(() =>
-  !form.enabled || (hasConnectionFields.value && Boolean(form.prefix.trim()) && form.encryption_key_ready),
+  form.encryption_key_ready && (!form.enabled || (hasConnectionFields.value && Boolean(form.prefix.trim()))),
 )
 
 function assignConfig(config: ImageHistoryStorageConfig): void {

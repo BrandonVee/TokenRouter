@@ -124,6 +124,30 @@ describe('FileStorageSettings', () => {
     expect(showSuccess).toHaveBeenCalledWith('admin.settings.fileStorage.images.saved')
   })
 
+  it('requires an encryption key to save without blocking a connection test', async () => {
+    getConfig.mockResolvedValue({
+      ...structuredClone(databaseConfig),
+      encryption_key_ready: false,
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const testButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('fileStorage.images.test'))
+    const saveButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('common.save'))
+    expect(wrapper.get('[data-testid="image-history-encryption-warning"]').text()).toContain('encryptionKeyRequired')
+    expect(saveButton!.attributes('disabled')).toBeDefined()
+
+    await testButton!.trigger('click')
+    await flushPromises()
+
+    expect(testConnection).toHaveBeenCalledOnce()
+    expect(updateConfig).not.toHaveBeenCalled()
+  })
+
   it('restores deployment config after confirmation', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const wrapper = mountView()
