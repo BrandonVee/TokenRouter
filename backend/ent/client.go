@@ -33,6 +33,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/group"
 	"github.com/BrandonVee/TokenRouter/ent/idempotencyrecord"
 	"github.com/BrandonVee/TokenRouter/ent/identityadoptiondecision"
+	"github.com/BrandonVee/TokenRouter/ent/imagehistory"
 	"github.com/BrandonVee/TokenRouter/ent/invoiceattachment"
 	"github.com/BrandonVee/TokenRouter/ent/invoicedelivery"
 	"github.com/BrandonVee/TokenRouter/ent/invoicerequest"
@@ -109,6 +110,8 @@ type Client struct {
 	IdempotencyRecord *IdempotencyRecordClient
 	// IdentityAdoptionDecision is the client for interacting with the IdentityAdoptionDecision builders.
 	IdentityAdoptionDecision *IdentityAdoptionDecisionClient
+	// ImageHistory is the client for interacting with the ImageHistory builders.
+	ImageHistory *ImageHistoryClient
 	// InvoiceAttachment is the client for interacting with the InvoiceAttachment builders.
 	InvoiceAttachment *InvoiceAttachmentClient
 	// InvoiceDelivery is the client for interacting with the InvoiceDelivery builders.
@@ -200,6 +203,7 @@ func (c *Client) init() {
 	c.Group = NewGroupClient(c.config)
 	c.IdempotencyRecord = NewIdempotencyRecordClient(c.config)
 	c.IdentityAdoptionDecision = NewIdentityAdoptionDecisionClient(c.config)
+	c.ImageHistory = NewImageHistoryClient(c.config)
 	c.InvoiceAttachment = NewInvoiceAttachmentClient(c.config)
 	c.InvoiceDelivery = NewInvoiceDeliveryClient(c.config)
 	c.InvoiceRequest = NewInvoiceRequestClient(c.config)
@@ -341,6 +345,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Group:                    NewGroupClient(cfg),
 		IdempotencyRecord:        NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision: NewIdentityAdoptionDecisionClient(cfg),
+		ImageHistory:             NewImageHistoryClient(cfg),
 		InvoiceAttachment:        NewInvoiceAttachmentClient(cfg),
 		InvoiceDelivery:          NewInvoiceDeliveryClient(cfg),
 		InvoiceRequest:           NewInvoiceRequestClient(cfg),
@@ -409,6 +414,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Group:                    NewGroupClient(cfg),
 		IdempotencyRecord:        NewIdempotencyRecordClient(cfg),
 		IdentityAdoptionDecision: NewIdentityAdoptionDecisionClient(cfg),
+		ImageHistory:             NewImageHistoryClient(cfg),
 		InvoiceAttachment:        NewInvoiceAttachmentClient(cfg),
 		InvoiceDelivery:          NewInvoiceDeliveryClient(cfg),
 		InvoiceRequest:           NewInvoiceRequestClient(cfg),
@@ -473,12 +479,12 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
 		c.BatchImageItem, c.BatchImageJob, c.CompositeModelRoute, c.DashboardAd,
 		c.DataShareSession, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.InvoiceAttachment, c.InvoiceDelivery,
-		c.InvoiceRequest, c.InvoiceRequestItem, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.RedeemCodeUsage, c.SecuritySecret, c.Setting,
-		c.SubscriptionPlan, c.TLSFingerprintProfile, c.TLSFingerprintRouter, c.Team,
-		c.TeamInvitation, c.TeamMembership, c.TeamOwnershipTransfer,
+		c.IdentityAdoptionDecision, c.ImageHistory, c.InvoiceAttachment,
+		c.InvoiceDelivery, c.InvoiceRequest, c.InvoiceRequestItem, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.RedeemCodeUsage, c.SecuritySecret,
+		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.TLSFingerprintRouter,
+		c.Team, c.TeamInvitation, c.TeamMembership, c.TeamOwnershipTransfer,
 		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
 		c.UserAttributeDefinition, c.UserAttributeValue, c.UserDisabledPublicGroup,
 		c.UserPlatformQuota, c.UserSubscription,
@@ -495,12 +501,12 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AnnouncementRead, c.AuthIdentity, c.AuthIdentityChannel, c.BatchImageEvent,
 		c.BatchImageItem, c.BatchImageJob, c.CompositeModelRoute, c.DashboardAd,
 		c.DataShareSession, c.ErrorPassthroughRule, c.Group, c.IdempotencyRecord,
-		c.IdentityAdoptionDecision, c.InvoiceAttachment, c.InvoiceDelivery,
-		c.InvoiceRequest, c.InvoiceRequestItem, c.PaymentAuditLog, c.PaymentOrder,
-		c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode, c.PromoCodeUsage,
-		c.Proxy, c.RedeemCode, c.RedeemCodeUsage, c.SecuritySecret, c.Setting,
-		c.SubscriptionPlan, c.TLSFingerprintProfile, c.TLSFingerprintRouter, c.Team,
-		c.TeamInvitation, c.TeamMembership, c.TeamOwnershipTransfer,
+		c.IdentityAdoptionDecision, c.ImageHistory, c.InvoiceAttachment,
+		c.InvoiceDelivery, c.InvoiceRequest, c.InvoiceRequestItem, c.PaymentAuditLog,
+		c.PaymentOrder, c.PaymentProviderInstance, c.PendingAuthSession, c.PromoCode,
+		c.PromoCodeUsage, c.Proxy, c.RedeemCode, c.RedeemCodeUsage, c.SecuritySecret,
+		c.Setting, c.SubscriptionPlan, c.TLSFingerprintProfile, c.TLSFingerprintRouter,
+		c.Team, c.TeamInvitation, c.TeamMembership, c.TeamOwnershipTransfer,
 		c.UsageCleanupTask, c.UsageLog, c.User, c.UserAllowedGroup,
 		c.UserAttributeDefinition, c.UserAttributeValue, c.UserDisabledPublicGroup,
 		c.UserPlatformQuota, c.UserSubscription,
@@ -548,6 +554,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.IdempotencyRecord.mutate(ctx, m)
 	case *IdentityAdoptionDecisionMutation:
 		return c.IdentityAdoptionDecision.mutate(ctx, m)
+	case *ImageHistoryMutation:
+		return c.ImageHistory.mutate(ctx, m)
 	case *InvoiceAttachmentMutation:
 		return c.InvoiceAttachment.mutate(ctx, m)
 	case *InvoiceDeliveryMutation:
@@ -3509,6 +3517,139 @@ func (c *IdentityAdoptionDecisionClient) mutate(ctx context.Context, m *Identity
 		return (&IdentityAdoptionDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown IdentityAdoptionDecision mutation op: %q", m.Op())
+	}
+}
+
+// ImageHistoryClient is a client for the ImageHistory schema.
+type ImageHistoryClient struct {
+	config
+}
+
+// NewImageHistoryClient returns a client for the ImageHistory from the given config.
+func NewImageHistoryClient(c config) *ImageHistoryClient {
+	return &ImageHistoryClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `imagehistory.Hooks(f(g(h())))`.
+func (c *ImageHistoryClient) Use(hooks ...Hook) {
+	c.hooks.ImageHistory = append(c.hooks.ImageHistory, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `imagehistory.Intercept(f(g(h())))`.
+func (c *ImageHistoryClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ImageHistory = append(c.inters.ImageHistory, interceptors...)
+}
+
+// Create returns a builder for creating a ImageHistory entity.
+func (c *ImageHistoryClient) Create() *ImageHistoryCreate {
+	mutation := newImageHistoryMutation(c.config, OpCreate)
+	return &ImageHistoryCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ImageHistory entities.
+func (c *ImageHistoryClient) CreateBulk(builders ...*ImageHistoryCreate) *ImageHistoryCreateBulk {
+	return &ImageHistoryCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ImageHistoryClient) MapCreateBulk(slice any, setFunc func(*ImageHistoryCreate, int)) *ImageHistoryCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ImageHistoryCreateBulk{err: fmt.Errorf("calling to ImageHistoryClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ImageHistoryCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ImageHistoryCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ImageHistory.
+func (c *ImageHistoryClient) Update() *ImageHistoryUpdate {
+	mutation := newImageHistoryMutation(c.config, OpUpdate)
+	return &ImageHistoryUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ImageHistoryClient) UpdateOne(_m *ImageHistory) *ImageHistoryUpdateOne {
+	mutation := newImageHistoryMutation(c.config, OpUpdateOne, withImageHistory(_m))
+	return &ImageHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ImageHistoryClient) UpdateOneID(id string) *ImageHistoryUpdateOne {
+	mutation := newImageHistoryMutation(c.config, OpUpdateOne, withImageHistoryID(id))
+	return &ImageHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ImageHistory.
+func (c *ImageHistoryClient) Delete() *ImageHistoryDelete {
+	mutation := newImageHistoryMutation(c.config, OpDelete)
+	return &ImageHistoryDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ImageHistoryClient) DeleteOne(_m *ImageHistory) *ImageHistoryDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ImageHistoryClient) DeleteOneID(id string) *ImageHistoryDeleteOne {
+	builder := c.Delete().Where(imagehistory.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ImageHistoryDeleteOne{builder}
+}
+
+// Query returns a query builder for ImageHistory.
+func (c *ImageHistoryClient) Query() *ImageHistoryQuery {
+	return &ImageHistoryQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeImageHistory},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ImageHistory entity by its id.
+func (c *ImageHistoryClient) Get(ctx context.Context, id string) (*ImageHistory, error) {
+	return c.Query().Where(imagehistory.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ImageHistoryClient) GetX(ctx context.Context, id string) *ImageHistory {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ImageHistoryClient) Hooks() []Hook {
+	return c.hooks.ImageHistory
+}
+
+// Interceptors returns the client interceptors.
+func (c *ImageHistoryClient) Interceptors() []Interceptor {
+	return c.inters.ImageHistory
+}
+
+func (c *ImageHistoryClient) mutate(ctx context.Context, m *ImageHistoryMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ImageHistoryCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ImageHistoryUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ImageHistoryUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ImageHistoryDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ImageHistory mutation op: %q", m.Op())
 	}
 }
 
@@ -8516,10 +8657,10 @@ type (
 		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
 		BatchImageItem, BatchImageJob, CompositeModelRoute, DashboardAd,
 		DataShareSession, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, InvoiceAttachment, InvoiceDelivery, InvoiceRequest,
-		InvoiceRequestItem, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingAuthSession, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
-		RedeemCodeUsage, SecuritySecret, Setting, SubscriptionPlan,
+		IdentityAdoptionDecision, ImageHistory, InvoiceAttachment, InvoiceDelivery,
+		InvoiceRequest, InvoiceRequestItem, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
+		RedeemCode, RedeemCodeUsage, SecuritySecret, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, TLSFingerprintRouter, Team, TeamInvitation,
 		TeamMembership, TeamOwnershipTransfer, UsageCleanupTask, UsageLog, User,
 		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,
@@ -8530,10 +8671,10 @@ type (
 		AnnouncementRead, AuthIdentity, AuthIdentityChannel, BatchImageEvent,
 		BatchImageItem, BatchImageJob, CompositeModelRoute, DashboardAd,
 		DataShareSession, ErrorPassthroughRule, Group, IdempotencyRecord,
-		IdentityAdoptionDecision, InvoiceAttachment, InvoiceDelivery, InvoiceRequest,
-		InvoiceRequestItem, PaymentAuditLog, PaymentOrder, PaymentProviderInstance,
-		PendingAuthSession, PromoCode, PromoCodeUsage, Proxy, RedeemCode,
-		RedeemCodeUsage, SecuritySecret, Setting, SubscriptionPlan,
+		IdentityAdoptionDecision, ImageHistory, InvoiceAttachment, InvoiceDelivery,
+		InvoiceRequest, InvoiceRequestItem, PaymentAuditLog, PaymentOrder,
+		PaymentProviderInstance, PendingAuthSession, PromoCode, PromoCodeUsage, Proxy,
+		RedeemCode, RedeemCodeUsage, SecuritySecret, Setting, SubscriptionPlan,
 		TLSFingerprintProfile, TLSFingerprintRouter, Team, TeamInvitation,
 		TeamMembership, TeamOwnershipTransfer, UsageCleanupTask, UsageLog, User,
 		UserAllowedGroup, UserAttributeDefinition, UserAttributeValue,

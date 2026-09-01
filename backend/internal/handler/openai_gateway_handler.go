@@ -35,11 +35,21 @@ type OpenAIGatewayHandler struct {
 	errorPassthroughService    *service.ErrorPassthroughService
 	contentModerationService   *service.ContentModerationService
 	grokMediaEligibilityProber grokMediaEligibilityProber
+	imageHistoryService        *service.ImageHistoryService
+	imageHistorySaveWorkerPool *service.ImageHistorySaveWorkerPool
 	opsService                 *service.OpsService
 	concurrencyHelper          *ConcurrencyHelper
 	imageLimiter               *imageConcurrencyLimiter
 	maxAccountSwitches         int
 	cfg                        *config.Config
+}
+
+// SetImageHistoryDeps 注入用户主动开启的生图历史服务和有界转存队列。
+func (h *OpenAIGatewayHandler) SetImageHistoryDeps(imageHistoryService *service.ImageHistoryService, workerPool *service.ImageHistorySaveWorkerPool) {
+	if h != nil {
+		h.imageHistoryService = imageHistoryService
+		h.imageHistorySaveWorkerPool = workerPool
+	}
 }
 
 var errOpenAIWSLocalRoutingRejected = errors.New("local websocket routing rejected")

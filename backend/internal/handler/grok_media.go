@@ -200,6 +200,14 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		}
 	}
 	requestCtx := c.Request.Context()
+	var imageHistoryCollector *service.GeneratedImageCaptureCollector
+	if endpoint == service.GrokMediaEndpointImagesGenerations || endpoint == service.GrokMediaEndpointImagesEdits {
+		requestCtx, imageHistoryCollector = h.prepareImageHistoryCapture(requestCtx, subject.UserID)
+		if imageHistoryCollector != nil {
+			// 服务层转发使用 gin request context 捕获最终 JSON 图片。
+			c.Request = c.Request.WithContext(requestCtx)
+		}
+	}
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(requestCtx, apiKey.GroupID, routingModel)
 	forwardBody, forwardContentType, err := applyGrokMediaChannelMapping(body, contentType, channelMapping)
 	if err != nil {
@@ -468,6 +476,17 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			}
 		} else if shouldRecordGrokMediaUsage(endpoint, requestModel, result) {
 			recordGrokMediaUsage(c, h, reqLog, apiKey, subject, subscription, account, result, requestModel, channelMapping, body, requestID)
+		}
+		if result != nil && result.ImageCount > 0 {
+			h.saveImageHistoryAsync(service.SaveImageHistoryInput{
+				UserID:    subject.UserID,
+				APIKeyID:  apiKey.ID,
+				RequestID: result.RequestID,
+				Source:    "grok",
+				Endpoint:  string(endpoint),
+				Model:     requestModel,
+				Prompt:    requestInfo.Prompt,
+			}, imageHistoryCollector)
 		}
 		reqLog.Debug("grok_media.request_completed",
 			zap.Int64("account_id", account.ID),

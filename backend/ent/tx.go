@@ -50,6 +50,8 @@ type Tx struct {
 	IdempotencyRecord *IdempotencyRecordClient
 	// IdentityAdoptionDecision is the client for interacting with the IdentityAdoptionDecision builders.
 	IdentityAdoptionDecision *IdentityAdoptionDecisionClient
+	// ImageHistory is the client for interacting with the ImageHistory builders.
+	ImageHistory *ImageHistoryClient
 	// InvoiceAttachment is the client for interacting with the InvoiceAttachment builders.
 	InvoiceAttachment *InvoiceAttachmentClient
 	// InvoiceDelivery is the client for interacting with the InvoiceDelivery builders.
@@ -261,6 +263,7 @@ func (tx *Tx) init() {
 	tx.Group = NewGroupClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)
 	tx.IdentityAdoptionDecision = NewIdentityAdoptionDecisionClient(tx.config)
+	tx.ImageHistory = NewImageHistoryClient(tx.config)
 	tx.InvoiceAttachment = NewInvoiceAttachmentClient(tx.config)
 	tx.InvoiceDelivery = NewInvoiceDeliveryClient(tx.config)
 	tx.InvoiceRequest = NewInvoiceRequestClient(tx.config)

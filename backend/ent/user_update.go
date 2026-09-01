@@ -455,6 +455,20 @@ func (_u *UserUpdate) AddAPIKeyLimit(v int) *UserUpdate {
 	return _u
 }
 
+// SetSaveImageHistory sets the "save_image_history" field.
+func (_u *UserUpdate) SetSaveImageHistory(v bool) *UserUpdate {
+	_u.mutation.SetSaveImageHistory(v)
+	return _u
+}
+
+// SetNillableSaveImageHistory sets the "save_image_history" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableSaveImageHistory(v *bool) *UserUpdate {
+	if v != nil {
+		_u.SetSaveImageHistory(*v)
+	}
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *UserUpdate) AddAPIKeyIDs(ids ...int64) *UserUpdate {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -1240,6 +1254,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedAPIKeyLimit(); ok {
 		_spec.AddField(user.FieldAPIKeyLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SaveImageHistory(); ok {
+		_spec.SetField(user.FieldSaveImageHistory, field.TypeBool, value)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -2418,6 +2435,20 @@ func (_u *UserUpdateOne) AddAPIKeyLimit(v int) *UserUpdateOne {
 	return _u
 }
 
+// SetSaveImageHistory sets the "save_image_history" field.
+func (_u *UserUpdateOne) SetSaveImageHistory(v bool) *UserUpdateOne {
+	_u.mutation.SetSaveImageHistory(v)
+	return _u
+}
+
+// SetNillableSaveImageHistory sets the "save_image_history" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableSaveImageHistory(v *bool) *UserUpdateOne {
+	if v != nil {
+		_u.SetSaveImageHistory(*v)
+	}
+	return _u
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_u *UserUpdateOne) AddAPIKeyIDs(ids ...int64) *UserUpdateOne {
 	_u.mutation.AddAPIKeyIDs(ids...)
@@ -3233,6 +3264,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.AddedAPIKeyLimit(); ok {
 		_spec.AddField(user.FieldAPIKeyLimit, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.SaveImageHistory(); ok {
+		_spec.SetField(user.FieldSaveImageHistory, field.TypeBool, value)
 	}
 	if _u.mutation.APIKeysCleared() {
 		edge := &sqlgraph.EdgeSpec{

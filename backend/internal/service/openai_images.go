@@ -927,6 +927,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(resp *http
 		}
 	}
 	c.Data(resp.StatusCode, contentType, body)
+	CaptureGeneratedImagesFromJSON(c.Request.Context(), body)
 
 	usage, _ := extractOpenAIUsageFromJSONBytes(body)
 	return usage, extractOpenAIImageCountFromJSONBytes(body), collectOpenAIResponseImageOutputSizesFromJSONBytes(body), nil
@@ -968,6 +969,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		fallbackBytes = 0
 		mergeOpenAIUsage(&usage, dataBytes)
 		imageCounter.AddSSEData(dataBytes)
+		CaptureGeneratedImagesFromSSE(c.Request.Context(), dataBytes)
 	}
 
 	flushSSEEvent := func() {
@@ -1018,6 +1020,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		}
 		mergeOpenAIUsage(&usage, body)
 		imageCounter.AddJSONResponse(body)
+		CaptureGeneratedImagesFromJSON(c.Request.Context(), body)
 	}
 
 	streamInterval := s.openAIImageStreamDataInterval()

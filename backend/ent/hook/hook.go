@@ -225,6 +225,18 @@ func (f IdentityAdoptionDecisionFunc) Mutate(ctx context.Context, m ent.Mutation
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.IdentityAdoptionDecisionMutation", m)
 }
 
+// The ImageHistoryFunc type is an adapter to allow the use of ordinary
+// function as ImageHistory mutator.
+type ImageHistoryFunc func(context.Context, *ent.ImageHistoryMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ImageHistoryFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ImageHistoryMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ImageHistoryMutation", m)
+}
+
 // The InvoiceAttachmentFunc type is an adapter to allow the use of ordinary
 // function as InvoiceAttachment mutator.
 type InvoiceAttachmentFunc func(context.Context, *ent.InvoiceAttachmentMutation) (ent.Value, error)

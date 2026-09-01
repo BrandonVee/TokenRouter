@@ -261,6 +261,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/image-history',
+    name: 'ImageHistory',
+    component: () => import('@/views/user/ImageHistoryView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Image History',
+      titleKey: 'imageHistory.title',
+      descriptionKey: 'imageHistory.description'
+    }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),

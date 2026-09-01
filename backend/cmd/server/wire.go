@@ -101,6 +101,7 @@ func provideCleanup(
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	dataSharingService *service.DataSharingService,
 	dataSharingCaptureWorkerPool *service.DataSharingCaptureWorkerPool,
+	imageHistorySaveWorkerPool *service.ImageHistorySaveWorkerPool,
 	subscriptionService *service.SubscriptionService,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
@@ -266,6 +267,12 @@ func provideCleanup(
 			{"UsageRecordWorkerPool", func() error {
 				if usageRecordWorkerPool != nil {
 					usageRecordWorkerPool.Stop()
+				}
+				return nil
+			}},
+			{"ImageHistorySaveWorkerPool", func() error {
+				if imageHistorySaveWorkerPool != nil {
+					imageHistorySaveWorkerPool.Stop()
 				}
 				return nil
 			}},

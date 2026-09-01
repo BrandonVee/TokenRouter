@@ -112,6 +112,7 @@ export default {
     team: 'Team',
     teams: 'Teams',
     batchImage: 'Batch Images',
+    imageHistory: 'Image History',
     usage: 'Usage',
     dataSharing: 'Data Sharing',
     redeem: 'Redeem',

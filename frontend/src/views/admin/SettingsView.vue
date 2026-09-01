@@ -8461,8 +8461,16 @@
           <BackupSettings />
         </div>
 
+        <!-- Tab: File Storage -->
+        <div v-if="activeTab === 'storage'">
+          <FileStorageSettings
+            @open-backup="selectSettingsTab('backup')"
+            @open-data-sharing="router.push('/admin/data-sharing')"
+          />
+        </div>
+
         <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="flex justify-end">
+        <div v-show="activeTab !== 'backup' && activeTab !== 'storage'" class="flex justify-end">
           <button
             type="submit"
             :disabled="saving || loadFailed"
@@ -8527,7 +8535,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { adminAPI } from "@/api";
 import {
   appendAuthSourceDefaultsToUpdateRequest,
@@ -8579,6 +8587,7 @@ import { useBalanceDisplay } from "@/composables/useBalanceDisplay";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
 import OpenAIFastPolicyUserSelector from "@/views/admin/settings/OpenAIFastPolicyUserSelector.vue";
 import PreAggregationSettings from "@/views/admin/settings/PreAggregationSettings.vue";
+import FileStorageSettings from "@/views/admin/settings/FileStorageSettings.vue";
 import { useClipboard } from "@/composables/useClipboard";
 import {
   useStepUp,
@@ -8601,6 +8610,7 @@ import {
 
 const { t, locale } = useI18n();
 const route = useRoute();
+const router = useRouter();
 const appStore = useAppStore();
 // 关闭 step-up 开关是敏感操作：后端返回 STEP_UP_REQUIRED 时弹 TOTP 码重试
 const settingsStepUp = useStepUp();
@@ -8628,6 +8638,7 @@ type SettingsTab =
   | "gateway"
   | "payment"
   | "email"
+  | "storage"
   | "backup";
 const settingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
@@ -8638,6 +8649,7 @@ const settingsTabs = [
   { key: "gateway" as SettingsTab, icon: "server" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
+  { key: "storage" as SettingsTab, icon: "folder" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
 // 允许通过路由参数直接定位到指定标签。

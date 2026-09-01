@@ -6,6 +6,7 @@
 
 - [全局入口](#全局入口)：理解所有请求共享的处理顺序。
 - [路由族](#路由族)：选择 URL、认证和拥有者。
+- [生图历史接口](#生图历史接口)：管理用户保存选择、列表和私有对象。
 - [人工发票接口](#invoice_api)：实现合并开票申请、审批、附件与邮件交付时读取。
 - [API Key 结算策略接口](#api-key-结算策略接口)：配置资金来源、查询订阅和收窄分组。
 - [分组客户端协议](#分组客户端协议)：理解上游平台与客户端准入的独立契约。
@@ -66,6 +67,22 @@ OAuth 登录 start 对 GitHub、Google、LinuxDo、DingTalk、WeChat 和 OIDC �
 账号高级调度评分诊断仅限管理员：`GET /api/v1/admin/accounts/:id/advanced-scheduler-score` 返回该账号所属高级分组摘要；携带 `group_id` 时返回指定高级分组的完整候选池、硬过滤、有效配置、指标原值/归一化值/贡献、Top-K 权重与实际活动池概率及平台策略提示。订阅优先启用且存在合格订阅账号时，普通账号标记为延后且不进入本轮概率；开启粘性加权时 previous-response 和 session 只影响 Top-K 权重，关闭时有效硬粘性账号按实际强制选择显示概率 1。`POST /api/v1/admin/accounts/:id/advanced-scheduler-score/preview` 接受 `group_id`、可选 `requested_model`、`sticky_account_id` 和 `previous_response_account_id`，用于无状态的评分模拟；previous-response 只对 OpenAI 分组有效，其它平台返回 `ignored`。请求体严格拒绝其它字段，尤其不得传入 session hash、响应正文或凭据。两个接口不分配并发槽、不写粘性，并且响应不包含凭据、代理认证、session hash 或上游响应内容。诊断复用请求信息足以判断的生产硬过滤；endpoint、transport、compact、media 等缺少请求上下文的能力以 `not_evaluated` 明示，不伪装成已通过。
 
 路由前缀不独自决定协议处理器。例如 `/v1/messages` 会根据分组平台分派到 Anthropic、OpenAI/Grok 或 Qoder handler；路由层拥有分派，handler/service 不能通过字符串猜测调用方已经具备某个平台能力。
+
+## 生图历史接口
+
+生图历史位于用户 JWT 路由族 `/api/v1/user/image-history`，所有对象操作都使用当前认证用户 ID 约束查询，不能用 API Key、记录 UUID 或预览 URL 替代对象归属校验：
+
+| 方法与路径 | 语义 |
+| --- | --- |
+| `GET /settings` | 返回 `{ available, enabled }`；`available` 表示部署者已启用完整存储，`enabled` 是可用性与用户选择共同生效后的值 |
+| `PUT /settings` | 接受 `{ "enabled": boolean }`；全局不可用时拒绝开启，允许关闭 |
+| `GET /` | 使用通用 `page`、`page_size` 分页，单页最多 100，返回元数据和短期 `preview_url`，不返回对象键 |
+| `GET /:id/content` | 校验当前用户归属后代理私有对象并以附件形式下载 |
+| `DELETE /:id` | 校验当前用户归属后删除私有对象和元数据 |
+
+历史列表和对象操作在全局存储关闭时返回 `IMAGE_HISTORY_UNAVAILABLE`；不存在或不属于当前用户的记录统一返回 `IMAGE_HISTORY_NOT_FOUND`，避免跨用户枚举。设置默认关闭，现有历史不会因关闭用户开关而自动删除。具体捕获与失败语义见[生图历史](../domains/image_history.md)。
+
+管理员存储配置位于 `/api/v1/admin/settings/image-history-storage`：`GET` 返回脱敏后的当前有效配置，`PUT` 保存数据库覆盖并热生效，`DELETE` 删除覆盖并恢复 YAML/环境变量部署配置，`POST /test` 只测试连接、不持久化。`PUT`/`DELETE` 需要 step-up 2FA；Secret 不会在响应中回显，入库前使用固定 `TOTP_ENCRYPTION_KEY` 加密。该管理配置不改变备份、发票附件或数据共享的既有存储边界。
 
 <a id="invoice_api"></a>
 ## 人工发票接口

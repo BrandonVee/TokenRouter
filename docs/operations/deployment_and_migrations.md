@@ -68,6 +68,12 @@
 
 迁移 `258_dashboard_ads_fit_mode.sql` 为现有 `dashboard_ads` 增加 `fit_mode` 列，历史广告默认使用 `adaptive`；非法值也会在迁移时归一化。升级后应验证管理员选择图片适应方式并保存，用户仪表盘能分别呈现自适应、填充和拉伸效果。
 
+迁移 `259_channel_model_peak_rate.sql` 存在两个已部署的已知版本：历史版本只创建单时段字段，当前版本还创建 `peak_rate_windows`。runner 只对白名单中的两个精确 checksum 放行，不改写迁移记录；`261_restore_channel_peak_rate_windows.sql` 使用 `ADD COLUMN IF NOT EXISTS` 前向补齐多时段字段，因此两种数据库状态最终收敛到相同 schema。升级后应确认 `peak_rate_windows` 为非空 JSONB、默认值为 `[]`，并验证渠道峰谷多时段配置可以保存和读取。
+
+迁移 `260_image_history.sql` 为 `users` 增加默认关闭的 `save_image_history`，并新增只保存私有对象元数据的 `image_histories` 表、用户时间索引和请求 ID 索引。迁移是兼容的纯新增 schema；旧后端忽略新列和新表，但前端页面应在新后端实例全部就绪后再开放，避免混跑时历史接口间歇返回 `404`。升级后先确认所有存量用户仍为未开启，再验证开启用户的 OpenAI/Grok 同步生图、列表预览、鉴权下载和对象/元数据删除。
+
+图片字节不在 PostgreSQL 备份中。生产启用前必须配置独立的 `image_history` 私有 S3 桶或前缀、验证服务账号具备 Put/Get/Delete/Presign 所需权限，并把该前缀纳入容量、生命周期和恢复方案；不能复用已下线的 `image_storage` 配置或假设数据库恢复会同时恢复图片。回退旧二进制不会删除新表或 S3 对象，但旧版本不会提供历史访问和清理入口。
+
 新增文件使用 `<递增数字>_<snake_case 描述>.sql`；并发索引使用 `<递增数字>_<描述>_notx.sql`。仓库历史上存在重复编号和字母后缀，不能据此复用编号。每次创建前都要扫描 `backend/migrations/` 的数字前缀，取当前最大值再加一，并确认按字典序排在预期位置。
 
 本 fork 同步上游时有额外硬约束：上游在 `backend/migrations/` 新增的迁移不能原名照搬。应按上游提交顺序逐个把数字前缀改为本 fork 当前最大编号加一；同时更新测试、runner 特例、文档或其它对原文件名的精确引用。已存在于 fork 的迁移保持原名，不为“整理顺序”重编号。

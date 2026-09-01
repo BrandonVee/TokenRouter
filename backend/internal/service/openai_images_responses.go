@@ -1325,6 +1325,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthNonStreamingResponse(
 		return OpenAIUsage{}, 0, nil, err
 	}
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
+	CaptureGeneratedImagesFromJSON(c.Request.Context(), responseBody)
 	c.Data(resp.StatusCode, "application/json; charset=utf-8", responseBody)
 	return usage, len(results), openAIResponsesImageResultSizes(results), nil
 }
@@ -1377,6 +1378,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 			ms := int(time.Since(startTime).Milliseconds())
 			firstTokenMs = &ms
 		}
+		CaptureGeneratedImagesFromSSE(c.Request.Context(), dataBytes)
 		s.parseOpenAIImagesSSEUsageBytes(dataBytes, &usage)
 		if !gjson.ValidBytes(dataBytes) {
 			return

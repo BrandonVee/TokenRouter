@@ -31,8 +31,62 @@ dataSharing: {
         users: '用户默认值',
         gateway: '网关服务',
         email: '邮件设置',
+        storage: '文件存储',
         backup: '数据备份',
         payment: '支付设置',
+      },
+      fileStorage: {
+        sections: {
+          label: '文件存储分类',
+          images: '生图历史',
+          other: '其他文件'
+        },
+        images: {
+          title: '生图历史存储',
+          description: 'OpenAI 与 Grok 同步生图结果使用的私有 S3 兼容存储。',
+          enabled: '启用生图历史存储',
+          enabledHint: '启用后，用户可以自行选择是否保存后续生成的图片。',
+          endpoint: 'S3 端点',
+          region: '区域',
+          bucket: '存储桶',
+          accessKeyId: 'Access Key ID',
+          secretAccessKey: 'Secret Access Key',
+          secretConfigured: '已配置，留空保持不变',
+          prefix: '图片目录',
+          forcePathStyle: '路径风格访问',
+          forcePathStyleHint: 'MinIO 等需要 path-style 的服务开启此项。',
+          encryptionKeyRequired: '保存对象存储凭据前，需要先配置固定的 TOTP_ENCRYPTION_KEY。连接测试不受影响。',
+          source: {
+            deployment: '部署配置',
+            database: '页面配置'
+          },
+          test: '测试连接',
+          testSucceeded: '对象存储连接成功',
+          testFailed: '对象存储连接失败',
+          restoreDeployment: '恢复部署配置',
+          restoreConfirm: '确认删除页面配置并恢复 YAML 或环境变量中的生图存储配置？',
+          restored: '已恢复部署配置',
+          restoreFailed: '恢复部署配置失败',
+          loadFailed: '加载生图存储配置失败',
+          saved: '生图存储配置已保存并生效',
+          saveFailed: '保存生图存储配置失败'
+        },
+        other: {
+          backup: {
+            title: '数据库备份',
+            description: '继续使用独立的本地或 S3 备份配置，已有备份记录按原存储位置恢复。',
+            action: '打开备份设置'
+          },
+          invoice: {
+            title: '发票附件',
+            description: '继续保存在持久化数据目录，多实例部署需要共享该目录。'
+          },
+          dataSharing: {
+            title: '数据共享导出',
+            description: '本地产物与远端上传配置保持独立，不复用生图历史目录。',
+            action: '打开数据共享'
+          }
+        }
       },
       gatewaySections: {
         label: '网关设置分类',

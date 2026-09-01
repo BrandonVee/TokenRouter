@@ -52,6 +52,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 	idempotencyCleanupSvc := service.NewIdempotencyCleanupService(nil, cfg)
 	schedulerSnapshotSvc := service.NewSchedulerSnapshotService(nil, nil, nil, nil, cfg)
 	opsSystemLogSinkSvc := service.NewOpsSystemLogSink(nil)
+	imageHistorySaveWorkerPool := service.NewImageHistorySaveWorkerPool(service.NewImageHistoryService(nil, nil, nil), nil)
 
 	cleanup := provideCleanup(
 		nil, // entClient
@@ -82,6 +83,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		&service.UsageRecordWorkerPool{},
 		nil, // dataSharingService
 		&service.DataSharingCaptureWorkerPool{},
+		imageHistorySaveWorkerPool,
 		&service.SubscriptionService{},
 		oauthSvc,
 		openAIOAuthSvc,

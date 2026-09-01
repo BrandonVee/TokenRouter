@@ -161,4 +161,31 @@ func TestIsMigrationChecksumCompatible(t *testing.T) {
 		)
 		require.False(t, ok)
 	})
+
+	t.Run("259缺少多时段列的历史checksum可兼容", func(t *testing.T) {
+		ok := isMigrationChecksumCompatible(
+			"259_channel_model_peak_rate.sql",
+			"e63c2123710569ab3978feff4dda7f8893baa8f27b0154edb69cee90fe7452bb",
+			"fdb596b7270e4e36ea1a7b945cd0baec8c22bc8b56ea8f893c9233abff715520",
+		)
+		require.True(t, ok)
+	})
+
+	t.Run("259当前文件checksum可兼容已部署历史checksum", func(t *testing.T) {
+		ok := isMigrationChecksumCompatible(
+			"259_channel_model_peak_rate.sql",
+			"e63c2123710569ab3978feff4dda7f8893baa8f27b0154edb69cee90fe7452bb",
+			"06411de73f67fb71e6c581d0db1aff682e943ec4e1164c64ed80aaf539599d1b",
+		)
+		require.True(t, ok)
+	})
+
+	t.Run("259未知checksum不兼容", func(t *testing.T) {
+		ok := isMigrationChecksumCompatible(
+			"259_channel_model_peak_rate.sql",
+			"e63c2123710569ab3978feff4dda7f8893baa8f27b0154edb69cee90fe7452bb",
+			"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		)
+		require.False(t, ok)
+	})
 }

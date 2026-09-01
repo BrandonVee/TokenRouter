@@ -6,6 +6,7 @@
 
 - [配置分层](#配置分层)：先确定一个选项属于哪一层。
 - [进程配置来源](#进程配置来源)：修改默认值、YAML 或环境变量时读取。
+- [生图历史对象存储](#生图历史对象存储)：配置私有 S3、转存上限和 worker 时读取。
 - [首次初始化](#首次初始化)：修改 setup 和安全密钥引导时读取。
 - [数据库运行时设置](#数据库运行时设置)：修改管理员设置和热更新时读取。
 - [领域配置](#领域配置)：避免把业务实体塞入通用键值设置。
@@ -48,6 +49,16 @@
 加载完成后会做字符串规范化、枚举回退、派生默认、文件读取和完整 `Validate`。无效安全 header、URL、数值范围、模式组合或必要 secret 会让启动失败；不应等到某个请求首次使用时才发现。自动生成的 TOTP key 只适合开发，`EncryptionKeyConfigured=false` 会阻止后台把 TOTP 当成生产可用配置。
 
 环境变量优先于 YAML，因此排查“文件修改不生效”时先检查容器环境。不得在日志、错误或管理响应中输出数据库密码、JWT/TOTP secret、OAuth secret、对象存储 secret 或账号凭据。
+
+## 生图历史对象存储
+
+`image_history` 的 YAML/环境变量是部署默认配置，独立于备份、数据共享和已经下线的旧 `image_storage`。`enabled` 默认关闭；开启时 `bucket`、`access_key_id`、`secret_access_key` 和安全的非空 `prefix` 必填。`endpoint` 可为空以使用 AWS 默认端点，`region` 默认 `auto`，需要 path-style 的 MinIO 等实现通过 `force_path_style=true` 启用。桶应保持私有，列表预览只通过有效期受限的预签名 URL 暴露。
+
+默认限制为单对象 32 MiB、URL 下载 30 秒、预览 URL 15 分钟、4 个 worker、256 个排队任务和每任务 45 秒。`preview_url_expiry_minutes` 允许 1-1440，worker 允许 1-64，队列允许 1-10000，任务总超时允许 1-600 秒；其它大小和超时必须为正数。队列满时丢弃历史转存而不阻断生图，因此容量应按实例并发、平均图片大小、S3 延迟和内存预算共同设置。
+
+所有键都通过 Viper 的点分键映射到同名大写下划线环境变量，例如 `IMAGE_HISTORY_ENABLED`、`IMAGE_HISTORY_BUCKET`、`IMAGE_HISTORY_ACCESS_KEY_ID`、`IMAGE_HISTORY_SECRET_ACCESS_KEY` 和 `IMAGE_HISTORY_PREFIX`。部署配置只在启动时加载，修改后需要重启；部署配置凭据不会复制到数据库设置或前端响应。
+
+管理员“设置 - 文件存储 - 生图历史”可通过 `/api/v1/admin/settings/image-history-storage` 保存一份数据库覆盖。覆盖保存后立即替换运行中的 S3 客户端，不需要重启；页面不会回显 Secret，数据库中的 Secret 使用固定 `TOTP_ENCRYPTION_KEY` 加密。保存和恢复部署配置要求 step-up 2FA，连接测试只验证桶访问能力且不写入数据库。删除页面覆盖后，服务恢复使用当前进程启动时读取的 YAML/环境变量配置；如果覆盖记录损坏或无法解密，也会回退到部署配置并保留管理员修复入口。覆盖配置只改变生图历史，备份、发票附件和数据共享继续使用各自原有的本地目录或 S3 配置。
 
 ## 首次初始化
 

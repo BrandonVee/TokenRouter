@@ -6,6 +6,7 @@
 
 - [账号与凭据](#账号与凭据)：修改 OAuth、API Key、隐私或客户端限制时读取。
 - [协议与传输](#协议与传输)：修改 Responses、WebSocket、Realtime 或兼容转换时读取。
+- [Images 历史捕获](#images-历史捕获)：修改同步图片响应或留存旁路时读取。
 - [远程压缩协议](#远程压缩协议)：区分原生 `remote_compaction_v2` 与旧版 `/responses/compact` 时读取。
 - [模型与能力](#模型与能力)：修改模型别名、endpoint capability 或推理参数时读取。
 - [额度与调度](#额度与调度)：修改窗口配额、评分、粘性或自动暂停时读取。
@@ -43,6 +44,12 @@ OpenAI 分组支持 Messages、Responses 和 Chat，新建时默认启用 Respon
 OpenAI 兼容非流式响应的 usage 按 `usage`、`response.usage`、`data.usage`、`data.response.usage` 的顺序解析；前两条原生路径优先于 Cline 等兼容上游使用的 `data` envelope。同层的 hosted image usage 必须随对应路径读取，不能把不同 envelope 的 token 与图片用量混合。
 
 `/backend-api/codex` 和无 `/v1` 别名服务特定客户端兼容，但仍经过 TokenRouter Key 鉴权、分组准入、调度和结算。Responses WebSocket 不支持 Qoder；其它平台是否可进入 OpenAI 兼容处理器由路由和平台专题共同决定，不能仅凭 URL 推断。
+
+### Images 历史捕获
+
+用户主动开启生图历史且部署者已配置独立私有 S3 时，专用 Images handler 会在成功响应中旁路捕获最终图片。API Key 上游的普通 JSON、SSE 和 SSE 退化 JSON，以及 OAuth 上游从 Responses 事件转换出的生成/编辑结果都进入同一请求级捕获器；partial image 被忽略，转换过程重复出现的最终图片按引用去重。通用 Responses handler 中的其它图片输出不因结构相似而自动纳入。
+
+捕获只读取已经用于原响应和计费的最终结果，随后非阻塞提交后台转存；提交或 S3 失败不能改变客户端响应、上游重试或计费。完整保存与访问规则见[生图历史](../domains/image_history.md)。
 
 管理员账号连接测试按账号协议构造最小请求：OAuth/Codex 测试保留 ChatGPT 所需的内置 `instructions`，API Key 测试不注入 Codex 基础提示词；国产供应商的 Chat Completions 测试同样只发送用户消息，避免把网关内部提示词转发给第三方上游。
 

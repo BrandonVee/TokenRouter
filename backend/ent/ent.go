@@ -30,6 +30,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/group"
 	"github.com/BrandonVee/TokenRouter/ent/idempotencyrecord"
 	"github.com/BrandonVee/TokenRouter/ent/identityadoptiondecision"
+	"github.com/BrandonVee/TokenRouter/ent/imagehistory"
 	"github.com/BrandonVee/TokenRouter/ent/invoiceattachment"
 	"github.com/BrandonVee/TokenRouter/ent/invoicedelivery"
 	"github.com/BrandonVee/TokenRouter/ent/invoicerequest"
@@ -139,6 +140,7 @@ func checkColumn(t, c string) error {
 			group.Table:                    group.ValidColumn,
 			idempotencyrecord.Table:        idempotencyrecord.ValidColumn,
 			identityadoptiondecision.Table: identityadoptiondecision.ValidColumn,
+			imagehistory.Table:             imagehistory.ValidColumn,
 			invoiceattachment.Table:        invoiceattachment.ValidColumn,
 			invoicedelivery.Table:          invoicedelivery.ValidColumn,
 			invoicerequest.Table:           invoicerequest.ValidColumn,

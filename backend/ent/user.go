@@ -67,6 +67,8 @@ type User struct {
 	RpmLimit int `json:"rpm_limit,omitempty"`
 	// APIKeyLimit holds the value of the "api_key_limit" field.
 	APIKeyLimit int `json:"api_key_limit,omitempty"`
+	// SaveImageHistory holds the value of the "save_image_history" field.
+	SaveImageHistory bool `json:"save_image_history,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserQuery when eager-loading is set.
 	Edges        UserEdges `json:"edges"`
@@ -283,7 +285,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case user.FieldTotpEnabled, user.FieldBalanceNotifyEnabled:
+		case user.FieldTotpEnabled, user.FieldBalanceNotifyEnabled, user.FieldSaveImageHistory:
 			values[i] = new(sql.NullBool)
 		case user.FieldBalance, user.FieldFrozenBalance, user.FieldBalanceNotifyThreshold, user.FieldTotalRecharged:
 			values[i] = new(sql.NullFloat64)
@@ -469,6 +471,12 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field api_key_limit", values[i])
 			} else if value.Valid {
 				_m.APIKeyLimit = int(value.Int64)
+			}
+		case user.FieldSaveImageHistory:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field save_image_history", values[i])
+			} else if value.Valid {
+				_m.SaveImageHistory = value.Bool
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -682,6 +690,9 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("api_key_limit=")
 	builder.WriteString(fmt.Sprintf("%v", _m.APIKeyLimit))
+	builder.WriteString(", ")
+	builder.WriteString("save_image_history=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SaveImageHistory))
 	builder.WriteByte(')')
 	return builder.String()
 }

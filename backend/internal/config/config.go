@@ -98,6 +98,7 @@ type Config struct {
 	Update                  UpdateConfig                  `mapstructure:"update"`
 	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
+	ImageHistory            ImageHistoryConfig            `mapstructure:"image_history"`
 	Team                    TeamConfig                    `mapstructure:"team"`
 }
 
@@ -236,6 +237,24 @@ type BatchImageConfig struct {
 	VertexOutputRetentionHours   int    `mapstructure:"vertex_output_retention_hours"`
 	VertexBatchPredictionBaseURL string `mapstructure:"vertex_batch_prediction_base_url"`
 	VertexGCSBaseURL             string `mapstructure:"vertex_gcs_base_url"`
+}
+
+// ImageHistoryConfig 控制用户主动开启的同步生图历史存储。
+type ImageHistoryConfig struct {
+	Enabled                 bool   `mapstructure:"enabled"`
+	Endpoint                string `mapstructure:"endpoint"`
+	Region                  string `mapstructure:"region"`
+	Bucket                  string `mapstructure:"bucket"`
+	AccessKeyID             string `mapstructure:"access_key_id"`
+	SecretAccessKey         string `mapstructure:"secret_access_key"`
+	Prefix                  string `mapstructure:"prefix"`
+	ForcePathStyle          bool   `mapstructure:"force_path_style"`
+	MaxObjectBytes          int64  `mapstructure:"max_object_bytes"`
+	DownloadTimeoutSeconds  int    `mapstructure:"download_timeout_seconds"`
+	PreviewURLExpiryMinutes int    `mapstructure:"preview_url_expiry_minutes"`
+	WorkerCount             int    `mapstructure:"worker_count"`
+	QueueSize               int    `mapstructure:"queue_size"`
+	SaveTimeoutSeconds      int    `mapstructure:"save_timeout_seconds"`
 }
 
 type LinuxDoConnectConfig struct {
@@ -2196,6 +2215,22 @@ func setDefaults() {
 	viper.SetDefault("batch_image.vertex_batch_prediction_base_url", "")
 	viper.SetDefault("batch_image.vertex_gcs_base_url", "")
 
+	// 用户生图历史使用独立的私有 S3 前缀，默认不保存任何图片。
+	viper.SetDefault("image_history.enabled", false)
+	viper.SetDefault("image_history.endpoint", "")
+	viper.SetDefault("image_history.region", "auto")
+	viper.SetDefault("image_history.bucket", "")
+	viper.SetDefault("image_history.access_key_id", "")
+	viper.SetDefault("image_history.secret_access_key", "")
+	viper.SetDefault("image_history.prefix", "image-history")
+	viper.SetDefault("image_history.force_path_style", false)
+	viper.SetDefault("image_history.max_object_bytes", int64(32*1024*1024))
+	viper.SetDefault("image_history.download_timeout_seconds", 30)
+	viper.SetDefault("image_history.preview_url_expiry_minutes", 15)
+	viper.SetDefault("image_history.worker_count", 4)
+	viper.SetDefault("image_history.queue_size", 256)
+	viper.SetDefault("image_history.save_timeout_seconds", 45)
+
 	// Ops (vNext)
 	viper.SetDefault("ops.enabled", true)
 	viper.SetDefault("ops.cleanup.enabled", true)
@@ -3055,6 +3090,36 @@ func (c *Config) Validate() error {
 		}
 		if c.BatchImage.VertexOutputRetentionHours <= 0 {
 			return fmt.Errorf("batch_image.vertex_output_retention_hours must be positive")
+		}
+	}
+	if c.ImageHistory.Enabled {
+		if strings.TrimSpace(c.ImageHistory.Bucket) == "" {
+			return fmt.Errorf("image_history.bucket must not be empty when image history is enabled")
+		}
+		if strings.TrimSpace(c.ImageHistory.AccessKeyID) == "" || strings.TrimSpace(c.ImageHistory.SecretAccessKey) == "" {
+			return fmt.Errorf("image_history S3 credentials must not be empty when image history is enabled")
+		}
+		prefix := strings.Trim(strings.TrimSpace(c.ImageHistory.Prefix), "/")
+		if prefix == "" || prefix == "." || strings.Contains(prefix, "..") {
+			return fmt.Errorf("image_history.prefix must be a safe non-empty object prefix")
+		}
+		if c.ImageHistory.MaxObjectBytes <= 0 {
+			return fmt.Errorf("image_history.max_object_bytes must be positive")
+		}
+		if c.ImageHistory.DownloadTimeoutSeconds <= 0 {
+			return fmt.Errorf("image_history.download_timeout_seconds must be positive")
+		}
+		if c.ImageHistory.PreviewURLExpiryMinutes <= 0 || c.ImageHistory.PreviewURLExpiryMinutes > 1440 {
+			return fmt.Errorf("image_history.preview_url_expiry_minutes must be between 1 and 1440")
+		}
+		if c.ImageHistory.WorkerCount <= 0 || c.ImageHistory.WorkerCount > 64 {
+			return fmt.Errorf("image_history.worker_count must be between 1 and 64")
+		}
+		if c.ImageHistory.QueueSize <= 0 || c.ImageHistory.QueueSize > 10000 {
+			return fmt.Errorf("image_history.queue_size must be between 1 and 10000")
+		}
+		if c.ImageHistory.SaveTimeoutSeconds <= 0 || c.ImageHistory.SaveTimeoutSeconds > 600 {
+			return fmt.Errorf("image_history.save_timeout_seconds must be between 1 and 600")
 		}
 	}
 	if c.Dashboard.Enabled {

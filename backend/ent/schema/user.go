@@ -119,6 +119,9 @@ func (User) Fields() []ent.Field {
 		field.Int("api_key_limit").
 			Default(domain.DefaultUserAPIKeyLimit).
 			Range(0, domain.MaxUserAPIKeyLimit),
+		// 用户必须主动开启后，网关才会把后续同步生图结果写入历史存储。
+		field.Bool("save_image_history").
+			Default(false),
 	}
 }
 

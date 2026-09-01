@@ -26,6 +26,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/group"
 	"github.com/BrandonVee/TokenRouter/ent/idempotencyrecord"
 	"github.com/BrandonVee/TokenRouter/ent/identityadoptiondecision"
+	"github.com/BrandonVee/TokenRouter/ent/imagehistory"
 	"github.com/BrandonVee/TokenRouter/ent/invoiceattachment"
 	"github.com/BrandonVee/TokenRouter/ent/invoicedelivery"
 	"github.com/BrandonVee/TokenRouter/ent/invoicerequest"
@@ -600,6 +601,33 @@ func (f TraverseIdentityAdoptionDecision) Traverse(ctx context.Context, q ent.Qu
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.IdentityAdoptionDecisionQuery", q)
+}
+
+// The ImageHistoryFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ImageHistoryFunc func(context.Context, *ent.ImageHistoryQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ImageHistoryFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ImageHistoryQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ImageHistoryQuery", q)
+}
+
+// The TraverseImageHistory type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseImageHistory func(context.Context, *ent.ImageHistoryQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseImageHistory) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseImageHistory) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ImageHistoryQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ImageHistoryQuery", q)
 }
 
 // The InvoiceAttachmentFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1478,6 +1506,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.IdempotencyRecordQuery, predicate.IdempotencyRecord, idempotencyrecord.OrderOption]{typ: ent.TypeIdempotencyRecord, tq: q}, nil
 	case *ent.IdentityAdoptionDecisionQuery:
 		return &query[*ent.IdentityAdoptionDecisionQuery, predicate.IdentityAdoptionDecision, identityadoptiondecision.OrderOption]{typ: ent.TypeIdentityAdoptionDecision, tq: q}, nil
+	case *ent.ImageHistoryQuery:
+		return &query[*ent.ImageHistoryQuery, predicate.ImageHistory, imagehistory.OrderOption]{typ: ent.TypeImageHistory, tq: q}, nil
 	case *ent.InvoiceAttachmentQuery:
 		return &query[*ent.InvoiceAttachmentQuery, predicate.InvoiceAttachment, invoiceattachment.OrderOption]{typ: ent.TypeInvoiceAttachment, tq: q}, nil
 	case *ent.InvoiceDeliveryQuery:

@@ -155,6 +155,11 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		}
 	}
 	requestCtx := service.WithOpenAIImagesEndpoint(service.WithOpenAIImageGenerationIntent(c.Request.Context()))
+	requestCtx, imageHistoryCollector := h.prepareImageHistoryCapture(requestCtx, subject.UserID)
+	if imageHistoryCollector != nil {
+		// 服务层响应转换通过 gin request context 读取同一个捕获器。
+		c.Request = c.Request.WithContext(requestCtx)
+	}
 
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
@@ -429,6 +434,20 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				).Error("openai.images.record_usage_failed", zap.Error(err))
 			}
 		})
+
+		historyRequestID := ""
+		if result != nil {
+			historyRequestID = result.RequestID
+		}
+		h.saveImageHistoryAsync(service.SaveImageHistoryInput{
+			UserID:    subject.UserID,
+			APIKeyID:  apiKey.ID,
+			RequestID: historyRequestID,
+			Source:    "openai",
+			Endpoint:  parsed.Endpoint,
+			Model:     requestModel,
+			Prompt:    parsed.Prompt,
+		}, imageHistoryCollector)
 
 		reqLog.Debug("openai.images.request_completed",
 			zap.Int64("account_id", account.ID),

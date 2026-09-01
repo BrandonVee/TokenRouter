@@ -1162,6 +1162,48 @@ var (
 			},
 		},
 	}
+	// ImageHistoriesColumns holds the columns for the "image_histories" table.
+	ImageHistoriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString, Size: 36},
+		{Name: "user_id", Type: field.TypeInt64},
+		{Name: "api_key_id", Type: field.TypeInt64, Nullable: true},
+		{Name: "request_id", Type: field.TypeString, Size: 255, Default: ""},
+		{Name: "source", Type: field.TypeString, Size: 32},
+		{Name: "endpoint", Type: field.TypeString, Size: 64},
+		{Name: "model", Type: field.TypeString, Size: 255, Default: ""},
+		{Name: "prompt", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "revised_prompt", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "object_key", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "mime_type", Type: field.TypeString, Size: 100},
+		{Name: "size_bytes", Type: field.TypeInt64},
+		{Name: "width", Type: field.TypeInt, Default: 0},
+		{Name: "height", Type: field.TypeInt, Default: 0},
+		{Name: "sha256", Type: field.TypeString, Size: 64},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// ImageHistoriesTable holds the schema information for the "image_histories" table.
+	ImageHistoriesTable = &schema.Table{
+		Name:       "image_histories",
+		Columns:    ImageHistoriesColumns,
+		PrimaryKey: []*schema.Column{ImageHistoriesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "imagehistory_user_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ImageHistoriesColumns[1], ImageHistoriesColumns[15]},
+			},
+			{
+				Name:    "imagehistory_request_id",
+				Unique:  false,
+				Columns: []*schema.Column{ImageHistoriesColumns[3]},
+			},
+			{
+				Name:    "imagehistory_object_key",
+				Unique:  true,
+				Columns: []*schema.Column{ImageHistoriesColumns[9]},
+			},
+		},
+	}
 	// InvoiceAttachmentsColumns holds the columns for the "invoice_attachments" table.
 	InvoiceAttachmentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -2285,6 +2327,7 @@ var (
 		{Name: "total_recharged", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
 		{Name: "rpm_limit", Type: field.TypeInt, Default: 0},
 		{Name: "api_key_limit", Type: field.TypeInt, Default: 100},
+		{Name: "save_image_history", Type: field.TypeBool, Default: false},
 	}
 	// UsersTable holds the schema information for the "users" table.
 	UsersTable = &schema.Table{
@@ -2626,6 +2669,7 @@ var (
 		GroupsTable,
 		IdempotencyRecordsTable,
 		IdentityAdoptionDecisionsTable,
+		ImageHistoriesTable,
 		InvoiceAttachmentsTable,
 		InvoiceDeliveriesTable,
 		InvoiceRequestsTable,
@@ -2730,6 +2774,9 @@ func init() {
 	IdentityAdoptionDecisionsTable.ForeignKeys[1].RefTable = PendingAuthSessionsTable
 	IdentityAdoptionDecisionsTable.Annotation = &entsql.Annotation{
 		Table: "identity_adoption_decisions",
+	}
+	ImageHistoriesTable.Annotation = &entsql.Annotation{
+		Table: "image_histories",
 	}
 	InvoiceAttachmentsTable.Annotation = &entsql.Annotation{
 		Table: "invoice_attachments",

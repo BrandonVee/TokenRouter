@@ -370,6 +370,20 @@ func (_c *UserCreate) SetNillableAPIKeyLimit(v *int) *UserCreate {
 	return _c
 }
 
+// SetSaveImageHistory sets the "save_image_history" field.
+func (_c *UserCreate) SetSaveImageHistory(v bool) *UserCreate {
+	_c.mutation.SetSaveImageHistory(v)
+	return _c
+}
+
+// SetNillableSaveImageHistory sets the "save_image_history" field if the given value is not nil.
+func (_c *UserCreate) SetNillableSaveImageHistory(v *bool) *UserCreate {
+	if v != nil {
+		_c.SetSaveImageHistory(*v)
+	}
+	return _c
+}
+
 // AddAPIKeyIDs adds the "api_keys" edge to the APIKey entity by IDs.
 func (_c *UserCreate) AddAPIKeyIDs(ids ...int64) *UserCreate {
 	_c.mutation.AddAPIKeyIDs(ids...)
@@ -721,6 +735,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultAPIKeyLimit
 		_c.mutation.SetAPIKeyLimit(v)
 	}
+	if _, ok := _c.mutation.SaveImageHistory(); !ok {
+		v := user.DefaultSaveImageHistory
+		_c.mutation.SetSaveImageHistory(v)
+	}
 	return nil
 }
 
@@ -817,6 +835,9 @@ func (_c *UserCreate) check() error {
 		if err := user.APIKeyLimitValidator(v); err != nil {
 			return &ValidationError{Name: "api_key_limit", err: fmt.Errorf(`ent: validator failed for field "User.api_key_limit": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.SaveImageHistory(); !ok {
+		return &ValidationError{Name: "save_image_history", err: errors.New(`ent: missing required field "User.save_image_history"`)}
 	}
 	return nil
 }
@@ -944,6 +965,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.APIKeyLimit(); ok {
 		_spec.SetField(user.FieldAPIKeyLimit, field.TypeInt, value)
 		_node.APIKeyLimit = value
+	}
+	if value, ok := _c.mutation.SaveImageHistory(); ok {
+		_spec.SetField(user.FieldSaveImageHistory, field.TypeBool, value)
+		_node.SaveImageHistory = value
 	}
 	if nodes := _c.mutation.APIKeysIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -1627,6 +1652,18 @@ func (u *UserUpsert) AddAPIKeyLimit(v int) *UserUpsert {
 	return u
 }
 
+// SetSaveImageHistory sets the "save_image_history" field.
+func (u *UserUpsert) SetSaveImageHistory(v bool) *UserUpsert {
+	u.Set(user.FieldSaveImageHistory, v)
+	return u
+}
+
+// UpdateSaveImageHistory sets the "save_image_history" field to the value that was provided on create.
+func (u *UserUpsert) UpdateSaveImageHistory() *UserUpsert {
+	u.SetExcluded(user.FieldSaveImageHistory)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -2096,6 +2133,20 @@ func (u *UserUpsertOne) AddAPIKeyLimit(v int) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateAPIKeyLimit() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateAPIKeyLimit()
+	})
+}
+
+// SetSaveImageHistory sets the "save_image_history" field.
+func (u *UserUpsertOne) SetSaveImageHistory(v bool) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetSaveImageHistory(v)
+	})
+}
+
+// UpdateSaveImageHistory sets the "save_image_history" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateSaveImageHistory() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateSaveImageHistory()
 	})
 }
 
@@ -2734,6 +2785,20 @@ func (u *UserUpsertBulk) AddAPIKeyLimit(v int) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateAPIKeyLimit() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateAPIKeyLimit()
+	})
+}
+
+// SetSaveImageHistory sets the "save_image_history" field.
+func (u *UserUpsertBulk) SetSaveImageHistory(v bool) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetSaveImageHistory(v)
+	})
+}
+
+// UpdateSaveImageHistory sets the "save_image_history" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateSaveImageHistory() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateSaveImageHistory()
 	})
 }
 

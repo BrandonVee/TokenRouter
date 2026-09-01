@@ -33,6 +33,16 @@ type BuildInfo struct {
 	BuildType string
 }
 
+// ProvideGatewayServiceOptions 把复合模型路由能力注入网关服务。
+func ProvideGatewayServiceOptions(resolver *CompositeRouteResolver) []GatewayServiceOption {
+	return []GatewayServiceOption{WithCompositeRouteResolver(resolver)}
+}
+
+// ProvideAdminServiceOptions 把复合模型路由仓储和解析器注入管理服务。
+func ProvideAdminServiceOptions(repo CompositeModelRouteRepository, resolver *CompositeRouteResolver) []AdminServiceOption {
+	return []AdminServiceOption{WithAdminCompositeRouting(repo, resolver)}
+}
+
 // ProvidePricingService creates and initializes PricingService
 func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient) (*PricingService, error) {
 	svc := NewPricingService(cfg, remoteClient)
@@ -801,6 +811,8 @@ var ProviderSet = wire.NewSet(
 	NewPasskeyService,
 	NewUserService,
 	NewTeamService,
+	ProvideGatewayServiceOptions,
+	ProvideAdminServiceOptions,
 	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
 	ProvideAuthCacheInvalidationWorker,
@@ -830,6 +842,8 @@ var ProviderSet = wire.NewSet(
 	ProvideBatchImageModelPricingResolver,
 	NewBatchImagePublicService,
 	NewBatchImageDownloadService,
+	ProvideImageHistoryService,
+	NewImageHistorySaveWorkerPool,
 	ProvideBatchImageCleanupService,
 	ProvideBatchImageWorkerRuntime,
 	wire.Bind(new(AccountRuntimeBlocker), new(*OpenAIGatewayService)),

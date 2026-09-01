@@ -40,6 +40,38 @@ func TestLoadServerTimingConfig(t *testing.T) {
 	})
 }
 
+func TestLoadImageHistoryConfig(t *testing.T) {
+	t.Run("默认关闭且使用有界队列默认值", func(t *testing.T) {
+		resetViperWithJWTSecret(t)
+		cfg, err := Load()
+		require.NoError(t, err)
+		require.False(t, cfg.ImageHistory.Enabled)
+		require.Equal(t, int64(32*1024*1024), cfg.ImageHistory.MaxObjectBytes)
+		require.Equal(t, 4, cfg.ImageHistory.WorkerCount)
+		require.Equal(t, 256, cfg.ImageHistory.QueueSize)
+		require.Equal(t, 45, cfg.ImageHistory.SaveTimeoutSeconds)
+	})
+
+	t.Run("从环境变量启用独立私有存储", func(t *testing.T) {
+		resetViperWithJWTSecret(t)
+		t.Setenv("IMAGE_HISTORY_ENABLED", "true")
+		t.Setenv("IMAGE_HISTORY_BUCKET", "history-bucket")
+		t.Setenv("IMAGE_HISTORY_ACCESS_KEY_ID", "access-key")
+		t.Setenv("IMAGE_HISTORY_SECRET_ACCESS_KEY", "secret-key")
+		t.Setenv("IMAGE_HISTORY_PREFIX", "private-history")
+		t.Setenv("IMAGE_HISTORY_WORKER_COUNT", "2")
+		t.Setenv("IMAGE_HISTORY_QUEUE_SIZE", "64")
+
+		cfg, err := Load()
+		require.NoError(t, err)
+		require.True(t, cfg.ImageHistory.Enabled)
+		require.Equal(t, "history-bucket", cfg.ImageHistory.Bucket)
+		require.Equal(t, "private-history", cfg.ImageHistory.Prefix)
+		require.Equal(t, 2, cfg.ImageHistory.WorkerCount)
+		require.Equal(t, 64, cfg.ImageHistory.QueueSize)
+	})
+}
+
 func TestLoadCORSAllowedOriginsFromEnvironment(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("CORS_ALLOWED_ORIGINS", " https://panel.example.com,https://admin.example.com ")

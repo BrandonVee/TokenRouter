@@ -73,6 +73,7 @@ func RegisterAdminRoutes(
 
 		// 系统设置
 		registerSettingsRoutes(admin, h)
+		registerFileStorageRoutes(admin, h, stepUpAuth)
 		admin.GET("/dashboard-ads", h.Admin.Setting.GetDashboardAds)
 		admin.PUT("/dashboard-ads", h.Admin.Setting.UpdateDashboardAds)
 
@@ -139,6 +140,18 @@ func RegisterAdminRoutes(
 			teams.POST("/:id/force-transfer", gin.HandlerFunc(stepUpAuth), h.Admin.Team.ForceTransfer)
 			teams.DELETE("/:id", gin.HandlerFunc(stepUpAuth), h.Admin.Team.Dissolve)
 		}
+	}
+}
+
+// registerFileStorageRoutes 注册管理员可热更新的私有文件存储配置。
+func registerFileStorageRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
+	storage := admin.Group("/settings/image-history-storage")
+	{
+		storage.GET("", h.Admin.ImageHistory.GetStorageConfig)
+		storage.POST("/test", h.Admin.ImageHistory.TestStorageConnection)
+		// 修改目标桶可能改变用户图片的落点，因此要求二次验证。
+		storage.PUT("", gin.HandlerFunc(stepUpAuth), h.Admin.ImageHistory.UpdateStorageConfig)
+		storage.DELETE("", gin.HandlerFunc(stepUpAuth), h.Admin.ImageHistory.ResetStorageConfig)
 	}
 }
 

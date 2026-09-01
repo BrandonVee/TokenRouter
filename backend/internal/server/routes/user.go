@@ -44,6 +44,16 @@ func RegisterUserRoutes(
 			user.GET("/api-keys/:id/usage/daily", panelRateLimiter.Heavy(), h.Usage.GetMyAPIKeyDailyUsage)
 			user.GET("/platform-quotas", h.User.GetMyPlatformQuotas)
 
+			// 生图历史只管理当前用户主动留存的私有对象。
+			imageHistory := user.Group("/image-history")
+			{
+				imageHistory.GET("/settings", h.ImageHistory.GetSettings)
+				imageHistory.PUT("/settings", h.ImageHistory.UpdateSettings)
+				imageHistory.GET("", h.ImageHistory.List)
+				imageHistory.GET("/:id/content", h.ImageHistory.Download)
+				imageHistory.DELETE("/:id", h.ImageHistory.Delete)
+			}
+
 			// 通知邮箱管理
 			notifyEmail := user.Group("/notify-email")
 			{

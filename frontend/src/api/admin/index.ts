@@ -36,6 +36,7 @@ import adminDataSharingAPI from './dataSharing'
 import auditAPI from './audit'
 import teamsAPI from './teams'
 import cnProvidersAPI from './cnProviders'
+import fileStorageAPI from './fileStorage'
 
 /**
  * Unified admin API object for convenient access
@@ -73,7 +74,8 @@ export const adminAPI = {
   dataSharing: adminDataSharingAPI,
   audit: auditAPI,
   teams: teamsAPI,
-  cnProviders: cnProvidersAPI
+  cnProviders: cnProvidersAPI,
+  fileStorage: fileStorageAPI
 }
 
 export {
@@ -109,7 +111,8 @@ export {
   adminDataSharingAPI,
   auditAPI,
   teamsAPI,
-  cnProvidersAPI
+  cnProvidersAPI,
+  fileStorageAPI
 }
 
 export default adminAPI

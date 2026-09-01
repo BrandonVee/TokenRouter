@@ -23,6 +23,7 @@ import (
 	"github.com/BrandonVee/TokenRouter/ent/group"
 	"github.com/BrandonVee/TokenRouter/ent/idempotencyrecord"
 	"github.com/BrandonVee/TokenRouter/ent/identityadoptiondecision"
+	"github.com/BrandonVee/TokenRouter/ent/imagehistory"
 	"github.com/BrandonVee/TokenRouter/ent/invoiceattachment"
 	"github.com/BrandonVee/TokenRouter/ent/invoicedelivery"
 	"github.com/BrandonVee/TokenRouter/ent/invoicerequest"
@@ -1358,6 +1359,68 @@ func init() {
 	identityadoptiondecisionDescDecidedAt := identityadoptiondecisionFields[4].Descriptor()
 	// identityadoptiondecision.DefaultDecidedAt holds the default value on creation for the decided_at field.
 	identityadoptiondecision.DefaultDecidedAt = identityadoptiondecisionDescDecidedAt.Default.(func() time.Time)
+	imagehistoryFields := schema.ImageHistory{}.Fields()
+	_ = imagehistoryFields
+	// imagehistoryDescRequestID is the schema descriptor for request_id field.
+	imagehistoryDescRequestID := imagehistoryFields[3].Descriptor()
+	// imagehistory.DefaultRequestID holds the default value on creation for the request_id field.
+	imagehistory.DefaultRequestID = imagehistoryDescRequestID.Default.(string)
+	// imagehistory.RequestIDValidator is a validator for the "request_id" field. It is called by the builders before save.
+	imagehistory.RequestIDValidator = imagehistoryDescRequestID.Validators[0].(func(string) error)
+	// imagehistoryDescSource is the schema descriptor for source field.
+	imagehistoryDescSource := imagehistoryFields[4].Descriptor()
+	// imagehistory.SourceValidator is a validator for the "source" field. It is called by the builders before save.
+	imagehistory.SourceValidator = imagehistoryDescSource.Validators[0].(func(string) error)
+	// imagehistoryDescEndpoint is the schema descriptor for endpoint field.
+	imagehistoryDescEndpoint := imagehistoryFields[5].Descriptor()
+	// imagehistory.EndpointValidator is a validator for the "endpoint" field. It is called by the builders before save.
+	imagehistory.EndpointValidator = imagehistoryDescEndpoint.Validators[0].(func(string) error)
+	// imagehistoryDescModel is the schema descriptor for model field.
+	imagehistoryDescModel := imagehistoryFields[6].Descriptor()
+	// imagehistory.DefaultModel holds the default value on creation for the model field.
+	imagehistory.DefaultModel = imagehistoryDescModel.Default.(string)
+	// imagehistory.ModelValidator is a validator for the "model" field. It is called by the builders before save.
+	imagehistory.ModelValidator = imagehistoryDescModel.Validators[0].(func(string) error)
+	// imagehistoryDescPrompt is the schema descriptor for prompt field.
+	imagehistoryDescPrompt := imagehistoryFields[7].Descriptor()
+	// imagehistory.DefaultPrompt holds the default value on creation for the prompt field.
+	imagehistory.DefaultPrompt = imagehistoryDescPrompt.Default.(string)
+	// imagehistoryDescRevisedPrompt is the schema descriptor for revised_prompt field.
+	imagehistoryDescRevisedPrompt := imagehistoryFields[8].Descriptor()
+	// imagehistory.DefaultRevisedPrompt holds the default value on creation for the revised_prompt field.
+	imagehistory.DefaultRevisedPrompt = imagehistoryDescRevisedPrompt.Default.(string)
+	// imagehistoryDescMimeType is the schema descriptor for mime_type field.
+	imagehistoryDescMimeType := imagehistoryFields[10].Descriptor()
+	// imagehistory.MimeTypeValidator is a validator for the "mime_type" field. It is called by the builders before save.
+	imagehistory.MimeTypeValidator = imagehistoryDescMimeType.Validators[0].(func(string) error)
+	// imagehistoryDescSizeBytes is the schema descriptor for size_bytes field.
+	imagehistoryDescSizeBytes := imagehistoryFields[11].Descriptor()
+	// imagehistory.SizeBytesValidator is a validator for the "size_bytes" field. It is called by the builders before save.
+	imagehistory.SizeBytesValidator = imagehistoryDescSizeBytes.Validators[0].(func(int64) error)
+	// imagehistoryDescWidth is the schema descriptor for width field.
+	imagehistoryDescWidth := imagehistoryFields[12].Descriptor()
+	// imagehistory.DefaultWidth holds the default value on creation for the width field.
+	imagehistory.DefaultWidth = imagehistoryDescWidth.Default.(int)
+	// imagehistory.WidthValidator is a validator for the "width" field. It is called by the builders before save.
+	imagehistory.WidthValidator = imagehistoryDescWidth.Validators[0].(func(int) error)
+	// imagehistoryDescHeight is the schema descriptor for height field.
+	imagehistoryDescHeight := imagehistoryFields[13].Descriptor()
+	// imagehistory.DefaultHeight holds the default value on creation for the height field.
+	imagehistory.DefaultHeight = imagehistoryDescHeight.Default.(int)
+	// imagehistory.HeightValidator is a validator for the "height" field. It is called by the builders before save.
+	imagehistory.HeightValidator = imagehistoryDescHeight.Validators[0].(func(int) error)
+	// imagehistoryDescSha256 is the schema descriptor for sha256 field.
+	imagehistoryDescSha256 := imagehistoryFields[14].Descriptor()
+	// imagehistory.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
+	imagehistory.Sha256Validator = imagehistoryDescSha256.Validators[0].(func(string) error)
+	// imagehistoryDescCreatedAt is the schema descriptor for created_at field.
+	imagehistoryDescCreatedAt := imagehistoryFields[15].Descriptor()
+	// imagehistory.DefaultCreatedAt holds the default value on creation for the created_at field.
+	imagehistory.DefaultCreatedAt = imagehistoryDescCreatedAt.Default.(func() time.Time)
+	// imagehistoryDescID is the schema descriptor for id field.
+	imagehistoryDescID := imagehistoryFields[0].Descriptor()
+	// imagehistory.IDValidator is a validator for the "id" field. It is called by the builders before save.
+	imagehistory.IDValidator = imagehistoryDescID.Validators[0].(func(string) error)
 	invoiceattachmentFields := schema.InvoiceAttachment{}.Fields()
 	_ = invoiceattachmentFields
 	// invoiceattachmentDescFileName is the schema descriptor for file_name field.
@@ -2839,6 +2902,10 @@ func init() {
 	user.DefaultAPIKeyLimit = userDescAPIKeyLimit.Default.(int)
 	// user.APIKeyLimitValidator is a validator for the "api_key_limit" field. It is called by the builders before save.
 	user.APIKeyLimitValidator = userDescAPIKeyLimit.Validators[0].(func(int) error)
+	// userDescSaveImageHistory is the schema descriptor for save_image_history field.
+	userDescSaveImageHistory := userFields[22].Descriptor()
+	// user.DefaultSaveImageHistory holds the default value on creation for the save_image_history field.
+	user.DefaultSaveImageHistory = userDescSaveImageHistory.Default.(bool)
 	userallowedgroupFields := schema.UserAllowedGroup{}.Fields()
 	_ = userallowedgroupFields
 	// userallowedgroupDescCreatedAt is the schema descriptor for created_at field.

@@ -43,6 +43,7 @@ func ProvideAdminHandlers(
 	paymentHandler *admin.PaymentHandler,
 	affiliateHandler *admin.AffiliateHandler,
 	dataSharingHandler *admin.DataSharingHandler,
+	imageHistoryAdminHandler *admin.ImageHistoryHandler,
 	codexInviteResetHandler *admin.CodexInviteResetHandler,
 	auditLogHandler *admin.AuditLogHandler,
 	teamHandler *admin.TeamHandler,
@@ -83,6 +84,7 @@ func ProvideAdminHandlers(
 		Payment:               paymentHandler,
 		Affiliate:             affiliateHandler,
 		DataSharing:           dataSharingHandler,
+		ImageHistory:          imageHistoryAdminHandler,
 		CodexInviteReset:      codexInviteResetHandler,
 		AuditLog:              auditLogHandler,
 		Team:                  teamHandler,
@@ -100,11 +102,14 @@ func ProvideOpenAIGatewayHandler(
 	contentModerationService *service.ContentModerationService,
 	opsService *service.OpsService,
 	grokQuotaService *service.GrokQuotaService,
+	imageHistoryService *service.ImageHistoryService,
+	imageHistorySaveWorkerPool *service.ImageHistorySaveWorkerPool,
 	cfg *config.Config,
 ) *OpenAIGatewayHandler {
 	h := NewOpenAIGatewayHandler(gatewayService, concurrencyService, billingCacheService, apiKeyService,
 		usageRecordWorkerPool, errorPassthroughService, contentModerationService, opsService, cfg)
 	h.grokMediaEligibilityProber = grokQuotaService
+	h.SetImageHistoryDeps(imageHistoryService, imageHistorySaveWorkerPool)
 	return h
 }
 
@@ -177,6 +182,7 @@ func ProvideHandlers(
 	paymentWebhookHandler *PaymentWebhookHandler,
 	dataSharingHandler *DataSharingHandler,
 	batchImageHandler *BatchImageHandler,
+	imageHistoryHandler *ImageHistoryHandler,
 	teamHandler *TeamHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
@@ -201,6 +207,7 @@ func ProvideHandlers(
 		PaymentWebhook:   paymentWebhookHandler,
 		DataSharing:      dataSharingHandler,
 		BatchImage:       batchImageHandler,
+		ImageHistory:     imageHistoryHandler,
 		Team:             teamHandler,
 	}
 }
@@ -226,6 +233,7 @@ var ProviderSet = wire.NewSet(
 	NewPaymentWebhookHandler,
 	NewDataSharingHandler,
 	NewBatchImageHandler,
+	NewImageHistoryHandler,
 	NewTeamHandler,
 
 	// Admin handlers
@@ -262,6 +270,7 @@ var ProviderSet = wire.NewSet(
 	ProvideAdminPaymentHandler,
 	admin.NewAffiliateHandler,
 	admin.NewDataSharingHandler,
+	admin.NewImageHistoryHandler,
 	admin.NewCodexInviteResetHandler,
 	admin.NewAuditLogHandler,
 	admin.NewTeamHandler,

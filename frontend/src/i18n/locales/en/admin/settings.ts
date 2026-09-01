@@ -31,8 +31,62 @@ dataSharing: {
         users: 'Users',
         gateway: 'Gateway',
         email: 'Email',
+        storage: 'File Storage',
         backup: 'Backup',
         payment: 'Payment',
+      },
+      fileStorage: {
+        sections: {
+          label: 'File storage categories',
+          images: 'Image History',
+          other: 'Other Files'
+        },
+        images: {
+          title: 'Image History Storage',
+          description: 'Private S3-compatible storage for synchronous OpenAI and Grok image results.',
+          enabled: 'Enable image history storage',
+          enabledHint: 'Users can opt in to saving newly generated images after this is enabled.',
+          endpoint: 'S3 Endpoint',
+          region: 'Region',
+          bucket: 'Bucket',
+          accessKeyId: 'Access Key ID',
+          secretAccessKey: 'Secret Access Key',
+          secretConfigured: 'Configured; leave blank to keep it',
+          prefix: 'Image Directory',
+          forcePathStyle: 'Path-style access',
+          forcePathStyleHint: 'Enable this for MinIO and other services that require path-style URLs.',
+          encryptionKeyRequired: 'Set a fixed TOTP_ENCRYPTION_KEY before saving object storage credentials. Connection tests remain available.',
+          source: {
+            deployment: 'Deployment config',
+            database: 'Admin config'
+          },
+          test: 'Test Connection',
+          testSucceeded: 'Object storage connection succeeded',
+          testFailed: 'Object storage connection failed',
+          restoreDeployment: 'Restore Deployment Config',
+          restoreConfirm: 'Delete the admin override and restore image storage from YAML or environment variables?',
+          restored: 'Deployment config restored',
+          restoreFailed: 'Failed to restore deployment config',
+          loadFailed: 'Failed to load image storage config',
+          saved: 'Image storage config saved and applied',
+          saveFailed: 'Failed to save image storage config'
+        },
+        other: {
+          backup: {
+            title: 'Database Backups',
+            description: 'Keeps its independent local or S3 configuration; existing records restore from their original location.',
+            action: 'Open Backup Settings'
+          },
+          invoice: {
+            title: 'Invoice Attachments',
+            description: 'Remains in the persistent data directory, which must be shared by every application instance.'
+          },
+          dataSharing: {
+            title: 'Data Sharing Exports',
+            description: 'Local artifacts and remote uploads remain independent from the image history directory.',
+            action: 'Open Data Sharing'
+          }
+        }
       },
       gatewaySections: {
         label: 'Gateway setting categories',

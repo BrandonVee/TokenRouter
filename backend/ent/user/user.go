@@ -65,6 +65,8 @@ const (
 	FieldRpmLimit = "rpm_limit"
 	// FieldAPIKeyLimit holds the string denoting the api_key_limit field in the database.
 	FieldAPIKeyLimit = "api_key_limit"
+	// FieldSaveImageHistory holds the string denoting the save_image_history field in the database.
+	FieldSaveImageHistory = "save_image_history"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -255,6 +257,7 @@ var Columns = []string{
 	FieldTotalRecharged,
 	FieldRpmLimit,
 	FieldAPIKeyLimit,
+	FieldSaveImageHistory,
 }
 
 var (
@@ -334,6 +337,8 @@ var (
 	DefaultAPIKeyLimit int
 	// APIKeyLimitValidator is a validator for the "api_key_limit" field. It is called by the builders before save.
 	APIKeyLimitValidator func(int) error
+	// DefaultSaveImageHistory holds the default value on creation for the "save_image_history" field.
+	DefaultSaveImageHistory bool
 )
 
 // OrderOption defines the ordering options for the User queries.
@@ -467,6 +472,11 @@ func ByRpmLimit(opts ...sql.OrderTermOption) OrderOption {
 // ByAPIKeyLimit orders the results by the api_key_limit field.
 func ByAPIKeyLimit(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAPIKeyLimit, opts...).ToFunc()
+}
+
+// BySaveImageHistory orders the results by the save_image_history field.
+func BySaveImageHistory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSaveImageHistory, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.

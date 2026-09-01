@@ -88,6 +88,7 @@ var ProviderSet = wire.NewSet(
 	NewDataShareExportArtifactRepository,
 	NewUsageBillingRepository,
 	NewBatchImageRepository,
+	NewImageHistoryRepository,
 	NewIdempotencyRepository,
 	NewUsageCleanupRepository,
 	NewDashboardAggregationRepository,
@@ -148,6 +149,7 @@ var ProviderSet = wire.NewSet(
 	// Backup infrastructure
 	NewPgDumper,
 	NewS3BackupStoreFactory,
+	NewImageHistoryS3StoreFactory,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
 	NewTurnstileVerifier,

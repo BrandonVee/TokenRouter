@@ -186,6 +186,7 @@ vi.mock("@/composables/useBalanceDisplay", () => ({
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: {}, hash: "" }),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("vue-i18n", async () => {

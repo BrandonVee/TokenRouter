@@ -180,6 +180,11 @@ func APIKeyLimit(v int) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldAPIKeyLimit, v))
 }
 
+// SaveImageHistory applies equality check predicate on the "save_image_history" field. It's identical to SaveImageHistoryEQ.
+func SaveImageHistory(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldSaveImageHistory, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldCreatedAt, v))
@@ -1428,6 +1433,16 @@ func APIKeyLimitLT(v int) predicate.User {
 // APIKeyLimitLTE applies the LTE predicate on the "api_key_limit" field.
 func APIKeyLimitLTE(v int) predicate.User {
 	return predicate.User(sql.FieldLTE(FieldAPIKeyLimit, v))
+}
+
+// SaveImageHistoryEQ applies the EQ predicate on the "save_image_history" field.
+func SaveImageHistoryEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldSaveImageHistory, v))
+}
+
+// SaveImageHistoryNEQ applies the NEQ predicate on the "save_image_history" field.
+func SaveImageHistoryNEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldSaveImageHistory, v))
 }
 
 // HasAPIKeys applies the HasEdge predicate on the "api_keys" edge.
