@@ -54,11 +54,8 @@ generated_key=$(read_env_value TOTP_ENCRYPTION_KEY "$TEMP_DIR/generated.env")
 ensure_env_secret TOTP_ENCRYPTION_KEY "$TEMP_DIR/generated.env"
 assert_env_value "$TEMP_DIR/generated.env" TOTP_ENCRYPTION_KEY "$generated_key"
 
-# systemd 安装器使用相同的幂等规则，并把持久环境文件挂入服务单元。
-TOKENROUTER_DEPLOY_LIB_ONLY=true source "$ROOT_DIR/deploy/install.sh"
-printf 'TOTP_ENCRYPTION_KEY=systemd-existing\n' > "$TEMP_DIR/systemd.env"
-ensure_env_secret TOTP_ENCRYPTION_KEY "$TEMP_DIR/systemd.env"
-assert_env_value "$TEMP_DIR/systemd.env" TOTP_ENCRYPTION_KEY systemd-existing
+# systemd 安装器要求 Bash 4（关联数组）；这里不加载执行它，避免 macOS
+# 默认 Bash 3.2 在 CI 中提前退出，只静态验证持久环境文件接入点。
 grep -Fq 'EnvironmentFile=-${ENV_FILE}' "$ROOT_DIR/deploy/install.sh" || fail "systemd unit does not load the persistent environment file"
 grep -Fq 'ensure_service_environment_file' "$ROOT_DIR/deploy/install.sh" || fail "legacy systemd unit migration is missing"
 
