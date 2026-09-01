@@ -23,6 +23,10 @@ const (
 	FieldSizeBytes = "size_bytes"
 	// FieldStorageKey holds the string denoting the storage_key field in the database.
 	FieldStorageKey = "storage_key"
+	// FieldStorageType holds the string denoting the storage_type field in the database.
+	FieldStorageType = "storage_type"
+	// FieldStorageProfileID holds the string denoting the storage_profile_id field in the database.
+	FieldStorageProfileID = "storage_profile_id"
 	// FieldSha256 holds the string denoting the sha256 field in the database.
 	FieldSha256 = "sha256"
 	// FieldUploadedBy holds the string denoting the uploaded_by field in the database.
@@ -41,6 +45,8 @@ var Columns = []string{
 	FieldContentType,
 	FieldSizeBytes,
 	FieldStorageKey,
+	FieldStorageType,
+	FieldStorageProfileID,
 	FieldSha256,
 	FieldUploadedBy,
 	FieldCreatedAt,
@@ -63,6 +69,14 @@ var (
 	ContentTypeValidator func(string) error
 	// StorageKeyValidator is a validator for the "storage_key" field. It is called by the builders before save.
 	StorageKeyValidator func(string) error
+	// DefaultStorageType holds the default value on creation for the "storage_type" field.
+	DefaultStorageType string
+	// StorageTypeValidator is a validator for the "storage_type" field. It is called by the builders before save.
+	StorageTypeValidator func(string) error
+	// DefaultStorageProfileID holds the default value on creation for the "storage_profile_id" field.
+	DefaultStorageProfileID string
+	// StorageProfileIDValidator is a validator for the "storage_profile_id" field. It is called by the builders before save.
+	StorageProfileIDValidator func(string) error
 	// Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
 	Sha256Validator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -100,6 +114,16 @@ func BySizeBytes(opts ...sql.OrderTermOption) OrderOption {
 // ByStorageKey orders the results by the storage_key field.
 func ByStorageKey(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStorageKey, opts...).ToFunc()
+}
+
+// ByStorageType orders the results by the storage_type field.
+func ByStorageType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStorageType, opts...).ToFunc()
+}
+
+// ByStorageProfileID orders the results by the storage_profile_id field.
+func ByStorageProfileID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStorageProfileID, opts...).ToFunc()
 }
 
 // BySha256 orders the results by the sha256 field.

@@ -1435,12 +1435,24 @@ func init() {
 	invoiceattachmentDescStorageKey := invoiceattachmentFields[4].Descriptor()
 	// invoiceattachment.StorageKeyValidator is a validator for the "storage_key" field. It is called by the builders before save.
 	invoiceattachment.StorageKeyValidator = invoiceattachmentDescStorageKey.Validators[0].(func(string) error)
+	// invoiceattachmentDescStorageType is the schema descriptor for storage_type field.
+	invoiceattachmentDescStorageType := invoiceattachmentFields[5].Descriptor()
+	// invoiceattachment.DefaultStorageType holds the default value on creation for the storage_type field.
+	invoiceattachment.DefaultStorageType = invoiceattachmentDescStorageType.Default.(string)
+	// invoiceattachment.StorageTypeValidator is a validator for the "storage_type" field. It is called by the builders before save.
+	invoiceattachment.StorageTypeValidator = invoiceattachmentDescStorageType.Validators[0].(func(string) error)
+	// invoiceattachmentDescStorageProfileID is the schema descriptor for storage_profile_id field.
+	invoiceattachmentDescStorageProfileID := invoiceattachmentFields[6].Descriptor()
+	// invoiceattachment.DefaultStorageProfileID holds the default value on creation for the storage_profile_id field.
+	invoiceattachment.DefaultStorageProfileID = invoiceattachmentDescStorageProfileID.Default.(string)
+	// invoiceattachment.StorageProfileIDValidator is a validator for the "storage_profile_id" field. It is called by the builders before save.
+	invoiceattachment.StorageProfileIDValidator = invoiceattachmentDescStorageProfileID.Validators[0].(func(string) error)
 	// invoiceattachmentDescSha256 is the schema descriptor for sha256 field.
-	invoiceattachmentDescSha256 := invoiceattachmentFields[5].Descriptor()
+	invoiceattachmentDescSha256 := invoiceattachmentFields[7].Descriptor()
 	// invoiceattachment.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
 	invoiceattachment.Sha256Validator = invoiceattachmentDescSha256.Validators[0].(func(string) error)
 	// invoiceattachmentDescCreatedAt is the schema descriptor for created_at field.
-	invoiceattachmentDescCreatedAt := invoiceattachmentFields[7].Descriptor()
+	invoiceattachmentDescCreatedAt := invoiceattachmentFields[9].Descriptor()
 	// invoiceattachment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	invoiceattachment.DefaultCreatedAt = invoiceattachmentDescCreatedAt.Default.(func() time.Time)
 	invoicedeliveryFields := schema.InvoiceDelivery{}.Fields()

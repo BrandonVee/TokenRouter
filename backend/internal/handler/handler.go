@@ -40,6 +40,7 @@ type AdminHandlers struct {
 	Affiliate             *admin.AffiliateHandler
 	DataSharing           *admin.DataSharingHandler
 	ImageHistory          *admin.ImageHistoryHandler
+	FileStorage           *admin.FileStorageHandler
 	CodexInviteReset      *admin.CodexInviteResetHandler
 	AuditLog              *admin.AuditLogHandler
 	Team                  *admin.TeamHandler

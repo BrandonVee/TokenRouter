@@ -31853,6 +31853,8 @@ type InvoiceAttachmentMutation struct {
 	size_bytes            *int64
 	addsize_bytes         *int64
 	storage_key           *string
+	storage_type          *string
+	storage_profile_id    *string
 	sha256                *string
 	uploaded_by           *int64
 	adduploaded_by        *int64
@@ -32181,6 +32183,78 @@ func (m *InvoiceAttachmentMutation) ResetStorageKey() {
 	m.storage_key = nil
 }
 
+// SetStorageType sets the "storage_type" field.
+func (m *InvoiceAttachmentMutation) SetStorageType(s string) {
+	m.storage_type = &s
+}
+
+// StorageType returns the value of the "storage_type" field in the mutation.
+func (m *InvoiceAttachmentMutation) StorageType() (r string, exists bool) {
+	v := m.storage_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStorageType returns the old "storage_type" field's value of the InvoiceAttachment entity.
+// If the InvoiceAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InvoiceAttachmentMutation) OldStorageType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStorageType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStorageType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStorageType: %w", err)
+	}
+	return oldValue.StorageType, nil
+}
+
+// ResetStorageType resets all changes to the "storage_type" field.
+func (m *InvoiceAttachmentMutation) ResetStorageType() {
+	m.storage_type = nil
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (m *InvoiceAttachmentMutation) SetStorageProfileID(s string) {
+	m.storage_profile_id = &s
+}
+
+// StorageProfileID returns the value of the "storage_profile_id" field in the mutation.
+func (m *InvoiceAttachmentMutation) StorageProfileID() (r string, exists bool) {
+	v := m.storage_profile_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStorageProfileID returns the old "storage_profile_id" field's value of the InvoiceAttachment entity.
+// If the InvoiceAttachment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *InvoiceAttachmentMutation) OldStorageProfileID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStorageProfileID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStorageProfileID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStorageProfileID: %w", err)
+	}
+	return oldValue.StorageProfileID, nil
+}
+
+// ResetStorageProfileID resets all changes to the "storage_profile_id" field.
+func (m *InvoiceAttachmentMutation) ResetStorageProfileID() {
+	m.storage_profile_id = nil
+}
+
 // SetSha256 sets the "sha256" field.
 func (m *InvoiceAttachmentMutation) SetSha256(s string) {
 	m.sha256 = &s
@@ -32343,7 +32417,7 @@ func (m *InvoiceAttachmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *InvoiceAttachmentMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.invoice_request_id != nil {
 		fields = append(fields, invoiceattachment.FieldInvoiceRequestID)
 	}
@@ -32358,6 +32432,12 @@ func (m *InvoiceAttachmentMutation) Fields() []string {
 	}
 	if m.storage_key != nil {
 		fields = append(fields, invoiceattachment.FieldStorageKey)
+	}
+	if m.storage_type != nil {
+		fields = append(fields, invoiceattachment.FieldStorageType)
+	}
+	if m.storage_profile_id != nil {
+		fields = append(fields, invoiceattachment.FieldStorageProfileID)
 	}
 	if m.sha256 != nil {
 		fields = append(fields, invoiceattachment.FieldSha256)
@@ -32386,6 +32466,10 @@ func (m *InvoiceAttachmentMutation) Field(name string) (ent.Value, bool) {
 		return m.SizeBytes()
 	case invoiceattachment.FieldStorageKey:
 		return m.StorageKey()
+	case invoiceattachment.FieldStorageType:
+		return m.StorageType()
+	case invoiceattachment.FieldStorageProfileID:
+		return m.StorageProfileID()
 	case invoiceattachment.FieldSha256:
 		return m.Sha256()
 	case invoiceattachment.FieldUploadedBy:
@@ -32411,6 +32495,10 @@ func (m *InvoiceAttachmentMutation) OldField(ctx context.Context, name string) (
 		return m.OldSizeBytes(ctx)
 	case invoiceattachment.FieldStorageKey:
 		return m.OldStorageKey(ctx)
+	case invoiceattachment.FieldStorageType:
+		return m.OldStorageType(ctx)
+	case invoiceattachment.FieldStorageProfileID:
+		return m.OldStorageProfileID(ctx)
 	case invoiceattachment.FieldSha256:
 		return m.OldSha256(ctx)
 	case invoiceattachment.FieldUploadedBy:
@@ -32460,6 +32548,20 @@ func (m *InvoiceAttachmentMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStorageKey(v)
+		return nil
+	case invoiceattachment.FieldStorageType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStorageType(v)
+		return nil
+	case invoiceattachment.FieldStorageProfileID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStorageProfileID(v)
 		return nil
 	case invoiceattachment.FieldSha256:
 		v, ok := value.(string)
@@ -32584,6 +32686,12 @@ func (m *InvoiceAttachmentMutation) ResetField(name string) error {
 		return nil
 	case invoiceattachment.FieldStorageKey:
 		m.ResetStorageKey()
+		return nil
+	case invoiceattachment.FieldStorageType:
+		m.ResetStorageType()
+		return nil
+	case invoiceattachment.FieldStorageProfileID:
+		m.ResetStorageProfileID()
 		return nil
 	case invoiceattachment.FieldSha256:
 		m.ResetSha256()

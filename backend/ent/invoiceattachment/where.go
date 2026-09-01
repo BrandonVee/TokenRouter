@@ -79,6 +79,16 @@ func StorageKey(v string) predicate.InvoiceAttachment {
 	return predicate.InvoiceAttachment(sql.FieldEQ(FieldStorageKey, v))
 }
 
+// StorageType applies equality check predicate on the "storage_type" field. It's identical to StorageTypeEQ.
+func StorageType(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldEQ(FieldStorageType, v))
+}
+
+// StorageProfileID applies equality check predicate on the "storage_profile_id" field. It's identical to StorageProfileIDEQ.
+func StorageProfileID(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldEQ(FieldStorageProfileID, v))
+}
+
 // Sha256 applies equality check predicate on the "sha256" field. It's identical to Sha256EQ.
 func Sha256(v string) predicate.InvoiceAttachment {
 	return predicate.InvoiceAttachment(sql.FieldEQ(FieldSha256, v))
@@ -367,6 +377,136 @@ func StorageKeyEqualFold(v string) predicate.InvoiceAttachment {
 // StorageKeyContainsFold applies the ContainsFold predicate on the "storage_key" field.
 func StorageKeyContainsFold(v string) predicate.InvoiceAttachment {
 	return predicate.InvoiceAttachment(sql.FieldContainsFold(FieldStorageKey, v))
+}
+
+// StorageTypeEQ applies the EQ predicate on the "storage_type" field.
+func StorageTypeEQ(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldEQ(FieldStorageType, v))
+}
+
+// StorageTypeNEQ applies the NEQ predicate on the "storage_type" field.
+func StorageTypeNEQ(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldNEQ(FieldStorageType, v))
+}
+
+// StorageTypeIn applies the In predicate on the "storage_type" field.
+func StorageTypeIn(vs ...string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldIn(FieldStorageType, vs...))
+}
+
+// StorageTypeNotIn applies the NotIn predicate on the "storage_type" field.
+func StorageTypeNotIn(vs ...string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldNotIn(FieldStorageType, vs...))
+}
+
+// StorageTypeGT applies the GT predicate on the "storage_type" field.
+func StorageTypeGT(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldGT(FieldStorageType, v))
+}
+
+// StorageTypeGTE applies the GTE predicate on the "storage_type" field.
+func StorageTypeGTE(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldGTE(FieldStorageType, v))
+}
+
+// StorageTypeLT applies the LT predicate on the "storage_type" field.
+func StorageTypeLT(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldLT(FieldStorageType, v))
+}
+
+// StorageTypeLTE applies the LTE predicate on the "storage_type" field.
+func StorageTypeLTE(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldLTE(FieldStorageType, v))
+}
+
+// StorageTypeContains applies the Contains predicate on the "storage_type" field.
+func StorageTypeContains(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldContains(FieldStorageType, v))
+}
+
+// StorageTypeHasPrefix applies the HasPrefix predicate on the "storage_type" field.
+func StorageTypeHasPrefix(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldHasPrefix(FieldStorageType, v))
+}
+
+// StorageTypeHasSuffix applies the HasSuffix predicate on the "storage_type" field.
+func StorageTypeHasSuffix(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldHasSuffix(FieldStorageType, v))
+}
+
+// StorageTypeEqualFold applies the EqualFold predicate on the "storage_type" field.
+func StorageTypeEqualFold(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldEqualFold(FieldStorageType, v))
+}
+
+// StorageTypeContainsFold applies the ContainsFold predicate on the "storage_type" field.
+func StorageTypeContainsFold(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldContainsFold(FieldStorageType, v))
+}
+
+// StorageProfileIDEQ applies the EQ predicate on the "storage_profile_id" field.
+func StorageProfileIDEQ(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldEQ(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDNEQ applies the NEQ predicate on the "storage_profile_id" field.
+func StorageProfileIDNEQ(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldNEQ(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDIn applies the In predicate on the "storage_profile_id" field.
+func StorageProfileIDIn(vs ...string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldIn(FieldStorageProfileID, vs...))
+}
+
+// StorageProfileIDNotIn applies the NotIn predicate on the "storage_profile_id" field.
+func StorageProfileIDNotIn(vs ...string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldNotIn(FieldStorageProfileID, vs...))
+}
+
+// StorageProfileIDGT applies the GT predicate on the "storage_profile_id" field.
+func StorageProfileIDGT(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldGT(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDGTE applies the GTE predicate on the "storage_profile_id" field.
+func StorageProfileIDGTE(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldGTE(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDLT applies the LT predicate on the "storage_profile_id" field.
+func StorageProfileIDLT(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldLT(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDLTE applies the LTE predicate on the "storage_profile_id" field.
+func StorageProfileIDLTE(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldLTE(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDContains applies the Contains predicate on the "storage_profile_id" field.
+func StorageProfileIDContains(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldContains(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDHasPrefix applies the HasPrefix predicate on the "storage_profile_id" field.
+func StorageProfileIDHasPrefix(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldHasPrefix(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDHasSuffix applies the HasSuffix predicate on the "storage_profile_id" field.
+func StorageProfileIDHasSuffix(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldHasSuffix(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDEqualFold applies the EqualFold predicate on the "storage_profile_id" field.
+func StorageProfileIDEqualFold(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldEqualFold(FieldStorageProfileID, v))
+}
+
+// StorageProfileIDContainsFold applies the ContainsFold predicate on the "storage_profile_id" field.
+func StorageProfileIDContainsFold(v string) predicate.InvoiceAttachment {
+	return predicate.InvoiceAttachment(sql.FieldContainsFold(FieldStorageProfileID, v))
 }
 
 // Sha256EQ applies the EQ predicate on the "sha256" field.

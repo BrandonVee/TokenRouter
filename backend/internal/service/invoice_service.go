@@ -65,16 +65,16 @@ type InvoiceService struct {
 	entClient    *dbent.Client
 	emailService *EmailService
 	notification *NotificationEmailService
-	storageRoot  string
+	fileStorage  *FileStorageService
 }
 
-// ProvideInvoiceService 组装发票服务，并将附件保存在应用持久数据目录。
-func ProvideInvoiceService(entClient *dbent.Client, emailService *EmailService, notification *NotificationEmailService) *InvoiceService {
+// ProvideInvoiceService 组装发票服务，并通过统一文件存储解析附件后端。
+func ProvideInvoiceService(entClient *dbent.Client, emailService *EmailService, notification *NotificationEmailService, fileStorage *FileStorageService) *InvoiceService {
 	return &InvoiceService{
 		entClient:    entClient,
 		emailService: emailService,
 		notification: notification,
-		storageRoot:  filepath.Join(defaultDataShareExportDataDir(), "invoice-attachments"),
+		fileStorage:  fileStorage,
 	}
 }
 
@@ -402,13 +402,15 @@ func (s *InvoiceService) DeleteAttachment(ctx context.Context, attachmentID, adm
 	if request.Status != InvoiceStatusApproved && request.Status != InvoiceStatusIssued {
 		return infraerrors.Conflict("INVOICE_ATTACHMENT_DELETE_INVALID", "attachments cannot be deleted after invoice delivery")
 	}
+	store, err := s.attachmentStore(ctx, attachment)
+	if err != nil {
+		return err
+	}
+	if err := store.Delete(ctx, attachment.StorageKey); err != nil {
+		return fmt.Errorf("remove invoice attachment file: %w", err)
+	}
 	if err := s.entClient.InvoiceAttachment.DeleteOneID(attachmentID).Exec(ctx); err != nil {
 		return fmt.Errorf("delete invoice attachment: %w", err)
-	}
-	if filepath.Base(attachment.StorageKey) == attachment.StorageKey {
-		if err := os.Remove(filepath.Join(s.storageRoot, attachment.StorageKey)); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove invoice attachment file: %w", err)
-		}
 	}
 	return nil
 }
@@ -437,7 +439,7 @@ func (s *InvoiceService) Send(ctx context.Context, requestID, adminID int64) (*d
 		if attachmentBytes > invoiceEmailAttachmentsMaxBytes {
 			return nil, infraerrors.BadRequest("INVOICE_EMAIL_ATTACHMENT_LIMIT", "invoice email attachments cannot exceed 20 MiB in total")
 		}
-		file, openErr := s.openAttachment(attachment)
+		file, openErr := s.openAttachment(ctx, attachment)
 		if openErr != nil {
 			return nil, openErr
 		}
@@ -529,25 +531,26 @@ func (s *InvoiceService) UploadAttachment(ctx context.Context, requestID, adminI
 	if err != nil {
 		return nil, fmt.Errorf("generate invoice attachment key: %w", err)
 	}
-	if err := os.MkdirAll(s.storageRoot, 0o750); err != nil {
-		return nil, fmt.Errorf("create invoice attachment directory: %w", err)
+	profileID := s.fileStorage.CurrentInvoiceAttachmentProfileID()
+	store, err := s.fileStorage.ResolveInvoiceAttachmentStore(ctx, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve invoice attachment storage: %w", err)
 	}
-	path := filepath.Join(s.storageRoot, storageKey)
-	if err := os.WriteFile(path, data, 0o640); err != nil {
+	if err := store.Put(ctx, storageKey, contentType, data); err != nil {
 		return nil, fmt.Errorf("store invoice attachment: %w", err)
 	}
 	sum := sha256.Sum256(data)
 	attachment, err := s.entClient.InvoiceAttachment.Create().SetInvoiceRequestID(requestID).SetFileName(fileName).
-		SetContentType(contentType).SetSizeBytes(int64(len(data))).SetStorageKey(storageKey).SetSha256(hex.EncodeToString(sum[:])).SetUploadedBy(adminID).Save(ctx)
+		SetContentType(contentType).SetSizeBytes(int64(len(data))).SetStorageKey(storageKey).SetStorageType(s.fileStorage.InvoiceAttachmentStorageType(profileID)).SetStorageProfileID(profileID).SetSha256(hex.EncodeToString(sum[:])).SetUploadedBy(adminID).Save(ctx)
 	if err != nil {
-		_ = os.Remove(path)
+		_ = store.Delete(ctx, storageKey)
 		return nil, fmt.Errorf("create invoice attachment record: %w", err)
 	}
 	return attachment, nil
 }
 
 // OpenAttachmentForUser 打开用户拥有的发票附件，并由调用方负责关闭文件。
-func (s *InvoiceService) OpenAttachmentForUser(ctx context.Context, attachmentID, userID int64) (*dbent.InvoiceAttachment, *os.File, error) {
+func (s *InvoiceService) OpenAttachmentForUser(ctx context.Context, attachmentID, userID int64) (*dbent.InvoiceAttachment, io.ReadCloser, error) {
 	attachment, err := s.entClient.InvoiceAttachment.Get(ctx, attachmentID)
 	if err != nil {
 		return nil, nil, infraerrors.NotFound("INVOICE_ATTACHMENT_NOT_FOUND", "invoice attachment not found")
@@ -557,7 +560,7 @@ func (s *InvoiceService) OpenAttachmentForUser(ctx context.Context, attachmentID
 		return nil, nil, err
 	}
 	_ = request
-	file, err := s.openAttachment(attachment)
+	file, err := s.openAttachment(ctx, attachment)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -565,12 +568,12 @@ func (s *InvoiceService) OpenAttachmentForUser(ctx context.Context, attachmentID
 }
 
 // OpenAttachmentForAdmin 打开管理员有权读取的发票附件。
-func (s *InvoiceService) OpenAttachmentForAdmin(ctx context.Context, attachmentID int64) (*dbent.InvoiceAttachment, *os.File, error) {
+func (s *InvoiceService) OpenAttachmentForAdmin(ctx context.Context, attachmentID int64) (*dbent.InvoiceAttachment, io.ReadCloser, error) {
 	attachment, err := s.entClient.InvoiceAttachment.Get(ctx, attachmentID)
 	if err != nil {
 		return nil, nil, infraerrors.NotFound("INVOICE_ATTACHMENT_NOT_FOUND", "invoice attachment not found")
 	}
-	file, err := s.openAttachment(attachment)
+	file, err := s.openAttachment(ctx, attachment)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -601,11 +604,15 @@ func (s *InvoiceService) recordDelivery(ctx context.Context, requestID int64, re
 	return err
 }
 
-func (s *InvoiceService) openAttachment(attachment *dbent.InvoiceAttachment) (*os.File, error) {
-	if attachment == nil || filepath.Base(attachment.StorageKey) != attachment.StorageKey {
+func (s *InvoiceService) openAttachment(ctx context.Context, attachment *dbent.InvoiceAttachment) (io.ReadCloser, error) {
+	if attachment == nil || strings.TrimSpace(attachment.StorageKey) == "" {
 		return nil, infraerrors.NotFound("INVOICE_ATTACHMENT_NOT_FOUND", "invoice attachment not found")
 	}
-	file, err := os.Open(filepath.Join(s.storageRoot, attachment.StorageKey))
+	store, err := s.attachmentStore(ctx, attachment)
+	if err != nil {
+		return nil, err
+	}
+	file, err := store.Open(ctx, attachment.StorageKey)
 	if os.IsNotExist(err) {
 		return nil, infraerrors.NotFound("INVOICE_ATTACHMENT_MISSING", "invoice attachment file is missing")
 	}
@@ -613,6 +620,14 @@ func (s *InvoiceService) openAttachment(attachment *dbent.InvoiceAttachment) (*o
 		return nil, fmt.Errorf("open invoice attachment: %w", err)
 	}
 	return file, nil
+}
+
+// attachmentStore 通过附件的不可变档案解析存储，旧数据默认使用本地档案。
+func (s *InvoiceService) attachmentStore(ctx context.Context, attachment *dbent.InvoiceAttachment) (FileObjectStore, error) {
+	if s == nil || s.fileStorage == nil {
+		return nil, fmt.Errorf("invoice attachment storage is not configured")
+	}
+	return s.fileStorage.ResolveInvoiceAttachmentStore(ctx, attachment.StorageProfileID)
 }
 
 func validateInvoiceOrders(orders []*dbent.PaymentOrder) (string, float64, error) {

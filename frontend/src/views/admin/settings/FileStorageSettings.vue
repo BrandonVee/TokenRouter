@@ -161,6 +161,36 @@
       </template>
     </template>
 
+    <template v-else-if="activeSection === 'attachments'">
+      <div class="card">
+        <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+          <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('admin.settings.fileStorage.invoice.title') }}</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.settings.fileStorage.invoice.description') }}</p>
+        </div>
+        <div class="space-y-5 p-6">
+          <div class="grid grid-cols-2 gap-2 rounded border border-gray-200 p-1 dark:border-dark-700">
+            <button type="button" class="btn btn-sm" :class="invoiceForm.profile.type === 'local' ? 'btn-primary' : 'btn-secondary'" @click="invoiceForm.profile.type = 'local'">{{ t('admin.settings.fileStorage.invoice.local') }}</button>
+            <button type="button" class="btn btn-sm" :class="invoiceForm.profile.type === 's3' ? 'btn-primary' : 'btn-secondary'" @click="invoiceForm.profile.type = 's3'">S3</button>
+          </div>
+          <div v-if="invoiceForm.profile.type === 'local'" class="rounded border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-sm text-gray-700 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-300">{{ invoiceForm.profile.local_path }}</div>
+          <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="md:col-span-2"><label class="input-label">{{ t('admin.settings.fileStorage.images.endpoint') }}</label><input v-model.trim="invoiceForm.profile.s3.endpoint" class="input w-full font-mono text-sm" placeholder="https://ACCOUNT_ID.r2.cloudflarestorage.com" /></div>
+            <div><label class="input-label">{{ t('admin.settings.fileStorage.images.region') }}</label><input v-model.trim="invoiceForm.profile.s3.region" class="input w-full font-mono text-sm" placeholder="auto" /></div>
+            <div><label class="input-label">{{ t('admin.settings.fileStorage.images.bucket') }}</label><input v-model.trim="invoiceForm.profile.s3.bucket" class="input w-full font-mono text-sm" /></div>
+            <div><label class="input-label">{{ t('admin.settings.fileStorage.images.accessKeyId') }}</label><input v-model.trim="invoiceForm.profile.s3.access_key_id" class="input w-full font-mono text-sm" /></div>
+            <div><label class="input-label">{{ t('admin.settings.fileStorage.images.secretAccessKey') }}</label><input v-model="invoiceForm.profile.s3.secret_access_key" type="password" class="input w-full font-mono text-sm" :placeholder="invoiceForm.profile.secret_configured ? t('admin.settings.fileStorage.images.secretConfigured') : ''" /></div>
+            <div class="md:col-span-2"><label class="input-label">{{ t('admin.settings.fileStorage.images.prefix') }}</label><input v-model.trim="invoiceForm.profile.s3.prefix" class="input w-full font-mono text-sm" placeholder="invoice-attachments" /></div>
+            <div class="flex items-center justify-between gap-4 md:col-span-2"><span class="text-sm text-gray-700 dark:text-gray-300">{{ t('admin.settings.fileStorage.images.forcePathStyle') }}</span><Toggle v-model="invoiceForm.profile.s3.force_path_style" /></div>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.fileStorage.invoice.versionHint') }}</p>
+          <div class="flex justify-end gap-2 border-t border-gray-100 pt-5 dark:border-dark-700">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="invoiceTesting" @click="testInvoiceStorage"><Icon name="cloud" size="sm" />{{ invoiceTesting ? t('common.loading') : t('admin.settings.fileStorage.images.test') }}</button>
+            <button type="button" class="btn btn-primary btn-sm" :disabled="invoiceSaving" @click="saveInvoiceStorage"><Icon name="check" size="sm" />{{ invoiceSaving ? t('common.saving') : t('common.save') }}</button>
+          </div>
+        </div>
+      </div>
+    </template>
+
     <div v-else class="divide-y divide-gray-100 border-y border-gray-200 dark:divide-dark-700 dark:border-dark-700">
       <div v-for="item in otherStorageItems" :key="item.key" class="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 items-start gap-3">
@@ -188,7 +218,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
-import type { ImageHistoryStorageConfig } from '@/api/admin/fileStorage'
+import type { FileStorageDirectoryConfig, ImageHistoryStorageConfig } from '@/api/admin/fileStorage'
 import Icon from '@/components/icons/Icon.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import TotpStepUpDialog from '@/components/auth/TotpStepUpDialog.vue'
@@ -204,12 +234,14 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const appStore = useAppStore()
 const storageStepUp = useStepUp()
-const sections = ['images', 'other'] as const
+const sections = ['images', 'attachments', 'other'] as const
 const activeSection = ref<(typeof sections)[number]>('images')
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
 const resetting = ref(false)
+const invoiceSaving = ref(false)
+const invoiceTesting = ref(false)
 
 const emptyConfig = (): ImageHistoryStorageConfig => ({
   enabled: false,
@@ -227,6 +259,10 @@ const emptyConfig = (): ImageHistoryStorageConfig => ({
 })
 
 const form = reactive<ImageHistoryStorageConfig>(emptyConfig())
+const invoiceForm = reactive<FileStorageDirectoryConfig>({
+  directory: 'invoice_attachments',
+  profile: { id: '', type: 'local', local_path: '', s3: { endpoint: '', region: 'auto', bucket: '', access_key_id: '', secret_access_key: '', prefix: 'invoice-attachments', force_path_style: false }, secret_configured: false, encryption_key_ready: false },
+})
 
 const hasConnectionFields = computed(() =>
   Boolean(form.bucket.trim() && form.access_key_id.trim() && (form.secret_access_key?.trim() || form.secret_configured)),
@@ -265,11 +301,43 @@ async function loadConfig(): Promise<void> {
   loading.value = true
   try {
     assignConfig(await adminAPI.fileStorage.getImageHistoryStorageConfig())
+	// 发票目录加载失败不应阻断既有生图历史配置，管理员仍可修复独立接口。
+	try {
+		const invoiceConfig = await adminAPI.fileStorage.getInvoiceAttachmentStorageConfig()
+		Object.assign(invoiceForm, invoiceConfig, { profile: { ...invoiceConfig.profile, s3: { ...invoiceConfig.profile.s3, secret_access_key: '' } } })
+	} catch {
+		// 保留默认本地档案，避免某个目录不可用导致整个页面不可用。
+	}
   } catch (error) {
     appStore.showError(extractApiErrorMessage(error, t('admin.settings.fileStorage.images.loadFailed')))
   } finally {
     loading.value = false
   }
+}
+
+function invoicePayload(): FileStorageDirectoryConfig {
+  return { ...invoiceForm, profile: { ...invoiceForm.profile, s3: { ...invoiceForm.profile.s3, region: invoiceForm.profile.s3.region || 'auto', secret_access_key: invoiceForm.profile.s3.secret_access_key || '' } } }
+}
+
+async function saveInvoiceStorage(): Promise<void> {
+  invoiceSaving.value = true
+  try {
+    const updated = await storageStepUp.run(() => adminAPI.fileStorage.updateInvoiceAttachmentStorageConfig(invoicePayload()))
+    Object.assign(invoiceForm, updated, { profile: { ...updated.profile, s3: { ...updated.profile.s3, secret_access_key: '' } } })
+    appStore.showSuccess(t('admin.settings.fileStorage.invoice.saved'))
+  } catch (error) {
+    if (isStepUpCancelled(error) || reportStepUpBlocked(error)) return
+    appStore.showError(extractApiErrorMessage(error, t('admin.settings.fileStorage.invoice.saveFailed')))
+  } finally { invoiceSaving.value = false }
+}
+
+async function testInvoiceStorage(): Promise<void> {
+  invoiceTesting.value = true
+  try {
+    const result = await adminAPI.fileStorage.testInvoiceAttachmentStorageConnection(invoicePayload())
+    if (result.ok) appStore.showSuccess(t('admin.settings.fileStorage.images.testSucceeded'))
+    else appStore.showError(result.message || t('admin.settings.fileStorage.images.testFailed'))
+  } catch (error) { appStore.showError(extractApiErrorMessage(error, t('admin.settings.fileStorage.images.testFailed'))) } finally { invoiceTesting.value = false }
 }
 
 async function saveConfig(): Promise<void> {

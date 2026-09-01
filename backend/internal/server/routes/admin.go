@@ -145,6 +145,13 @@ func RegisterAdminRoutes(
 
 // registerFileStorageRoutes 注册管理员可热更新的私有文件存储配置。
 func registerFileStorageRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
+	attachments := admin.Group("/settings/file-storage/invoice-attachments")
+	{
+		attachments.GET("", h.Admin.FileStorage.GetInvoiceAttachmentConfig)
+		attachments.POST("/test", h.Admin.FileStorage.TestInvoiceAttachmentStorageConnection)
+		attachments.PUT("", gin.HandlerFunc(stepUpAuth), h.Admin.FileStorage.UpdateInvoiceAttachmentConfig)
+	}
+
 	storage := admin.Group("/settings/image-history-storage")
 	{
 		storage.GET("", h.Admin.ImageHistory.GetStorageConfig)

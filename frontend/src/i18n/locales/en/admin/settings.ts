@@ -39,6 +39,7 @@ dataSharing: {
         sections: {
           label: 'File storage categories',
           images: 'Image History',
+	  attachments: 'Invoice Attachments',
           other: 'Other Files'
         },
         images: {
@@ -71,6 +72,14 @@ dataSharing: {
           saved: 'Image storage config saved and applied',
           saveFailed: 'Failed to save image storage config'
         },
+	invoice: {
+	  title: 'Invoice Attachment Storage',
+	  description: 'Choose local storage or private S3-compatible storage for newly uploaded invoice attachments.',
+	  local: 'Local storage',
+	  versionHint: 'Saving creates a new storage profile. Existing attachments always use their original profile.',
+	  saved: 'Invoice attachment storage saved and applied',
+	  saveFailed: 'Failed to save invoice attachment storage'
+	},
         other: {
           backup: {
             title: 'Database Backups',
@@ -79,7 +88,7 @@ dataSharing: {
           },
           invoice: {
             title: 'Invoice Attachments',
-            description: 'Remains in the persistent data directory, which must be shared by every application instance.'
+		    description: 'Configure local or S3 storage for new uploads in the Invoice Attachments section.'
           },
           dataSharing: {
             title: 'Data Sharing Exports',

@@ -1211,7 +1211,9 @@ var (
 		{Name: "file_name", Type: field.TypeString, Size: 255},
 		{Name: "content_type", Type: field.TypeString, Size: 100},
 		{Name: "size_bytes", Type: field.TypeInt64},
-		{Name: "storage_key", Type: field.TypeString, Unique: true, Size: 255},
+		{Name: "storage_key", Type: field.TypeString, Unique: true, Size: 1024},
+		{Name: "storage_type", Type: field.TypeString, Size: 16, Default: "local"},
+		{Name: "storage_profile_id", Type: field.TypeString, Size: 64, Default: "local-default"},
 		{Name: "sha256", Type: field.TypeString, Size: 64},
 		{Name: "uploaded_by", Type: field.TypeInt64},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
@@ -1225,7 +1227,7 @@ var (
 			{
 				Name:    "invoiceattachment_invoice_request_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{InvoiceAttachmentsColumns[1], InvoiceAttachmentsColumns[8]},
+				Columns: []*schema.Column{InvoiceAttachmentsColumns[1], InvoiceAttachmentsColumns[10]},
 			},
 		},
 	}

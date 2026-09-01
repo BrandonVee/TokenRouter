@@ -26,7 +26,10 @@ func (InvoiceAttachment) Fields() []ent.Field {
 		field.String("file_name").MaxLen(255),
 		field.String("content_type").MaxLen(100),
 		field.Int64("size_bytes"),
-		field.String("storage_key").MaxLen(255).Unique(),
+		field.String("storage_key").MaxLen(1024).Unique(),
+		// storage_type 与 storage_profile_id 固化对象的读取位置，配置切换不影响历史附件。
+		field.String("storage_type").MaxLen(16).Default("local"),
+		field.String("storage_profile_id").MaxLen(64).Default("local-default"),
 		field.String("sha256").MaxLen(64),
 		field.Int64("uploaded_by"),
 		field.Time("created_at").Immutable().Default(time.Now).SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),

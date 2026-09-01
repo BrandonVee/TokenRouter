@@ -27,6 +27,10 @@ type InvoiceAttachment struct {
 	SizeBytes int64 `json:"size_bytes,omitempty"`
 	// StorageKey holds the value of the "storage_key" field.
 	StorageKey string `json:"storage_key,omitempty"`
+	// StorageType holds the value of the "storage_type" field.
+	StorageType string `json:"storage_type,omitempty"`
+	// StorageProfileID holds the value of the "storage_profile_id" field.
+	StorageProfileID string `json:"storage_profile_id,omitempty"`
 	// Sha256 holds the value of the "sha256" field.
 	Sha256 string `json:"sha256,omitempty"`
 	// UploadedBy holds the value of the "uploaded_by" field.
@@ -43,7 +47,7 @@ func (*InvoiceAttachment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case invoiceattachment.FieldID, invoiceattachment.FieldInvoiceRequestID, invoiceattachment.FieldSizeBytes, invoiceattachment.FieldUploadedBy:
 			values[i] = new(sql.NullInt64)
-		case invoiceattachment.FieldFileName, invoiceattachment.FieldContentType, invoiceattachment.FieldStorageKey, invoiceattachment.FieldSha256:
+		case invoiceattachment.FieldFileName, invoiceattachment.FieldContentType, invoiceattachment.FieldStorageKey, invoiceattachment.FieldStorageType, invoiceattachment.FieldStorageProfileID, invoiceattachment.FieldSha256:
 			values[i] = new(sql.NullString)
 		case invoiceattachment.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -97,6 +101,18 @@ func (_m *InvoiceAttachment) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field storage_key", values[i])
 			} else if value.Valid {
 				_m.StorageKey = value.String
+			}
+		case invoiceattachment.FieldStorageType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field storage_type", values[i])
+			} else if value.Valid {
+				_m.StorageType = value.String
+			}
+		case invoiceattachment.FieldStorageProfileID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field storage_profile_id", values[i])
+			} else if value.Valid {
+				_m.StorageProfileID = value.String
 			}
 		case invoiceattachment.FieldSha256:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -166,6 +182,12 @@ func (_m *InvoiceAttachment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("storage_key=")
 	builder.WriteString(_m.StorageKey)
+	builder.WriteString(", ")
+	builder.WriteString("storage_type=")
+	builder.WriteString(_m.StorageType)
+	builder.WriteString(", ")
+	builder.WriteString("storage_profile_id=")
+	builder.WriteString(_m.StorageProfileID)
 	builder.WriteString(", ")
 	builder.WriteString("sha256=")
 	builder.WriteString(_m.Sha256)

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"io"
 	"mime"
 	"net/http"
 	"strconv"
@@ -120,9 +122,15 @@ func (h *PaymentHandler) DownloadInvoiceAttachment(c *gin.Context) {
 		return
 	}
 	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	_ = file.Close()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "cannot read invoice attachment")
+		return
+	}
 	c.Header("Content-Type", attachment.ContentType)
 	c.Header("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": attachment.FileName}))
-	http.ServeContent(c.Writer, c.Request, attachment.FileName, attachment.CreatedAt, file)
+	http.ServeContent(c.Writer, c.Request, attachment.FileName, attachment.CreatedAt, bytes.NewReader(data))
 }
 
 func (h *PaymentHandler) requireInvoiceService(c *gin.Context) bool {

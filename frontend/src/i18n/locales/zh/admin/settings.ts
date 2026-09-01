@@ -39,6 +39,7 @@ dataSharing: {
         sections: {
           label: '文件存储分类',
           images: '生图历史',
+	  attachments: '发票附件',
           other: '其他文件'
         },
         images: {
@@ -71,6 +72,14 @@ dataSharing: {
           saved: '生图存储配置已保存并生效',
           saveFailed: '保存生图存储配置失败'
         },
+	invoice: {
+	  title: '发票附件存储',
+	  description: '为后续上传的发票附件选择本地目录或私有 S3 兼容存储。',
+	  local: '本地存储',
+	  versionHint: '保存会创建新的存储档案；既有附件始终使用其原档案读取，不受换桶影响。',
+	  saved: '发票附件存储已保存并生效',
+	  saveFailed: '保存发票附件存储失败'
+	},
         other: {
           backup: {
             title: '数据库备份',
@@ -79,7 +88,7 @@ dataSharing: {
           },
           invoice: {
             title: '发票附件',
-            description: '继续保存在持久化数据目录，多实例部署需要共享该目录。'
+		    description: '在“发票附件”分类中配置后续上传的本地或 S3 存储。'
           },
           dataSharing: {
             title: '数据共享导出',

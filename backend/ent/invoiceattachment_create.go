@@ -52,6 +52,34 @@ func (_c *InvoiceAttachmentCreate) SetStorageKey(v string) *InvoiceAttachmentCre
 	return _c
 }
 
+// SetStorageType sets the "storage_type" field.
+func (_c *InvoiceAttachmentCreate) SetStorageType(v string) *InvoiceAttachmentCreate {
+	_c.mutation.SetStorageType(v)
+	return _c
+}
+
+// SetNillableStorageType sets the "storage_type" field if the given value is not nil.
+func (_c *InvoiceAttachmentCreate) SetNillableStorageType(v *string) *InvoiceAttachmentCreate {
+	if v != nil {
+		_c.SetStorageType(*v)
+	}
+	return _c
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (_c *InvoiceAttachmentCreate) SetStorageProfileID(v string) *InvoiceAttachmentCreate {
+	_c.mutation.SetStorageProfileID(v)
+	return _c
+}
+
+// SetNillableStorageProfileID sets the "storage_profile_id" field if the given value is not nil.
+func (_c *InvoiceAttachmentCreate) SetNillableStorageProfileID(v *string) *InvoiceAttachmentCreate {
+	if v != nil {
+		_c.SetStorageProfileID(*v)
+	}
+	return _c
+}
+
 // SetSha256 sets the "sha256" field.
 func (_c *InvoiceAttachmentCreate) SetSha256(v string) *InvoiceAttachmentCreate {
 	_c.mutation.SetSha256(v)
@@ -113,6 +141,14 @@ func (_c *InvoiceAttachmentCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *InvoiceAttachmentCreate) defaults() {
+	if _, ok := _c.mutation.StorageType(); !ok {
+		v := invoiceattachment.DefaultStorageType
+		_c.mutation.SetStorageType(v)
+	}
+	if _, ok := _c.mutation.StorageProfileID(); !ok {
+		v := invoiceattachment.DefaultStorageProfileID
+		_c.mutation.SetStorageProfileID(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := invoiceattachment.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -149,6 +185,22 @@ func (_c *InvoiceAttachmentCreate) check() error {
 	if v, ok := _c.mutation.StorageKey(); ok {
 		if err := invoiceattachment.StorageKeyValidator(v); err != nil {
 			return &ValidationError{Name: "storage_key", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_key": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.StorageType(); !ok {
+		return &ValidationError{Name: "storage_type", err: errors.New(`ent: missing required field "InvoiceAttachment.storage_type"`)}
+	}
+	if v, ok := _c.mutation.StorageType(); ok {
+		if err := invoiceattachment.StorageTypeValidator(v); err != nil {
+			return &ValidationError{Name: "storage_type", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_type": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.StorageProfileID(); !ok {
+		return &ValidationError{Name: "storage_profile_id", err: errors.New(`ent: missing required field "InvoiceAttachment.storage_profile_id"`)}
+	}
+	if v, ok := _c.mutation.StorageProfileID(); ok {
+		if err := invoiceattachment.StorageProfileIDValidator(v); err != nil {
+			return &ValidationError{Name: "storage_profile_id", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_profile_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Sha256(); !ok {
@@ -211,6 +263,14 @@ func (_c *InvoiceAttachmentCreate) createSpec() (*InvoiceAttachment, *sqlgraph.C
 	if value, ok := _c.mutation.StorageKey(); ok {
 		_spec.SetField(invoiceattachment.FieldStorageKey, field.TypeString, value)
 		_node.StorageKey = value
+	}
+	if value, ok := _c.mutation.StorageType(); ok {
+		_spec.SetField(invoiceattachment.FieldStorageType, field.TypeString, value)
+		_node.StorageType = value
+	}
+	if value, ok := _c.mutation.StorageProfileID(); ok {
+		_spec.SetField(invoiceattachment.FieldStorageProfileID, field.TypeString, value)
+		_node.StorageProfileID = value
 	}
 	if value, ok := _c.mutation.Sha256(); ok {
 		_spec.SetField(invoiceattachment.FieldSha256, field.TypeString, value)
@@ -345,6 +405,30 @@ func (u *InvoiceAttachmentUpsert) SetStorageKey(v string) *InvoiceAttachmentUpse
 // UpdateStorageKey sets the "storage_key" field to the value that was provided on create.
 func (u *InvoiceAttachmentUpsert) UpdateStorageKey() *InvoiceAttachmentUpsert {
 	u.SetExcluded(invoiceattachment.FieldStorageKey)
+	return u
+}
+
+// SetStorageType sets the "storage_type" field.
+func (u *InvoiceAttachmentUpsert) SetStorageType(v string) *InvoiceAttachmentUpsert {
+	u.Set(invoiceattachment.FieldStorageType, v)
+	return u
+}
+
+// UpdateStorageType sets the "storage_type" field to the value that was provided on create.
+func (u *InvoiceAttachmentUpsert) UpdateStorageType() *InvoiceAttachmentUpsert {
+	u.SetExcluded(invoiceattachment.FieldStorageType)
+	return u
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (u *InvoiceAttachmentUpsert) SetStorageProfileID(v string) *InvoiceAttachmentUpsert {
+	u.Set(invoiceattachment.FieldStorageProfileID, v)
+	return u
+}
+
+// UpdateStorageProfileID sets the "storage_profile_id" field to the value that was provided on create.
+func (u *InvoiceAttachmentUpsert) UpdateStorageProfileID() *InvoiceAttachmentUpsert {
+	u.SetExcluded(invoiceattachment.FieldStorageProfileID)
 	return u
 }
 
@@ -504,6 +588,34 @@ func (u *InvoiceAttachmentUpsertOne) SetStorageKey(v string) *InvoiceAttachmentU
 func (u *InvoiceAttachmentUpsertOne) UpdateStorageKey() *InvoiceAttachmentUpsertOne {
 	return u.Update(func(s *InvoiceAttachmentUpsert) {
 		s.UpdateStorageKey()
+	})
+}
+
+// SetStorageType sets the "storage_type" field.
+func (u *InvoiceAttachmentUpsertOne) SetStorageType(v string) *InvoiceAttachmentUpsertOne {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.SetStorageType(v)
+	})
+}
+
+// UpdateStorageType sets the "storage_type" field to the value that was provided on create.
+func (u *InvoiceAttachmentUpsertOne) UpdateStorageType() *InvoiceAttachmentUpsertOne {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.UpdateStorageType()
+	})
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (u *InvoiceAttachmentUpsertOne) SetStorageProfileID(v string) *InvoiceAttachmentUpsertOne {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.SetStorageProfileID(v)
+	})
+}
+
+// UpdateStorageProfileID sets the "storage_profile_id" field to the value that was provided on create.
+func (u *InvoiceAttachmentUpsertOne) UpdateStorageProfileID() *InvoiceAttachmentUpsertOne {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.UpdateStorageProfileID()
 	})
 }
 
@@ -834,6 +946,34 @@ func (u *InvoiceAttachmentUpsertBulk) SetStorageKey(v string) *InvoiceAttachment
 func (u *InvoiceAttachmentUpsertBulk) UpdateStorageKey() *InvoiceAttachmentUpsertBulk {
 	return u.Update(func(s *InvoiceAttachmentUpsert) {
 		s.UpdateStorageKey()
+	})
+}
+
+// SetStorageType sets the "storage_type" field.
+func (u *InvoiceAttachmentUpsertBulk) SetStorageType(v string) *InvoiceAttachmentUpsertBulk {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.SetStorageType(v)
+	})
+}
+
+// UpdateStorageType sets the "storage_type" field to the value that was provided on create.
+func (u *InvoiceAttachmentUpsertBulk) UpdateStorageType() *InvoiceAttachmentUpsertBulk {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.UpdateStorageType()
+	})
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (u *InvoiceAttachmentUpsertBulk) SetStorageProfileID(v string) *InvoiceAttachmentUpsertBulk {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.SetStorageProfileID(v)
+	})
+}
+
+// UpdateStorageProfileID sets the "storage_profile_id" field to the value that was provided on create.
+func (u *InvoiceAttachmentUpsertBulk) UpdateStorageProfileID() *InvoiceAttachmentUpsertBulk {
+	return u.Update(func(s *InvoiceAttachmentUpsert) {
+		s.UpdateStorageProfileID()
 	})
 }
 

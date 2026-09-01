@@ -111,6 +111,34 @@ func (_u *InvoiceAttachmentUpdate) SetNillableStorageKey(v *string) *InvoiceAtta
 	return _u
 }
 
+// SetStorageType sets the "storage_type" field.
+func (_u *InvoiceAttachmentUpdate) SetStorageType(v string) *InvoiceAttachmentUpdate {
+	_u.mutation.SetStorageType(v)
+	return _u
+}
+
+// SetNillableStorageType sets the "storage_type" field if the given value is not nil.
+func (_u *InvoiceAttachmentUpdate) SetNillableStorageType(v *string) *InvoiceAttachmentUpdate {
+	if v != nil {
+		_u.SetStorageType(*v)
+	}
+	return _u
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (_u *InvoiceAttachmentUpdate) SetStorageProfileID(v string) *InvoiceAttachmentUpdate {
+	_u.mutation.SetStorageProfileID(v)
+	return _u
+}
+
+// SetNillableStorageProfileID sets the "storage_profile_id" field if the given value is not nil.
+func (_u *InvoiceAttachmentUpdate) SetNillableStorageProfileID(v *string) *InvoiceAttachmentUpdate {
+	if v != nil {
+		_u.SetStorageProfileID(*v)
+	}
+	return _u
+}
+
 // SetSha256 sets the "sha256" field.
 func (_u *InvoiceAttachmentUpdate) SetSha256(v string) *InvoiceAttachmentUpdate {
 	_u.mutation.SetSha256(v)
@@ -195,6 +223,16 @@ func (_u *InvoiceAttachmentUpdate) check() error {
 			return &ValidationError{Name: "storage_key", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.StorageType(); ok {
+		if err := invoiceattachment.StorageTypeValidator(v); err != nil {
+			return &ValidationError{Name: "storage_type", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StorageProfileID(); ok {
+		if err := invoiceattachment.StorageProfileIDValidator(v); err != nil {
+			return &ValidationError{Name: "storage_profile_id", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_profile_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Sha256(); ok {
 		if err := invoiceattachment.Sha256Validator(v); err != nil {
 			return &ValidationError{Name: "sha256", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.sha256": %w`, err)}
@@ -235,6 +273,12 @@ func (_u *InvoiceAttachmentUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.StorageKey(); ok {
 		_spec.SetField(invoiceattachment.FieldStorageKey, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StorageType(); ok {
+		_spec.SetField(invoiceattachment.FieldStorageType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StorageProfileID(); ok {
+		_spec.SetField(invoiceattachment.FieldStorageProfileID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Sha256(); ok {
 		_spec.SetField(invoiceattachment.FieldSha256, field.TypeString, value)
@@ -349,6 +393,34 @@ func (_u *InvoiceAttachmentUpdateOne) SetNillableStorageKey(v *string) *InvoiceA
 	return _u
 }
 
+// SetStorageType sets the "storage_type" field.
+func (_u *InvoiceAttachmentUpdateOne) SetStorageType(v string) *InvoiceAttachmentUpdateOne {
+	_u.mutation.SetStorageType(v)
+	return _u
+}
+
+// SetNillableStorageType sets the "storage_type" field if the given value is not nil.
+func (_u *InvoiceAttachmentUpdateOne) SetNillableStorageType(v *string) *InvoiceAttachmentUpdateOne {
+	if v != nil {
+		_u.SetStorageType(*v)
+	}
+	return _u
+}
+
+// SetStorageProfileID sets the "storage_profile_id" field.
+func (_u *InvoiceAttachmentUpdateOne) SetStorageProfileID(v string) *InvoiceAttachmentUpdateOne {
+	_u.mutation.SetStorageProfileID(v)
+	return _u
+}
+
+// SetNillableStorageProfileID sets the "storage_profile_id" field if the given value is not nil.
+func (_u *InvoiceAttachmentUpdateOne) SetNillableStorageProfileID(v *string) *InvoiceAttachmentUpdateOne {
+	if v != nil {
+		_u.SetStorageProfileID(*v)
+	}
+	return _u
+}
+
 // SetSha256 sets the "sha256" field.
 func (_u *InvoiceAttachmentUpdateOne) SetSha256(v string) *InvoiceAttachmentUpdateOne {
 	_u.mutation.SetSha256(v)
@@ -446,6 +518,16 @@ func (_u *InvoiceAttachmentUpdateOne) check() error {
 			return &ValidationError{Name: "storage_key", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_key": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.StorageType(); ok {
+		if err := invoiceattachment.StorageTypeValidator(v); err != nil {
+			return &ValidationError{Name: "storage_type", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.StorageProfileID(); ok {
+		if err := invoiceattachment.StorageProfileIDValidator(v); err != nil {
+			return &ValidationError{Name: "storage_profile_id", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.storage_profile_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Sha256(); ok {
 		if err := invoiceattachment.Sha256Validator(v); err != nil {
 			return &ValidationError{Name: "sha256", err: fmt.Errorf(`ent: validator failed for field "InvoiceAttachment.sha256": %w`, err)}
@@ -503,6 +585,12 @@ func (_u *InvoiceAttachmentUpdateOne) sqlSave(ctx context.Context) (_node *Invoi
 	}
 	if value, ok := _u.mutation.StorageKey(); ok {
 		_spec.SetField(invoiceattachment.FieldStorageKey, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StorageType(); ok {
+		_spec.SetField(invoiceattachment.FieldStorageType, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.StorageProfileID(); ok {
+		_spec.SetField(invoiceattachment.FieldStorageProfileID, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Sha256(); ok {
 		_spec.SetField(invoiceattachment.FieldSha256, field.TypeString, value)

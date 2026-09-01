@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"bytes"
+	"io"
 	"mime"
 	"net/http"
 	"strconv"
@@ -212,6 +214,12 @@ func (h *PaymentHandler) DownloadInvoiceAttachment(c *gin.Context) {
 		return
 	}
 	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	_ = file.Close()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "cannot read invoice attachment")
+		return
+	}
 	c.Header("Content-Type", attachment.ContentType)
 	// 预览请求以内联方式返回，普通下载仍保持附件响应。
 	disposition := "attachment"
@@ -219,7 +227,7 @@ func (h *PaymentHandler) DownloadInvoiceAttachment(c *gin.Context) {
 		disposition = "inline"
 	}
 	c.Header("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": attachment.FileName}))
-	http.ServeContent(c.Writer, c.Request, attachment.FileName, attachment.CreatedAt, file)
+	http.ServeContent(c.Writer, c.Request, attachment.FileName, attachment.CreatedAt, bytes.NewReader(data))
 }
 
 func (h *PaymentHandler) requireInvoiceService(c *gin.Context) bool {
