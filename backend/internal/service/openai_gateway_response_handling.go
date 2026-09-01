@@ -552,6 +552,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 				line = "data: " + data
 				eventType = strings.TrimSpace(gjson.GetBytes(dataBytes, "type").String())
 			}
+			// Responses 通用转发也可能返回 image_generation_call，统一捕获最终图片。
+			// 捕获器会忽略 partial_image，并在请求内按图片引用去重。
+			CaptureGeneratedImagesFromSSE(c.Request.Context(), dataBytes)
 			var responseEvent apicompat.ResponsesStreamEvent
 			if err := json.Unmarshal(dataBytes, &responseEvent); err == nil {
 				responseAccumulator.ProcessEvent(&responseEvent)
@@ -1305,6 +1308,8 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
 		c.Data(resp.StatusCode, contentType, body)
 	}
+	// 非流式 Responses 的最终 body 可能由上游直接返回图片工具结果。
+	CaptureGeneratedImagesFromJSON(c.Request.Context(), body)
 
 	return &openaiNonStreamingResult{
 		OpenAIUsage:      usage,
@@ -1413,6 +1418,15 @@ func (s *OpenAIGatewayService) handleSSEToJSON(ctx context.Context, resp *http.R
 	}
 	if !writeOpenAICompactSSEBridge(c, resp.StatusCode, body) {
 		c.Data(resp.StatusCode, contentType, body)
+	}
+	if ok {
+		// SSE 聚合后的最终 Responses JSON 是历史保存的权威图片结果。
+		CaptureGeneratedImagesFromJSON(c.Request.Context(), body)
+	} else {
+		// 某些兼容上游没有终态 JSON，逐个捕获 SSE data 事件中的最终图片。
+		forEachOpenAISSEDataPayload(bodyText, func(data []byte) {
+			CaptureGeneratedImagesFromSSE(c.Request.Context(), data)
+		})
 	}
 
 	return &openaiNonStreamingResult{

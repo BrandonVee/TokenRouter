@@ -3718,6 +3718,56 @@ func TestHandleSSEToJSON_ReconstructsImageGenerationOutputItemDone(t *testing.T)
 	require.Equal(t, "draw a cat", gjson.Get(rec.Body.String(), "output.0.revised_prompt").String())
 }
 
+func TestHandleNonStreamingResponse_CapturesImageGenerationOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	collector := NewGeneratedImageCaptureCollector()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(
+		WithGeneratedImageCaptureCollector(context.Background(), collector),
+	)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	body := `{"id":"resp_img_json","object":"response","model":"gpt-5.4","status":"completed","output":[{"type":"image_generation_call","result":"aGVsbG8=","output_format":"png","revised_prompt":"draw a cat"}],"usage":{"input_tokens":1,"output_tokens":2}}`
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+	}
+
+	result, err := svc.handleNonStreamingResponse(context.Background(), resp, c, &Account{ID: 1, Type: AccountTypeAPIKey}, "gpt-5.4", "gpt-5.4")
+	require.NoError(t, err)
+	require.Equal(t, 1, result.imageCount)
+	require.Len(t, collector.Items(), 1)
+	require.Equal(t, "aGVsbG8=", collector.Items()[0].Base64)
+}
+
+func TestHandleSSEToJSON_CapturesImageGenerationOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	collector := NewGeneratedImageCaptureCollector()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(
+		WithGeneratedImageCaptureCollector(context.Background(), collector),
+	)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+	}
+	body := []byte(strings.Join([]string{
+		`data: {"type":"response.output_item.done","item":{"id":"ig_456","type":"image_generation_call","result":"aGVsbG8=","output_format":"png"}}`,
+		`data: {"type":"response.completed","response":{"id":"resp_img_sse","model":"gpt-5.4","output":[],"usage":{"input_tokens":1,"output_tokens":2}}}`,
+		`data: [DONE]`,
+	}, "\n"))
+
+	_, err := svc.handleSSEToJSON(context.Background(), resp, c, nil, body, "gpt-5.4", "gpt-5.4")
+	require.NoError(t, err)
+	require.Len(t, collector.Items(), 1)
+	require.Equal(t, "aGVsbG8=", collector.Items()[0].Base64)
+}
+
 func TestHandleSSEToJSON_NoFinalResponseKeepsSSEBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
