@@ -171,7 +171,8 @@ function passiveBucketStatus(bucket: MarketplaceGroupAvailabilityDay): 'success'
 
 function passiveBucketClass(bucket: MarketplaceGroupAvailabilityDay): string {
 	const status = passiveBucketStatus(bucket)
-	if (status === 'upstream_error') return 'bg-rose-500'
+	// 市场页只表达“降级”提示，不把上游瞬时故障渲染成阻断性的红色错误。
+	if (status === 'upstream_error') return 'bg-amber-400'
 	if (status === 'slow_stream') return 'bg-amber-400'
 	return 'bg-emerald-500'
 }
@@ -194,6 +195,6 @@ function bucketClass(rate?: number | null, totalCount?: number): string {
   if (rate >= 0.9) {
     return 'bg-amber-400'
   }
-  return 'bg-rose-400'
+	return 'bg-amber-400'
 }
 </script>

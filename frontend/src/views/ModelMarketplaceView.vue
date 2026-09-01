@@ -83,10 +83,10 @@
           <p class="mt-4 text-sm text-gray-500 dark:text-dark-400">{{ t('common.loading') }}</p>
         </div>
 
-        <div v-else-if="errorMessage" class="card border-red-200 p-6 dark:border-red-500/30">
+        <div v-else-if="errorMessage" class="card border-amber-200 bg-amber-50/50 p-6 dark:border-amber-500/30 dark:bg-amber-500/5">
           <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('common.error') }}</h2>
+              <h2 class="text-lg font-semibold text-amber-900 dark:text-amber-200">{{ t('marketplace.degradedTitle') }}</h2>
               <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-dark-300">{{ errorMessage }}</p>
             </div>
             <button class="btn btn-primary" type="button" @click="fetchMarketplace">

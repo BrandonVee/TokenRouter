@@ -36,6 +36,7 @@ INSTALL_DIR="/opt/sub2api"
 SERVICE_NAME="sub2api"
 SERVICE_USER="sub2api"
 CONFIG_DIR="/etc/sub2api"
+ENV_FILE="${CONFIG_DIR}/sub2api.env"
 
 # Server configuration (will be set by user)
 SERVER_HOST="0.0.0.0"
@@ -473,6 +474,10 @@ check_dependencies() {
         missing+=("tar")
     fi
 
+    if ! command -v openssl &> /dev/null; then
+        missing+=("openssl")
+    fi
+
     if [ ${#missing[@]} -gt 0 ]; then
         print_error "$(msg 'missing_deps'): ${missing[*]}"
         print_info "$(msg 'install_deps_first')"
@@ -710,6 +715,61 @@ setup_directories() {
     print_success "$(msg 'dirs_configured')"
 }
 
+# 读取环境文件中的最后一个同名配置，避免执行不可信的环境文件内容。
+read_env_value() {
+    local key="$1"
+    local file="$2"
+
+    awk -F= -v expected_key="$key" '
+        $1 == expected_key {
+            sub(/^[^=]*=/, "")
+            value = $0
+        }
+        END { print value }
+    ' "$file"
+}
+
+# 仅在配置缺失或为空时写入密钥，已有密钥在安装、升级和回退时都保持不变。
+ensure_env_secret() {
+    local key="$1"
+    local file="$2"
+    local value
+
+    value=$(read_env_value "$key" "$file")
+    if [ -n "$value" ]; then
+        return 0
+    fi
+
+    value=$(openssl rand -hex 32)
+    if grep -q "^${key}=" "$file"; then
+        sed -i "s/^${key}=.*/${key}=${value}/" "$file"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+    fi
+}
+
+# 为单二进制部署创建 root 专属环境文件，固定保存需要跨重启使用的加密密钥。
+ensure_runtime_environment() {
+    mkdir -p "$CONFIG_DIR"
+    touch "$ENV_FILE"
+    ensure_env_secret "TOTP_ENCRYPTION_KEY" "$ENV_FILE"
+    chown root:root "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+}
+
+# 老版本的服务单元没有 EnvironmentFile，升级时原位补齐且不改动其它自定义项。
+ensure_service_environment_file() {
+    local service_file="/etc/systemd/system/sub2api.service"
+
+    if [ ! -f "$service_file" ]; then
+        return 0
+    fi
+    if ! grep -Fq "EnvironmentFile=-${ENV_FILE}" "$service_file"; then
+        sed -i "/^\[Service\]$/a EnvironmentFile=-${ENV_FILE}" "$service_file"
+    fi
+    systemctl daemon-reload
+}
+
 # Install systemd service
 install_service() {
     print_info "$(msg 'installing_service')"
@@ -727,6 +787,7 @@ Type=simple
 User=sub2api
 Group=sub2api
 WorkingDirectory=/opt/sub2api
+EnvironmentFile=-${ENV_FILE}
 ExecStart=/opt/sub2api/sub2api
 Restart=always
 RestartSec=5
@@ -862,6 +923,10 @@ upgrade() {
 
     print_info "$(msg 'upgrading')"
 
+    # 老服务器首次使用新版升级脚本时自动补齐固定密钥，之后升级只复用原值。
+    ensure_runtime_environment
+    ensure_service_environment_file
+
     # Get current version
     CURRENT_VERSION=$("$INSTALL_DIR/sub2api" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
     print_info "$(msg 'current_version'): $CURRENT_VERSION"
@@ -901,6 +966,10 @@ install_version() {
         print_info "$(msg 'fresh_install_hint'): $0 install -v $target_version"
         exit 1
     fi
+
+    # 指定版本升级和回退也必须沿用同一份持久密钥。
+    ensure_runtime_environment
+    ensure_service_environment_file
 
     # Validate and normalize version
     target_version=$(validate_version "$target_version")
@@ -1112,6 +1181,7 @@ main() {
                     download_and_extract
                     create_user
                     setup_directories
+                    ensure_runtime_environment
                     install_service
                     prepare_for_setup
                     get_public_ip
@@ -1126,6 +1196,7 @@ main() {
                 download_and_extract
                 create_user
                 setup_directories
+                ensure_runtime_environment
                 install_service
                 prepare_for_setup
                 get_public_ip
@@ -1206,6 +1277,7 @@ main() {
             download_and_extract
             create_user
             setup_directories
+            ensure_runtime_environment
             install_service
             prepare_for_setup
             get_public_ip
@@ -1220,6 +1292,7 @@ main() {
         download_and_extract
         create_user
         setup_directories
+        ensure_runtime_environment
         install_service
         prepare_for_setup
         get_public_ip
@@ -1229,4 +1302,7 @@ main() {
     fi
 }
 
-main "$@"
+# 测试可只加载函数；正常安装、升级和回退不受影响。
+if [ "${TOKENROUTER_DEPLOY_LIB_ONLY:-false}" != "true" ]; then
+    main "$@"
+fi

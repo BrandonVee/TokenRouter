@@ -16,7 +16,10 @@ jobs:
       - name: Check deployment scripts
         run: |
           /bin/bash -n deploy/apple-container.sh
+          /bin/bash -n deploy/install.sh
+          /bin/bash -n deploy/docker-deploy.sh
           /bin/bash deploy/tests/apple-container-test.sh
+          /bin/bash deploy/tests/deployment-secrets-test.sh
           /bin/sh deploy/tests/docker-compose-security-test.sh
           /bin/sh deploy/tests/docker-compose-postgres-test.sh
           /bin/sh deploy/tests/docker-compose-variants-test.sh

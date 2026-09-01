@@ -50,6 +50,15 @@ sudo systemctl enable sub2api
 
 可以直接在 **管理后台** 左上角点击 **检测更新** 按钮进行在线升级。
 
+通过服务器安装脚本升级（包括回退）时，脚本会自动创建或复用
+`/etc/sub2api/sub2api.env` 中的固定 `TOTP_ENCRYPTION_KEY`，不会因替换二进制而改变：
+
+```bash
+curl -sSL https://raw.githubusercontent.com/BrandonVee/TokenRouter/main/deploy/install.sh | sudo bash -s -- upgrade
+```
+
+不要删除或覆盖该环境文件；数据库中的对象存储凭据依赖它解密。
+
 网页升级功能支持：
 - 自动检测新版本
 - 一键下载并应用更新
@@ -221,10 +230,16 @@ docker compose -f docker-compose.local.yml logs sub2api | grep "admin password"
 #### 升级
 
 ```bash
+# 下载并更新 Compose 文件/环境变量样例，保留现有 .env 和所有密钥
+curl -sSL https://raw.githubusercontent.com/BrandonVee/TokenRouter/main/deploy/docker-deploy.sh | bash -s -- update
+
 # 拉取最新镜像并重建容器
-docker compose -f docker-compose.local.yml pull
-docker compose -f docker-compose.local.yml up -d
+docker compose pull
+docker compose up -d
 ```
+
+`update` 必须在原部署目录执行。它会自动补充新版本新增的环境变量，已有的
+`JWT_SECRET`、`TOTP_ENCRYPTION_KEY`、数据库密码及自定义配置不会被覆盖。
 
 #### 轻松迁移（本地目录版）
 

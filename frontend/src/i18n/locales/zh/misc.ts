@@ -34,7 +34,8 @@ marketplace: {
     availabilityNoData: '暂无数据',
     availabilityHint: '近 {days} 天主动探测可用率 {rate}（成功 {success} / 总计 {total}）',
     availabilityHintNoData: '近 {days} 天暂无主动探测数据',
-    passiveAvailabilityAriaLabel: '最近 60 个时间桶，每桶 {minutes} 分钟：绿色表示成功或无数据，黄色表示加权异常分为 25% 至 60%，红色表示异常分至少 60% 且有至少 3 次上游故障。',
+    passiveAvailabilityAriaLabel: '最近 60 个时间桶，每桶 {minutes} 分钟：绿色表示成功或无数据，黄色表示存在降级或上游故障。',
+    degradedTitle: '服务暂时降级',
     passiveAvailabilityHint: '最近 60 个 {minutes} 分钟时间桶健康分 {rate}（成功 {success} / 有效请求 {total}）',
     passiveAvailabilityStatus: {
       success: '成功',

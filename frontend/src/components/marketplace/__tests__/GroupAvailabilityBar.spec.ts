@@ -71,9 +71,28 @@ describe('GroupAvailabilityBar passive time buckets', () => {
     expect(bars).toHaveLength(60)
     expect(bars[0].classes()).toContain('bg-emerald-500')
     expect(bars[1].classes()).toContain('bg-amber-400')
-    expect(bars[2].classes()).toContain('bg-rose-500')
+    expect(bars[2].classes()).toContain('bg-amber-400')
     expect(bars[3].classes()).toContain('bg-amber-400')
     expect(bars[4].classes()).toContain('bg-amber-400')
+  })
+
+  it('renders active low availability as a yellow degraded bar', () => {
+    const wrapper = mount(GroupAvailabilityBar, {
+      props: {
+        availability: {
+          mode: 'active',
+          window_days: 1,
+          bucket_minutes: 120,
+          success_count: 1,
+          total_count: 10,
+          availability_rate: 0.1,
+          days: [bucket(0, { success_count: 1, total_count: 10, availability_rate: 0.1 })],
+        },
+      },
+    })
+
+    const bars = wrapper.get('[role="img"]').findAll('span')
+    expect(bars[bars.length - 1].classes()).toContain('bg-amber-400')
   })
 
   it('renders empty active time buckets as successful bars', () => {

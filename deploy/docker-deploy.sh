@@ -40,18 +40,96 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Generate random secret
+# 生成随机密钥。
 generate_secret() {
     openssl rand -hex 32
 }
 
-# Check if command exists
+# 检查命令是否存在。
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# 下载到临时文件后再替换，避免网络中断留下半份部署文件。
+download_file() {
+    local url="$1"
+    local target="$2"
+    local temp_file
+
+    temp_file=$(mktemp "${target}.tmp.XXXXXX")
+    if command_exists curl; then
+        curl -sSL "$url" -o "$temp_file"
+    else
+        wget -q "$url" -O "$temp_file"
+    fi
+    mv "$temp_file" "$target"
+}
+
+# 读取最后一个同名配置，不执行可能包含命令的 .env 文件。
+read_env_value() {
+    local key="$1"
+    local file="$2"
+
+    awk -F= -v expected_key="$key" '
+        $1 == expected_key {
+            sub(/^[^=]*=/, "")
+            value = $0
+        }
+        END { print value }
+    ' "$file"
+}
+
+# 缺失或为空时生成密钥，已有值在更新部署文件时保持不变。
+ensure_env_secret() {
+    local key="$1"
+    local file="$2"
+    local value
+
+    value=$(read_env_value "$key" "$file")
+    if [ -n "$value" ]; then
+        return 0
+    fi
+
+    value=$(generate_secret)
+    if grep -q "^${key}=" "$file"; then
+        sed -i.bak "s/^${key}=.*/${key}=${value}/" "$file"
+        rm -f "${file}.bak"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+    fi
+}
+
+# 将新版本样例中新增的变量追加到现有 .env，不覆盖服务器上的自定义值。
+merge_env_defaults() {
+    local example_file="$1"
+    local env_file="$2"
+    local line
+    local key
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+            key=${line%%=*}
+            if ! grep -q "^${key}=" "$env_file"; then
+                printf '%s\n' "$line" >> "$env_file"
+            fi
+        fi
+    done < "$example_file"
+}
+
 # Main installation function
 main() {
+    local mode="${1:-install}"
+    local existing_env=false
+
+    case "$mode" in
+        install|update)
+            ;;
+        *)
+            print_error "Usage: $0 [install|update]"
+            exit 1
+            ;;
+    esac
+
     echo ""
     echo "=========================================="
     echo "  TokenRouter Deployment Preparation"
@@ -64,61 +142,53 @@ main() {
         exit 1
     fi
 
-    # Check if deployment already exists
-    if [ -f "docker-compose.yml" ] && [ -f ".env" ]; then
-        print_warning "Deployment files already exist in current directory."
-        read -p "Overwrite existing files? (y/N): " -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            print_info "Cancelled."
-            exit 0
+    if [ -f ".env" ]; then
+        existing_env=true
+    elif [ "$mode" = "update" ]; then
+        print_error "Cannot update: .env does not exist in the current directory."
+        exit 1
+    fi
+
+    if [ "$existing_env" = true ]; then
+        print_info "Existing deployment detected; preserving all current .env values."
+        if [ -f "docker-compose.yml" ]; then
+            cp docker-compose.yml docker-compose.yml.backup
+            print_info "Previous docker-compose.yml saved as docker-compose.yml.backup"
         fi
     fi
 
-    # Download docker-compose.local.yml and save as docker-compose.yml
+    # 更新 Compose 文件；现有文件已在上方留有可恢复副本。
     print_info "Downloading docker-compose.yml..."
-    if command_exists curl; then
-        curl -sSL "${GITHUB_RAW_URL}/docker-compose.local.yml" -o docker-compose.yml
-    elif command_exists wget; then
-        wget -q "${GITHUB_RAW_URL}/docker-compose.local.yml" -O docker-compose.yml
-    else
+    if ! command_exists curl && ! command_exists wget; then
         print_error "Neither curl nor wget is installed. Please install one of them."
         exit 1
     fi
+    download_file "${GITHUB_RAW_URL}/docker-compose.local.yml" docker-compose.yml
     print_success "Downloaded docker-compose.yml"
 
-    # Download .env.example
+    # 始终刷新样例文件，现有 .env 只增补新变量。
     print_info "Downloading .env.example..."
-    if command_exists curl; then
-        curl -sSL "${GITHUB_RAW_URL}/.env.example" -o .env.example
-    else
-        wget -q "${GITHUB_RAW_URL}/.env.example" -O .env.example
-    fi
+    download_file "${GITHUB_RAW_URL}/.env.example" .env.example
     print_success "Downloaded .env.example"
 
-    # Generate .env file with auto-generated secrets
-    print_info "Generating secure secrets..."
-    echo ""
-
-    # Generate secrets
-    JWT_SECRET=$(generate_secret)
-    TOTP_ENCRYPTION_KEY=$(generate_secret)
-    POSTGRES_PASSWORD=$(generate_secret)
-
-    # Create .env from .env.example
-    cp .env.example .env
-
-    # Update .env with generated secrets (cross-platform compatible)
-    if sed --version >/dev/null 2>&1; then
-        # GNU sed (Linux)
-        sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
-        sed -i "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
-        sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
+    # 首装复制完整样例，更新只追加新版本引入的配置项。
+    if [ "$existing_env" = true ]; then
+        merge_env_defaults .env.example .env
     else
-        # BSD sed (macOS)
-        sed -i '' "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
-        sed -i '' "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
-        sed -i '' "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
+        cp .env.example .env
+    fi
+
+    print_info "Ensuring persistent secrets..."
+    echo ""
+    ensure_env_secret "JWT_SECRET" .env
+    ensure_env_secret "TOTP_ENCRYPTION_KEY" .env
+    ensure_env_secret "POSTGRES_PASSWORD" .env
+
+    # 首次部署时保留凭据回显，方便管理员记录；更新时绝不回显已有密钥。
+    if [ "$existing_env" = false ]; then
+        JWT_SECRET=$(read_env_value JWT_SECRET .env)
+        TOTP_ENCRYPTION_KEY=$(read_env_value TOTP_ENCRYPTION_KEY .env)
+        POSTGRES_PASSWORD=$(read_env_value POSTGRES_PASSWORD .env)
     fi
 
     # Create data directories
@@ -130,18 +200,22 @@ main() {
     chmod 600 .env
     echo ""
 
-    # Display completion message
+    # 首装输出仅显示本次生成的凭据；更新输出不包含任何敏感值。
     echo "=========================================="
     echo "  Preparation Complete!"
     echo "=========================================="
     echo ""
-    echo "Generated secure credentials:"
-    echo "  POSTGRES_PASSWORD:     ${POSTGRES_PASSWORD}"
-    echo "  JWT_SECRET:            ${JWT_SECRET}"
-    echo "  TOTP_ENCRYPTION_KEY:   ${TOTP_ENCRYPTION_KEY}"
-    echo ""
-    print_warning "These credentials have been saved to .env file."
-    print_warning "Please keep them secure and do not share publicly!"
+    if [ "$existing_env" = false ]; then
+        echo "Generated secure credentials:"
+        echo "  POSTGRES_PASSWORD:     ${POSTGRES_PASSWORD}"
+        echo "  JWT_SECRET:            ${JWT_SECRET}"
+        echo "  TOTP_ENCRYPTION_KEY:   ${TOTP_ENCRYPTION_KEY}"
+        echo ""
+        print_warning "These credentials are saved in .env. Keep this output private."
+    else
+        print_success "Persistent credentials were preserved in .env."
+    fi
+    print_warning "Back up .env securely; do not replace its encryption keys during upgrades."
     echo ""
     echo "Directory structure:"
     echo "  docker-compose.yml        - Docker Compose configuration"
@@ -167,5 +241,7 @@ main() {
     echo ""
 }
 
-# Run main function
-main "$@"
+# 测试可只加载函数；正常执行脚本时始终进入主流程。
+if [ "${TOKENROUTER_DEPLOY_LIB_ONLY:-false}" != "true" ]; then
+    main "$@"
+fi
