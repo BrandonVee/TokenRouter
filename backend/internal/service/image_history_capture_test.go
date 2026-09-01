@@ -64,3 +64,14 @@ func TestHistoryParametersFromResponsesJSONExcludesInputPayload(t *testing.T) {
 	require.JSONEq(t, `{"model":"gpt-image-1","image_generation_tools":[{"type":"image_generation","size":"1024x1024"}]}`, parameters)
 	require.Equal(t, "画一只猫", HistoryPromptFromResponsesJSON([]byte(`{"input":[{"type":"input_text","text":"画一只猫"},{"type":"input_image","image_url":"secret"}]}`)))
 }
+
+func TestCaptureGeneratedImagesFromGeminiJSON(t *testing.T) {
+	collector := NewGeneratedImageCaptureCollector()
+	ctx := WithGeneratedImageCaptureCollector(context.Background(), collector)
+	payload := []byte(`{"candidates":[{"content":{"parts":[{"text":"done"},{"inlineData":{"mimeType":"image/png","data":"` + imageHistoryValidPNGBase64 + `"}},{"inline_data":{"mime_type":"image/png","data":"` + imageHistoryValidPNGBase64 + `"}}]}}]}`)
+	CaptureGeneratedImagesFromGeminiJSON(ctx, payload)
+	items := collector.Items()
+	require.Len(t, items, 1)
+	require.Equal(t, imageHistoryValidPNGBase64, items[0].Base64)
+	require.Equal(t, "image/png", items[0].MimeType)
+}

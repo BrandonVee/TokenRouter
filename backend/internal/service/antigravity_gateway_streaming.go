@@ -233,6 +233,7 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 				inner, parseErr := s.unwrapV1InternalResponse([]byte(payload))
 				if parseErr == nil && inner != nil {
 					payload = string(inner)
+					CaptureGeneratedImagesFromGeminiJSON(c.Request.Context(), inner)
 				}
 
 				// 解析 usage
@@ -399,6 +400,7 @@ func (s *AntigravityGatewayService) handleGeminiStreamToNonStreaming(c *gin.Cont
 			if err := json.Unmarshal(inner, &parsed); err != nil {
 				continue
 			}
+			CaptureGeneratedImagesFromGeminiJSON(c.Request.Context(), inner)
 
 			// 记录首 token 时间
 			if firstTokenMs == nil {
@@ -481,6 +483,7 @@ returnResponse:
 		return nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
 	c.Data(http.StatusOK, "application/json", respBody)
+	CaptureGeneratedImagesFromGeminiJSON(c.Request.Context(), respBody)
 
 	return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, nil
 }

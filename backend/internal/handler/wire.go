@@ -115,6 +115,33 @@ func ProvideOpenAIGatewayHandler(
 	return h
 }
 
+// ProvideGatewayHandler 组装通用网关，并注入 Gemini 生图历史保存依赖。
+func ProvideGatewayHandler(
+	gatewayService *service.GatewayService,
+	openAIGatewayService *service.OpenAIGatewayService,
+	geminiCompatService *service.GeminiMessagesCompatService,
+	antigravityGatewayService *service.AntigravityGatewayService,
+	userService *service.UserService,
+	concurrencyService *service.ConcurrencyService,
+	billingCacheService *service.BillingCacheService,
+	usageService *service.UsageService,
+	apiKeyService *service.APIKeyService,
+	usageRecordWorkerPool *service.UsageRecordWorkerPool,
+	errorPassthroughService *service.ErrorPassthroughService,
+	contentModerationService *service.ContentModerationService,
+	userMsgQueueService *service.UserMessageQueueService,
+	cfg *config.Config,
+	settingService *service.SettingService,
+	imageHistoryService *service.ImageHistoryService,
+	imageHistorySaveWorkerPool *service.ImageHistorySaveWorkerPool,
+) *GatewayHandler {
+	gatewayHandler := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
+		userService, concurrencyService, billingCacheService, usageService, apiKeyService, usageRecordWorkerPool,
+		errorPassthroughService, contentModerationService, userMsgQueueService, cfg, settingService)
+	gatewayHandler.SetImageHistoryDeps(imageHistoryService, imageHistorySaveWorkerPool)
+	return gatewayHandler
+}
+
 // ProvideSystemHandler creates admin.SystemHandler with UpdateService
 func ProvideSystemHandler(updateService *service.UpdateService, lockService *service.SystemOperationLockService) *admin.SystemHandler {
 	return admin.NewSystemHandler(updateService, lockService)
@@ -225,7 +252,7 @@ var ProviderSet = wire.NewSet(
 	NewSubscriptionHandler,
 	NewAnnouncementHandler,
 	NewModelMarketplaceHandler,
-	NewGatewayHandler,
+	ProvideGatewayHandler,
 	ProvideOpenAIGatewayHandler,
 	NewQoderGatewayHandler,
 	NewTotpHandler,

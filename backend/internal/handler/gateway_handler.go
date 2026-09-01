@@ -39,23 +39,54 @@ var gatewayCompatibilityMetricsLogCounter atomic.Uint64
 
 // GatewayHandler handles API gateway requests
 type GatewayHandler struct {
-	gatewayService            *service.GatewayService
-	openAIGatewayService      *service.OpenAIGatewayService
-	geminiCompatService       *service.GeminiMessagesCompatService
-	antigravityGatewayService *service.AntigravityGatewayService
-	userService               *service.UserService
-	billingCacheService       *service.BillingCacheService
-	usageService              *service.UsageService
-	apiKeyService             *service.APIKeyService
-	usageRecordWorkerPool     *service.UsageRecordWorkerPool
-	errorPassthroughService   *service.ErrorPassthroughService
-	contentModerationService  *service.ContentModerationService
-	concurrencyHelper         *ConcurrencyHelper
-	userMsgQueueHelper        *UserMsgQueueHelper
-	maxAccountSwitches        int
-	maxAccountSwitchesGemini  int
-	cfg                       *config.Config
-	settingService            *service.SettingService
+	gatewayService             *service.GatewayService
+	openAIGatewayService       *service.OpenAIGatewayService
+	geminiCompatService        *service.GeminiMessagesCompatService
+	antigravityGatewayService  *service.AntigravityGatewayService
+	userService                *service.UserService
+	billingCacheService        *service.BillingCacheService
+	usageService               *service.UsageService
+	apiKeyService              *service.APIKeyService
+	usageRecordWorkerPool      *service.UsageRecordWorkerPool
+	errorPassthroughService    *service.ErrorPassthroughService
+	contentModerationService   *service.ContentModerationService
+	concurrencyHelper          *ConcurrencyHelper
+	userMsgQueueHelper         *UserMsgQueueHelper
+	maxAccountSwitches         int
+	maxAccountSwitchesGemini   int
+	cfg                        *config.Config
+	settingService             *service.SettingService
+	imageHistoryService        *service.ImageHistoryService
+	imageHistorySaveWorkerPool *service.ImageHistorySaveWorkerPool
+}
+
+// SetImageHistoryDeps 注入 Gemini 原生生图历史保存依赖。
+func (h *GatewayHandler) SetImageHistoryDeps(imageHistoryService *service.ImageHistoryService, workerPool *service.ImageHistorySaveWorkerPool) {
+	if h != nil {
+		h.imageHistoryService = imageHistoryService
+		h.imageHistorySaveWorkerPool = workerPool
+	}
+}
+
+// prepareGeminiImageHistoryCapture 仅为已开启历史的用户创建 Gemini 请求捕获器。
+func (h *GatewayHandler) prepareGeminiImageHistoryCapture(ctx context.Context, userID int64) (context.Context, *service.GeneratedImageCaptureCollector) {
+	if h == nil || h.imageHistoryService == nil || !h.imageHistoryService.ShouldCapture(ctx, userID) {
+		return ctx, nil
+	}
+	collector := service.NewGeneratedImageCaptureCollector()
+	return service.WithGeneratedImageCaptureCollector(ctx, collector), collector
+}
+
+// saveGeminiImageHistoryAsync 将 Gemini 最终图片提交到共享有界队列。
+func (h *GatewayHandler) saveGeminiImageHistoryAsync(input service.SaveImageHistoryInput, collector *service.GeneratedImageCaptureCollector) {
+	if h == nil || h.imageHistorySaveWorkerPool == nil || collector == nil {
+		return
+	}
+	input.Images = collector.Items()
+	if len(input.Images) == 0 {
+		return
+	}
+	h.imageHistorySaveWorkerPool.Submit(input)
 }
 
 // NewGatewayHandler creates a new GatewayHandler

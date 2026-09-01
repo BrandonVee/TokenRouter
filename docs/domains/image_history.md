@@ -12,9 +12,9 @@
 
 ## 捕获范围
 
-当前捕获范围是经 TokenRouter 网关完成的同步 OpenAI Images 与 Grok 图片生成/编辑请求，包括普通 JSON、SSE，以及 OpenAI OAuth 路径内部从 Responses 事件转换出的最终 Images 响应。捕获器只接受最终 `b64_json`、图片 URL 或等价最终结果，忽略 partial image，并在单次请求内按图片引用去重。
+当前捕获范围是经 TokenRouter 网关完成的同步 OpenAI Images、OpenAI Responses、Grok 图片生成/编辑和 Gemini 原生 `generateContent` 图片请求，包括普通 JSON、SSE，以及 OAuth/Antigravity 路径内部聚合出的最终图片响应。捕获器接受最终 `b64_json`、图片 URL、Gemini `inlineData` 或等价最终结果，忽略 partial image，并在单次请求内按图片引用去重。
 
-批量图片作业、视频、聊天/通用 Responses 中没有经过 Images handler 的图片，以及已下线的异步图片任务不进入该历史。历史捕获发生在网关原响应已经成功处理之后，不参与账号选择、上游重试、计费或客户端响应形状。
+批量图片作业、视频、聊天响应中没有图片生成结果的请求，以及已下线的异步图片任务不进入该历史。历史捕获发生在网关原响应已经成功处理之后，不参与账号选择、上游重试、计费或客户端响应形状。
 
 ## 保存链路
 

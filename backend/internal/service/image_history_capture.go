@@ -63,6 +63,42 @@ func HistoryPromptFromResponsesJSON(body []byte) string {
 	return ""
 }
 
+// HistoryParametersFromGeminiJSON 返回 Gemini 生图请求的安全参数快照。
+func HistoryParametersFromGeminiJSON(body []byte) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	root := gjson.ParseBytes(body)
+	params := map[string]any{}
+	for _, key := range []string{"generationConfig", "generation_config", "safetySettings", "safety_settings", "tools", "toolConfig", "tool_config"} {
+		if value := root.Get(key); value.Exists() {
+			params[key] = value.Value()
+		}
+	}
+	data, err := json.Marshal(params)
+	if err != nil || len(params) == 0 {
+		return ""
+	}
+	return string(data)
+}
+
+// HistoryPromptFromGeminiJSON 提取 Gemini contents 中的文本提示词，忽略图片数据。
+func HistoryPromptFromGeminiJSON(body []byte) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	var parts []string
+	root := gjson.ParseBytes(body)
+	root.Get("contents").ForEach(func(_, content gjson.Result) bool {
+		content.Get("parts").ForEach(func(_, part gjson.Result) bool {
+			collectResponsePromptText(part.Get("text"), &parts)
+			return len(parts) < 32
+		})
+		return len(parts) < 32
+	})
+	return strings.Join(parts, "\n")
+}
+
 func collectResponsePromptText(value gjson.Result, parts *[]string) {
 	if parts == nil || !value.Exists() {
 		return
@@ -158,6 +194,35 @@ func CaptureGeneratedImagesFromSSE(ctx context.Context, data []byte) {
 	}
 }
 
+// CaptureGeneratedImagesFromGeminiJSON 提取 Gemini 原生响应中的 inlineData 图片。
+// 支持 camelCase/snake_case，并按图片数据去重，避免流式累计响应重复保存。
+func CaptureGeneratedImagesFromGeminiJSON(ctx context.Context, body []byte) {
+	collector := generatedImageCollectorFromContext(ctx)
+	if collector == nil || len(body) == 0 || !gjson.ValidBytes(body) {
+		return
+	}
+	root := gjson.ParseBytes(body)
+	root.Get("candidates").ForEach(func(_, candidate gjson.Result) bool {
+		candidate.Get("content.parts").ForEach(func(_, part gjson.Result) bool {
+			inline := part.Get("inlineData")
+			if !inline.Exists() {
+				inline = part.Get("inline_data")
+			}
+			encoded := strings.TrimSpace(inline.Get("data").String())
+			if encoded == "" {
+				return true
+			}
+			mimeType := strings.TrimSpace(inline.Get("mimeType").String())
+			if mimeType == "" {
+				mimeType = strings.TrimSpace(inline.Get("mime_type").String())
+			}
+			collector.add(GeneratedImageCapture{Base64: encoded, MimeType: mimeType})
+			return true
+		})
+		return true
+	})
+}
+
 // Items 返回与捕获器内部存储隔离的结果快照。
 func (c *GeneratedImageCaptureCollector) Items() []GeneratedImageCapture {
 	if c == nil {
@@ -224,26 +289,32 @@ func (c *GeneratedImageCaptureCollector) addOutputItem(item gjson.Result) {
 		return
 	}
 
-	identity := encoded
-	if identity == "" {
-		identity = imageURL
-	}
-	sum := sha256.Sum256([]byte(identity))
-	key := hex.EncodeToString(sum[:])
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, exists := c.seen[key]; exists {
-		return
-	}
-	c.seen[key] = struct{}{}
-	c.items = append(c.items, GeneratedImageCapture{
+	c.add(GeneratedImageCapture{
 		Base64:        encoded,
 		URL:           imageURL,
 		MimeType:      firstNonEmpty(item.Get("mime_type").String(), item.Get("content_type").String(), mimeTypeFromOutputFormat(item.Get("output_format").String())),
 		RevisedPrompt: firstNonEmpty(item.Get("revised_prompt").String(), item.Get("prompt").String()),
 		Size:          strings.TrimSpace(item.Get("size").String()),
 	})
+}
+
+func (c *GeneratedImageCaptureCollector) add(item GeneratedImageCapture) {
+	if c == nil {
+		return
+	}
+	identity := item.Base64
+	if identity == "" {
+		identity = item.URL
+	}
+	sum := sha256.Sum256([]byte(identity))
+	key := hex.EncodeToString(sum[:])
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, exists := c.seen[key]; exists {
+		return
+	}
+	c.seen[key] = struct{}{}
+	c.items = append(c.items, item)
 }
 
 func mimeTypeFromOutputFormat(format string) string {

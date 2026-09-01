@@ -1670,6 +1670,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 			b, _ := json.Marshal(collected)
 			responseBody = cloneDataSharingRequestBody(b)
 			observeGeminiImageOutputs(c, b)
+			CaptureGeneratedImagesFromGeminiJSON(c.Request.Context(), b)
 			c.Data(http.StatusOK, "application/json", b)
 			usage = usageObj
 		} else {
@@ -2640,6 +2641,7 @@ func (s *GeminiMessagesCompatService) handleNativeNonStreamingResponse(c *gin.Co
 		}
 	}
 	observeGeminiImageOutputs(c, respBody)
+	CaptureGeneratedImagesFromGeminiJSON(c.Request.Context(), respBody)
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
@@ -2730,6 +2732,7 @@ func (s *GeminiMessagesCompatService) handleNativeStreamingResponse(c *gin.Conte
 						}
 					}
 					observeGeminiImageOutputs(c, rawBytes)
+					CaptureGeneratedImagesFromGeminiJSON(c.Request.Context(), rawBytes)
 
 					if firstTokenMs == nil {
 						ms := int(time.Since(startTime).Milliseconds())

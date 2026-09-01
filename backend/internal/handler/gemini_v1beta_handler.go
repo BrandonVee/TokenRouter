@@ -307,6 +307,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 	if channelMapping.Mapped {
 		modelName = channelMapping.MappedModel
 	}
+	requestCtx := c.Request.Context()
+	var imageHistoryCollector *service.GeneratedImageCaptureCollector
+	requestCtx, imageHistoryCollector = h.prepareGeminiImageHistoryCapture(requestCtx, authSubject.UserID)
+	if imageHistoryCollector != nil {
+		c.Request = c.Request.WithContext(requestCtx)
+	}
 
 	// Get subscription (may be nil)
 	subscription, _ := middleware.GetSubscriptionFromContext(c)
@@ -680,6 +686,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				).Error("gemini.record_usage_failed", zap.Error(err))
 			}
 		})
+		h.saveGeminiImageHistoryAsync(service.SaveImageHistoryInput{
+			UserID: authSubject.UserID, APIKeyID: apiKey.ID, RequestID: result.RequestID,
+			Source: "gemini", Endpoint: "/v1beta/models/" + modelName + ":" + action,
+			Model: reqModel, Prompt: service.HistoryPromptFromGeminiJSON(body),
+			Parameters: service.HistoryParametersFromGeminiJSON(body),
+		}, imageHistoryCollector)
 		reqLog.Debug("gemini.request_completed",
 			zap.Int64("account_id", account.ID),
 			zap.Int("switch_count", fs.SwitchCount),
