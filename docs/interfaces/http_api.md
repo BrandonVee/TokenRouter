@@ -82,7 +82,7 @@ OAuth 登录 start 对 GitHub、Google、LinuxDo、DingTalk、WeChat 和 OIDC �
 
 历史列表和对象操作在全局存储关闭时返回 `IMAGE_HISTORY_UNAVAILABLE`；不存在或不属于当前用户的记录统一返回 `IMAGE_HISTORY_NOT_FOUND`，避免跨用户枚举。设置默认关闭，现有历史不会因关闭用户开关而自动删除。具体捕获与失败语义见[生图历史](../domains/image_history.md)。
 
-管理员存储配置位于 `/api/v1/admin/settings/image-history-storage`：`GET` 返回脱敏后的当前有效配置，`PUT` 保存数据库覆盖并热生效，`DELETE` 删除覆盖并恢复 YAML/环境变量部署配置，`POST /test` 只测试连接、不持久化。`PUT`/`DELETE` 需要 step-up 2FA；Secret 不会在响应中回显，入库前使用固定 `TOTP_ENCRYPTION_KEY` 加密。该管理配置不改变备份、发票附件或数据共享的既有存储边界。
+管理员存储配置位于 `/api/v1/admin/settings/image-history-storage`：`GET` 返回脱敏后的当前有效配置，`PUT` 保存数据库覆盖并热生效，`DELETE` 删除覆盖并恢复 YAML/环境变量部署配置，`POST /test` 只测试连接、不持久化。`PUT`/`DELETE` 需要 step-up 2FA；Secret 不会在响应中回显，入库前使用启动时在 `security_secrets` 中自动确保稳定的 TOTP 加密密钥加密。该管理配置不改变备份、发票附件或数据共享的既有存储边界。
 
 <a id="invoice_api"></a>
 ## 人工发票接口

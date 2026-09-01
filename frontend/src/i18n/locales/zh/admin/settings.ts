@@ -56,7 +56,7 @@ dataSharing: {
           prefix: '图片目录',
           forcePathStyle: '路径风格访问',
           forcePathStyleHint: 'MinIO 等需要 path-style 的服务开启此项。',
-          encryptionKeyRequired: '保存对象存储凭据前，需要先配置固定的 TOTP_ENCRYPTION_KEY。连接测试不受影响。',
+          encryptionKeyRequired: '服务会在首次启动时自动创建并持久化 TOTP 加密密钥；连接测试不受影响。',
           source: {
             deployment: '部署配置',
             database: '页面配置'
@@ -226,7 +226,7 @@ dataSharing: {
         totp: '双因素认证 (2FA)',
         totpHint: '允许用户使用 Google Authenticator 等应用进行二次验证',
         totpKeyNotConfigured:
-          '请先在环境变量中配置 TOTP_ENCRYPTION_KEY。使用命令 openssl rand -hex 32 生成密钥。'
+          'TOTP 加密密钥尚未完成数据库初始化，请在数据库初始化完成后重启服务。'
       },
       security: {
         stepUp: '敏感操作二次验证 (step-up 2FA)',

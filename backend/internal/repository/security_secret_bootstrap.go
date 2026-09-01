@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	securitySecretKeyJWT        = "jwt_secret"
-	securitySecretReadRetryMax  = 5
-	securitySecretReadRetryWait = 10 * time.Millisecond
+	securitySecretKeyJWT            = "jwt_secret"
+	securitySecretKeyTOTPEncryption = "totp_encryption_key"
+	securitySecretReadRetryMax      = 5
+	securitySecretReadRetryWait     = 10 * time.Millisecond
 )
 
 var readRandomBytes = rand.Read
@@ -42,17 +43,68 @@ func ensureBootstrapSecrets(ctx context.Context, client *ent.Client, cfg *config
 			log.Println("Warning: configured JWT secret mismatches persisted value; using persisted secret for cross-instance consistency.")
 		}
 		cfg.JWT.Secret = storedSecret
-		return nil
+	} else {
+		secret, created, err := getOrCreateGeneratedSecuritySecret(ctx, client, securitySecretKeyJWT, 32)
+		if err != nil {
+			return fmt.Errorf("ensure jwt secret: %w", err)
+		}
+		cfg.JWT.Secret = secret
+
+		if created {
+			log.Println("Warning: JWT secret auto-generated and persisted to database. Consider rotating to a managed secret for production.")
+		}
 	}
 
-	secret, created, err := getOrCreateGeneratedSecuritySecret(ctx, client, securitySecretKeyJWT, 32)
+	if err := ensureTOTPEncryptionKey(ctx, client, cfg); err != nil {
+		return fmt.Errorf("ensure totp encryption key: %w", err)
+	}
+	return nil
+}
+
+// ensureTOTPEncryptionKey 将 TOTP 密钥持久化到数据库，保证缺省配置在重启和多实例间保持一致。
+func ensureTOTPEncryptionKey(ctx context.Context, client *ent.Client, cfg *config.Config) error {
+	configured := strings.TrimSpace(cfg.Totp.EncryptionKey)
+	var (
+		stored  string
+		created bool
+		err     error
+	)
+
+	if configured != "" {
+		if err := validateTOTPEncryptionKey(configured); err != nil {
+			return err
+		}
+		stored, err = createSecuritySecretIfAbsent(ctx, client, securitySecretKeyTOTPEncryption, configured)
+		if err == nil && stored != configured {
+			log.Println("Warning: configured TOTP encryption key mismatches persisted value; using persisted key for cross-instance consistency.")
+		}
+	} else {
+		stored, created, err = getOrCreateGeneratedSecuritySecret(ctx, client, securitySecretKeyTOTPEncryption, 32)
+	}
 	if err != nil {
-		return fmt.Errorf("ensure jwt secret: %w", err)
+		return fmt.Errorf("persist key: %w", err)
 	}
-	cfg.JWT.Secret = secret
+	if err := validateTOTPEncryptionKey(stored); err != nil {
+		return fmt.Errorf("stored key: %w", err)
+	}
 
+	cfg.Totp.EncryptionKey = stored
+	// 数据库记录已经提供跨重启稳定性，后续服务可以安全保存加密凭据。
+	cfg.Totp.EncryptionKeyConfigured = true
 	if created {
-		log.Println("Warning: JWT secret auto-generated and persisted to database. Consider rotating to a managed secret for production.")
+		log.Println("Warning: TOTP encryption key auto-generated and persisted to database. Keep security_secrets in backups; set TOTP_ENCRYPTION_KEY before first startup for external secret management.")
+	}
+	return nil
+}
+
+// validateTOTPEncryptionKey 校验 AES-256 所需的 32 字节十六进制密钥格式。
+func validateTOTPEncryptionKey(value string) error {
+	decoded, err := hex.DecodeString(strings.TrimSpace(value))
+	if err != nil {
+		return fmt.Errorf("totp encryption key must be 64 hexadecimal characters: %w", err)
+	}
+	if len(decoded) != 32 {
+		return fmt.Errorf("totp encryption key must be 32 bytes (64 hexadecimal characters), got %d bytes", len(decoded))
 	}
 	return nil
 }

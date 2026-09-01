@@ -766,12 +766,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
-	// TOTP 双因素认证参数验证
-	// 只有手动配置了加密密钥才允许启用 TOTP 功能
+	// TOTP 双因素认证参数验证，要求启动引导已经准备好稳定加密密钥。
 	if req.TotpEnabled && !previousSettings.TotpEnabled {
-		// 尝试启用 TOTP，检查加密密钥是否已手动配置
+		// 尝试启用 TOTP，检查加密密钥是否已完成引导
 		if !h.settingService.IsTotpEncryptionKeyConfigured() {
-			response.BadRequest(c, "Cannot enable TOTP: TOTP_ENCRYPTION_KEY environment variable must be configured first. Generate a key with 'openssl rand -hex 32' and set it in your environment.")
+			response.BadRequest(c, "Cannot enable TOTP: the stable encryption key is not ready; restart after database initialization completes.")
 			return
 		}
 	}

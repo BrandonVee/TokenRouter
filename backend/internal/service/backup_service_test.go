@@ -392,7 +392,7 @@ func TestBackupService_EphemeralKeyAllowsExistingSecretReuse(t *testing.T) {
 	seedS3Config(t, repo)
 	svc := newTestBackupServiceWithEncryptionKey(t, repo, &mockDumper{}, newMockObjectStore(), false)
 
-	// 省略密钥时只复用已有密文，不会生成依赖当前临时密钥的新密文。
+	// 稳定密钥尚未就绪时只复用已有密文，不会写入新的 S3 密文。
 	_, err := svc.UpdateS3Config(context.Background(), BackupS3Config{
 		Bucket:      "my-bucket",
 		AccessKeyID: "AKID-NEW",

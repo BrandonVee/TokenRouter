@@ -1600,10 +1600,9 @@ type JWTConfig struct {
 // TotpConfig TOTP 双因素认证配置
 type TotpConfig struct {
 	// EncryptionKey 用于加密 TOTP 密钥的 AES-256 密钥（32 字节 hex 编码）
-	// 如果为空，将自动生成一个随机密钥（仅适用于开发环境）
+	// 为空时会在数据库启动引导阶段自动生成并持久化。
 	EncryptionKey string `mapstructure:"encryption_key"`
-	// EncryptionKeyConfigured 标记加密密钥是否为手动配置（非自动生成）
-	// 只有手动配置了密钥才允许在管理后台启用 TOTP 功能
+	// EncryptionKeyConfigured 标记密钥是否已具备跨重启稳定性。
 	EncryptionKeyConfigured bool `mapstructure:"-"`
 }
 
@@ -1869,19 +1868,9 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 		cfg.Gateway.UserMessageQueue.Mode = ""
 	}
 
-	// Auto-generate TOTP encryption key if not set (32 bytes = 64 hex chars for AES-256)
+	// TOTP 密钥由数据库启动引导阶段补齐，避免配置加载时生成不可跨重启使用的临时值。
 	cfg.Totp.EncryptionKey = strings.TrimSpace(cfg.Totp.EncryptionKey)
-	if cfg.Totp.EncryptionKey == "" {
-		key, err := generateJWTSecret(32) // Reuse the same random generation function
-		if err != nil {
-			return nil, fmt.Errorf("generate totp encryption key error: %w", err)
-		}
-		cfg.Totp.EncryptionKey = key
-		cfg.Totp.EncryptionKeyConfigured = false
-		slog.Warn("TOTP encryption key auto-generated. Consider setting a fixed key for production.")
-	} else {
-		cfg.Totp.EncryptionKeyConfigured = true
-	}
+	cfg.Totp.EncryptionKeyConfigured = cfg.Totp.EncryptionKey != ""
 
 	originalJWTSecret := cfg.JWT.Secret
 	if allowMissingJWTSecret && originalJWTSecret == "" {

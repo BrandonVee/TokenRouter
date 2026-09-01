@@ -178,8 +178,7 @@ func (s *SettingService) IsTotpEnabled(ctx context.Context) bool {
 	return value == "true"
 }
 
-// IsTotpEncryptionKeyConfigured 检查 TOTP 加密密钥是否已手动配置
-// 只有手动配置了密钥才允许在管理后台启用 TOTP 功能
+// IsTotpEncryptionKeyConfigured 检查 TOTP 加密密钥是否已具备跨重启稳定性。
 func (s *SettingService) IsTotpEncryptionKeyConfigured() bool {
 	return s.cfg.Totp.EncryptionKeyConfigured
 }

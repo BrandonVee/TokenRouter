@@ -29,10 +29,9 @@ func ProvideEncryptionKey(cfg *config.Config) (EncryptionKey, error) {
 		slog.Warn("payment encryption key not configured — encrypted payment config will be unavailable")
 		return nil, nil
 	}
-	// Reject auto-generated TOTP keys for payment signing.
-	// They change across restarts/instances and can silently break resume-token flows.
+	// 数据库启动引导会把自动生成的 TOTP 密钥固定下来，只有仍未完成引导时才禁用支付加密。
 	if !cfg.Totp.EncryptionKeyConfigured {
-		slog.Warn("payment encryption/signing key is not explicitly configured; set TOTP_ENCRYPTION_KEY to enable payment resume tokens")
+		slog.Warn("payment encryption/signing key is not ready; complete database security-secret bootstrap to enable payment resume tokens")
 		return nil, nil
 	}
 	key, err := hex.DecodeString(keyHex)

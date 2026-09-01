@@ -51,13 +51,14 @@ sudo systemctl enable sub2api
 可以直接在 **管理后台** 左上角点击 **检测更新** 按钮进行在线升级。
 
 通过服务器安装脚本升级（包括回退）时，脚本会自动创建或复用
-`/etc/sub2api/sub2api.env` 中的固定 `TOTP_ENCRYPTION_KEY`，不会因替换二进制而改变：
+`/etc/sub2api/sub2api.env` 中的 `TOTP_ENCRYPTION_KEY`；未显式配置时，服务也会在数据库
+`security_secrets` 中自动创建并复用稳定密钥，不会因替换二进制而改变：
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/BrandonVee/TokenRouter/main/deploy/install.sh | sudo bash -s -- upgrade
 ```
 
-不要删除或覆盖该环境文件；数据库中的对象存储凭据依赖它解密。
+不要删除或覆盖该环境文件；数据库中的对象存储凭据依赖环境密钥或数据库中的稳定密钥解密。
 
 网页升级功能支持：
 - 自动检测新版本
@@ -118,7 +119,7 @@ docker compose logs -f sub2api
 
 **脚本功能：**
 - 下载 `docker-compose.local.yml`（本地保存为 `docker-compose.yml`）和 `.env.example`
-- 自动生成安全凭证（JWT_SECRET、TOTP_ENCRYPTION_KEY、POSTGRES_PASSWORD）
+- 自动生成安全凭证（JWT_SECRET、TOTP_ENCRYPTION_KEY、POSTGRES_PASSWORD）；未提供 TOTP 密钥时服务会在数据库中自动持久化
 - 创建 `.env` 文件并填充自动生成的密钥
 - 创建数据目录（使用本地目录，便于备份和迁移）
 - 显示生成的凭证供你记录
@@ -139,7 +140,7 @@ cp .env.example .env
 nano .env
 ```
 
-**`.env` 必须配置项：**
+**`.env` 基本配置：**
 
 ```bash
 # PostgreSQL 密码（必需）
@@ -148,8 +149,8 @@ POSTGRES_PASSWORD=your_secure_password_here
 # JWT 密钥（推荐 - 重启后保持用户登录状态）
 JWT_SECRET=your_jwt_secret_here
 
-# TOTP 加密密钥（推荐 - 重启后保留双因素认证）
-TOTP_ENCRYPTION_KEY=your_totp_key_here
+# TOTP 加密密钥（可选；留空时服务首次启动自动在数据库持久化）
+TOTP_ENCRYPTION_KEY=
 
 # 可选：管理员账号
 ADMIN_EMAIL=admin@example.com

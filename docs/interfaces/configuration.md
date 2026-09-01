@@ -47,7 +47,7 @@
 
 环境变量把点分键转成大写下划线，例如 `database.host` 对应 `DATABASE_HOST`，`gateway.max_body_size` 对应 `GATEWAY_MAX_BODY_SIZE`。`setDefaults` 还负责把所有 struct 键注册进 Viper，使纯环境变量部署能被 `Unmarshal` 看到；新增字段不能只加 `mapstructure` tag 而不注册默认/可达键。少量变量有显式绑定或专用解析：`ENABLE_SERVER_TIMING`，逗号分隔的 `SERVER_TRUSTED_PROXIES` 和 `SECURITY_FORWARDED_CLIENT_IP_HEADERS`，以及受兼容条件约束的旧 WeChat 变量。
 
-加载完成后会做字符串规范化、枚举回退、派生默认、文件读取和完整 `Validate`。无效安全 header、URL、数值范围、模式组合或必要 secret 会让启动失败；不应等到某个请求首次使用时才发现。自动生成的 TOTP key 只适合开发，`EncryptionKeyConfigured=false` 会阻止后台把 TOTP 当成生产可用配置。
+加载完成后会做字符串规范化、枚举回退、派生默认、文件读取和完整 `Validate`。无效安全 header、URL、数值范围、模式组合或必要 secret 会让启动失败；不应等到某个请求首次使用时才发现。数据库初始化随后补齐持久安全密钥：未显式配置 `TOTP_ENCRYPTION_KEY` 时，服务原子生成 32 字节密钥并保存到 `security_secrets`；后续重启和共享数据库的实例复用该记录，再将 `EncryptionKeyConfigured` 标记为可持久使用。显式配置首次启动也会写入同一记录；以后若环境值与数据库记录不一致，使用数据库记录维持已加密数据和多实例一致性。
 
 环境变量优先于 YAML，因此排查“文件修改不生效”时先检查容器环境。不得在日志、错误或管理响应中输出数据库密码、JWT/TOTP secret、OAuth secret、对象存储 secret 或账号凭据。
 
@@ -59,11 +59,11 @@
 
 所有键都通过 Viper 的点分键映射到同名大写下划线环境变量，例如 `IMAGE_HISTORY_ENABLED`、`IMAGE_HISTORY_BUCKET`、`IMAGE_HISTORY_ACCESS_KEY_ID`、`IMAGE_HISTORY_SECRET_ACCESS_KEY` 和 `IMAGE_HISTORY_PREFIX`。仓库提供的三套 Compose（`docker-compose.yml`、`docker-compose.local.yml`、`docker-compose.dev.yml`）和 `deploy/.env.example` 均已透传这些变量；本地环境只需在 `.env` 填写后重建/重启应用容器。部署配置只在启动时加载，修改后需要重启；部署配置凭据不会复制到数据库设置或前端响应。
 
-管理员“设置 - 文件存储 - 生图历史”可通过 `/api/v1/admin/settings/image-history-storage` 保存一份数据库覆盖。任何保存操作都必须先配置固定的 `TOTP_ENCRYPTION_KEY`，页面不会回显 Secret，数据库中的 Secret 使用该密钥加密；覆盖保存后立即替换运行中的 S3 客户端，不需要重启。保存和恢复部署配置要求 step-up 2FA，连接测试不要求该密钥，只验证桶访问能力且不写入数据库。删除页面覆盖后，服务恢复使用当前进程启动时读取的 YAML/环境变量配置；如果覆盖记录损坏或无法解密，也会回退到部署配置并保留管理员修复入口。覆盖配置只改变生图历史，备份、发票附件和数据共享继续使用各自的配置与生命周期。
+管理员“设置 - 文件存储 - 生图历史”可通过 `/api/v1/admin/settings/image-history-storage` 保存一份数据库覆盖。页面不会回显 Secret，数据库中的 Secret 使用启动时自动确保稳定的 TOTP 加密密钥加密；覆盖保存后立即替换运行中的 S3 客户端，不需要重启。保存和恢复部署配置要求 step-up 2FA，连接测试不依赖凭据持久化，只验证桶访问能力且不写入数据库。删除页面覆盖后，服务恢复使用当前进程启动时读取的 YAML/环境变量配置；如果覆盖记录损坏或无法解密，也会回退到部署配置并保留管理员修复入口。覆盖配置只改变生图历史，备份、发票附件和数据共享继续使用各自的配置与生命周期。
 
 ## 统一文件存储目录
 
-管理员“设置 - 文件存储”按业务目录管理私有文件的落点。当前 `invoice_attachments` 可为后续上传选择应用持久目录或 S3 兼容存储；S3 凭据使用固定 `TOTP_ENCRYPTION_KEY` 加密，保存和切换均要求 step-up 2FA。保存 S3 配置会创建不可变的存储档案，而不是覆盖旧档案。每个新附件在元数据中记录 `storage_type` 和 `storage_profile_id`，因此后续改桶、改前缀或切回本地不会让既有附件失联。
+管理员“设置 - 文件存储”按业务目录管理私有文件的落点。当前 `invoice_attachments` 可为后续上传选择应用持久目录或 S3 兼容存储；S3 凭据使用启动时自动确保稳定的 TOTP 加密密钥加密，保存和切换均要求 step-up 2FA。保存 S3 配置会创建不可变的存储档案，而不是覆盖旧档案。每个新附件在元数据中记录 `storage_type` 和 `storage_profile_id`，因此后续改桶、改前缀或切回本地不会让既有附件失联。
 
 遗留附件默认关联 `local-default`，仍从历史本地目录读取，无需自动迁移。所有附件下载继续通过受鉴权的应用接口代理，不能把桶 URL 或预签名 URL 直接交给普通接口。删除档案及跨后端迁移不由配置保存隐式执行；这类清理/迁移必须作为可观测、可重试的专门任务实现。
 
@@ -73,7 +73,7 @@ setup 使用 `DATA_DIR > 可写 /app/data > 当前目录` 选择 `config.yaml` �
 
 交互或 `AUTO_SETUP` 流程测试 PostgreSQL/Redis、执行迁移、只在空数据库中创建初始管理员、以 `0600` 写入配置并创建安装锁。已有管理员或已有普通用户时不会覆盖密码。自动 setup 的 `DATABASE_*`、`REDIS_*`、`ADMIN_*`、`SERVER_*`、`JWT_*` 和时区变量是生成初始文件的输入；生成后常规启动仍走统一 config loader。
 
-主服务使用 `LoadForBootstrap`，只在引导阶段允许 `jwt.secret` 暂时为空。数据库 repository 初始化会从 `security_secrets` 读取既有 JWT secret，或原子生成并持久化一个新 secret，然后重新执行完整配置校验。多个实例不能各自使用临时随机 JWT key；显式配置与数据库已有 secret 不一致时，以已持久化的安全边界处理，避免滚动部署让会话随机失效。
+主服务使用 `LoadForBootstrap`，在数据库引导前允许 `jwt.secret` 和 TOTP 密钥暂时为空。数据库 repository 初始化会从 `security_secrets` 读取既有 JWT secret 和 TOTP 加密密钥，或分别原子生成并持久化新值，然后重新执行完整配置校验。多个实例不能各自使用临时随机密钥；显式配置与数据库已有 secret 不一致时，以已持久化的安全边界处理，避免滚动部署让会话或密文随机失效。PostgreSQL 灾备必须包含 `security_secrets`，否则恢复后的 TOTP、对象存储凭据和其它密文将失去原密钥。
 
 ## 数据库运行时设置
 

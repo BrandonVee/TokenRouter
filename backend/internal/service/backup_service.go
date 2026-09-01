@@ -53,10 +53,10 @@ var (
 	ErrBackupStorageConfigCorrupt = infraerrors.InternalServer("BACKUP_STORAGE_CONFIG_CORRUPT", "backup storage config data is corrupted")
 	ErrBackupContentConfigCorrupt = infraerrors.InternalServer("BACKUP_CONTENT_CONFIG_CORRUPT", "backup content config data is corrupted")
 	ErrDatabaseMaintenanceBusy    = infraerrors.Conflict("MAINTENANCE_BUSY", "another database maintenance task is running")
-	// ErrSecretEncryptionKeyNotConfigured 表示当前使用的是重启后会变化的临时密钥，不能持久化新的 S3 密钥。
+	// ErrSecretEncryptionKeyNotConfigured 表示稳定加密密钥尚未完成启动引导，不能持久化新的 S3 密钥。
 	ErrSecretEncryptionKeyNotConfigured = infraerrors.BadRequest(
 		"SECRET_ENCRYPTION_KEY_NOT_CONFIGURED",
-		"cannot store the S3 secret access key: no fixed secret encryption key is configured, so the auto-generated key would change on every restart and make the stored secret undecryptable after a restart or upgrade. Set a fixed TOTP_ENCRYPTION_KEY (e.g. generate one with `openssl rand -hex 32`) and try again",
+		"cannot store the S3 secret access key: stable secret encryption key is not ready; restart after database security-secret initialization",
 	)
 )
 
@@ -231,7 +231,7 @@ type BackupService struct {
 	settingRepo SettingRepository
 	dbCfg       *config.DatabaseConfig
 	encryptor   SecretEncryptor
-	// encryptionKeyConfigured 标记加密密钥是否由部署显式配置；临时密钥不能用于持久化新凭证。
+	// encryptionKeyConfigured 标记加密密钥是否已具备跨重启稳定性。
 	encryptionKeyConfigured bool
 	storeFactory            BackupObjectStoreFactory
 	dumper                  DBDumper
@@ -398,7 +398,7 @@ func (s *BackupService) Stop() {
 
 // ─── 存储配置管理 ───
 
-// EncryptionKeyConfigured 返回当前是否使用部署显式配置、可跨重启保持不变的加密密钥。
+// EncryptionKeyConfigured 返回当前是否使用可跨重启保持不变的加密密钥。
 func (s *BackupService) EncryptionKeyConfigured() bool {
 	return s != nil && s.encryptionKeyConfigured
 }
@@ -1504,7 +1504,7 @@ func (s *BackupService) prepareS3ConfigForSave(ctx context.Context, cfg BackupS3
 	if cfg.SecretAccessKey == "" {
 		cfg.SecretAccessKey = s.loadStoredEncryptedS3Secret(ctx)
 	} else {
-		// 自动生成的临时密钥会在重启后变化，使用它落库会让新密文永久无法解密。
+		// 未完成数据库密钥引导时不写入新密文，避免使用不稳定的密钥。
 		if !s.encryptionKeyConfigured {
 			return nil, ErrSecretEncryptionKeyNotConfigured
 		}

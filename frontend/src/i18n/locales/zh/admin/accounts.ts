@@ -277,7 +277,7 @@ export default {
         configured: '已配置',
         notConfigured: '未配置',
         notRefreshed: '尚未刷新',
-        encryptionKeyRequired: '请先配置持久 TOTP_ENCRYPTION_KEY，再保存浏览器会话。',
+        encryptionKeyRequired: 'TOTP 加密密钥尚未完成数据库初始化，请在数据库初始化完成后重启服务。',
         sessionLabel: 'Ollama 浏览器 Cookie',
         sessionPlaceholder: 'wos-session=...; __Secure-authjs.session-token.0=...',
         writeOnlyHint: '仅写入。已保存内容不可查看，留空不会覆盖。',

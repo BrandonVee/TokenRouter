@@ -197,7 +197,7 @@ func (s *FileStorageService) prepareProfile(_ context.Context, input FileStorage
 		return storedFileStorageProfile{ID: localFileStorageProfileID, Type: FileStorageTypeLocal, LocalPath: s.localPath}, nil
 	case FileStorageTypeS3:
 		if !s.encryptionKeyConfigured || s.encryptor == nil {
-			return storedFileStorageProfile{}, infraerrors.BadRequest("FILE_STORAGE_ENCRYPTION_KEY_REQUIRED", "set a fixed TOTP_ENCRYPTION_KEY before saving file storage credentials")
+			return storedFileStorageProfile{}, infraerrors.BadRequest("FILE_STORAGE_ENCRYPTION_KEY_REQUIRED", "stable TOTP encryption key is not ready; restart after database security-secret initialization")
 		}
 		cfg := input.S3
 		cfg.Endpoint = strings.TrimSpace(cfg.Endpoint)

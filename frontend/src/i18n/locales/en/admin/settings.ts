@@ -56,7 +56,7 @@ dataSharing: {
           prefix: 'Image Directory',
           forcePathStyle: 'Path-style access',
           forcePathStyleHint: 'Enable this for MinIO and other services that require path-style URLs.',
-          encryptionKeyRequired: 'Set a fixed TOTP_ENCRYPTION_KEY before saving object storage credentials. Connection tests remain available.',
+          encryptionKeyRequired: 'A stable TOTP encryption key is created and persisted automatically on first startup. Connection tests remain available.',
           source: {
             deployment: 'Deployment config',
             database: 'Admin config'
@@ -229,7 +229,7 @@ dataSharing: {
         totp: 'Two-Factor Authentication (2FA)',
         totpHint: 'Allow users to use authenticator apps like Google Authenticator',
         totpKeyNotConfigured:
-          'Please configure TOTP_ENCRYPTION_KEY in environment variables first. Generate a key with: openssl rand -hex 32'
+          'The stable TOTP encryption key is not ready. Restart after database initialization completes.'
       },
       security: {
         stepUp: 'Step-up 2FA for Sensitive Operations',

@@ -23,7 +23,7 @@ var (
 	ErrImageHistoryStorageConfigInvalid = infraerrors.BadRequest("IMAGE_HISTORY_STORAGE_CONFIG_INVALID", "image history storage config is invalid")
 	ErrImageHistoryStorageKeyRequired   = infraerrors.BadRequest(
 		"IMAGE_HISTORY_STORAGE_ENCRYPTION_KEY_REQUIRED",
-		"set a fixed TOTP_ENCRYPTION_KEY before saving image history storage credentials",
+		"stable TOTP encryption key is not ready; restart after database security-secret initialization",
 	)
 )
 
@@ -139,7 +139,7 @@ func (s *ImageHistoryService) UpdateStorageConfig(ctx context.Context, input Ima
 		_, current := s.storageSnapshot()
 		runtimeCfg.SecretAccessKey = current.SecretAccessKey
 	}
-	// 页面覆盖会持久化对象存储凭据，必须使用可跨重启解密的固定密钥。
+	// 页面覆盖会持久化对象存储凭据，必须使用可跨重启解密的稳定密钥。
 	if !s.encryptionKeyConfigured {
 		return ImageHistoryStorageConfig{}, ErrImageHistoryStorageKeyRequired
 	}
