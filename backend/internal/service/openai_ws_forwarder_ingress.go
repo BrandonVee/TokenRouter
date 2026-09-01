@@ -1024,6 +1024,8 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				}
 			}
 			imageCounter.AddSSEData(upstreamMessage)
+			// Responses WebSocket 的终态事件同样进入生图历史捕获器。
+			CaptureGeneratedImagesFromSSE(ctx, upstreamMessage)
 			terminalPolicy := openAIWSTerminalPolicyDecision{
 				TerminalEvent: normalizeOpenAIWSTerminalEvent(eventType),
 				Decision:      UpstreamErrorDecision{Policy: ErrorPolicyNone},

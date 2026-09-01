@@ -617,6 +617,8 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 			responseAccumulator.ProcessEvent(&responseEvent)
 		}
 		imageCounter.AddSSEData(message)
+		// WebSocket v2 的终态事件同样进入生图历史捕获器。
+		CaptureGeneratedImagesFromSSE(ctx, message)
 		if warning := buildOpenAIWSUpstreamWarning(eventType, message); warning != nil {
 			upstreamWarning = warning
 		}

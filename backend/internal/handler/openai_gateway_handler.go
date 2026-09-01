@@ -1668,6 +1668,11 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	userAgent := strings.TrimSpace(c.GetHeader("User-Agent"))
 	clientLifecycleCtx := c.Request.Context()
 	ctx := clientLifecycleCtx
+	// WebSocket 多轮 Responses 也复用请求级捕获器，逐轮提交最终生图结果。
+	ctx, imageHistoryCollector := h.prepareImageHistoryCapture(ctx, subject.UserID)
+	if imageHistoryCollector != nil {
+		c.Request = c.Request.WithContext(ctx)
+	}
 	maxIngressConnections := 0
 	if h.cfg != nil {
 		maxIngressConnections = h.cfg.Gateway.OpenAIWS.MaxIngressConnectionsPerAPIKey
@@ -2083,6 +2088,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		currentFastModePolicy.Store(apiKey.FastModePolicy)
 		maxReasoningEffort := ""
 		var reasoningEffortMappings []service.ReasoningEffortMapping
+		savedImageHistoryItems := 0
 		if apiKey.Group != nil && apiKey.Group.Platform == service.PlatformOpenAI {
 			maxReasoningEffort = apiKey.Group.MaxReasoningEffort
 			reasoningEffortMappings = apiKey.Group.ReasoningEffortMappings
@@ -2276,6 +2282,29 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 				}
 				if result == nil {
 					return
+				}
+				if imageHistoryCollector != nil {
+					capturedImages := imageHistoryCollector.Items()
+					if savedImageHistoryItems < len(capturedImages) {
+						turnImages := capturedImages[savedImageHistoryItems:]
+						turnRequestBody := capture.RequestBody
+						if len(turnRequestBody) == 0 {
+							turnRequestBody = wsFirstMessageForUsageFallback
+						}
+						accepted := h.saveImageHistoryItemsAsync(service.SaveImageHistoryInput{
+							UserID:     subject.UserID,
+							APIKeyID:   apiKey.ID,
+							RequestID:  result.RequestID,
+							Source:     "openai",
+							Endpoint:   "/v1/responses",
+							Model:      turnModel,
+							Prompt:     service.HistoryPromptFromResponsesJSON(turnRequestBody),
+							Parameters: service.HistoryParametersFromResponsesJSON(turnRequestBody),
+						}, turnImages)
+						if accepted {
+							savedImageHistoryItems = len(capturedImages)
+						}
+					}
 				}
 				// 排除 spark 影子:其 codex_* 仅由 QueryUsage(/wham/usage bengalfox)更新(外审第7轮 P1)。
 				if account.Type == service.AccountTypeOAuth && !account.IsShadow() {

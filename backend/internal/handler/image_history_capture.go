@@ -21,8 +21,14 @@ func (h *OpenAIGatewayHandler) saveImageHistoryAsync(input service.SaveImageHist
 		return
 	}
 	input.Images = collector.Items()
-	if len(input.Images) == 0 {
-		return
+	h.saveImageHistoryItemsAsync(input, input.Images)
+}
+
+// saveImageHistoryItemsAsync 提交指定图片，供多轮 WebSocket 请求避免重复保存历史图片。
+func (h *OpenAIGatewayHandler) saveImageHistoryItemsAsync(input service.SaveImageHistoryInput, images []service.GeneratedImageCapture) bool {
+	if h == nil || h.imageHistorySaveWorkerPool == nil || len(images) == 0 {
+		return false
 	}
-	h.imageHistorySaveWorkerPool.Submit(input)
+	input.Images = images
+	return h.imageHistorySaveWorkerPool.Submit(input)
 }
