@@ -28,6 +28,7 @@ export default {
     createdAt: '生成时间',
     prompt: '提示词',
     revisedPrompt: '优化提示词',
+    parameters: '生图参数',
     unknownModel: '未知模型',
   },
 }

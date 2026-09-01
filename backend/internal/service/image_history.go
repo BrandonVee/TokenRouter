@@ -33,6 +33,7 @@ const (
 	imageHistorySourceMaxRunes        = 32
 	imageHistoryEndpointMaxRunes      = 64
 	imageHistoryModelMaxRunes         = 255
+	imageHistoryParametersMaxRunes    = 65536
 	imageHistoryPromptMaxRunes        = 32768
 	imageHistoryRevisedPromptMaxRunes = 32768
 	imageHistoryCleanupTimeout        = 10 * time.Second
@@ -54,6 +55,7 @@ type ImageHistoryRecord struct {
 	Model         string    `json:"model"`
 	Prompt        string    `json:"prompt"`
 	RevisedPrompt string    `json:"revised_prompt,omitempty"`
+	Parameters    string    `json:"parameters,omitempty"`
 	ObjectKey     string    `json:"-"`
 	MimeType      string    `json:"mime_type"`
 	SizeBytes     int64     `json:"size_bytes"`
@@ -81,14 +83,15 @@ type ImageHistoryList struct {
 
 // SaveImageHistoryInput 描述一次成功生图请求及其最终图片。
 type SaveImageHistoryInput struct {
-	UserID    int64
-	APIKeyID  int64
-	RequestID string
-	Source    string
-	Endpoint  string
-	Model     string
-	Prompt    string
-	Images    []GeneratedImageCapture
+	UserID     int64
+	APIKeyID   int64
+	RequestID  string
+	Source     string
+	Endpoint   string
+	Model      string
+	Prompt     string
+	Parameters string
+	Images     []GeneratedImageCapture
 }
 
 // ImageHistoryRepository 负责用户偏好和历史元数据，图片字节由对象存储负责。
@@ -331,6 +334,7 @@ func (s *ImageHistoryService) saveCapturedImage(ctx context.Context, input SaveI
 		Model:         truncateImageHistoryText(input.Model, imageHistoryModelMaxRunes),
 		Prompt:        truncateImageHistoryText(input.Prompt, imageHistoryPromptMaxRunes),
 		RevisedPrompt: truncateImageHistoryText(captured.RevisedPrompt, imageHistoryRevisedPromptMaxRunes),
+		Parameters:    truncateImageHistoryText(input.Parameters, imageHistoryParametersMaxRunes),
 		ObjectKey:     objectKey,
 		MimeType:      mimeType,
 		SizeBytes:     int64(len(data)),

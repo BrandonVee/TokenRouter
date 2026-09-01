@@ -1173,6 +1173,7 @@ var (
 		{Name: "model", Type: field.TypeString, Size: 255, Default: ""},
 		{Name: "prompt", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "revised_prompt", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "parameters", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "object_key", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "mime_type", Type: field.TypeString, Size: 100},
 		{Name: "size_bytes", Type: field.TypeInt64},
@@ -1190,7 +1191,7 @@ var (
 			{
 				Name:    "imagehistory_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{ImageHistoriesColumns[1], ImageHistoriesColumns[15]},
+				Columns: []*schema.Column{ImageHistoriesColumns[1], ImageHistoriesColumns[16]},
 			},
 			{
 				Name:    "imagehistory_request_id",
@@ -1200,7 +1201,7 @@ var (
 			{
 				Name:    "imagehistory_object_key",
 				Unique:  true,
-				Columns: []*schema.Column{ImageHistoriesColumns[9]},
+				Columns: []*schema.Column{ImageHistoriesColumns[10]},
 			},
 		},
 	}

@@ -90,6 +90,49 @@ type OpenAIImagesRequest struct {
 	bodyHash           string
 }
 
+// HistoryParameters 返回可安全持久化的生图参数，不包含原始请求体中的图片字节。
+func (r *OpenAIImagesRequest) HistoryParameters() string {
+	if r == nil {
+		return ""
+	}
+	params := map[string]any{
+		"endpoint": r.Endpoint,
+		"model":    r.Model,
+		"n":        r.N,
+		"stream":   r.Stream,
+	}
+	optional := map[string]string{
+		"size":            r.Size,
+		"size_tier":       r.SizeTier,
+		"response_format": r.ResponseFormat,
+		"quality":         r.Quality,
+		"background":      r.Background,
+		"output_format":   r.OutputFormat,
+		"moderation":      r.Moderation,
+		"input_fidelity":  r.InputFidelity,
+		"style":           r.Style,
+	}
+	for key, value := range optional {
+		if strings.TrimSpace(value) != "" {
+			params[key] = value
+		}
+	}
+	if r.OutputCompression != nil {
+		params["output_compression"] = *r.OutputCompression
+	}
+	if r.PartialImages != nil {
+		params["partial_images"] = *r.PartialImages
+	}
+	if r.HasMask {
+		params["has_mask"] = true
+	}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
 func (r *OpenAIImagesRequest) ModerationBody() []byte {
 	if r == nil {
 		return nil

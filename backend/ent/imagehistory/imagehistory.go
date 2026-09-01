@@ -29,6 +29,8 @@ const (
 	FieldPrompt = "prompt"
 	// FieldRevisedPrompt holds the string denoting the revised_prompt field in the database.
 	FieldRevisedPrompt = "revised_prompt"
+	// FieldParameters holds the string denoting the parameters field in the database.
+	FieldParameters = "parameters"
 	// FieldObjectKey holds the string denoting the object_key field in the database.
 	FieldObjectKey = "object_key"
 	// FieldMimeType holds the string denoting the mime_type field in the database.
@@ -58,6 +60,7 @@ var Columns = []string{
 	FieldModel,
 	FieldPrompt,
 	FieldRevisedPrompt,
+	FieldParameters,
 	FieldObjectKey,
 	FieldMimeType,
 	FieldSizeBytes,
@@ -94,6 +97,8 @@ var (
 	DefaultPrompt string
 	// DefaultRevisedPrompt holds the default value on creation for the "revised_prompt" field.
 	DefaultRevisedPrompt string
+	// DefaultParameters holds the default value on creation for the "parameters" field.
+	DefaultParameters string
 	// MimeTypeValidator is a validator for the "mime_type" field. It is called by the builders before save.
 	MimeTypeValidator func(string) error
 	// SizeBytesValidator is a validator for the "size_bytes" field. It is called by the builders before save.
@@ -160,6 +165,11 @@ func ByPrompt(opts ...sql.OrderTermOption) OrderOption {
 // ByRevisedPrompt orders the results by the revised_prompt field.
 func ByRevisedPrompt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRevisedPrompt, opts...).ToFunc()
+}
+
+// ByParameters orders the results by the parameters field.
+func ByParameters(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldParameters, opts...).ToFunc()
 }
 
 // ByObjectKey orders the results by the object_key field.

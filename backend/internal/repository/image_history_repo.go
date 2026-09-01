@@ -47,6 +47,7 @@ func (r *imageHistoryRepository) Create(ctx context.Context, record service.Imag
 		SetModel(record.Model).
 		SetPrompt(record.Prompt).
 		SetRevisedPrompt(record.RevisedPrompt).
+		SetParameters(record.Parameters).
 		SetObjectKey(record.ObjectKey).
 		SetMimeType(record.MimeType).
 		SetSizeBytes(record.SizeBytes).
@@ -118,6 +119,7 @@ func imageHistoryEntityToService(item *dbent.ImageHistory) service.ImageHistoryR
 		Model:         item.Model,
 		Prompt:        item.Prompt,
 		RevisedPrompt: item.RevisedPrompt,
+		Parameters:    item.Parameters,
 		ObjectKey:     item.ObjectKey,
 		MimeType:      item.MimeType,
 		SizeBytes:     item.SizeBytes,

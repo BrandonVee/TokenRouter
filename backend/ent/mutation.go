@@ -30577,6 +30577,7 @@ type ImageHistoryMutation struct {
 	model          *string
 	prompt         *string
 	revised_prompt *string
+	parameters     *string
 	object_key     *string
 	mime_type      *string
 	size_bytes     *int64
@@ -31039,6 +31040,42 @@ func (m *ImageHistoryMutation) ResetRevisedPrompt() {
 	m.revised_prompt = nil
 }
 
+// SetParameters sets the "parameters" field.
+func (m *ImageHistoryMutation) SetParameters(s string) {
+	m.parameters = &s
+}
+
+// Parameters returns the value of the "parameters" field in the mutation.
+func (m *ImageHistoryMutation) Parameters() (r string, exists bool) {
+	v := m.parameters
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParameters returns the old "parameters" field's value of the ImageHistory entity.
+// If the ImageHistory object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ImageHistoryMutation) OldParameters(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParameters is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParameters requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParameters: %w", err)
+	}
+	return oldValue.Parameters, nil
+}
+
+// ResetParameters resets all changes to the "parameters" field.
+func (m *ImageHistoryMutation) ResetParameters() {
+	m.parameters = nil
+}
+
 // SetObjectKey sets the "object_key" field.
 func (m *ImageHistoryMutation) SetObjectKey(s string) {
 	m.object_key = &s
@@ -31385,7 +31422,7 @@ func (m *ImageHistoryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ImageHistoryMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.user_id != nil {
 		fields = append(fields, imagehistory.FieldUserID)
 	}
@@ -31409,6 +31446,9 @@ func (m *ImageHistoryMutation) Fields() []string {
 	}
 	if m.revised_prompt != nil {
 		fields = append(fields, imagehistory.FieldRevisedPrompt)
+	}
+	if m.parameters != nil {
+		fields = append(fields, imagehistory.FieldParameters)
 	}
 	if m.object_key != nil {
 		fields = append(fields, imagehistory.FieldObjectKey)
@@ -31455,6 +31495,8 @@ func (m *ImageHistoryMutation) Field(name string) (ent.Value, bool) {
 		return m.Prompt()
 	case imagehistory.FieldRevisedPrompt:
 		return m.RevisedPrompt()
+	case imagehistory.FieldParameters:
+		return m.Parameters()
 	case imagehistory.FieldObjectKey:
 		return m.ObjectKey()
 	case imagehistory.FieldMimeType:
@@ -31494,6 +31536,8 @@ func (m *ImageHistoryMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldPrompt(ctx)
 	case imagehistory.FieldRevisedPrompt:
 		return m.OldRevisedPrompt(ctx)
+	case imagehistory.FieldParameters:
+		return m.OldParameters(ctx)
 	case imagehistory.FieldObjectKey:
 		return m.OldObjectKey(ctx)
 	case imagehistory.FieldMimeType:
@@ -31572,6 +31616,13 @@ func (m *ImageHistoryMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRevisedPrompt(v)
+		return nil
+	case imagehistory.FieldParameters:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParameters(v)
 		return nil
 	case imagehistory.FieldObjectKey:
 		v, ok := value.(string)
@@ -31766,6 +31817,9 @@ func (m *ImageHistoryMutation) ResetField(name string) error {
 		return nil
 	case imagehistory.FieldRevisedPrompt:
 		m.ResetRevisedPrompt()
+		return nil
+	case imagehistory.FieldParameters:
+		m.ResetParameters()
 		return nil
 	case imagehistory.FieldObjectKey:
 		m.ResetObjectKey()

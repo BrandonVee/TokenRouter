@@ -111,6 +111,20 @@ func (_c *ImageHistoryCreate) SetNillableRevisedPrompt(v *string) *ImageHistoryC
 	return _c
 }
 
+// SetParameters sets the "parameters" field.
+func (_c *ImageHistoryCreate) SetParameters(v string) *ImageHistoryCreate {
+	_c.mutation.SetParameters(v)
+	return _c
+}
+
+// SetNillableParameters sets the "parameters" field if the given value is not nil.
+func (_c *ImageHistoryCreate) SetNillableParameters(v *string) *ImageHistoryCreate {
+	if v != nil {
+		_c.SetParameters(*v)
+	}
+	return _c
+}
+
 // SetObjectKey sets the "object_key" field.
 func (_c *ImageHistoryCreate) SetObjectKey(v string) *ImageHistoryCreate {
 	_c.mutation.SetObjectKey(v)
@@ -234,6 +248,10 @@ func (_c *ImageHistoryCreate) defaults() {
 		v := imagehistory.DefaultRevisedPrompt
 		_c.mutation.SetRevisedPrompt(v)
 	}
+	if _, ok := _c.mutation.Parameters(); !ok {
+		v := imagehistory.DefaultParameters
+		_c.mutation.SetParameters(v)
+	}
 	if _, ok := _c.mutation.Width(); !ok {
 		v := imagehistory.DefaultWidth
 		_c.mutation.SetWidth(v)
@@ -290,6 +308,9 @@ func (_c *ImageHistoryCreate) check() error {
 	}
 	if _, ok := _c.mutation.RevisedPrompt(); !ok {
 		return &ValidationError{Name: "revised_prompt", err: errors.New(`ent: missing required field "ImageHistory.revised_prompt"`)}
+	}
+	if _, ok := _c.mutation.Parameters(); !ok {
+		return &ValidationError{Name: "parameters", err: errors.New(`ent: missing required field "ImageHistory.parameters"`)}
 	}
 	if _, ok := _c.mutation.ObjectKey(); !ok {
 		return &ValidationError{Name: "object_key", err: errors.New(`ent: missing required field "ImageHistory.object_key"`)}
@@ -409,6 +430,10 @@ func (_c *ImageHistoryCreate) createSpec() (*ImageHistory, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.RevisedPrompt(); ok {
 		_spec.SetField(imagehistory.FieldRevisedPrompt, field.TypeString, value)
 		_node.RevisedPrompt = value
+	}
+	if value, ok := _c.mutation.Parameters(); ok {
+		_spec.SetField(imagehistory.FieldParameters, field.TypeString, value)
+		_node.Parameters = value
 	}
 	if value, ok := _c.mutation.ObjectKey(); ok {
 		_spec.SetField(imagehistory.FieldObjectKey, field.TypeString, value)
@@ -559,6 +584,18 @@ func (u *ImageHistoryUpsert) SetRevisedPrompt(v string) *ImageHistoryUpsert {
 // UpdateRevisedPrompt sets the "revised_prompt" field to the value that was provided on create.
 func (u *ImageHistoryUpsert) UpdateRevisedPrompt() *ImageHistoryUpsert {
 	u.SetExcluded(imagehistory.FieldRevisedPrompt)
+	return u
+}
+
+// SetParameters sets the "parameters" field.
+func (u *ImageHistoryUpsert) SetParameters(v string) *ImageHistoryUpsert {
+	u.Set(imagehistory.FieldParameters, v)
+	return u
+}
+
+// UpdateParameters sets the "parameters" field to the value that was provided on create.
+func (u *ImageHistoryUpsert) UpdateParameters() *ImageHistoryUpsert {
+	u.SetExcluded(imagehistory.FieldParameters)
 	return u
 }
 
@@ -781,6 +818,20 @@ func (u *ImageHistoryUpsertOne) SetRevisedPrompt(v string) *ImageHistoryUpsertOn
 func (u *ImageHistoryUpsertOne) UpdateRevisedPrompt() *ImageHistoryUpsertOne {
 	return u.Update(func(s *ImageHistoryUpsert) {
 		s.UpdateRevisedPrompt()
+	})
+}
+
+// SetParameters sets the "parameters" field.
+func (u *ImageHistoryUpsertOne) SetParameters(v string) *ImageHistoryUpsertOne {
+	return u.Update(func(s *ImageHistoryUpsert) {
+		s.SetParameters(v)
+	})
+}
+
+// UpdateParameters sets the "parameters" field to the value that was provided on create.
+func (u *ImageHistoryUpsertOne) UpdateParameters() *ImageHistoryUpsertOne {
+	return u.Update(func(s *ImageHistoryUpsert) {
+		s.UpdateParameters()
 	})
 }
 
@@ -1183,6 +1234,20 @@ func (u *ImageHistoryUpsertBulk) SetRevisedPrompt(v string) *ImageHistoryUpsertB
 func (u *ImageHistoryUpsertBulk) UpdateRevisedPrompt() *ImageHistoryUpsertBulk {
 	return u.Update(func(s *ImageHistoryUpsert) {
 		s.UpdateRevisedPrompt()
+	})
+}
+
+// SetParameters sets the "parameters" field.
+func (u *ImageHistoryUpsertBulk) SetParameters(v string) *ImageHistoryUpsertBulk {
+	return u.Update(func(s *ImageHistoryUpsert) {
+		s.SetParameters(v)
+	})
+}
+
+// UpdateParameters sets the "parameters" field to the value that was provided on create.
+func (u *ImageHistoryUpsertBulk) UpdateParameters() *ImageHistoryUpsertBulk {
+	return u.Update(func(s *ImageHistoryUpsert) {
+		s.UpdateParameters()
 	})
 }
 

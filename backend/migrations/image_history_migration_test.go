@@ -26,3 +26,12 @@ func TestImageHistoryMigrationKeepsOptInAndPrivateObjectMetadata(t *testing.T) {
 	require.NotContains(t, sql, "public_url")
 	require.NotContains(t, sql, "base64")
 }
+
+func TestImageHistoryParametersMigrationAddsMetadataOnlyColumn(t *testing.T) {
+	content, err := FS.ReadFile("263_image_history_parameters.sql")
+	require.NoError(t, err)
+	sql := strings.ToLower(string(content))
+	require.Contains(t, sql, "add column if not exists parameters text not null default ''")
+	require.NotContains(t, sql, "base64")
+	require.NotContains(t, sql, "public_url")
+}

@@ -111,6 +111,20 @@ func (_u *ImageHistoryUpdate) SetNillableRevisedPrompt(v *string) *ImageHistoryU
 	return _u
 }
 
+// SetParameters sets the "parameters" field.
+func (_u *ImageHistoryUpdate) SetParameters(v string) *ImageHistoryUpdate {
+	_u.mutation.SetParameters(v)
+	return _u
+}
+
+// SetNillableParameters sets the "parameters" field if the given value is not nil.
+func (_u *ImageHistoryUpdate) SetNillableParameters(v *string) *ImageHistoryUpdate {
+	if v != nil {
+		_u.SetParameters(*v)
+	}
+	return _u
+}
+
 // SetMimeType sets the "mime_type" field.
 func (_u *ImageHistoryUpdate) SetMimeType(v string) *ImageHistoryUpdate {
 	_u.mutation.SetMimeType(v)
@@ -317,6 +331,9 @@ func (_u *ImageHistoryUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.RevisedPrompt(); ok {
 		_spec.SetField(imagehistory.FieldRevisedPrompt, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Parameters(); ok {
+		_spec.SetField(imagehistory.FieldParameters, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.MimeType(); ok {
 		_spec.SetField(imagehistory.FieldMimeType, field.TypeString, value)
 	}
@@ -441,6 +458,20 @@ func (_u *ImageHistoryUpdateOne) SetRevisedPrompt(v string) *ImageHistoryUpdateO
 func (_u *ImageHistoryUpdateOne) SetNillableRevisedPrompt(v *string) *ImageHistoryUpdateOne {
 	if v != nil {
 		_u.SetRevisedPrompt(*v)
+	}
+	return _u
+}
+
+// SetParameters sets the "parameters" field.
+func (_u *ImageHistoryUpdateOne) SetParameters(v string) *ImageHistoryUpdateOne {
+	_u.mutation.SetParameters(v)
+	return _u
+}
+
+// SetNillableParameters sets the "parameters" field if the given value is not nil.
+func (_u *ImageHistoryUpdateOne) SetNillableParameters(v *string) *ImageHistoryUpdateOne {
+	if v != nil {
+		_u.SetParameters(*v)
 	}
 	return _u
 }
@@ -680,6 +711,9 @@ func (_u *ImageHistoryUpdateOne) sqlSave(ctx context.Context) (_node *ImageHisto
 	}
 	if value, ok := _u.mutation.RevisedPrompt(); ok {
 		_spec.SetField(imagehistory.FieldRevisedPrompt, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Parameters(); ok {
+		_spec.SetField(imagehistory.FieldParameters, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.MimeType(); ok {
 		_spec.SetField(imagehistory.FieldMimeType, field.TypeString, value)

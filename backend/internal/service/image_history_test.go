@@ -211,6 +211,7 @@ func TestImageHistoryServiceSavesValidatedImageAndTruncatesMetadata(t *testing.T
 	require.Equal(t, 255, utf8.RuneCountInString(record.Model))
 	require.Contains(t, record.ObjectKey, "image-history/11/")
 	require.NotEmpty(t, record.SHA256)
+	require.Empty(t, record.Parameters)
 	require.Len(t, store.objects, 1)
 }
 

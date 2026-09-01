@@ -468,6 +468,13 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		// 生图家族限流依赖上下文标记，必须使用渠道映射后的显式意图结果。
 		selectionCtx = service.WithOpenAIImageGenerationIntent(selectionCtx)
 	}
+	var imageHistoryCollector *service.GeneratedImageCaptureCollector
+	// Responses 可能由桥接层或上游模型返回图片，不能只依赖请求体中的显式 imageIntent。
+	// 仅在用户已开启历史时创建捕获器，普通文本请求不会产生额外存储开销。
+	selectionCtx, imageHistoryCollector = h.prepareImageHistoryCapture(selectionCtx, subject.UserID)
+	if imageHistoryCollector != nil {
+		c.Request = c.Request.WithContext(selectionCtx)
+	}
 	if imageIntent && !service.GroupAllowsImageGeneration(apiKey.Group) {
 		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 		h.errorResponse(c, http.StatusForbidden, "permission_error", service.ImageGenerationPermissionMessage())
@@ -830,6 +837,23 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				).Error("openai.record_usage_failed", zap.Error(err))
 			}
 		})
+		historyRequestID := ""
+		if result != nil {
+			historyRequestID = result.RequestID
+			if strings.TrimSpace(historyRequestID) == "" {
+				historyRequestID = result.ResponseID
+			}
+		}
+		h.saveImageHistoryAsync(service.SaveImageHistoryInput{
+			UserID:     subject.UserID,
+			APIKeyID:   apiKey.ID,
+			RequestID:  historyRequestID,
+			Source:     "openai",
+			Endpoint:   "/v1/responses",
+			Model:      reqModel,
+			Prompt:     service.HistoryPromptFromResponsesJSON(body),
+			Parameters: service.HistoryParametersFromResponsesJSON(body),
+		}, imageHistoryCollector)
 		reqLog.Debug("openai.request_completed",
 			zap.Int64("account_id", account.ID),
 			zap.Int("switch_count", switchCount),

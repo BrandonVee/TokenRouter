@@ -4,11 +4,92 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"sync"
 
 	"github.com/tidwall/gjson"
 )
+
+// HistoryParametersFromResponsesJSON 提取 Responses 生图请求中的非敏感参数。
+// 输入消息、工具上下文和内联图片不会被原样持久化。
+func HistoryParametersFromResponsesJSON(body []byte) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	root := gjson.ParseBytes(body)
+	params := map[string]any{}
+	for _, key := range []string{"model", "stream", "parallel_tool_calls", "temperature", "top_p", "max_output_tokens", "reasoning", "text"} {
+		if value := root.Get(key); value.Exists() {
+			params[key] = value.Value()
+		}
+	}
+	if tools := root.Get("tools"); tools.IsArray() {
+		imageTools := make([]any, 0)
+		tools.ForEach(func(_, tool gjson.Result) bool {
+			if strings.Contains(strings.ToLower(tool.Get("type").String()), "image_generation") {
+				imageTools = append(imageTools, tool.Value())
+			}
+			return true
+		})
+		if len(imageTools) > 0 {
+			params["image_generation_tools"] = imageTools
+		}
+	}
+	data, err := json.Marshal(params)
+	if err != nil || len(params) == 0 {
+		return ""
+	}
+	return string(data)
+}
+
+// HistoryPromptFromResponsesJSON 提取 Responses 请求中的简短提示词摘要。
+func HistoryPromptFromResponsesJSON(body []byte) string {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return ""
+	}
+	root := gjson.ParseBytes(body)
+	for _, key := range []string{"instructions", "prompt"} {
+		value := root.Get(key)
+		if value.Type == gjson.String && strings.TrimSpace(value.String()) != "" {
+			return strings.TrimSpace(value.String())
+		}
+	}
+	var promptParts []string
+	collectResponsePromptText(root.Get("input"), &promptParts)
+	if len(promptParts) > 0 {
+		return strings.Join(promptParts, "\n")
+	}
+	return ""
+}
+
+func collectResponsePromptText(value gjson.Result, parts *[]string) {
+	if parts == nil || !value.Exists() {
+		return
+	}
+	if value.Type == gjson.String {
+		text := strings.TrimSpace(value.String())
+		if text != "" && !strings.HasPrefix(strings.ToLower(text), "data:image/") {
+			*parts = append(*parts, text)
+		}
+		return
+	}
+	if value.IsArray() {
+		value.ForEach(func(_, item gjson.Result) bool {
+			collectResponsePromptText(item, parts)
+			return len(*parts) < 32
+		})
+		return
+	}
+	if !value.IsObject() {
+		return
+	}
+	for _, key := range []string{"text", "input_text", "instructions", "prompt", "content"} {
+		if child := value.Get(key); child.Exists() {
+			collectResponsePromptText(child, parts)
+		}
+	}
+}
 
 // GeneratedImageCapture 是从成功生图响应中提取的最终图片引用。
 type GeneratedImageCapture struct {

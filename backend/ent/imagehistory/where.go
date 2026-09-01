@@ -104,6 +104,11 @@ func RevisedPrompt(v string) predicate.ImageHistory {
 	return predicate.ImageHistory(sql.FieldEQ(FieldRevisedPrompt, v))
 }
 
+// Parameters applies equality check predicate on the "parameters" field. It's identical to ParametersEQ.
+func Parameters(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldEQ(FieldParameters, v))
+}
+
 // ObjectKey applies equality check predicate on the "object_key" field. It's identical to ObjectKeyEQ.
 func ObjectKey(v string) predicate.ImageHistory {
 	return predicate.ImageHistory(sql.FieldEQ(FieldObjectKey, v))
@@ -617,6 +622,71 @@ func RevisedPromptEqualFold(v string) predicate.ImageHistory {
 // RevisedPromptContainsFold applies the ContainsFold predicate on the "revised_prompt" field.
 func RevisedPromptContainsFold(v string) predicate.ImageHistory {
 	return predicate.ImageHistory(sql.FieldContainsFold(FieldRevisedPrompt, v))
+}
+
+// ParametersEQ applies the EQ predicate on the "parameters" field.
+func ParametersEQ(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldEQ(FieldParameters, v))
+}
+
+// ParametersNEQ applies the NEQ predicate on the "parameters" field.
+func ParametersNEQ(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldNEQ(FieldParameters, v))
+}
+
+// ParametersIn applies the In predicate on the "parameters" field.
+func ParametersIn(vs ...string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldIn(FieldParameters, vs...))
+}
+
+// ParametersNotIn applies the NotIn predicate on the "parameters" field.
+func ParametersNotIn(vs ...string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldNotIn(FieldParameters, vs...))
+}
+
+// ParametersGT applies the GT predicate on the "parameters" field.
+func ParametersGT(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldGT(FieldParameters, v))
+}
+
+// ParametersGTE applies the GTE predicate on the "parameters" field.
+func ParametersGTE(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldGTE(FieldParameters, v))
+}
+
+// ParametersLT applies the LT predicate on the "parameters" field.
+func ParametersLT(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldLT(FieldParameters, v))
+}
+
+// ParametersLTE applies the LTE predicate on the "parameters" field.
+func ParametersLTE(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldLTE(FieldParameters, v))
+}
+
+// ParametersContains applies the Contains predicate on the "parameters" field.
+func ParametersContains(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldContains(FieldParameters, v))
+}
+
+// ParametersHasPrefix applies the HasPrefix predicate on the "parameters" field.
+func ParametersHasPrefix(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldHasPrefix(FieldParameters, v))
+}
+
+// ParametersHasSuffix applies the HasSuffix predicate on the "parameters" field.
+func ParametersHasSuffix(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldHasSuffix(FieldParameters, v))
+}
+
+// ParametersEqualFold applies the EqualFold predicate on the "parameters" field.
+func ParametersEqualFold(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldEqualFold(FieldParameters, v))
+}
+
+// ParametersContainsFold applies the ContainsFold predicate on the "parameters" field.
+func ParametersContainsFold(v string) predicate.ImageHistory {
+	return predicate.ImageHistory(sql.FieldContainsFold(FieldParameters, v))
 }
 
 // ObjectKeyEQ applies the EQ predicate on the "object_key" field.

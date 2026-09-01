@@ -70,7 +70,7 @@
 
 迁移 `259_channel_model_peak_rate.sql` 存在两个已部署的已知版本：历史版本只创建单时段字段，当前版本还创建 `peak_rate_windows`。runner 只对白名单中的两个精确 checksum 放行，不改写迁移记录；`261_restore_channel_peak_rate_windows.sql` 使用 `ADD COLUMN IF NOT EXISTS` 前向补齐多时段字段，因此两种数据库状态最终收敛到相同 schema。升级后应确认 `peak_rate_windows` 为非空 JSONB、默认值为 `[]`，并验证渠道峰谷多时段配置可以保存和读取。
 
-迁移 `260_image_history.sql` 为 `users` 增加默认关闭的 `save_image_history`，并新增只保存私有对象元数据的 `image_histories` 表、用户时间索引和请求 ID 索引。迁移是兼容的纯新增 schema；旧后端忽略新列和新表，但前端页面应在新后端实例全部就绪后再开放，避免混跑时历史接口间歇返回 `404`。升级后先确认所有存量用户仍为未开启，再验证开启用户的 OpenAI/Grok 同步生图、列表预览、鉴权下载和对象/元数据删除。
+迁移 `260_image_history.sql` 为 `users` 增加默认关闭的 `save_image_history`，并新增只保存私有对象元数据的 `image_histories` 表、用户时间索引和请求 ID 索引；迁移 `263_image_history_parameters.sql` 为历史记录增加非敏感生图参数快照列。迁移是兼容的纯新增 schema；旧后端忽略新列和新表，但前端页面应在新后端实例全部就绪后再开放，避免混跑时历史接口间歇返回 `404`。升级后先确认所有存量用户仍为未开启，再验证开启用户的 OpenAI/Grok 同步生图、参数/提示词展示、列表预览、鉴权下载和对象/元数据删除。
 
 图片字节不在 PostgreSQL 备份中。生产启用前必须配置独立的 `image_history` 私有 S3 桶或前缀、验证服务账号具备 Put/Get/Delete/Presign 所需权限，并把该前缀纳入容量、生命周期和恢复方案；不能复用已下线的 `image_storage` 配置或假设数据库恢复会同时恢复图片。回退旧二进制不会删除新表或 S3 对象，但旧版本不会提供历史访问和清理入口。
 

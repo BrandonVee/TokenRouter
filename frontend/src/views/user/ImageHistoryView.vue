@@ -179,6 +179,12 @@
             <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageHistory.revisedPrompt') }}</dt>
             <dd class="mt-1 break-words text-gray-900 dark:text-gray-100">{{ selectedRecord.revised_prompt }}</dd>
           </div>
+          <div v-if="selectedRecord.parameters">
+            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageHistory.parameters') }}</dt>
+            <dd class="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md bg-gray-50 p-2 font-mono text-xs text-gray-700 dark:bg-dark-800 dark:text-gray-200">
+              {{ formatParameters(selectedRecord.parameters) }}
+            </dd>
+          </div>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <dt class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('imageHistory.source') }}</dt>
@@ -318,6 +324,14 @@ async function updateSavingSetting(enabled: boolean) {
 
 function openPreview(record: ImageHistoryRecord) {
   selectedRecord.value = record
+}
+
+function formatParameters(value: string) {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2)
+  } catch {
+    return value
+  }
 }
 
 function markPreviewError(id: string) {

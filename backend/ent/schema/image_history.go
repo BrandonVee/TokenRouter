@@ -33,6 +33,7 @@ func (ImageHistory) Fields() []ent.Field {
 		field.String("model").MaxLen(255).Default(""),
 		field.String("prompt").SchemaType(map[string]string{dialect.Postgres: "text"}).Default(""),
 		field.String("revised_prompt").SchemaType(map[string]string{dialect.Postgres: "text"}).Default(""),
+		field.String("parameters").SchemaType(map[string]string{dialect.Postgres: "text"}).Default(""),
 		field.String("object_key").SchemaType(map[string]string{dialect.Postgres: "text"}).Immutable(),
 		field.String("mime_type").MaxLen(100),
 		field.Int64("size_bytes").Positive(),

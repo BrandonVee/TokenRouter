@@ -14,6 +14,7 @@ export interface ImageHistoryRecord {
   model: string
   prompt: string
   revised_prompt?: string
+  parameters?: string
   mime_type: string
   size_bytes: number
   width: number

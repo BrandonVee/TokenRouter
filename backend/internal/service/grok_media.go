@@ -67,6 +67,32 @@ type GrokMediaRequestInfo struct {
 	MaskUpload      *OpenAIImagesUpload
 }
 
+// HistoryParameters 返回可安全持久化的 Grok 生图参数，不包含原始图片输入。
+func (r GrokMediaRequestInfo) HistoryParameters() string {
+	params := map[string]any{
+		"model": r.Model,
+		"n":     r.N,
+	}
+	optional := map[string]string{
+		"size":       r.Size,
+		"size_tier":  r.SizeTier,
+		"resolution": r.Resolution,
+	}
+	for key, value := range optional {
+		if strings.TrimSpace(value) != "" {
+			params[key] = value
+		}
+	}
+	if r.DurationSeconds > 0 {
+		params["duration_seconds"] = r.DurationSeconds
+	}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
 func (r GrokMediaRequestInfo) ModerationBody() []byte {
 	payload := map[string]any{}
 	if prompt := strings.TrimSpace(r.Prompt); prompt != "" {

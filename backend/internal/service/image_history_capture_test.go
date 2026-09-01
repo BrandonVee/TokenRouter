@@ -53,3 +53,14 @@ func TestCaptureGeneratedImagesWithoutCollectorIsNoop(t *testing.T) {
 		CaptureGeneratedImagesFromSSE(context.Background(), []byte(`not-json`))
 	})
 }
+
+func TestHistoryParametersFromResponsesJSONExcludesInputPayload(t *testing.T) {
+	parameters := HistoryParametersFromResponsesJSON([]byte(`{
+		"model":"gpt-image-1",
+		"input":"画一只猫",
+		"tools":[{"type":"image_generation","size":"1024x1024"}],
+		"input_image":"data:image/png;base64,secret"
+	}`))
+	require.JSONEq(t, `{"model":"gpt-image-1","image_generation_tools":[{"type":"image_generation","size":"1024x1024"}]}`, parameters)
+	require.Equal(t, "画一只猫", HistoryPromptFromResponsesJSON([]byte(`{"input":[{"type":"input_text","text":"画一只猫"},{"type":"input_image","image_url":"secret"}]}`)))
+}

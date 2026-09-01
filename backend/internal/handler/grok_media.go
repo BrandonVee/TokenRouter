@@ -479,13 +479,14 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		}
 		if result != nil && result.ImageCount > 0 {
 			h.saveImageHistoryAsync(service.SaveImageHistoryInput{
-				UserID:    subject.UserID,
-				APIKeyID:  apiKey.ID,
-				RequestID: result.RequestID,
-				Source:    "grok",
-				Endpoint:  string(endpoint),
-				Model:     requestModel,
-				Prompt:    requestInfo.Prompt,
+				UserID:     subject.UserID,
+				APIKeyID:   apiKey.ID,
+				RequestID:  result.RequestID,
+				Source:     "grok",
+				Endpoint:   string(endpoint),
+				Model:      requestModel,
+				Prompt:     requestInfo.Prompt,
+				Parameters: requestInfo.HistoryParameters(),
 			}, imageHistoryCollector)
 		}
 		reqLog.Debug("grok_media.request_completed",

@@ -440,13 +440,14 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 			historyRequestID = result.RequestID
 		}
 		h.saveImageHistoryAsync(service.SaveImageHistoryInput{
-			UserID:    subject.UserID,
-			APIKeyID:  apiKey.ID,
-			RequestID: historyRequestID,
-			Source:    "openai",
-			Endpoint:  parsed.Endpoint,
-			Model:     requestModel,
-			Prompt:    parsed.Prompt,
+			UserID:     subject.UserID,
+			APIKeyID:   apiKey.ID,
+			RequestID:  historyRequestID,
+			Source:     "openai",
+			Endpoint:   parsed.Endpoint,
+			Model:      requestModel,
+			Prompt:     parsed.Prompt,
+			Parameters: parsed.HistoryParameters(),
 		}, imageHistoryCollector)
 
 		reqLog.Debug("openai.images.request_completed",

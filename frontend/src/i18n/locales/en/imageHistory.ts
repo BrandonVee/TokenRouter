@@ -28,6 +28,7 @@ export default {
     createdAt: 'Created',
     prompt: 'Prompt',
     revisedPrompt: 'Revised prompt',
+    parameters: 'Generation parameters',
     unknownModel: 'Unknown model',
   },
 }

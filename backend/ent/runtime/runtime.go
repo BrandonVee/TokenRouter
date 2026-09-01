@@ -1389,32 +1389,36 @@ func init() {
 	imagehistoryDescRevisedPrompt := imagehistoryFields[8].Descriptor()
 	// imagehistory.DefaultRevisedPrompt holds the default value on creation for the revised_prompt field.
 	imagehistory.DefaultRevisedPrompt = imagehistoryDescRevisedPrompt.Default.(string)
+	// imagehistoryDescParameters is the schema descriptor for parameters field.
+	imagehistoryDescParameters := imagehistoryFields[9].Descriptor()
+	// imagehistory.DefaultParameters holds the default value on creation for the parameters field.
+	imagehistory.DefaultParameters = imagehistoryDescParameters.Default.(string)
 	// imagehistoryDescMimeType is the schema descriptor for mime_type field.
-	imagehistoryDescMimeType := imagehistoryFields[10].Descriptor()
+	imagehistoryDescMimeType := imagehistoryFields[11].Descriptor()
 	// imagehistory.MimeTypeValidator is a validator for the "mime_type" field. It is called by the builders before save.
 	imagehistory.MimeTypeValidator = imagehistoryDescMimeType.Validators[0].(func(string) error)
 	// imagehistoryDescSizeBytes is the schema descriptor for size_bytes field.
-	imagehistoryDescSizeBytes := imagehistoryFields[11].Descriptor()
+	imagehistoryDescSizeBytes := imagehistoryFields[12].Descriptor()
 	// imagehistory.SizeBytesValidator is a validator for the "size_bytes" field. It is called by the builders before save.
 	imagehistory.SizeBytesValidator = imagehistoryDescSizeBytes.Validators[0].(func(int64) error)
 	// imagehistoryDescWidth is the schema descriptor for width field.
-	imagehistoryDescWidth := imagehistoryFields[12].Descriptor()
+	imagehistoryDescWidth := imagehistoryFields[13].Descriptor()
 	// imagehistory.DefaultWidth holds the default value on creation for the width field.
 	imagehistory.DefaultWidth = imagehistoryDescWidth.Default.(int)
 	// imagehistory.WidthValidator is a validator for the "width" field. It is called by the builders before save.
 	imagehistory.WidthValidator = imagehistoryDescWidth.Validators[0].(func(int) error)
 	// imagehistoryDescHeight is the schema descriptor for height field.
-	imagehistoryDescHeight := imagehistoryFields[13].Descriptor()
+	imagehistoryDescHeight := imagehistoryFields[14].Descriptor()
 	// imagehistory.DefaultHeight holds the default value on creation for the height field.
 	imagehistory.DefaultHeight = imagehistoryDescHeight.Default.(int)
 	// imagehistory.HeightValidator is a validator for the "height" field. It is called by the builders before save.
 	imagehistory.HeightValidator = imagehistoryDescHeight.Validators[0].(func(int) error)
 	// imagehistoryDescSha256 is the schema descriptor for sha256 field.
-	imagehistoryDescSha256 := imagehistoryFields[14].Descriptor()
+	imagehistoryDescSha256 := imagehistoryFields[15].Descriptor()
 	// imagehistory.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
 	imagehistory.Sha256Validator = imagehistoryDescSha256.Validators[0].(func(string) error)
 	// imagehistoryDescCreatedAt is the schema descriptor for created_at field.
-	imagehistoryDescCreatedAt := imagehistoryFields[15].Descriptor()
+	imagehistoryDescCreatedAt := imagehistoryFields[16].Descriptor()
 	// imagehistory.DefaultCreatedAt holds the default value on creation for the created_at field.
 	imagehistory.DefaultCreatedAt = imagehistoryDescCreatedAt.Default.(func() time.Time)
 	// imagehistoryDescID is the schema descriptor for id field.

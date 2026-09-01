@@ -33,6 +33,8 @@ type ImageHistory struct {
 	Prompt string `json:"prompt,omitempty"`
 	// RevisedPrompt holds the value of the "revised_prompt" field.
 	RevisedPrompt string `json:"revised_prompt,omitempty"`
+	// Parameters holds the value of the "parameters" field.
+	Parameters string `json:"parameters,omitempty"`
 	// ObjectKey holds the value of the "object_key" field.
 	ObjectKey string `json:"object_key,omitempty"`
 	// MimeType holds the value of the "mime_type" field.
@@ -57,7 +59,7 @@ func (*ImageHistory) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case imagehistory.FieldUserID, imagehistory.FieldAPIKeyID, imagehistory.FieldSizeBytes, imagehistory.FieldWidth, imagehistory.FieldHeight:
 			values[i] = new(sql.NullInt64)
-		case imagehistory.FieldID, imagehistory.FieldRequestID, imagehistory.FieldSource, imagehistory.FieldEndpoint, imagehistory.FieldModel, imagehistory.FieldPrompt, imagehistory.FieldRevisedPrompt, imagehistory.FieldObjectKey, imagehistory.FieldMimeType, imagehistory.FieldSha256:
+		case imagehistory.FieldID, imagehistory.FieldRequestID, imagehistory.FieldSource, imagehistory.FieldEndpoint, imagehistory.FieldModel, imagehistory.FieldPrompt, imagehistory.FieldRevisedPrompt, imagehistory.FieldParameters, imagehistory.FieldObjectKey, imagehistory.FieldMimeType, imagehistory.FieldSha256:
 			values[i] = new(sql.NullString)
 		case imagehistory.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -130,6 +132,12 @@ func (_m *ImageHistory) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field revised_prompt", values[i])
 			} else if value.Valid {
 				_m.RevisedPrompt = value.String
+			}
+		case imagehistory.FieldParameters:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field parameters", values[i])
+			} else if value.Valid {
+				_m.Parameters = value.String
 			}
 		case imagehistory.FieldObjectKey:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -234,6 +242,9 @@ func (_m *ImageHistory) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("revised_prompt=")
 	builder.WriteString(_m.RevisedPrompt)
+	builder.WriteString(", ")
+	builder.WriteString("parameters=")
+	builder.WriteString(_m.Parameters)
 	builder.WriteString(", ")
 	builder.WriteString("object_key=")
 	builder.WriteString(_m.ObjectKey)
