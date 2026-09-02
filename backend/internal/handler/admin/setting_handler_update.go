@@ -1333,7 +1333,14 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			return
 		}
 		for i, item := range items {
-			if strings.TrimSpace(item.Label) == "" {
+			// 双语名称任一填写即可，旧版 label 继续作为兼容回退。
+			item.Label = strings.TrimSpace(item.Label)
+			item.LabelZh = strings.TrimSpace(item.LabelZh)
+			item.LabelEn = strings.TrimSpace(item.LabelEn)
+			if item.Label == "" {
+				item.Label = firstNonEmpty(item.LabelZh, item.LabelEn)
+			}
+			if item.Label == "" {
 				response.BadRequest(c, "Custom menu item label is required")
 				return
 			}
@@ -1341,6 +1348,13 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 				response.BadRequest(c, "Custom menu item label is too long (max 50 characters)")
 				return
 			}
+			if len(item.LabelZh) > maxMenuItemLabelLen || len(item.LabelEn) > maxMenuItemLabelLen {
+				response.BadRequest(c, "Custom menu item localized label is too long (max 50 characters)")
+				return
+			}
+			items[i].Label = item.Label
+			items[i].LabelZh = item.LabelZh
+			items[i].LabelEn = item.LabelEn
 			urlTrimmed := strings.TrimSpace(item.URL)
 			if strings.HasPrefix(urlTrimmed, "md:") {
 				// Markdown 页面模式使用 md:<slug>，slug 规则与 /api/v1/pages/:slug 保持一致。

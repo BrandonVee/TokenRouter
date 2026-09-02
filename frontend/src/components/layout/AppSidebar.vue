@@ -191,6 +191,7 @@ import { Icon } from '@/components/icons'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { buildEmbeddedUrl, detectTheme } from '@/utils/embedded-url'
+import { resolveCustomMenuLabel } from '@/utils/customMenu'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
 import type { CustomMenuItem } from '@/types'
 
@@ -717,7 +718,7 @@ const userNavItems = computed((): NavItem[] => {
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,
-      label: item.label,
+      label: resolveCustomMenuLabel(item, locale.value),
       icon: null,
       iconSvg: item.icon_svg,
       openMode: item.open_mode ?? 'iframe',
@@ -781,7 +782,7 @@ const personalNavItems = computed((): NavItem[] => {
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,
-      label: item.label,
+      label: resolveCustomMenuLabel(item, locale.value),
       icon: null,
       iconSvg: item.icon_svg,
       openMode: item.open_mode ?? 'iframe',
@@ -880,7 +881,7 @@ const adminNavItems = computed((): NavItem[] => {
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
     // Add admin custom menu items after settings
     for (const cm of customMenuItemsForAdmin.value) {
-      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg, openMode: cm.open_mode ?? 'iframe', externalUrl: customMenuExternalUrl(cm) })
+      filtered.push({ path: `/custom/${cm.id}`, label: resolveCustomMenuLabel(cm, locale.value), icon: null, iconSvg: cm.icon_svg, openMode: cm.open_mode ?? 'iframe', externalUrl: customMenuExternalUrl(cm) })
     }
     return filtered
   }
@@ -889,7 +890,7 @@ const adminNavItems = computed((): NavItem[] => {
   visibleItems.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
   // Add admin custom menu items after settings
   for (const cm of customMenuItemsForAdmin.value) {
-    visibleItems.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg, openMode: cm.open_mode ?? 'iframe', externalUrl: customMenuExternalUrl(cm) })
+    visibleItems.push({ path: `/custom/${cm.id}`, label: resolveCustomMenuLabel(cm, locale.value), icon: null, iconSvg: cm.icon_svg, openMode: cm.open_mode ?? 'iframe', externalUrl: customMenuExternalUrl(cm) })
   }
   return visibleItems
 })

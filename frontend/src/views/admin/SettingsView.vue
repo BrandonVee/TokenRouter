@@ -6693,19 +6693,35 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <!-- Label -->
+                  <!-- 双语菜单名称 -->
                   <div>
                     <label
                       class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
                     >
-                      {{ t("admin.settings.customMenu.name") }}
+                      {{ t("admin.settings.customMenu.nameZh") }}
                     </label>
                     <input
-                      v-model="item.label"
+                      v-model="item.label_zh"
                       type="text"
                       class="input text-sm"
                       :placeholder="
-                        t('admin.settings.customMenu.namePlaceholder')
+                        t('admin.settings.customMenu.nameZhPlaceholder')
+                      "
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400"
+                    >
+                      {{ t("admin.settings.customMenu.nameEn") }}
+                    </label>
+                    <input
+                      v-model="item.label_en"
+                      type="text"
+                      class="input text-sm"
+                      :placeholder="
+                        t('admin.settings.customMenu.nameEnPlaceholder')
                       "
                     />
                   </div>
@@ -9284,6 +9300,8 @@ const form = reactive<SettingsForm>({
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
+    label_zh: string;
+    label_en: string;
     icon_svg: string;
     url: string;
     open_mode: "iframe" | "new_tab" | "same_tab";
@@ -10404,6 +10422,8 @@ function addMenuItem() {
   form.custom_menu_items.push({
     id: "",
     label: "",
+    label_zh: "",
+    label_en: "",
     icon_svg: "",
     url: "",
     open_mode: "iframe",
@@ -10614,6 +10634,8 @@ async function loadSettings() {
       : []
     ).map((item) => ({
       ...item,
+      label_zh: item.label_zh || item.label || "",
+      label_en: item.label_en || "",
       open_mode: normalizeCustomMenuOpenMode(item.open_mode),
       append_auth_params: item.append_auth_params === true,
     }));
@@ -11128,7 +11150,13 @@ async function saveSettings() {
       usage_ranking_limit: form.usage_ranking_limit,
       usage_ranking_enabled: form.usage_ranking_enabled,
       usage_ranking_data_visible: form.usage_ranking_data_visible,
-      custom_menu_items: form.custom_menu_items,
+      // 保存兼容字段时优先使用已填写的双语名称，旧客户端仍可读取 label。
+      custom_menu_items: form.custom_menu_items.map((item) => ({
+        ...item,
+        label: item.label_zh?.trim() || item.label_en?.trim() || "",
+        label_zh: item.label_zh?.trim() || "",
+        label_en: item.label_en?.trim() || "",
+      })),
       custom_endpoints: form.custom_endpoints,
       footer_links: normalizeFooterLinksForSave(),
       footer_text: form.footer_text,

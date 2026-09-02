@@ -189,6 +189,10 @@ export interface SendVerifyCodeResponse {
 export interface CustomMenuItem {
   id: string
   label: string
+  /** 中文菜单名称；为空时回退到另一语言或旧版 label。 */
+  label_zh?: string
+  /** 英文菜单名称；为空时回退到另一语言或旧版 label。 */
+  label_en?: string
   icon_svg: string
   url: string
   open_mode?: 'iframe' | 'new_tab' | 'same_tab'

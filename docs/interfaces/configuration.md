@@ -79,7 +79,7 @@ setup 使用 `DATA_DIR > 可写 /app/data > 当前目录` 选择 `config.yaml` �
 
 `settings` 是 `key/value/updated_at` 表，删除键表示恢复该 getter 的默认语义。`SettingService` 负责类型解析、范围/组合校验、敏感值保留、批量原子写入和更新后的缓存通知；handler 只负责 HTTP binding、权限、审计和响应。
 
-自定义菜单设置 `custom_menu_items` 保存侧边栏页面及其打开方式。每项的 `open_mode` 可为 `iframe`、`new_tab` 或 `same_tab`；省略该字段的历史配置按 `iframe` 兼容处理。`iframe` 使用站内 `/custom/:id` 页面承载外部 URL，另两种模式直接导航到经过校验的 URL；`md:<slug>` 页面在非 iframe 模式下仍通过自身路由打开。外部跳转可通过 `append_auth_params=true` 显式追加与 iframe 相同的用户、令牌、主题、语言和来源参数；历史项默认不追加，避免改变既有外链的凭据暴露范围。
+自定义菜单设置 `custom_menu_items` 保存侧边栏页面及其打开方式。每项可通过 `label_zh`、`label_en` 分别设置中英文名称，侧栏和页面标题按当前界面语言优先显示对应字段，缺失时回退到另一语言或兼容字段 `label`；旧配置只有 `label` 时继续有效。每项的 `open_mode` 可为 `iframe`、`new_tab` 或 `same_tab`；省略该字段的历史配置按 `iframe` 兼容处理。`iframe` 使用站内 `/custom/:id` 页面承载外部 URL，另两种模式直接导航到经过校验的 URL；`md:<slug>` 页面在非 iframe 模式下仍通过自身路由打开。外部跳转可通过 `append_auth_params=true` 显式追加与 iframe 相同的用户、令牌、主题、语言和来源参数；历史项默认不追加，避免改变既有外链的凭据暴露范围。
 
 运行时设置包括注册与邮件验证、第三方登录、SMTP、TOTP/session binding/step-up、登录协议、面板限流、部分冷却与流超时、数据共享、支付展示以及各类功能开关。仪表盘广告属于独立生命周期的列表实体，持久化在 `dashboard_ads` 表，由 `/api/v1/admin/dashboard-ads` 管理接口整体替换；每项可通过 `fit_mode` 选择 `adaptive`、`cover` 或 `fill`，缺省按 `adaptive` 处理。普通 `/api/v1/admin/settings` 保存不会覆盖广告。公开设置聚合该表内容供用户仪表盘展示。不同 getter 的回退可能来自代码常量或 `config.Config`，不能假设所有缺失键都等价于 `false`。
 
