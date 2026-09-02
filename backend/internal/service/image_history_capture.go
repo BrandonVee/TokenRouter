@@ -179,8 +179,12 @@ func CaptureGeneratedImagesFromSSE(ctx context.Context, data []byte) {
 	root := gjson.ParseBytes(data)
 	collector.addDataArray(root.Get("data"))
 	switch strings.TrimSpace(root.Get("type").String()) {
-	case "response.output_item.done":
+	case "response.output_item.done", "response.image_generation_call.completed":
 		collector.addOutputItem(root.Get("item"))
+		// 部分上游直接把最终图片字段放在 completed 事件根节点。
+		if !root.Get("item").Exists() {
+			collector.addOutputItem(root)
+		}
 	case "response.completed", "response.done":
 		collector.addOutputArray(root.Get("response.output"))
 	case "image_generation.completed", "image_edit.completed":
@@ -268,7 +272,7 @@ func (c *GeneratedImageCaptureCollector) addOutputItem(item gjson.Result) {
 		return
 	}
 	itemType := strings.TrimSpace(item.Get("type").String())
-	if itemType != "" && itemType != "image_generation_call" && itemType != "image_generation.completed" && itemType != "image_edit.completed" {
+	if itemType != "" && itemType != "image_generation_call" && itemType != "image_generation.completed" && itemType != "image_edit.completed" && itemType != "response.image_generation_call.completed" {
 		// Images API 的 data 数组通常没有 type；带 type 时只接受明确的最终图片对象。
 		if strings.TrimSpace(item.Get("b64_json").String()) == "" && strings.TrimSpace(item.Get("url").String()) == "" {
 			return

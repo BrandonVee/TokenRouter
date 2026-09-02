@@ -64,10 +64,6 @@ dataSharing: {
           test: 'Test Connection',
           testSucceeded: 'Object storage connection succeeded',
           testFailed: 'Object storage connection failed',
-          restoreDeployment: 'Restore Deployment Config',
-          restoreConfirm: 'Delete the admin override and restore image storage from YAML or environment variables?',
-          restored: 'Deployment config restored',
-          restoreFailed: 'Failed to restore deployment config',
           loadFailed: 'Failed to load image storage config',
           saved: 'Image storage config saved and applied',
           saveFailed: 'Failed to save image storage config'

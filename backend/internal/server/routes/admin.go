@@ -158,7 +158,6 @@ func registerFileStorageRoutes(admin *gin.RouterGroup, h *handler.Handlers, step
 		storage.POST("/test", h.Admin.ImageHistory.TestStorageConnection)
 		// 修改目标桶可能改变用户图片的落点，因此要求二次验证。
 		storage.PUT("", gin.HandlerFunc(stepUpAuth), h.Admin.ImageHistory.UpdateStorageConfig)
-		storage.DELETE("", gin.HandlerFunc(stepUpAuth), h.Admin.ImageHistory.ResetStorageConfig)
 	}
 }
 

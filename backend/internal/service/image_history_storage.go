@@ -197,22 +197,6 @@ func (s *ImageHistoryService) TestStorageConnection(ctx context.Context, input I
 	return tester.TestConnection(ctx)
 }
 
-// ResetStorageConfig 删除页面覆盖并恢复 YAML/环境变量配置。
-func (s *ImageHistoryService) ResetStorageConfig(ctx context.Context) (ImageHistoryStorageConfig, error) {
-	if s == nil || s.settingRepo == nil || s.storeFactory == nil {
-		return ImageHistoryStorageConfig{}, ErrImageHistoryStorageConfigInvalid
-	}
-	if err := s.settingRepo.Delete(ctx, settingKeyImageHistoryStorageConfig); err != nil {
-		return ImageHistoryStorageConfig{}, fmt.Errorf("delete image history storage config: %w", err)
-	}
-	store, err := s.storeFactory(s.deploymentStorageCfg)
-	if err != nil {
-		return ImageHistoryStorageConfig{}, fmt.Errorf("restore deployment image history storage config: %w", err)
-	}
-	s.applyStorageConfig(store, s.deploymentStorageCfg, ImageHistoryStorageSourceDeployment)
-	return s.GetStorageConfig(), nil
-}
-
 func (s *ImageHistoryService) loadPersistedStorageConfig(ctx context.Context) error {
 	if s == nil || s.settingRepo == nil {
 		return nil

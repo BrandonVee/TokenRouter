@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { get, put, post, remove } = vi.hoisted(() => ({
+const { get, put, post } = vi.hoisted(() => ({
   get: vi.fn(),
   put: vi.fn(),
   post: vi.fn(),
-  remove: vi.fn(),
 }))
 
 vi.mock('@/api/client', () => ({
@@ -12,7 +11,6 @@ vi.mock('@/api/client', () => ({
     get,
     put,
     post,
-    delete: remove,
   },
 }))
 
@@ -39,7 +37,6 @@ describe('file storage api', () => {
     get.mockResolvedValue({ data: config })
     put.mockResolvedValue({ data: config })
     post.mockResolvedValue({ data: { ok: true, message: 'connection successful' } })
-    remove.mockResolvedValue({ data: { ...config, source: 'deployment' } })
   })
 
   it('uses the image history storage administration endpoints', async () => {
@@ -49,14 +46,9 @@ describe('file storage api', () => {
       ok: true,
       message: 'connection successful',
     })
-    await expect(fileStorageAPI.resetImageHistoryStorageConfig()).resolves.toEqual({
-      ...config,
-      source: 'deployment',
-    })
 
     expect(get).toHaveBeenCalledWith('/admin/settings/image-history-storage')
     expect(put).toHaveBeenCalledWith('/admin/settings/image-history-storage', config)
     expect(post).toHaveBeenCalledWith('/admin/settings/image-history-storage/test', config)
-    expect(remove).toHaveBeenCalledWith('/admin/settings/image-history-storage')
   })
 })

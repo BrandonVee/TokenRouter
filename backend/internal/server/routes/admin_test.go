@@ -127,7 +127,6 @@ func TestAdminImageHistoryStorageRoutesAreRegisteredOutsideLegacyBackupPaths(t *
 	for _, route := range []string{
 		"GET /api/v1/admin/settings/image-history-storage",
 		"PUT /api/v1/admin/settings/image-history-storage",
-		"DELETE /api/v1/admin/settings/image-history-storage",
 		"POST /api/v1/admin/settings/image-history-storage/test",
 	} {
 		require.True(t, registered[route], "%s should be registered", route)

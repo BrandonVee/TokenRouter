@@ -47,6 +47,17 @@ func TestCaptureGeneratedImagesFromSSEIgnoresPartialAndDeduplicatesFinalImage(t 
 	require.Equal(t, "final-image", items[0].Base64)
 }
 
+func TestCaptureGeneratedImagesFromSSEAcceptsCompletedImageCallEvent(t *testing.T) {
+	collector := NewGeneratedImageCaptureCollector()
+	ctx := WithGeneratedImageCaptureCollector(context.Background(), collector)
+
+	CaptureGeneratedImagesFromSSE(ctx, []byte(`{"type":"response.image_generation_call.completed","result":"final-image"}`))
+
+	items := collector.Items()
+	require.Len(t, items, 1)
+	require.Equal(t, "final-image", items[0].Base64)
+}
+
 func TestCaptureGeneratedImagesWithoutCollectorIsNoop(t *testing.T) {
 	require.NotPanics(t, func() {
 		CaptureGeneratedImagesFromJSON(context.Background(), []byte(`{"data":[{"b64_json":"image"}]}`))

@@ -64,10 +64,6 @@ dataSharing: {
           test: '测试连接',
           testSucceeded: '对象存储连接成功',
           testFailed: '对象存储连接失败',
-          restoreDeployment: '恢复部署配置',
-          restoreConfirm: '确认删除页面配置并恢复 YAML 或环境变量中的生图存储配置？',
-          restored: '已恢复部署配置',
-          restoreFailed: '恢复部署配置失败',
           loadFailed: '加载生图存储配置失败',
           saved: '生图存储配置已保存并生效',
           saveFailed: '保存生图存储配置失败'

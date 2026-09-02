@@ -22,9 +22,11 @@ import (
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	infraerrors "github.com/BrandonVee/TokenRouter/internal/pkg/errors"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/logger"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/pagination"
 	"github.com/BrandonVee/TokenRouter/internal/util/urlvalidator"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	_ "golang.org/x/image/webp"
 )
 
@@ -208,7 +210,15 @@ func (s *ImageHistoryService) ShouldCapture(ctx context.Context, userID int64) b
 		return false
 	}
 	enabled, err := s.repo.GetSavingEnabled(ctx, userID)
-	return err == nil && enabled
+	if err != nil {
+		// 生产迁移或数据库异常不能静默伪装成用户关闭，保留可检索的诊断信号。
+		logger.L().With(
+			zap.String("component", "service.image_history"),
+			zap.Int64("user_id", userID),
+		).Warn("image_history.capture_preference_load_failed", zap.Error(err))
+		return false
+	}
+	return enabled
 }
 
 // SaveCapturedImages 逐张提交对象和元数据；单张失败不会删除同请求中已成功保存的图片。

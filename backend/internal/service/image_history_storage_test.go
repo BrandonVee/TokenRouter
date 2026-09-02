@@ -84,7 +84,7 @@ func imageHistoryStorageTestFactory(created *[]config.ImageHistoryConfig) ImageH
 	}
 }
 
-func TestImageHistoryStorageConfigFallsBackToDeploymentAndCanReset(t *testing.T) {
+func TestImageHistoryStorageConfigFallsBackToDeployment(t *testing.T) {
 	repo := newImageHistoryStorageSettingRepo()
 	created := make([]config.ImageHistoryConfig, 0)
 	cfg := &config.Config{
@@ -131,12 +131,6 @@ func TestImageHistoryStorageConfigFallsBackToDeploymentAndCanReset(t *testing.T)
 	require.Equal(t, "ciphertext", stored.SecretAccessKey)
 	require.Equal(t, "page-secret", created[len(created)-1].SecretAccessKey)
 
-	restored, err := svc.ResetStorageConfig(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, ImageHistoryStorageSourceDeployment, restored.Source)
-	require.Equal(t, "legacy-images", restored.Prefix)
-	_, exists := repo.values[settingKeyImageHistoryStorageConfig]
-	require.False(t, exists)
 }
 
 func TestImageHistoryStorageConfigLoadsPersistedOverrideAndPreservesSecret(t *testing.T) {

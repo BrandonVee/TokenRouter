@@ -49,13 +49,3 @@ func (h *ImageHistoryHandler) TestStorageConnection(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"ok": true, "message": "connection successful"})
 }
-
-// ResetStorageConfig 删除页面覆盖并恢复 YAML/环境变量配置。
-func (h *ImageHistoryHandler) ResetStorageConfig(c *gin.Context) {
-	cfg, err := h.service.ResetStorageConfig(c.Request.Context())
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, cfg)
-}

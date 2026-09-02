@@ -8,7 +8,6 @@ const {
   getConfig,
   updateConfig,
   testConnection,
-  resetConfig,
   showError,
   showSuccess,
   runStepUp,
@@ -16,7 +15,6 @@ const {
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
   testConnection: vi.fn(),
-  resetConfig: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   runStepUp: vi.fn((operation: () => Promise<unknown>) => operation()),
@@ -28,7 +26,6 @@ vi.mock('@/api', () => ({
       getImageHistoryStorageConfig: getConfig,
       updateImageHistoryStorageConfig: updateConfig,
       testImageHistoryStorageConnection: testConnection,
-      resetImageHistoryStorageConfig: resetConfig,
     },
   },
 }))
@@ -80,10 +77,6 @@ describe('FileStorageSettings', () => {
     getConfig.mockResolvedValue(structuredClone(databaseConfig))
     updateConfig.mockResolvedValue(structuredClone(databaseConfig))
     testConnection.mockResolvedValue({ ok: true, message: 'connection successful' })
-    resetConfig.mockResolvedValue({
-      ...structuredClone(databaseConfig),
-      source: 'deployment',
-    })
   })
 
   it('loads the effective config and keeps the saved Secret when testing and saving', async () => {
@@ -146,23 +139,6 @@ describe('FileStorageSettings', () => {
 
     expect(testConnection).toHaveBeenCalledOnce()
     expect(updateConfig).not.toHaveBeenCalled()
-  })
-
-  it('restores deployment config after confirmation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const wrapper = mountView()
-    await flushPromises()
-
-    const restoreButton = wrapper
-      .findAll('button')
-      .find((button) => button.text().includes('restoreDeployment'))
-    expect(restoreButton).toBeDefined()
-    await restoreButton!.trigger('click')
-    await flushPromises()
-
-    expect(resetConfig).toHaveBeenCalledOnce()
-    expect(wrapper.text()).toContain('fileStorage.images.source.deployment')
-    expect(showSuccess).toHaveBeenCalledWith('admin.settings.fileStorage.images.restored')
   })
 
   it('keeps other file stores independent and links to their existing settings', async () => {

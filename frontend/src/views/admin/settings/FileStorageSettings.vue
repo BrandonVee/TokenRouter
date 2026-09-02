@@ -134,17 +134,7 @@
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5 dark:border-dark-700">
-              <button
-                v-if="form.source === 'database'"
-                type="button"
-                class="btn btn-secondary btn-sm"
-                :disabled="resetting"
-                @click="resetConfig"
-              >
-                <Icon name="refresh" size="sm" />
-                {{ t('admin.settings.fileStorage.images.restoreDeployment') }}
-              </button>
-              <span v-else></span>
+              <span></span>
               <div class="flex flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary btn-sm" :disabled="testing || !hasConnectionFields" @click="testConnection">
                   <Icon name="cloud" size="sm" />
@@ -239,7 +229,6 @@ const activeSection = ref<(typeof sections)[number]>('images')
 const loading = ref(true)
 const saving = ref(false)
 const testing = ref(false)
-const resetting = ref(false)
 const invoiceSaving = ref(false)
 const invoiceTesting = ref(false)
 
@@ -369,21 +358,6 @@ async function testConnection(): Promise<void> {
     appStore.showError(extractApiErrorMessage(error, t('admin.settings.fileStorage.images.testFailed')))
   } finally {
     testing.value = false
-  }
-}
-
-async function resetConfig(): Promise<void> {
-  if (!window.confirm(t('admin.settings.fileStorage.images.restoreConfirm'))) return
-  resetting.value = true
-  try {
-    const restored = await storageStepUp.run(() => adminAPI.fileStorage.resetImageHistoryStorageConfig())
-    assignConfig(restored)
-    appStore.showSuccess(t('admin.settings.fileStorage.images.restored'))
-  } catch (error) {
-    if (isStepUpCancelled(error) || reportStepUpBlocked(error)) return
-    appStore.showError(extractApiErrorMessage(error, t('admin.settings.fileStorage.images.restoreFailed')))
-  } finally {
-    resetting.value = false
   }
 }
 

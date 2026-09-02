@@ -67,11 +67,6 @@ export async function testImageHistoryStorageConnection(
   return data
 }
 
-export async function resetImageHistoryStorageConfig(): Promise<ImageHistoryStorageConfig> {
-  const { data } = await apiClient.delete<ImageHistoryStorageConfig>('/admin/settings/image-history-storage')
-  return data
-}
-
 export async function getInvoiceAttachmentStorageConfig(): Promise<FileStorageDirectoryConfig> {
   const { data } = await apiClient.get<FileStorageDirectoryConfig>('/admin/settings/file-storage/invoice-attachments')
   return data
@@ -91,7 +86,6 @@ export const fileStorageAPI = {
   getImageHistoryStorageConfig,
   updateImageHistoryStorageConfig,
   testImageHistoryStorageConnection,
-  resetImageHistoryStorageConfig,
   getInvoiceAttachmentStorageConfig,
   updateInvoiceAttachmentStorageConfig,
   testInvoiceAttachmentStorageConnection,

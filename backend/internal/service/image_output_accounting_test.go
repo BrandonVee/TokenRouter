@@ -65,6 +65,16 @@ data: [DONE]`
 	}
 }
 
+func TestOpenAIImageOutputCounter_ResponsesCompletedImageCallEvent(t *testing.T) {
+	sseBody := `data: {"type":"response.image_generation_call.completed","result":"final-image"}
+
+data: [DONE]`
+
+	if count := countOpenAIImageOutputsFromSSEBody(sseBody); count != 1 {
+		t.Fatalf("expected 1 image for responses completed image call event, got %d", count)
+	}
+}
+
 func TestOpenAIImageOutputCounter_JSONDataArraySkipsNonImageObjects(t *testing.T) {
 	// 回归覆盖：非流式 JSON 响应中的非图片 data 数组也不能触发图片计费。
 	body := []byte(`{
