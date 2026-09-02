@@ -3768,6 +3768,85 @@ func TestHandleSSEToJSON_CapturesImageGenerationOutput(t *testing.T) {
 	require.Equal(t, "aGVsbG8=", collector.Items()[0].Base64)
 }
 
+func TestHandleNonStreamingResponsePassthrough_CapturesImageGenerationOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	collector := NewGeneratedImageCaptureCollector()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(
+		WithGeneratedImageCaptureCollector(context.Background(), collector),
+	)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"id":"resp_pass_json","output":[{"type":"image_generation_call","result":"aGVsbG8=","output_format":"png"}],"usage":{"input_tokens":1,"output_tokens":2}}`)),
+	}
+
+	result, err := svc.handleNonStreamingResponsePassthrough(context.Background(), resp, c, &Account{ID: 1}, "gpt-5.4", "gpt-5.4")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.imageCount)
+	require.Len(t, collector.Items(), 1)
+	require.Equal(t, "aGVsbG8=", collector.Items()[0].Base64)
+}
+
+func TestHandleStreamingResponsePassthrough_CapturesImageGenerationOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	collector := NewGeneratedImageCaptureCollector()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(
+		WithGeneratedImageCaptureCollector(context.Background(), collector),
+	)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize}}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			`data: {"type":"response.output_item.done","item":{"id":"ig_pass_sse","type":"image_generation_call","result":"aGVsbG8=","output_format":"png"}}`,
+			`data: {"type":"response.completed","response":{"id":"resp_pass_sse","output":[],"usage":{"input_tokens":1,"output_tokens":2}}}`,
+			`data: [DONE]`,
+		}, "\n"))),
+	}
+
+	result, err := svc.handleStreamingResponsePassthrough(context.Background(), resp, c, &Account{ID: 1}, time.Now(), "gpt-5.4", "gpt-5.4")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 1, result.imageCount)
+	require.Len(t, collector.Items(), 1)
+	require.Equal(t, "aGVsbG8=", collector.Items()[0].Base64)
+}
+
+func TestHandlePassthroughSSEToJSON_CapturesImageGenerationOutput(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	collector := NewGeneratedImageCaptureCollector()
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil).WithContext(
+		WithGeneratedImageCaptureCollector(context.Background(), collector),
+	)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+	}
+	body := []byte(strings.Join([]string{
+		`data: {"type":"response.output_item.done","item":{"id":"ig_pass_convert","type":"image_generation_call","result":"aGVsbG8=","output_format":"png"}}`,
+		`data: {"type":"response.completed","response":{"id":"resp_pass_convert","output":[],"usage":{"input_tokens":1,"output_tokens":2}}}`,
+		`data: [DONE]`,
+	}, "\n"))
+
+	result, err := svc.handlePassthroughSSEToJSON(context.Background(), resp, c, &Account{ID: 1}, body, "gpt-5.4", "gpt-5.4")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, collector.Items(), 1)
+	require.Equal(t, "aGVsbG8=", collector.Items()[0].Base64)
+}
+
 func TestHandleSSEToJSON_NoFinalResponseKeepsSSEBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
