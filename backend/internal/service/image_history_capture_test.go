@@ -2,10 +2,18 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestDecodeImageHistoryBase64AcceptsURLSafeUnpaddedPayload(t *testing.T) {
+	raw := base64.RawURLEncoding.EncodeToString([]byte("image payload"))
+	data, _, err := decodeImageHistoryBase64(raw, "image/png", 1024)
+	require.NoError(t, err)
+	require.Equal(t, []byte("image payload"), data)
+}
 
 func TestCaptureGeneratedImagesFromJSON(t *testing.T) {
 	collector := NewGeneratedImageCaptureCollector()
@@ -24,6 +32,36 @@ func TestCaptureGeneratedImagesFromJSON(t *testing.T) {
 	require.Equal(t, "first-image", items[0].Base64)
 	require.Equal(t, "revised", items[0].RevisedPrompt)
 	require.Equal(t, "https://cdn.example.com/second.png", items[1].URL)
+}
+
+func TestCaptureGeneratedImagesFromImageEvent(t *testing.T) {
+	collector := NewGeneratedImageCaptureCollector()
+	ctx := WithGeneratedImageCaptureCollector(context.Background(), collector)
+
+	// 兼容账号测试和部分供应商把图片地址放在 image 事件根部的格式。
+	CaptureGeneratedImagesFromJSON(ctx, []byte(`{
+		"type":"image",
+		"image_url":"https://cdn.example.com/generated.png",
+		"mime_type":"image/png",
+		"resolution":"1254x1254",
+		"response":{"data":[{"b64_json":"","width":1254,"height":1254}]}
+	}`))
+
+	items := collector.Items()
+	require.Len(t, items, 1)
+	require.Equal(t, "https://cdn.example.com/generated.png", items[0].URL)
+	require.Equal(t, "image/png", items[0].MimeType)
+}
+
+func TestCaptureGeneratedImagesFromCompletedEventUsesImageURL(t *testing.T) {
+	collector := NewGeneratedImageCaptureCollector()
+	ctx := WithGeneratedImageCaptureCollector(context.Background(), collector)
+
+	CaptureGeneratedImagesFromSSE(ctx, []byte(`{"type":"image_generation.completed","image_url":"data:image/png;base64,aGVsbG8="}`))
+
+	items := collector.Items()
+	require.Len(t, items, 1)
+	require.Equal(t, "data:image/png;base64,aGVsbG8=", items[0].URL)
 }
 
 func TestCaptureGeneratedImagesFromSSEIgnoresPartialAndDeduplicatesFinalImage(t *testing.T) {

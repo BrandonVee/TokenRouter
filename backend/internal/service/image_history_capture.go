@@ -165,6 +165,10 @@ func CaptureGeneratedImagesFromJSON(ctx context.Context, body []byte) {
 		return
 	}
 	root := gjson.ParseBytes(body)
+	// 兼容账号/供应商返回的统一图片事件：图片引用位于事件根部。
+	if root.Get("type").String() == "image" || root.Get("type").String() == "image_generation.completed" || root.Get("type").String() == "image_edit.completed" {
+		collector.addOutputItem(root)
+	}
 	collector.addDataArray(root.Get("data"))
 	collector.addOutputArray(root.Get("output"))
 	collector.addOutputArray(root.Get("response.output"))
@@ -179,6 +183,8 @@ func CaptureGeneratedImagesFromSSE(ctx context.Context, data []byte) {
 	root := gjson.ParseBytes(data)
 	collector.addDataArray(root.Get("data"))
 	switch strings.TrimSpace(root.Get("type").String()) {
+	case "image":
+		collector.addOutputItem(root)
 	case "response.output_item.done", "response.image_generation_call.completed":
 		collector.addOutputItem(root.Get("item"))
 		// 部分上游直接把最终图片字段放在 completed 事件根节点。
@@ -274,13 +280,20 @@ func (c *GeneratedImageCaptureCollector) addOutputItem(item gjson.Result) {
 	itemType := strings.TrimSpace(item.Get("type").String())
 	if itemType != "" && itemType != "image_generation_call" && itemType != "image_generation.completed" && itemType != "image_edit.completed" && itemType != "response.image_generation_call.completed" {
 		// Images API 的 data 数组通常没有 type；带 type 时只接受明确的最终图片对象。
-		if strings.TrimSpace(item.Get("b64_json").String()) == "" && strings.TrimSpace(item.Get("url").String()) == "" {
+		if strings.TrimSpace(item.Get("b64_json").String()) == "" && strings.TrimSpace(item.Get("url").String()) == "" && strings.TrimSpace(item.Get("image_url").String()) == "" && strings.TrimSpace(item.Get("imageUrl").String()) == "" && strings.TrimSpace(item.Get("image_url.url").String()) == "" && strings.TrimSpace(item.Get("imageUrl.url").String()) == "" {
 			return
 		}
 	}
 
 	encoded := strings.TrimSpace(item.Get("b64_json").String())
-	imageURL := strings.TrimSpace(item.Get("url").String())
+	imageURL := firstNonEmpty(
+		item.Get("url").String(),
+		item.Get("image_url").String(),
+		item.Get("imageUrl").String(),
+	)
+	if imageURL == "" {
+		imageURL = firstNonEmpty(item.Get("image_url.url").String(), item.Get("imageUrl.url").String())
+	}
 	if encoded == "" && imageURL == "" {
 		result := strings.TrimSpace(item.Get("result").String())
 		if strings.HasPrefix(strings.ToLower(result), "http://") || strings.HasPrefix(strings.ToLower(result), "https://") || strings.HasPrefix(strings.ToLower(result), "data:image/") {

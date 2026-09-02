@@ -430,16 +430,31 @@ func decodeImageHistoryBase64(raw, fallbackMIME string, maxBytes int64) ([]byte,
 		}
 		raw = raw[comma+1:]
 	}
-	raw = strings.TrimSpace(raw)
+	// 上游可能返回无 padding、URL-safe 编码或夹带换行/空白的 Base64；统一清理后按兼容编码依次解码。
+	raw = strings.Map(func(r rune) rune {
+		if r == ' ' || r == '\t' || r == '\r' || r == '\n' {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(raw))
 	if maxBytes > 0 && int64(len(raw)) > imageHistoryBase64EncodedLimit(maxBytes) {
 		return nil, "", fmt.Errorf("generated image exceeds configured history limit")
 	}
-	raw = strings.TrimRight(raw, "=") + strings.Repeat("=", (4-len(raw)%4)%4)
-	data, err := base64.StdEncoding.DecodeString(raw)
-	if err != nil {
-		return nil, "", fmt.Errorf("decode generated image: %w", err)
+	encodings := []*base64.Encoding{
+		base64.StdEncoding,
+		base64.RawStdEncoding,
+		base64.URLEncoding,
+		base64.RawURLEncoding,
 	}
-	return data, mimeType, nil
+	var lastErr error
+	for _, encoding := range encodings {
+		data, err := encoding.DecodeString(raw)
+		if err == nil {
+			return data, mimeType, nil
+		}
+		lastErr = err
+	}
+	return nil, "", fmt.Errorf("decode generated image: %w", lastErr)
 }
 
 func inspectImageHistoryData(data []byte) (string, int, int) {
