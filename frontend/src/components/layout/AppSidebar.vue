@@ -187,6 +187,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import VersionBadge from '@/components/common/VersionBadge.vue'
+import { Icon } from '@/components/icons'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { buildEmbeddedUrl, detectTheme } from '@/utils/embedded-url'
@@ -214,6 +215,13 @@ const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const adminSettingsStore = useAdminSettingsStore()
 const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
+
+// 复用项目统一图标路径，为容易混淆的导航入口提供独立图形。
+type SidebarIconName = 'clock' | 'trendingUp' | 'userCircle' | 'userPlus' | 'dollar' | 'calendar' | 'swap' | 'book' | 'sparkles' | 'document' | 'clipboard'
+
+const navIcon = (name: SidebarIconName) => ({
+  render: () => h(Icon, { name })
+})
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
@@ -314,6 +322,8 @@ const BatchImageIcon = {
     )
 }
 
+const ImageHistoryIcon = navIcon('clock')
+
 const ChartIcon = {
   render: () =>
     h(
@@ -328,6 +338,8 @@ const ChartIcon = {
       ]
     )
 }
+
+const OpsMonitoringIcon = navIcon('trendingUp')
 
 // 排行入口使用趋势图标，与使用记录的柱状图明确区分。
 const RankingIcon = {
@@ -390,6 +402,8 @@ const UserIcon = {
     )
 }
 
+const UserManagementIcon = navIcon('userCircle')
+
 const UsersIcon = {
   render: () =>
     h(
@@ -420,6 +434,9 @@ const AffiliateIcon = {
       ]
     )
 }
+
+const AffiliateInviteIcon = navIcon('userPlus')
+const AffiliateRebateIcon = navIcon('dollar')
 
 const FolderIcon = {
   render: () =>
@@ -465,6 +482,9 @@ const CreditCardIcon = {
       ]
     )
 }
+
+const SubscriptionIcon = navIcon('calendar')
+const TransferIcon = navIcon('swap')
 
 const RechargeSubscriptionIcon = {
   render: () =>
@@ -536,6 +556,9 @@ const BellIcon = {
     )
 }
 
+const ContentManagementIcon = navIcon('book')
+const DashboardAdsIcon = navIcon('sparkles')
+
 const TicketIcon = {
   render: () =>
     h(
@@ -601,6 +624,9 @@ const OrderListIcon = {
     )
 }
 
+const InvoiceIcon = navIcon('document')
+const AuditLogIcon = navIcon('clipboard')
+
 // ShieldIcon 用于风控中心菜单项，保持与现有手写 SVG 图标风格一致。
 const ShieldIcon = {
   render: () =>
@@ -642,15 +668,11 @@ const flagUsageRankingAccess = () => appStore.cachedPublicSettings?.usage_rankin
 const userNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-    { path: '/models', label: t('nav.modelMarketplace'), icon: ModelMarketplaceIcon },
-    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true, featureFlag: flagUsageRankingAccess },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/team', label: t('nav.team'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
-    { path: '/image-history', label: t('nav.imageHistory'), icon: BatchImageIcon, hideInSimpleMode: true },
+    { path: '/image-history', label: t('nav.imageHistory'), icon: ImageHistoryIcon, hideInSimpleMode: true },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/data-sharing', label: t('nav.dataSharing'), icon: DatabaseIcon, hideInSimpleMode: true, featureFlag: flagDataSharingAccess },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     ...(appStore.cachedPublicSettings?.payment_enabled
       ? [
           {
@@ -666,13 +688,13 @@ const userNavItems = computed((): NavItem[] => {
           {
             path: '/orders',
             label: t('nav.myOrders'),
-            icon: OrderListIcon,
+            icon: OrderIcon,
             hideInSimpleMode: true
           },
           {
             path: '/invoices',
             label: t('nav.invoiceRequests', '发票申请'),
-            icon: OrderListIcon,
+            icon: InvoiceIcon,
             hideInSimpleMode: true
           },
         ]
@@ -689,6 +711,10 @@ const userNavItems = computed((): NavItem[] => {
         ]
       : []),
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
+    { path: '/models', label: t('nav.modelMarketplace'), icon: ModelMarketplaceIcon },
+    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true, featureFlag: flagUsageRankingAccess },
+    { path: '/team', label: t('nav.team'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,
       label: item.label,
@@ -706,15 +732,11 @@ const userNavItems = computed((): NavItem[] => {
 const personalNavItems = computed((): NavItem[] => {
   const items: NavItem[] = [
     { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-    { path: '/models', label: t('nav.modelMarketplace'), icon: ModelMarketplaceIcon },
-    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true, featureFlag: flagUsageRankingAccess },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/team', label: t('nav.team'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
     { path: '/batch-image', label: t('nav.batchImage'), icon: BatchImageIcon, hideInSimpleMode: true, featureFlag: flagBatchImageAccess },
-    { path: '/image-history', label: t('nav.imageHistory'), icon: BatchImageIcon, hideInSimpleMode: true },
+    { path: '/image-history', label: t('nav.imageHistory'), icon: ImageHistoryIcon, hideInSimpleMode: true },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/data-sharing', label: t('nav.dataSharing'), icon: DatabaseIcon, hideInSimpleMode: true, featureFlag: flagDataSharingAccess },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     ...(appStore.cachedPublicSettings?.payment_enabled
       ? [
           {
@@ -730,13 +752,13 @@ const personalNavItems = computed((): NavItem[] => {
           {
             path: '/orders',
             label: t('nav.myOrders'),
-            icon: OrderListIcon,
+            icon: OrderIcon,
             hideInSimpleMode: true
           },
           {
             path: '/invoices',
             label: t('nav.invoiceRequests', '发票申请'),
-            icon: OrderListIcon,
+            icon: InvoiceIcon,
             hideInSimpleMode: true
           },
         ]
@@ -753,6 +775,10 @@ const personalNavItems = computed((): NavItem[] => {
         ]
       : []),
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
+    { path: '/models', label: t('nav.modelMarketplace'), icon: ModelMarketplaceIcon },
+    { path: '/usage-ranking', label: t('nav.usageRanking'), icon: RankingIcon, hideInSimpleMode: true, featureFlag: flagUsageRankingAccess },
+    { path: '/team', label: t('nav.team'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,
       label: item.label,
@@ -785,13 +811,13 @@ const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     ...(adminSettingsStore.opsMonitoringEnabled
-      ? [{ path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon }]
+      ? [{ path: '/admin/ops', label: t('nav.ops'), icon: OpsMonitoringIcon }]
       : []),
-    { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
+    { path: '/admin/users', label: t('nav.users'), icon: UserManagementIcon, hideInSimpleMode: true },
     { path: '/admin/teams', label: t('nav.teams'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
     { path: '/admin/channels', label: t('nav.channels', '渠道管理'), icon: ChannelIcon, hideInSimpleMode: true },
-    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: SubscriptionIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     {
@@ -807,12 +833,12 @@ const adminNavItems = computed((): NavItem[] => {
           {
             path: '/admin/affiliates',
             label: t('nav.affiliateManagement'),
-            icon: UsersIcon,
+            icon: AffiliateIcon,
             hideInSimpleMode: true,
             children: [
-              { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon },
-              { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon },
-              { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon },
+              { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: AffiliateInviteIcon },
+              { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: AffiliateRebateIcon },
+              { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: TransferIcon },
             ],
           },
         ]
@@ -826,9 +852,9 @@ const adminNavItems = computed((): NavItem[] => {
             hideInSimpleMode: true,
             children: [
               { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
-              { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
+              { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderListIcon },
               { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
-              { path: '/admin/orders/invoices', label: t('nav.invoiceManagement', '发票管理'), icon: OrderIcon },
+              { path: '/admin/orders/invoices', label: t('nav.invoiceManagement', '发票管理'), icon: InvoiceIcon },
             ],
           },
         ]
@@ -837,14 +863,14 @@ const adminNavItems = computed((): NavItem[] => {
     {
       path: '/admin/content',
       label: t('nav.contentManagement', '内容管理'),
-      icon: BellIcon,
+      icon: ContentManagementIcon,
       children: [
         { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
-        { path: '/admin/dashboard-ads', label: t('nav.dashboardAds', '仪表盘广告'), icon: BellIcon },
+        { path: '/admin/dashboard-ads', label: t('nav.dashboardAds', '仪表盘广告'), icon: DashboardAdsIcon },
       ],
     },
     { path: '/admin/data-sharing', label: t('nav.dataSharing'), icon: DatabaseIcon, hideInSimpleMode: true, featureFlag: flagDataSharingAccess },
-    { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true }
+    { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: AuditLogIcon, hideInSimpleMode: true }
   ]
 
   // 简单模式下，在系统设置前插入 API密钥

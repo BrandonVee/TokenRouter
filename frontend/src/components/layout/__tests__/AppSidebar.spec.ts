@@ -166,6 +166,36 @@ describe('AppSidebar admin personal menu', () => {
     expect(componentSource.match(/path: '\/team'.*icon: UsersIcon/g)).toHaveLength(2)
     expect(componentSource.match(/path: '\/affiliate',[\s\S]{0,180}?icon: AffiliateIcon/g)).toHaveLength(2)
   })
+
+  it('keeps personal entries distinct and moves the requested entries to the bottom', () => {
+    // 个人导航中的相邻入口必须使用不同图标，指定入口统一放到个人资料之后。
+    expect(componentSource.match(/path: '\/image-history'.*icon: ImageHistoryIcon/g)).toHaveLength(2)
+    expect(componentSource.match(/path: '\/orders',[\s\S]{0,120}?icon: OrderIcon/g)).toHaveLength(2)
+    expect(componentSource.match(/path: '\/invoices',[\s\S]{0,140}?icon: InvoiceIcon/g)).toHaveLength(2)
+
+    const personalNavItemsBlock = componentSource.match(
+      /const personalNavItems = computed\(\(\): NavItem\[\] => \{[\s\S]*?const adminNavItems = computed/
+    )?.[0] ?? ''
+    const profileIndex = personalNavItemsBlock.indexOf("path: '/profile'")
+    const bottomEntries = [
+      personalNavItemsBlock.indexOf("path: '/models'"),
+      personalNavItemsBlock.indexOf("path: '/usage-ranking'"),
+      personalNavItemsBlock.indexOf("path: '/team'"),
+      personalNavItemsBlock.indexOf("path: '/subscriptions'")
+    ]
+
+    expect(profileIndex).toBeGreaterThanOrEqual(0)
+    expect(bottomEntries.every(index => index > profileIndex)).toBe(true)
+    expect(bottomEntries).toEqual([...bottomEntries].sort((a, b) => a - b))
+  })
+
+  it('uses distinct icons for content and payment child entries', () => {
+    // 内容管理和订单管理的父子入口不能复用同一个图标。
+    expect(componentSource).toContain("icon: ContentManagementIcon")
+    expect(componentSource).toContain("path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon")
+    expect(componentSource).toContain("path: '/admin/dashboard-ads', label: t('nav.dashboardAds', '仪表盘广告'), icon: DashboardAdsIcon")
+    expect(componentSource).toContain("path: '/admin/orders/invoices', label: t('nav.invoiceManagement', '发票管理'), icon: InvoiceIcon")
+  })
 })
 
 describe('AppSidebar simple mode', () => {
