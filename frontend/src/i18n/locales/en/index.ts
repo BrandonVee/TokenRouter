@@ -1,4 +1,7 @@
-import landing from './landing'
+import home from './home'
+import keyUsage from './keyUsage'
+import setup from './setup'
+import batchImageGuide from './batchImageGuide'
 import common from './common'
 import dashboard from './dashboard'
 import batchImage from './batchImage'
@@ -8,7 +11,10 @@ import team from './team'
 import imageHistory from './imageHistory'
 
 export default {
-  ...landing,
+  ...home,
+  ...keyUsage,
+  ...setup,
+  ...batchImageGuide,
   ...common,
   ...dashboard,
   ...batchImage,

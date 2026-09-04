@@ -1,0 +1,2612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meteor — Large Model Service Platform</title>
+    <style>
+        :root {
+            --bg: #10141d;
+            --bg2: #0d1119;
+            --panel: #151a26;
+            --panel2: #121623;
+            --line: rgba(255, 255, 255, .08);
+            --line2: rgba(255, 255, 255, .16);
+            --txt: #eef1f6;
+            --dim: #8b93a3;
+            --dim2: #565e6e;
+            --acc: #10b981;
+            --acc2: #7dd3fc;
+            --amber: #fbbf24;
+            --red: #f87171;
+            --mono: 'SF Mono', 'Cascadia Code', Consolas, 'JetBrains Mono', monospace;
+            --sans: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html {
+            scroll-behavior: smooth
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--txt);
+            font-family: var(--sans);
+            overflow-x: hidden;
+            line-height: 1.6
+        }
+
+        ::selection {
+            background: rgba(16, 185, 129, .25)
+        }
+
+        /* ---------- aurora drifting blobs ---------- */
+        .aurora {
+            position: fixed;
+            inset: -15%;
+            z-index: 0;
+            pointer-events: none
+        }
+
+        .aurora i {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(70px)
+        }
+
+        .aurora .b1 {
+            width: 46vw;
+            height: 46vw;
+            top: -8%;
+            left: 6%;
+            background: radial-gradient(circle, rgba(16, 185, 129, .15), transparent 65%);
+            animation: auroraDrift 22s ease-in-out infinite
+        }
+
+        .aurora .b2 {
+            width: 42vw;
+            height: 42vw;
+            top: 0%;
+            right: 2%;
+            background: radial-gradient(circle, rgba(125, 211, 252, .11), transparent 65%);
+            animation: auroraDrift 27s ease-in-out infinite reverse
+        }
+
+        .aurora .b3 {
+            width: 38vw;
+            height: 38vw;
+            top: 32%;
+            left: 34%;
+            background: radial-gradient(circle, rgba(99, 102, 241, .08), transparent 65%);
+            animation: auroraDrift 32s ease-in-out infinite
+        }
+
+        @keyframes auroraDrift {
+            0% {
+                transform: translate(0) scale(1)
+            }
+
+            50% {
+                transform: translate(4%, -5%) scale(1.08)
+            }
+
+            100% {
+                transform: translate(-4%, 4%) scale(.96)
+            }
+        }
+
+        /* ---------- flowing grid ---------- */
+        .grid-fx {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            opacity: .5;
+            background-image: linear-gradient(rgba(255, 255, 255, .03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, .03) 1px, transparent 1px);
+            background-size: 72px 72px;
+            -webkit-mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 25%, transparent 70%);
+            mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 25%, transparent 70%);
+            animation: gridFlow 9s linear infinite
+        }
+
+        @keyframes gridFlow {
+            to {
+                background-position: 72px 72px
+            }
+        }
+
+        .wrap {
+            position: relative;
+            z-index: 1;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 0 24px
+        }
+
+        /* ---------- nav ---------- */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            background: rgba(13, 17, 25, .6);
+            border-bottom: 1px solid transparent;
+            transition: border-color .3s
+        }
+
+        nav.scrolled {
+            border-bottom-color: var(--line)
+        }
+
+        .nav-in {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 36px
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 17px;
+            letter-spacing: .02em;
+            cursor: pointer;
+            position: relative
+        }
+
+        .logo-mark {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            position: relative;
+            background: conic-gradient(from 180deg, var(--acc), var(--acc2), var(--acc));
+            animation: logoSpin 7s linear infinite, logoCharge 5s ease-in-out infinite
+        }
+
+        .logo-mark::after {
+            content: "";
+            position: absolute;
+            inset: 5px;
+            background: var(--bg);
+            border-radius: 3px
+        }
+
+        @keyframes logoSpin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        @keyframes logoCharge {
+
+            0%,
+            72%,
+            100% {
+                box-shadow: 0 0 0 rgba(16, 185, 129, 0)
+            }
+
+            80% {
+                box-shadow: 0 0 22px rgba(16, 185, 129, .55), 0 0 30px rgba(125, 211, 252, .4)
+            }
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 28px;
+            font-size: 13.5px;
+            color: var(--dim)
+        }
+
+        .nav-links a {
+            color: inherit;
+            text-decoration: none;
+            transition: color .2s
+        }
+
+        .nav-links a:hover {
+            color: var(--txt)
+        }
+
+        .nav-cta {
+            margin-left: auto;
+            display: flex;
+            gap: 12px;
+            align-items: center
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--line2);
+            background: transparent;
+            color: var(--txt);
+            text-decoration: none;
+            transition: all .25s;
+            position: relative;
+            overflow: hidden
+        }
+
+        .btn:hover {
+            border-color: rgba(255, 255, 255, .32);
+            background: rgba(255, 255, 255, .05)
+        }
+
+        .btn.primary {
+            background: var(--acc);
+            color: #04110b;
+            border-color: var(--acc);
+            box-shadow: 0 0 0 rgba(16, 185, 129, 0)
+        }
+
+        .btn.primary:hover {
+            background: #12c98e;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 28px -8px rgba(16, 185, 129, .5), 0 0 24px rgba(16, 185, 129, .25)
+        }
+
+        .btn.sm {
+            padding: 7px 14px;
+            font-size: 12.5px
+        }
+
+        /* ---------- hero ---------- */
+        .hero {
+            padding: 150px 0 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden
+        }
+
+        /* electric sweep beam across the whole hero */
+        .sweep {
+            position: absolute;
+            left: 0;
+            width: 36vw;
+            height: 3px;
+            top: 38%;
+            pointer-events: none;
+            background: linear-gradient(90deg, transparent, rgba(125, 211, 252, .9) 35%, rgba(16, 185, 129, .85) 65%, transparent);
+            filter: blur(1px);
+            opacity: 0;
+            animation: electricSweep 7.5s ease-in-out infinite
+        }
+
+        .sweep.s2 {
+            top: 52%;
+            animation-delay: 3.4s;
+            height: 2px;
+            opacity: 0
+        }
+
+        @keyframes electricSweep {
+
+            0%,
+            14% {
+                opacity: 0;
+                transform: translate(0) scaleX(.7)
+            }
+
+            24% {
+                opacity: .9
+            }
+
+            55% {
+                opacity: 1
+            }
+
+            76%,
+            100% {
+                opacity: 0;
+                transform: translate(115vw) scaleX(1.05)
+            }
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 14px 5px 10px;
+            border-radius: 99px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, .03);
+            font-size: 12px;
+            color: var(--dim);
+            font-family: var(--mono);
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            animation: heroFadeIn .9s cubic-bezier(.2, .8, .2, 1) both
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--acc);
+            box-shadow: 0 0 8px var(--acc);
+            animation: pulse 2s infinite
+        }
+
+        @keyframes pulse {
+            50% {
+                opacity: .35
+            }
+        }
+
+        @keyframes heroFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .hero h1 {
+            font-size: clamp(40px, 6.2vw, 76px);
+            font-weight: 700;
+            letter-spacing: -.03em;
+            line-height: 1.05;
+            margin: 26px 0 20px;
+            animation: heroFadeIn .9s .08s cubic-bezier(.2, .8, .2, 1) both
+        }
+
+        .hero h1 .grad {
+            background: linear-gradient(90deg, var(--acc) 0%, var(--acc2) 30%, #a5f3fc 50%, var(--acc2) 70%, var(--acc) 100%);
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradFlow 6s linear infinite
+        }
+
+        @keyframes gradFlow {
+            to {
+                background-position: 200% 0
+            }
+        }
+
+        .hero p.sub {
+            font-size: clamp(15px, 1.8vw, 18px);
+            color: var(--dim);
+            max-width: 560px;
+            margin: 0 auto 36px;
+            animation: heroFadeIn .9s .16s cubic-bezier(.2, .8, .2, 1) both
+        }
+
+        .hero-ctas {
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            margin-bottom: 70px;
+            flex-wrap: wrap;
+            animation: heroFadeIn .9s .24s cubic-bezier(.2, .8, .2, 1) both
+        }
+
+        /* ---------- observability panel with glass sheen ---------- */
+        .obs {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: rgba(21, 26, 38, .72);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            text-align: left;
+            position: relative;
+            animation: heroFadeIn 1s .35s cubic-bezier(.2, .8, .2, 1) both;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, .5)
+        }
+
+        .obs::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 45%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .06), transparent);
+            transform: translate(-100%);
+            animation: glassSheen 7s ease-in-out infinite
+        }
+
+        @keyframes glassSheen {
+
+            0%,
+            18% {
+                transform: translate(-100%)
+            }
+
+            68%,
+            100% {
+                transform: translate(360%)
+            }
+        }
+
+        .obs-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 13px 18px;
+            border-bottom: 1px solid var(--line);
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--dim2);
+            letter-spacing: .12em;
+            text-transform: uppercase
+        }
+
+        .obs-head .rec {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--red);
+            box-shadow: 0 0 8px var(--red);
+            animation: pulse 1.4s infinite
+        }
+
+        .obs-body {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            min-height: 230px
+        }
+
+        .obs-stream {
+            padding: 18px;
+            border-right: 1px solid var(--line);
+            position: relative;
+            overflow: hidden
+        }
+
+        .obs-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            font-family: var(--mono);
+            font-size: 13px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, .02);
+            animation: slideIn .5s cubic-bezier(.2, .8, .2, 1)
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .obs-row .prov {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 150px;
+            color: var(--txt)
+        }
+
+        .pv {
+            width: 18px;
+            height: 18px;
+            border-radius: 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 700;
+            color: #fff;
+            flex: none
+        }
+
+        .obs-row .lat {
+            margin-left: auto;
+            color: var(--dim)
+        }
+
+        .obs-row .lat b {
+            color: var(--acc);
+            font-weight: 600
+        }
+
+        .obs-row .bar {
+            position: relative;
+            flex: 1;
+            max-width: 120px;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, .06);
+            overflow: hidden
+        }
+
+        .obs-row .bar i {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            border-radius: 2px;
+            background: linear-gradient(90deg, var(--acc2), var(--acc));
+            animation: grow .8s ease
+        }
+
+        @keyframes grow {
+            from {
+                transform: scaleX(0);
+                transform-origin: left
+            }
+        }
+
+        .obs-side {
+            padding: 18px;
+            display: flex;
+            flex-direction: column
+        }
+
+        .stat-cell {
+            padding: 14px 6px;
+            border-bottom: 1px solid var(--line)
+        }
+
+        .stat-cell:last-child {
+            border-bottom: none
+        }
+
+        .stat-cell .k {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            color: var(--dim2);
+            letter-spacing: .1em;
+            text-transform: uppercase
+        }
+
+        .stat-cell .v {
+            font-size: 24px;
+            font-weight: 700;
+            font-family: var(--mono);
+            letter-spacing: -.02em;
+            margin-top: 2px
+        }
+
+        .stat-cell .v.g {
+            color: var(--acc);
+            text-shadow: 0 0 18px rgba(16, 185, 129, .4)
+        }
+
+        .stat-cell .v.c {
+            color: var(--acc2);
+            text-shadow: 0 0 18px rgba(125, 211, 252, .35)
+        }
+
+        /* ---------- providers: dual marquee ---------- */
+        .providers {
+            margin: 70px 0 20px
+        }
+
+        .providers .lbl {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--dim2);
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 22px
+        }
+
+        .marquee {
+            overflow: hidden;
+            padding: 4px 0;
+            -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent)
+        }
+
+        .marquee-track {
+            display: flex;
+            gap: 10px;
+            width: max-content;
+            animation: marqueeLTR 36s linear infinite
+        }
+
+        .marquee.rev .marquee-track {
+            animation: marqueeRTL 42s linear infinite
+        }
+
+        .marquee:hover .marquee-track {
+            animation-play-state: paused
+        }
+
+        @keyframes marqueeLTR {
+            to {
+                transform: translate(-50%)
+            }
+        }
+
+        @keyframes marqueeRTL {
+            from {
+                transform: translate(-50%)
+            }
+
+            to {
+                transform: translate(0)
+            }
+        }
+
+        .marquee+.marquee {
+            margin-top: 10px
+        }
+
+        .prov-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            padding: 9px 18px;
+            border-radius: 99px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, .02);
+            font-size: 13.5px;
+            color: var(--dim);
+            transition: all .25s;
+            cursor: default;
+            animation: provFloat 5s ease-in-out infinite
+        }
+
+        .marquee.rev .prov-chip {
+            animation-delay: -2.5s
+        }
+
+        .prov-chip:hover {
+            color: var(--txt);
+            border-color: rgba(16, 185, 129, .35);
+            background: rgba(16, 185, 129, .06);
+            box-shadow: 0 0 20px rgba(16, 185, 129, .12)
+        }
+
+        @keyframes provFloat {
+
+            0%,
+            100% {
+                transform: translateY(0)
+            }
+
+            50% {
+                transform: translateY(-4px)
+            }
+        }
+
+        /* ---------- section shell ---------- */
+        section.block {
+            padding: 110px 0
+        }
+
+        .sec-tag {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--acc);
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            margin-bottom: 16px
+        }
+
+        .sec-title {
+            font-size: clamp(28px, 4vw, 44px);
+            font-weight: 700;
+            letter-spacing: -.02em;
+            line-height: 1.15;
+            margin-bottom: 14px
+        }
+
+        .sec-sub {
+            color: var(--dim);
+            font-size: 16px;
+            max-width: 620px
+        }
+
+        /* ---------- pillars ---------- */
+        .pillars {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 48px
+        }
+
+        .pillar {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 28px;
+            background: var(--panel);
+            position: relative;
+            overflow: hidden;
+            transition: all .3s
+        }
+
+        .pillar:hover {
+            border-color: rgba(16, 185, 129, .35);
+            transform: translateY(-3px);
+            box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .6), 0 0 30px rgba(16, 185, 129, .06)
+        }
+
+        .pillar .num {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--dim2);
+            letter-spacing: .14em;
+            margin-bottom: 18px
+        }
+
+        .pillar h3 {
+            font-size: 17px;
+            margin-bottom: 10px;
+            letter-spacing: -.01em
+        }
+
+        .pillar p {
+            font-size: 13.5px;
+            color: var(--dim);
+            line-height: 1.65
+        }
+
+        .pillar .icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, .03)
+        }
+
+        .pillar .glow {
+            position: absolute;
+            top: -60px;
+            right: -60px;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, .14), transparent 70%);
+            opacity: 0;
+            transition: opacity .4s
+        }
+
+        .pillar:hover .glow {
+            opacity: 1
+        }
+
+        /* sheen across cards */
+        .pillar::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 50%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .04), transparent);
+            transform: translate(-100%) skewX(-8deg)
+        }
+
+        .pillar:hover::after {
+            animation: glassSheen 1.2s ease
+        }
+
+        /* ---------- big stats band ---------- */
+        .stats-band {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-top: 56px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            overflow: hidden
+        }
+
+        .stats-band .cell {
+            padding: 30px 24px;
+            border-right: 1px solid var(--line);
+            text-align: left;
+            position: relative;
+            overflow: hidden
+        }
+
+        .stats-band .cell:last-child {
+            border-right: none
+        }
+
+        .stats-band .n {
+            font-family: var(--mono);
+            font-size: 38px;
+            font-weight: 700;
+            letter-spacing: -.03em;
+            background: linear-gradient(120deg, #fff 20%, #7dd3fc 50%, #fff 80%);
+            background-size: 220% 100%;
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradFlow 5s linear infinite
+        }
+
+        .stats-band .l {
+            font-size: 13px;
+            color: var(--dim);
+            margin-top: 6px
+        }
+
+        /* ---------- network ---------- */
+        .net-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 60px;
+            align-items: center;
+            margin-top: 48px
+        }
+
+        .net-mini {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 28px
+        }
+
+        .net-mini .m {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 16px;
+            background: rgba(255, 255, 255, .02);
+            transition: border-color .3s
+        }
+
+        .net-mini .m:hover {
+            border-color: rgba(125, 211, 252, .3)
+        }
+
+        .net-mini .m .k {
+            font-family: var(--mono);
+            font-size: 10.5px;
+            color: var(--dim2);
+            text-transform: uppercase;
+            letter-spacing: .1em
+        }
+
+        .net-mini .m .v {
+            font-size: 20px;
+            font-weight: 700;
+            margin-top: 4px;
+            font-family: var(--mono)
+        }
+
+        .net-panel {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            padding: 20px;
+            position: relative;
+            overflow: hidden
+        }
+
+        .net-panel::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 40%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(105deg, transparent, rgba(125, 211, 252, .04), transparent);
+            transform: translate(-100%);
+            animation: glassSheen 9s ease-in-out infinite
+        }
+
+        .net-panel svg {
+            display: block;
+            width: 100%;
+            height: auto
+        }
+
+        .net-foot {
+            display: flex;
+            gap: 20px;
+            padding: 14px 18px;
+            border-top: 1px solid var(--line);
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--dim);
+            flex-wrap: wrap
+        }
+
+        .net-foot span {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px
+        }
+
+        .net-foot .sw {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px
+        }
+
+        .flow-arc {
+            stroke-dasharray: 6 8;
+            animation: dashmove 1.2s linear infinite
+        }
+
+        @keyframes dashmove {
+            to {
+                stroke-dashoffset: -28
+            }
+        }
+
+        .node-pulse {
+            animation: nodeGlow 2.4s ease-in-out infinite
+        }
+
+        @keyframes nodeGlow {
+
+            0%,
+            100% {
+                opacity: .4
+            }
+
+            50% {
+                opacity: 1
+            }
+        }
+
+        .ripple {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: ripple 2.8s ease-out infinite
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(.4);
+                opacity: .9
+            }
+
+            100% {
+                transform: scale(2.6);
+                opacity: 0
+            }
+        }
+
+        .node-float {
+            animation: nodeFloat 4.5s ease-in-out infinite
+        }
+
+        .node-float.f2 {
+            animation-delay: -2.2s
+        }
+
+        @keyframes nodeFloat {
+
+            0%,
+            100% {
+                transform: translateY(0)
+            }
+
+            50% {
+                transform: translateY(-7px)
+            }
+        }
+
+        .map-current {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: mapCurrent 12s linear infinite
+        }
+
+        @keyframes mapCurrent {
+            from {
+                transform: rotate(0) scaleX(1.05)
+            }
+
+            to {
+                transform: rotate(360deg) scaleX(1.05)
+            }
+        }
+
+        .map-signal {
+            animation: mapSignal 4s ease-in-out infinite
+        }
+
+        @keyframes mapSignal {
+
+            0%,
+            20% {
+                opacity: 0;
+                clip-path: inset(0 100% 0 0)
+            }
+
+            32% {
+                opacity: 1;
+                clip-path: inset(0 40% 0 0)
+            }
+
+            62% {
+                opacity: 1;
+                clip-path: inset(0)
+            }
+
+            78%,
+            100% {
+                opacity: 0;
+                clip-path: inset(0 0 0 100%)
+            }
+        }
+
+        /* ---------- webgl canvases ---------- */
+        #heroWebgl {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none
+        }
+
+        .hero .wrap {
+            position: relative;
+            z-index: 2
+        }
+
+        .net-panel {
+            padding: 0
+        }
+
+        #globeCanvas {
+            width: 100%;
+            height: 430px;
+            display: block;
+            cursor: grab;
+            touch-action: pan-y;
+            border-radius: 13px 13px 0 0
+        }
+
+        #globeCanvas:active {
+            cursor: grabbing
+        }
+
+        .no-webgl #heroWebgl,
+        .no-webgl #globeCanvas {
+            display: none
+        }
+
+        .no-webgl .net-panel {
+            background: radial-gradient(ellipse 80% 70% at 60% 40%, rgba(16, 185, 129, .08), rgba(21, 26, 38, 1) 70%)
+        }
+
+        .globe-hint {
+            position: absolute;
+            bottom: 12px;
+            right: 16px;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            color: var(--dim2);
+            letter-spacing: .08em;
+            pointer-events: none
+        }
+
+        /* ---------- pipeline ---------- */
+        .pipe-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+            border: 1px solid var(--line);
+            border-bottom: none;
+            border-radius: 14px 14px 0 0;
+            background: rgba(255, 255, 255, .02);
+            padding: 14px 20px;
+            font-family: var(--mono);
+            font-size: 12.5px
+        }
+
+        .pipe-head .method {
+            color: var(--acc);
+            font-weight: 600
+        }
+
+        .pipe-head .status {
+            color: var(--dim)
+        }
+
+        .pipe-head .ms {
+            color: var(--txt)
+        }
+
+        .pipe-body {
+            border: 1px solid var(--line);
+            border-radius: 0 0 14px 14px;
+            background: var(--panel);
+            overflow: hidden
+        }
+
+        .pipe-stages {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr)
+        }
+
+        .stage {
+            padding: 18px 14px;
+            border-right: 1px solid var(--line);
+            cursor: pointer;
+            position: relative;
+            transition: background .25s
+        }
+
+        .stage:last-child {
+            border-right: none
+        }
+
+        .stage:hover {
+            background: rgba(255, 255, 255, .03)
+        }
+
+        .stage.active {
+            background: rgba(16, 185, 129, .05)
+        }
+
+        .stage .idx {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--dim2);
+            letter-spacing: .1em
+        }
+
+        .stage .nm {
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 8px
+        }
+
+        .stage .t {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--acc);
+            margin-top: 4px
+        }
+
+        .stage .fill {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            height: 2px;
+            width: 100%;
+            background: var(--acc);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform .5s
+        }
+
+        .stage.done .fill {
+            transform: scaleX(1)
+        }
+
+        .stage.active .fill {
+            transform: scaleX(1);
+            background: var(--acc2);
+            animation: pulse 1s infinite
+        }
+
+        .stage-detail {
+            border-top: 1px solid var(--line);
+            padding: 26px;
+            min-height: 110px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start
+        }
+
+        .stage-detail .big-idx {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--dim2);
+            padding-top: 3px;
+            white-space: nowrap
+        }
+
+        .stage-detail h4 {
+            font-size: 16px;
+            margin-bottom: 8px
+        }
+
+        .stage-detail p {
+            font-size: 13.5px;
+            color: var(--dim);
+            max-width: 640px
+        }
+
+        .stage-detail .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(16, 185, 129, .35);
+            background: rgba(16, 185, 129, .07);
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--acc)
+        }
+
+        /* ---------- control plane ---------- */
+        .cp-tabs {
+            display: flex;
+            gap: 8px;
+            margin-top: 44px;
+            flex-wrap: wrap
+        }
+
+        .cp-tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: transparent;
+            color: var(--dim);
+            font-size: 12.5px;
+            font-family: var(--mono);
+            letter-spacing: .06em;
+            cursor: pointer;
+            transition: all .25s;
+            text-transform: uppercase
+        }
+
+        .cp-tab:hover {
+            color: var(--txt);
+            border-color: var(--line2)
+        }
+
+        .cp-tab.on {
+            color: var(--acc);
+            border-color: rgba(16, 185, 129, .4);
+            background: rgba(16, 185, 129, .06);
+            box-shadow: 0 0 18px rgba(16, 185, 129, .1)
+        }
+
+        .cp-body {
+            margin-top: 22px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 300px;
+            overflow: hidden
+        }
+
+        .cp-left {
+            padding: 36px;
+            border-right: 1px solid var(--line)
+        }
+
+        .cp-left .cp-no {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--acc);
+            letter-spacing: .14em;
+            margin-bottom: 14px
+        }
+
+        .cp-left h3 {
+            font-size: 26px;
+            letter-spacing: -.02em;
+            margin-bottom: 12px
+        }
+
+        .cp-left p {
+            color: var(--dim);
+            font-size: 14px
+        }
+
+        .cp-features {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px
+        }
+
+        .cp-features .f {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-size: 13px;
+            color: var(--dim)
+        }
+
+        .cp-features .f::before {
+            content: "";
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            flex: none;
+            background: rgba(16, 185, 129, .12);
+            border: 1px solid rgba(16, 185, 129, .3);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='3'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+            background-size: 9px;
+            background-position: center;
+            background-repeat: no-repeat
+        }
+
+        .cp-right {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            background: radial-gradient(ellipse 80% 60% at 60% 40%, rgba(125, 211, 252, .05), transparent 70%)
+        }
+
+        .cp-viz {
+            width: 100%;
+            max-width: 380px
+        }
+
+        .viz-line {
+            stroke-dasharray: 4 6;
+            animation: dashmove 1.6s linear infinite
+        }
+
+        /* ---------- flow diagram (chaos→order) ---------- */
+        .flow-wrap {
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            margin-top: 48px;
+            overflow: hidden;
+            position: relative
+        }
+
+        .flow-wrap svg {
+            display: block;
+            width: 100%;
+            height: auto
+        }
+
+        .core-pulse {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: corePulse 3.2s ease-in-out infinite
+        }
+
+        @keyframes corePulse {
+
+            0%,
+            100% {
+                filter: drop-shadow(0 0 6px rgba(16, 185, 129, .25))
+            }
+
+            50% {
+                filter: drop-shadow(0 0 20px rgba(16, 185, 129, .55))
+            }
+        }
+
+        /* ---------- footer ---------- */
+        footer {
+            border-top: 1px solid var(--line);
+            padding: 60px 0 40px;
+            margin-top: 40px
+        }
+
+        .foot-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 40px
+        }
+
+        .foot-grid h5 {
+            font-size: 12px;
+            color: var(--dim2);
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            font-family: var(--mono)
+        }
+
+        .foot-grid a {
+            display: block;
+            color: var(--dim);
+            text-decoration: none;
+            font-size: 13.5px;
+            margin-bottom: 10px;
+            transition: color .2s
+        }
+
+        .foot-grid a:hover {
+            color: var(--txt)
+        }
+
+        .foot-bottom {
+            margin-top: 50px;
+            padding-top: 24px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12.5px;
+            color: var(--dim2);
+            font-family: var(--mono);
+            flex-wrap: wrap;
+            gap: 10px
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(2rem);
+            transition: opacity .8s cubic-bezier(.2, .8, .2, 1), transform .8s cubic-bezier(.2, .8, .2, 1)
+        }
+
+        .reveal.in {
+            opacity: 1;
+            transform: none
+        }
+
+        @media(max-width:900px) {
+            .obs-body {
+                grid-template-columns: 1fr
+            }
+
+            .obs-stream {
+                border-right: none;
+                border-bottom: 1px solid var(--line)
+            }
+
+            .pillars {
+                grid-template-columns: 1fr
+            }
+
+            .stats-band {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .stats-band .cell:nth-child(2) {
+                border-right: none
+            }
+
+            .stats-band .cell:nth-child(-n+2) {
+                border-bottom: 1px solid var(--line)
+            }
+
+            .net-grid {
+                grid-template-columns: 1fr
+            }
+
+            .pipe-stages {
+                grid-template-columns: repeat(3, 1fr)
+            }
+
+            .stage:nth-child(3) {
+                border-right: none
+            }
+
+            .stage:nth-child(-n+3) {
+                border-bottom: 1px solid var(--line)
+            }
+
+            .cp-body {
+                grid-template-columns: 1fr
+            }
+
+            .cp-left {
+                border-right: none;
+                border-bottom: 1px solid var(--line)
+            }
+
+            .foot-grid {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .nav-links {
+                display: none
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="aurora"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+    <div class="grid-fx"></div>
+
+    <nav id="nav">
+        <div class="nav-in">
+            <div class="logo">
+                <div class="logo-mark"></div>Meteor
+            </div>
+            <div class="nav-links">
+                <a href="#pillars">Platform</a>
+                <a href="#network">Network</a>
+                <a href="#pipeline">Pipeline</a>
+                <a href="#control">Control Plane</a>
+                <a href="#">Docs</a>
+            </div>
+            <div class="nav-cta">
+                <a class="btn sm" href="#">Sign in</a>
+                <a class="btn sm primary" href="#">Get API key</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ============ HERO ============ -->
+    <header class="hero">
+        <canvas id="heroWebgl"></canvas>
+        <div class="sweep"></div>
+        <div class="sweep s2"></div>
+        <div class="wrap">
+            <div class="badge"><span class="dot"></span>Real-time observability · live</div>
+            <h1>Large Model<br><span class="grad">Service Platform</span></h1>
+            <p class="sub">One control plane for every model, every route, every decision. Built for AI systems moving
+                from experiment to production.</p>
+            <div class="hero-ctas">
+                <a class="btn primary" href="#">Start routing free →</a>
+                <a class="btn" href="#pipeline">See how it works</a>
+            </div>
+
+            <!-- live observability panel -->
+            <div class="obs">
+                <div class="obs-head">
+                    <span class="rec"></span>Real-time observability
+                    <span style="margin-left:auto">region: us-west-2 · tokyo-1</span>
+                </div>
+                <div class="obs-body">
+                    <div class="obs-stream" id="stream"></div>
+                    <div class="obs-side">
+                        <div class="stat-cell">
+                            <div class="k">Avg latency</div>
+                            <div class="v g">&lt;50ms</div>
+                        </div>
+                        <div class="stat-cell">
+                            <div class="k">Uptime SLA</div>
+                            <div class="v">99.9%</div>
+                        </div>
+                        <div class="stat-cell">
+                            <div class="k">Providers</div>
+                            <div class="v c">20+</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- providers: dual-direction infinite marquee -->
+            <div class="providers">
+                <div class="lbl">Works with leading model providers</div>
+                <div class="marquee">
+                    <div class="marquee-track" id="provRow1"></div>
+                </div>
+                <div class="marquee rev">
+                    <div class="marquee-track" id="provRow2"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============ PILLARS ============ -->
+    <section class="block" id="pillars">
+        <div class="wrap">
+            <div class="reveal">
+                <div class="sec-tag">The platform</div>
+                <h2 class="sec-title">One plane,<br>three disciplines</h2>
+            </div>
+            <div class="pillars">
+                <div class="pillar reveal">
+                    <div class="glow"></div>
+                    <div class="icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.8">
+                            <path d="M4 7h13m0 0-3-3m3 3-3 3M20 17H7m0 0 3 3m-3-3 3-3" />
+                        </svg>
+                    </div>
+                    <div class="num">01 · MODEL ROUTING</div>
+                    <h3>Route requests across frontier and private models</h3>
+                    <p>Weighted selection across providers by latency, cost and health — with automatic failover the
+                        moment an upstream degrades.</p>
+                </div>
+                <div class="pillar reveal">
+                    <div class="glow" style="background:radial-gradient(circle,rgba(125,211,252,.13),transparent 70%)">
+                    </div>
+                    <div class="icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" stroke-width="1.8">
+                            <path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z" />
+                            <path d="M9 12l2 2 4-4" />
+                        </svg>
+                    </div>
+                    <div class="num">02 · GOVERNANCE LAYER</div>
+                    <h3>Control access, policy, cost, and compliance</h3>
+                    <p>Per-key budgets, organization-level policy, audit trails and spend caps enforced before a single
+                        token leaves the building.</p>
+                </div>
+                <div class="pillar reveal">
+                    <div class="glow" style="background:radial-gradient(circle,rgba(251,191,36,.12),transparent 70%)">
+                    </div>
+                    <div class="icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.8">
+                            <path d="M3 12h4l2-6 4 12 2-6h6" />
+                        </svg>
+                    </div>
+                    <div class="num">03 · REAL-TIME OBSERVABILITY</div>
+                    <h3>Trace latency, quality, spend, and failures live</h3>
+                    <p>Every request traced end to end — stage-level timings, token flow, and cost attribution streamed
+                        in real time.</p>
+                </div>
+            </div>
+
+            <div class="stats-band reveal">
+                <div class="cell">
+                    <div class="n">1T</div>
+                    <div class="l">tokens routed monthly</div>
+                </div>
+                <div class="cell">
+                    <div class="n">+1w</div>
+                    <div class="l">production endpoints</div>
+                </div>
+                <div class="cell">
+                    <div class="n">20+</div>
+                    <div class="l">model providers</div>
+                </div>
+                <div class="cell">
+                    <div class="n">&lt;50ms</div>
+                    <div class="l">added overhead p95</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ NETWORK ============ -->
+    <section class="block" id="network"
+        style="background:linear-gradient(180deg,transparent,rgba(255,255,255,.012),transparent)">
+        <div class="wrap">
+            <div class="net-grid">
+                <div class="net-copy reveal">
+                    <div class="sec-tag">Global network</div>
+                    <h2 class="sec-title">Land nearby,<br>cross the Pacific faster</h2>
+                    <p class="sec-sub">The primary node runs in California. Asia-Pacific requests land on the Tokyo
+                        acceleration node first and relay back from there — cutting out a round trip across the Pacific.
+                        Everywhere else connects to the primary node directly.</p>
+                    <div class="net-mini">
+                        <div class="m">
+                            <div class="k">Routed monthly</div>
+                            <div class="v">1T tokens</div>
+                        </div>
+                        <div class="m">
+                            <div class="k">Providers</div>
+                            <div class="v">20+</div>
+                        </div>
+                        <div class="m">
+                            <div class="k">Uptime SLA</div>
+                            <div class="v">99.9%</div>
+                        </div>
+                        <div class="m">
+                            <div class="k">Avg latency</div>
+                            <div class="v">&lt;50ms</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="net-panel reveal">
+                    <canvas id="globeCanvas"></canvas>
+                    <div class="globe-hint">drag to rotate · webgl</div>
+                    <div class="net-foot">
+                        <span><span class="sw" style="background:#10b981"></span>Primary · California</span>
+                        <span><span class="sw" style="background:#7dd3fc"></span>Acceleration · Tokyo</span>
+                        <span><span class="sw" style="background:#565e6e"></span>Live requests</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ PIPELINE ============ -->
+    <section class="block" id="pipeline">
+        <div class="wrap">
+            <div class="reveal">
+                <div class="sec-tag">Request lifecycle</div>
+                <h2 class="sec-title">One request, six stages<br>inside the platform</h2>
+                <p class="sec-sub">From the SDK call to the streamed response, every stage is observable, throttleable
+                    and reroutable. Here is the full path a single call takes.</p>
+            </div>
+
+            <div class="reveal" style="margin-top:48px">
+                <div class="pipe-head">
+                    <span><span class="method">POST</span> <span
+                            style="color:var(--dim)">/v1/chat/completions</span></span>
+                    <span class="status">In flight · end to end <span class="ms" id="pipeMs">0ms</span></span>
+                </div>
+                <div class="pipe-body">
+                    <div class="pipe-stages" id="pipeStages"></div>
+                    <div class="stage-detail">
+                        <div class="big-idx" id="dIdx">01</div>
+                        <div>
+                            <h4 id="dTitle"></h4>
+                            <p id="dText"></p>
+                            <div class="chip" id="dChip" style="display:none"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ CONTROL PLANE ============ -->
+    <section class="block" id="control"
+        style="background:linear-gradient(180deg,transparent,rgba(255,255,255,.012),transparent)">
+        <div class="wrap">
+            <div class="reveal">
+                <div class="sec-tag">Control plane</div>
+                <h2 class="sec-title">The Control Plane for AI at Scale</h2>
+                <p class="sec-sub">Unify model access, routing, governance, observability, and cost control through one
+                    infrastructure layer.</p>
+            </div>
+
+            <div class="cp-tabs reveal" id="cpTabs"></div>
+            <div class="cp-body reveal">
+                <div class="cp-left">
+                    <div class="cp-no" id="cpNo"></div>
+                    <h3 id="cpTitle"></h3>
+                    <p id="cpText"></p>
+                    <div class="cp-features" id="cpFeat"></div>
+                </div>
+                <div class="cp-right">
+                    <svg class="cp-viz" id="cpViz" viewBox="0 0 380 280" fill="none"></svg>
+                </div>
+            </div>
+
+            <!-- chaos → order flow -->
+            <div class="flow-wrap reveal">
+                <svg viewBox="0 0 1060 300" fill="none">
+                    <defs>
+                        <linearGradient id="fg" x1="0" x2="1">
+                            <stop offset="0" stop-color="#f87171" stop-opacity="0" />
+                            <stop offset=".5" stop-color="#7dd3fc" />
+                            <stop offset="1" stop-color="#10b981" />
+                        </linearGradient>
+                    </defs>
+                    <!-- left: chaotic -->
+                    <g font-family="monospace" font-size="11">
+                        <text x="60" y="40" fill="#f87171">CHAOTIC TRAFFIC</text>
+                        <g stroke="rgba(248,113,113,.35)" stroke-width="1.2">
+                            <path d="M60 70 C 180 60, 240 110, 430 140" />
+                            <path d="M60 100 C 190 130, 250 90, 430 145" />
+                            <path d="M60 130 C 170 90, 260 150, 430 150" />
+                            <path d="M60 160 C 200 200, 240 130, 430 155" />
+                            <path d="M60 190 C 170 160, 260 210, 430 160" />
+                            <path d="M60 220 C 190 250, 250 180, 430 165" />
+                        </g>
+                        <g fill="#f87171" opacity=".7">
+                            <circle cx="60" cy="66" r="3" />
+                            <circle cx="60" cy="96" r="3" />
+                            <circle cx="60" cy="126" r="3" />
+                            <circle cx="60" cy="156" r="3" />
+                            <circle cx="60" cy="186" r="3" />
+                            <circle cx="60" cy="216" r="3" />
+                        </g>
+                    </g>
+
+                    <!-- center: platform (pulsing core) -->
+                    <g class="core-pulse">
+                        <rect x="430" y="105" width="200" height="90" rx="12" fill="rgba(16,185,129,.05)"
+                            stroke="rgba(16,185,129,.45)" stroke-width="1.2" />
+                        <text x="530" y="140" text-anchor="middle" fill="#eef1f6" font-size="13" font-weight="600"
+                            font-family="sans-serif">Model Service Platform</text>
+                        <text x="530" y="160" text-anchor="middle" fill="#8b93a3" font-size="10"
+                            font-family="monospace">auth · route · govern · observe</text>
+                    </g>
+                    <circle cx="530" cy="150" r="46" fill="none" stroke="rgba(16,185,129,.25)" stroke-width="1"
+                        class="ripple" />
+
+                    <!-- right: ordered -->
+                    <g font-family="monospace" font-size="11">
+                        <text x="915" y="40" fill="#10b981">ORDERED OUTPUT</text>
+                        <g stroke="rgba(16,185,129,.5)" stroke-width="1.4">
+                            <path d="M630 140 C 760 148, 830 150, 890 150" class="flow-arc" />
+                            <path d="M630 145 C 760 150, 830 152, 890 152" class="flow-arc" />
+                        </g>
+                        <circle cx="900" cy="150" r="4" fill="#10b981" />
+                        <g fill="#565e6e">
+                            <circle cx="930" cy="130" r="2.5" />
+                            <circle cx="945" cy="150" r="2.5" />
+                            <circle cx="930" cy="170" r="2.5" />
+                        </g>
+                        <text x="915" y="200" fill="#565e6e" font-size="10">unified protocol · e2e observable</text>
+                    </g>
+
+                    <g font-family="monospace" font-size="10.5" fill="#565e6e">
+                        <text x="70" y="265">01 · ROUTE</text>
+                        <text x="460" y="265">02 · GOVERN</text>
+                        <text x="860" y="265">03 · OBSERVE</text>
+                    </g>
+                </svg>
+            </div>
+            <p class="sec-sub reveal" style="margin-top:22px;font-size:14px">Every request passes through the platform —
+                authenticated, routed to the best model, and returned over one unified protocol, observable end to end.
+            </p>
+        </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer>
+        <div class="wrap">
+            <div class="foot-grid">
+                <div>
+                    <div class="logo" style="margin-bottom:14px">
+                        <div class="logo-mark"></div>Meteor
+                    </div>
+                    <p style="color:var(--dim);font-size:13px;max-width:260px">The large model service platform for AI
+                        moving from experiment to production.</p>
+                </div>
+                <div>
+                    <h5>Product</h5>
+                    <a href="#pillars">Routing</a><a href="#control">Governance</a><a
+                        href="#pipeline">Observability</a><a href="#">Cost control</a>
+                </div>
+                <div>
+                    <h5>Developers</h5>
+                    <a href="#">Documentation</a><a href="#">API reference</a><a href="#">SDKs</a><a href="#">Status</a>
+                </div>
+                <div>
+                    <h5>Company</h5>
+                    <a href="#">About</a><a href="#">Blog</a><a href="#">Careers</a><a href="#">Contact</a>
+                </div>
+            </div>
+            <div class="foot-bottom">
+                <span>© 2026 Meteor Labs</span>
+                <span>us-west-2 · tokyo-1 · eu-west-1</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        /* ---------- nav scroll ---------- */
+        const nav = document.getElementById('nav');
+        addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 10));
+
+        /* ---------- reveal on scroll ---------- */
+        const io = new IntersectionObserver(es => es.forEach(e => {
+            if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target) }
+        }), { threshold: .12 });
+        document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+        /* ---------- providers (dual marquee, duplicated for seamless loop) ---------- */
+        const provs = [
+            ['OpenAI', '#10a37f', 'OA'], ['Anthropic', '#d97757', 'AN'], ['Google', '#4796e3', 'GO'],
+            ['xAI', '#94a3b8', 'XA'], ['Meta', '#0668e1', 'ME'], ['Mistral', '#fa520f', 'MI'],
+            ['Cohere', '#39594d', 'CO'], ['Amazon', '#ff9900', 'AM'], ['Microsoft', '#00a4ef', 'MS'],
+            ['Groq', '#f55036', 'GQ'], ['Together', '#0f6b5c', 'TG'], ['Fireworks', '#a855f7', 'FW'],
+            ['Perplexity', '#20808d', 'PX'], ['AI21', '#ff6d00', 'A2']
+        ];
+        function chipHTML([n, c, s]) {
+            return `<span class="prov-chip"><span class="pv" style="background:${c}">${s}</span>${n}</span>`;
+        }
+        const half = provs.map(chipHTML).join('');
+        const shuffled = [...provs.slice(7), ...provs.slice(0, 7)].map(chipHTML).join('');
+        document.getElementById('provRow1').innerHTML = half + half;
+        document.getElementById('provRow2').innerHTML = shuffled + shuffled;
+
+        /* ---------- live obs stream ---------- */
+        const models = [
+            ['GPT-5.6 Sol', 'OA', '#10a37f', 14, 34],
+            ['Claude Fable 5.1', 'AN', '#d97757', 16, 42],
+            ['Claude Opus 5', 'AN', '#d97757', 15, 38],
+            ['Gemini 3.1 Pro', 'GO', '#4796e3', 18, 36],
+            ['Gemini 3.8 Flash', 'GO', '#4796e3', 10, 22],
+            ['Grok 4.6', 'XA', '#94a3b8', 17, 40],
+            ['GPT-5.6 Terra', 'OA', '#10a37f', 20, 44],
+            ['Llama 4 Scout', 'ME', '#0668e1', 22, 50]
+        ];
+        const stream = document.getElementById('stream');
+        function pushRow() {
+            const [nm, s, c, min, max] = models[Math.random() * models.length | 0];
+            const lat = min + Math.random() * (max - min) | 0;
+            const el = document.createElement('div');
+            el.className = 'obs-row';
+            el.innerHTML = `<span class="prov"><span class="pv" style="background:${c}">${s}</span>${nm}</span>
+    <span class="bar"><i style="width:${lat / max * 100}%"></i></span>
+    <span class="lat"><b>${lat}ms</b></span>`;
+            stream.prepend(el);
+            while (stream.children.length > 5) stream.lastChild.remove();
+        }
+        for (let i = 0; i < 5; i++)pushRow();
+        setInterval(pushRow, 2200);
+
+        /* ---------- pipeline ---------- */
+        const stages = [
+            {
+                nm: 'Client', t: '—', title: 'Client',
+                text: 'Point baseURL at Meteor — the official OpenAI, Anthropic and Gemini SDKs keep working unchanged.',
+                chip: null
+            },
+            {
+                nm: 'Ingress', t: '2ms', title: 'Ingress',
+                text: 'Detect which protocol the call speaks, normalise it internally, and restore the original shape on the way back.',
+                chip: null
+            },
+            {
+                nm: 'Auth · Quota', t: '3ms', title: 'Auth · Quota',
+                text: 'Check the API key, organisation and project quotas, and RPM limits. Anything over budget stops right here.',
+                chip: null
+            },
+            {
+                nm: 'Routing', t: '4ms', title: 'Routing',
+                text: 'Weighted pick among the providers serving that model — by group, weight and circuit state, skipping the ones already tried on this request.',
+                chip: 'GPT-5.6 Sol · lowest latency', pv: ['OA', '#10a37f']
+            },
+            {
+                nm: 'Upstream', t: '38ms', title: 'Upstream',
+                text: 'Call the real provider with its own credentials. On a failure or a throttle, step back and retry against another one.',
+                chip: 'GPT-5.6 Sol · 38ms', pv: ['OA', '#10a37f']
+            },
+            {
+                nm: 'Stream out', t: '—', title: 'Stream out',
+                text: 'Tokens stream straight through over SSE, while usage, cost and logs are batched to storage off the response path.',
+                chip: null
+            }
+        ];
+        const psEl = document.getElementById('pipeStages');
+        psEl.innerHTML = stages.map((s, i) => `
+  <div class="stage" data-i="${i}">
+    <div class="idx">0${i + 1}</div>
+    <div class="nm">${s.nm}</div>
+    <div class="t">${s.t}</div>
+    <div class="fill"></div>
+  </div>`).join('');
+        const dIdx = document.getElementById('dIdx'), dTitle = document.getElementById('dTitle'),
+            dText = document.getElementById('dText'), dChip = document.getElementById('dChip');
+        let cur = 0;
+        function showStage(i) {
+            cur = i;
+            document.querySelectorAll('.stage').forEach((el, j) => {
+                el.classList.toggle('active', j === i);
+                el.classList.toggle('done', j < i);
+            });
+            const s = stages[i];
+            dIdx.textContent = '0' + (i + 1);
+            dTitle.textContent = s.title;
+            dText.textContent = s.text;
+            if (s.chip) {
+                dChip.style.display = 'inline-flex';
+                dChip.innerHTML = `<span class="pv" style="background:${s.pv[1]}">${s.pv[0]}</span>${s.chip}`;
+            } else dChip.style.display = 'none';
+            // show the cumulative end-to-end time at this stage's completion
+            progress = 0;
+            msEl.textContent = cum[i + 1] + 'ms';
+        }
+        psEl.addEventListener('click', e => {
+            const st = e.target.closest('.stage');
+            if (st) showStage(+st.dataset.i);
+        });
+        let auto = true, progress = 0;
+        const msEl = document.getElementById('pipeMs');
+        // cumulative end-to-end ms at each stage boundary, matching the stage time labels
+        const cum = [0, 2, 5, 9, 47, 47, 47];
+        function paintMs() {
+            const frac = progress / 100;
+            msEl.textContent = (cum[cur] + (cum[cur + 1] - cum[cur]) * frac).toFixed(0) + 'ms';
+        }
+        setInterval(() => {
+            if (!auto) return;
+            progress += 2;
+            if (progress >= 100) { progress = 0; showStage((cur + 1) % stages.length) }
+            paintMs();
+        }, 80);
+        psEl.addEventListener('mouseenter', () => auto = false);
+        psEl.addEventListener('mouseleave', () => auto = true);
+        showStage(0);
+
+        /* ---------- control plane tabs ---------- */
+        const cps = [
+            {
+                tag: '01 / ROUTE', title: 'Intelligent routing',
+                text: 'Model selection across providers, regions, and private deployments — scored on latency, cost and reliability in real time.',
+                feat: ['Multi-provider weighted routing', 'Latency & cost aware selection', 'Automatic failover & retry', 'Private deployment support'],
+                viz: 'route'
+            },
+            {
+                tag: '02 / GOVERN', title: 'Centralized governance',
+                text: 'Policy, permissions, audit trails, and budget enforcement in one place — applied before any request leaves the edge.',
+                feat: ['Per-key budget & spend caps', 'Organization-level policy', 'Full audit trails', 'Compliant by default'],
+                viz: 'govern'
+            },
+            {
+                tag: '03 / OBSERVE', title: 'Live observability',
+                text: 'Live traces for latency, quality, reliability, token flow, and spend — every stage of every request, streamed as it happens.',
+                feat: ['Stage-level trace timelines', 'Token & spend attribution', 'Quality scoring', 'Failure replay'],
+                viz: 'observe'
+            }
+        ];
+        const tabsEl = document.getElementById('cpTabs');
+        tabsEl.innerHTML = cps.map((c, i) => `<button class="cp-tab${i === 0 ? ' on' : ''}" data-i="${i}">${c.tag}</button>`).join('');
+        const cpNo = document.getElementById('cpNo'), cpTitle = document.getElementById('cpTitle'),
+            cpText = document.getElementById('cpText'), cpFeat = document.getElementById('cpFeat'),
+            cpViz = document.getElementById('cpViz');
+
+        const vizRoute = `
+  <g font-family="monospace" font-size="10">
+    <circle cx="60" cy="140" r="5" fill="#565e6e"/>
+    <text x="60" y="166" fill="#565e6e" text-anchor="middle">request</text>
+    <path d="M70 140 H 130" stroke="rgba(255,255,255,.2)" stroke-width="1.2" class="viz-line"/>
+    <rect x="130" y="118" width="70" height="44" rx="8" fill="rgba(16,185,129,.06)" stroke="rgba(16,185,129,.4)"/>
+    <text x="165" y="144" fill="#10b981" text-anchor="middle">router</text>
+    <path d="M200 130 Q 240 100 280 84" stroke="rgba(16,163,127,.5)" stroke-width="1.2" class="viz-line"/>
+    <path d="M200 140 H 280" stroke="rgba(71,150,227,.5)" stroke-width="1.2" class="viz-line"/>
+    <path d="M200 150 Q 240 180 280 196" stroke="rgba(148,163,184,.5)" stroke-width="1.2" class="viz-line"/>
+    <g>
+      <rect x="280" y="66" width="76" height="34" rx="7" fill="rgba(16,163,127,.08)" stroke="rgba(16,163,127,.4)"/>
+      <text x="318" y="87" fill="#10a37f" text-anchor="middle">OpenAI</text>
+      <rect x="280" y="123" width="76" height="34" rx="7" fill="rgba(71,150,227,.08)" stroke="rgba(71,150,227,.4)"/>
+      <text x="318" y="144" fill="#4796e3" text-anchor="middle">Gemini 3.1 Pro</text>
+      <rect x="280" y="180" width="76" height="34" rx="7" fill="rgba(148,163,184,.08)" stroke="rgba(148,163,184,.4)"/>
+      <text x="318" y="201" fill="#94a3b8" text-anchor="middle">Grok 4.6</text>
+    </g>
+    <text x="318" y="36" fill="#8b93a3" text-anchor="middle">weighted pick · lowest latency</text>
+    <text x="318" y="52" fill="#10b981" text-anchor="middle">→ OpenAI (14ms)</text>
+  </g>`;
+        const vizGovern = `
+  <g font-family="monospace" font-size="10">
+    <rect x="120" y="40" width="140" height="200" rx="12" fill="rgba(125,211,252,.05)" stroke="rgba(125,211,252,.35)"/>
+    <text x="190" y="66" fill="#7dd3fc" text-anchor="middle">policy engine</text>
+    <g fill="none" stroke="rgba(125,211,252,.4)" stroke-width="1">
+      <rect x="140" y="86" width="100" height="26" rx="6"/>
+      <rect x="140" y="122" width="100" height="26" rx="6"/>
+      <rect x="140" y="158" width="100" height="26" rx="6"/>
+      <rect x="140" y="194" width="100" height="26" rx="6"/>
+    </g>
+    <g fill="#8b93a3" text-anchor="middle">
+      <text x="190" y="103">budget · $2k</text>
+      <text x="190" y="139">rpm · 1,200</text>
+      <text x="190" y="175">allow · gpt-*</text>
+      <text x="190" y="211">deny · pii</text>
+    </g>
+    <circle cx="60" cy="140" r="5" fill="#565e6e"/>
+    <path d="M65 140 H 115" stroke="rgba(255,255,255,.2)" stroke-width="1.2" class="viz-line"/>
+    <path d="M260 140 H 320" stroke="rgba(16,185,129,.5)" stroke-width="1.2" class="viz-line"/>
+    <text x="60" y="166" fill="#565e6e" text-anchor="middle">req</text>
+    <text x="340" y="136" fill="#10b981">pass ✓</text>
+    <text x="340" y="152" fill="#565e6e" font-size="9">audit logged</text>
+  </g>`;
+        const vizObserve = `
+  <g font-family="monospace" font-size="10">
+    <path d="M60 220 L 130 220 L 130 150 L 210 150 L 210 180 L 290 180 L 290 100 L 350 100"
+      stroke="#10b981" stroke-width="1.6" fill="none" opacity=".8"/>
+    <path d="M60 220 L 130 220 L 130 150 L 210 150 L 210 180 L 290 180 L 290 100 L 350 100"
+      stroke="#7dd3fc" stroke-width="3" fill="none" opacity=".25" stroke-dasharray="40 560">
+      <animate attributeName="stroke-dasharray" values="0 600;40 560;0 600" dur="3s" repeatCount="indefinite"/>
+    </path>
+    <g fill="#565e6e">
+      <circle cx="130" cy="220" r="3.5"/><circle cx="130" cy="150" r="3.5"/>
+      <circle cx="210" cy="150" r="3.5"/><circle cx="210" cy="180" r="3.5"/>
+      <circle cx="290" cy="180" r="3.5"/><circle cx="290" cy="100" r="3.5"/>
+    </g>
+    <g fill="#8b93a3" font-size="9.5">
+      <text x="130" y="240" text-anchor="middle">ingress 2ms</text>
+      <text x="210" y="132" text-anchor="middle">auth 3ms</text>
+      <text x="210" y="204" text-anchor="middle">route 4ms</text>
+      <text x="290" y="202" text-anchor="middle">upstream 38ms</text>
+      <text x="352" y="96" fill="#10b981" text-anchor="end">done · 47ms</text>
+    </g>
+    <text x="60" y="196" fill="#565e6e">trace</text>
+  </g>`;
+        const vizzes = { route: vizRoute, govern: vizGovern, observe: vizObserve };
+
+        function showCp(i) {
+            const c = cps[i];
+            tabsEl.querySelectorAll('.cp-tab').forEach((t, j) => t.classList.toggle('on', j === i));
+            cpNo.textContent = c.tag;
+            cpTitle.textContent = c.title;
+            cpText.textContent = c.text;
+            cpFeat.innerHTML = c.feat.map(f => `<div class="f">${f}</div>`).join('');
+            cpViz.innerHTML = vizzes[c.viz];
+        }
+        tabsEl.addEventListener('click', e => {
+            const t = e.target.closest('.cp-tab');
+            if (t) showCp(+t.dataset.i);
+        });
+        showCp(0);
+    </script>
+
+    <!-- ============ THREE.JS WEBGL EFFECTS ============ -->
+    <script>
+        (function () {
+            const V = '0.147.0';
+            function load(src) {
+                return new Promise((res, rej) => {
+                    const s = document.createElement('script'); s.src = src; s.async = false;
+                    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+                })
+            }
+            let C_ACC, C_SKY;
+
+            /* ================= 1. HERO — particle river + METEOR morph + comets + bloom ================= */
+            function initHero() {
+                const cv = document.getElementById('heroWebgl');
+                const renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: false, antialias: true });
+                renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+                renderer.setClearColor(0x10141d, 1);
+                const scene = new THREE.Scene();
+                const cam = new THREE.PerspectiveCamera(60, 2, .1, 120);
+                cam.position.set(0, 4.5, 15);
+
+                // soft glow backdrop (replaces CSS aurora inside the canvas)
+                (function () {
+                    const gc = document.createElement('canvas'); gc.width = gc.height = 256;
+                    const g = gc.getContext('2d');
+                    const rg = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+                    rg.addColorStop(0, 'rgba(16,185,129,.55)'); rg.addColorStop(.5, 'rgba(125,211,252,.18)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+                    g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
+                    const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: new THREE.CanvasTexture(gc), transparent: true, opacity: .55,
+                        blending: THREE.AdditiveBlending, depthWrite: false
+                    }));
+                    spr.scale.set(46, 30, 1); spr.position.set(0, 2, -10);
+                    scene.add(spr);
+                    const spr2 = spr.clone(); spr2.material = spr.material.clone();
+                    spr2.material.opacity = .35; spr2.scale.set(30, 22, 1);
+                    spr2.position.set(9, 4, -9); scene.add(spr2);
+                })();
+
+                // particle wave field
+                const N = 4200, SPAN = 46;
+                const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), seed = [];
+                const tmp = new THREE.Color();
+                for (let i = 0; i < N; i++) {
+                    const x = (Math.random() - .5) * SPAN, z = (Math.random() - .5) * SPAN * .8;
+                    seed.push({ x, z, ph: Math.random() * Math.PI * 2, sp: .4 + Math.random() * .9, d: Math.random() * .5 });
+                    tmp.copy(C_ACC).lerp(C_SKY, Math.pow(Math.random(), 1.5));
+                    col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+                }
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+                const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+                    size: .075, vertexColors: true, transparent: true, opacity: .9,
+                    depthWrite: false, blending: THREE.AdditiveBlending
+                }));
+                scene.add(pts);
+
+                // text morph targets — sample "METEOR" pixels from an offscreen canvas
+                const tcv = document.createElement('canvas'); tcv.width = 300; tcv.height = 72;
+                const tc = tcv.getContext('2d');
+                tc.fillStyle = '#fff'; tc.font = 'bold 58px Arial, sans-serif';
+                tc.textAlign = 'center'; tc.textBaseline = 'middle';
+                tc.fillText('METEOR', 150, 38);
+                const img = tc.getImageData(0, 0, 300, 72).data, targets = [];
+                for (let y = 0; y < 72; y += 3)for (let x = 0; x < 300; x += 3) {
+                    if (img[(y * 300 + x) * 4 + 3] > 128) targets.push({ x: (x / 300 - .5) * 15, y: (0.5 - y / 72) * 4.2 + 1.3 });
+                }
+                const tgt = [];
+                for (let i = 0; i < N; i++)tgt.push(targets[i % targets.length]);
+
+                // constellation layer (fewer, larger, slow)
+                const N2 = 90, pos2 = new Float32Array(N2 * 3), col2 = new Float32Array(N2 * 3), seed2 = [];
+                for (let i = 0; i < N2; i++) {
+                    seed2.push({ x: (Math.random() - .5) * SPAN, z: (Math.random() - .5) * SPAN * .8, ph: Math.random() * 7, sp: .3 + Math.random() * .5 });
+                    tmp.copy(C_ACC).lerp(C_SKY, Math.random());
+                    col2[i * 3] = tmp.r; col2[i * 3 + 1] = tmp.g; col2[i * 3 + 2] = tmp.b;
+                }
+                const geo2 = new THREE.BufferGeometry();
+                geo2.setAttribute('position', new THREE.BufferAttribute(pos2, 3));
+                geo2.setAttribute('color', new THREE.BufferAttribute(col2, 3));
+                scene.add(new THREE.Points(geo2, new THREE.PointsMaterial({
+                    size: .22, vertexColors: true, transparent: true, opacity: .5,
+                    depthWrite: false, blending: THREE.AdditiveBlending
+                })));
+
+                // comets with additive trails
+                const comets = [];
+                for (let k = 0; k < 3; k++) {
+                    const histN = 28;
+                    const cg = new THREE.BufferGeometry();
+                    cg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(histN * 3), 3));
+                    const line = new THREE.Line(cg, new THREE.LineBasicMaterial({
+                        color: k === 0 ? 0xffffff : (k === 1 ? 0x7dd3fc : 0x10b981), transparent: true, opacity: .9,
+                        blending: THREE.AdditiveBlending
+                    }));
+                    scene.add(line);
+                    comets.push({
+                        line, hist, histN,
+                        p: new THREE.Vector3((Math.random() - .5) * 40, 6 + Math.random() * 4, -6 + Math.random() * 8),
+                        v: new THREE.Vector3(-(2.6 + Math.random() * 2), -(1.1 + Math.random()), 0),
+                        wait: 1 + k * 2.4
+                    });
+                }
+
+                // mouse parallax
+                let mx = 0, my = 0;
+                addEventListener('pointermove', e => {
+                    mx = (e.clientX / innerWidth - .5) * 2; my = (e.clientY / innerHeight - .5) * 2;
+                });
+                // click hero to replay the METEOR morph
+                let morphClock = -3;
+                document.querySelector('.hero').addEventListener('click', () => morphClock = 0);
+
+                // bloom postprocessing
+                const composer = new THREE.EffectComposer(renderer);
+                composer.addPass(new THREE.RenderPass(scene, cam));
+                const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1, 1), .75, .85, 0);
+                composer.addPass(bloom);
+
+                function resize() {
+                    const w = cv.parentElement.clientWidth, h = cv.parentElement.clientHeight;
+                    renderer.setSize(w, h, false); composer.setSize(w, h);
+                    cam.aspect = w / h; cam.updateProjectionMatrix();
+                }
+                resize(); addEventListener('resize', resize);
+
+                let visible = true, t = 0;
+                new IntersectionObserver(es => visible = es[0].isIntersecting).observe(cv);
+                (function loop() {
+                    requestAnimationFrame(loop);
+                    if (!visible) return;
+                    t += .016; morphClock += .016;
+                    // morph envelope: assemble 0-1.4s, hold to 4.2s, disperse by 5.8s
+                    let M = 0;
+                    if (morphClock >= 0 && morphClock < 1.4) M = morphClock / 1.4;
+                    else if (morphClock >= 1.4 && morphClock < 4.2) M = 1;
+                    else if (morphClock >= 4.2 && morphClock < 5.8) M = 1 - (morphClock - 4.2) / 1.6;
+
+                    const p = geo.attributes.position.array;
+                    for (let i = 0; i < N; i++) {
+                        const s = seed[i];
+                        const wy = Math.sin(s.x * .32 + t * s.sp + s.ph) * 1.25 + Math.cos(s.z * .42 + t * .7 + s.ph) * .85 - 1.2;
+                        const m = Math.max(0, Math.min(1, (M - s.d) / .5));
+                        const e = m * m * (3 - 2 * m);
+                        if (e > 0 && tgt[i]) {
+                            p[i * 3] = s.x + (tgt[i].x - s.x) * e;
+                            p[i * 3 + 1] = wy + (tgt[i].y - wy) * e;
+                            p[i * 3 + 2] = s.z * (1 - e);
+                        } else { p[i * 3] = s.x; p[i * 3 + 1] = wy; p[i * 3 + 2] = s.z; }
+                    }
+                    geo.attributes.position.needsUpdate = true;
+                    const p2 = geo2.attributes.position.array;
+                    for (let i = 0; i < N2; i++) {
+                        const s = seed2[i];
+                        p2[i * 3] = s.x + Math.sin(t * .3 + s.ph) * .6;
+                        p2[i * 3 + 1] = Math.sin(s.x * .25 + t * s.sp * 1.4 + s.ph) * 2 - .4;
+                        p2[i * 3 + 2] = s.z + Math.cos(t * .25 + s.ph) * .6;
+                    }
+                    geo2.attributes.position.needsUpdate = true;
+                    pts.rotation.y = Math.sin(t * .05) * .06;
+
+                    // comets
+                    comets.forEach(c => {
+                        if (c.wait > 0) { c.wait -= .016; c.line.visible = false; return; }
+                        c.line.visible = true;
+                        c.p.add(c.v);
+                        c.hist.unshift(c.p.clone());
+                        while (c.hist.length > c.histN) c.hist.pop();
+                        const arr = c.line.geometry.attributes.position.array;
+                        for (let i = 0; i < c.histN; i++) {
+                            const h = c.hist[Math.min(i, c.hist.length - 1)] || c.p;
+                            arr[i * 3] = h.x; arr[i * 3 + 1] = h.y; arr[i * 3 + 2] = h.z;
+                        }
+                        c.line.geometry.attributes.position.needsUpdate = true;
+                        if (c.p.x < -26 || c.p.y < -4) {
+                            c.p.set((Math.random() - .5) * 40 + 14, 5 + Math.random() * 5, -6 + Math.random() * 8);
+                            c.v.set(-(2.6 + Math.random() * 2), -(1 + Math.random()), 0);
+                            c.hist.length = 0; c.wait = 1.5 + Math.random() * 3.5;
+                        }
+                    });
+
+                    cam.position.x += (mx * 1.6 - cam.position.x) * .04;
+                    cam.position.y += (4.5 - my * 1.2 - cam.position.y) * .04;
+                    cam.lookAt(0, .6, 0);
+                    composer.render();
+                })();
+            }
+
+            /* ================= 2. NETWORK — globe + starfield + orbit ring + bloom ================= */
+            function initGlobe() {
+                const cv = document.getElementById('globeCanvas');
+                const renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: false, antialias: true });
+                renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+                renderer.setClearColor(0x10141d, 1);
+                const scene = new THREE.Scene();
+                const cam = new THREE.PerspectiveCamera(45, 1, .1, 100);
+                cam.position.set(0, 0, 4.6);
+
+                // soft ambient glow behind the globe so the canvas blends with the page bg
+                (function () {
+                    const gc = document.createElement('canvas'); gc.width = gc.height = 256;
+                    const g = gc.getContext('2d');
+                    const rg = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+                    rg.addColorStop(0, 'rgba(16,185,129,.18)');
+                    rg.addColorStop(.45, 'rgba(125,211,252,.06)');
+                    rg.addColorStop(1, 'rgba(0,0,0,0)');
+                    g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
+                    const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: new THREE.CanvasTexture(gc), transparent: true, opacity: .5,
+                        blending: THREE.AdditiveBlending, depthWrite: false
+                    }));
+                    spr.scale.set(7.5, 7.5, 1); spr.position.set(0, 0, -2.6);
+                    scene.add(spr);
+                })();
+
+                const globe = new THREE.Group();
+                scene.add(globe);
+
+                // starfield shell
+                const S = 900, sp = new Float32Array(S * 3);
+                for (let i = 0; i < S; i++) {
+                    const v = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize()
+                        .multiplyScalar(16 + Math.random() * 12);
+                    sp[i * 3] = v.x; sp[i * 3 + 1] = v.y; sp[i * 3 + 2] = v.z;
+                }
+                const sg = new THREE.BufferGeometry();
+                sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+                scene.add(new THREE.Points(sg, new THREE.PointsMaterial({
+                    color: 0x8ea3c9, size: .05, transparent: true, opacity: .75, depthWrite: false
+                })));
+
+                // solid dark body so the globe is not see-through (no wireframe overlay)
+                const R = 1.5;
+                globe.add(new THREE.Mesh(new THREE.SphereGeometry(R * .996, 48, 32),
+                    new THREE.MeshBasicMaterial({ color: 0x0c1220 })));
+
+                // fibonacci dot sphere
+                const M = 2800, dp = new Float32Array(M * 3), dc = new Float32Array(M * 3);
+                const tmp = new THREE.Color(), dim = new THREE.Color('#3d4a63');
+                const GA = Math.PI * (3 - Math.sqrt(5));
+                for (let i = 0; i < M; i++) {
+                    const y = 1 - (i / (M - 1)) * 2, r = Math.sqrt(1 - y * y), th = GA * i;
+                    dp[i * 3] = Math.cos(th) * r * R; dp[i * 3 + 1] = y * R; dp[i * 3 + 2] = Math.sin(th) * r * R;
+                    tmp.copy(dim).lerp(C_ACC, Math.random() * .22);
+                    dc[i * 3] = tmp.r; dc[i * 3 + 1] = tmp.g; dc[i * 3 + 2] = tmp.b;
+                }
+                const dg = new THREE.BufferGeometry();
+                dg.setAttribute('position', new THREE.BufferAttribute(dp, 3));
+                dg.setAttribute('color', new THREE.BufferAttribute(dc, 3));
+                const abstractDots = new THREE.Points(dg, new THREE.PointsMaterial({
+                    size: .016, vertexColors: true, transparent: true, opacity: .95, depthWrite: false
+                }));
+                globe.add(abstractDots);
+
+                /* real-continent dots — sampled from NASA-derived earth imagery (public domain),
+                   primary: blue-marble (blue ocean) · fallback: earth-dark (light land, dark ocean).
+                   Replaces the abstract fibonacci sphere once loaded. */
+                (function loadLand() {
+                    const SRC = 'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg';
+                    const FALLBACK = 'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-dark.jpg';
+                    const img = new Image(); img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        try {
+                            const cw = 720, ch = 360;
+                            const c2 = document.createElement('canvas'); c2.width = cw; c2.height = ch;
+                            const g2 = c2.getContext('2d');
+                            g2.drawImage(img, 0, 0, cw, ch);
+                            const d = g2.getImageData(0, 0, cw, ch).data;
+                            const P = [], C = [], col = new THREE.Color();
+                            for (let lat = -84; lat <= 84; lat += 1.4) {
+                                const step = 1.4 / Math.max(.15, Math.cos(lat * Math.PI / 180));
+                                for (let lng = -180; lng < 180; lng += step) {
+                                    const u = Math.min(cw - 1, Math.floor((lng + 180) / 360 * cw));
+                                    const v = Math.min(ch - 1, Math.floor((90 - lat) / 180 * ch));
+                                    const o = (v * cw + u) * 4;
+                                    const rC = d[o], gC = d[o + 1], bC = d[o + 2];
+                                    const lum = .299 * rC + .587 * gC + .114 * bC;
+                                    const ocean = (bC > rC + 10 && bC > gC) || lum < 24;
+                                    if (ocean) continue;
+                                    const p = ll(lat, lng, R * 1.002);
+                                    P.push(p.x, p.y, p.z);
+                                    col.copy(C_ACC).lerp(C_SKY, Math.random() * .4);
+                                    C.push(col.r, col.g, col.b);
+                                }
+                            }
+                            if (P.length < 500) return; // sampling failed — keep abstract sphere
+                            const g3 = new THREE.BufferGeometry();
+                            g3.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+                            g3.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+                            const land = new THREE.Points(g3, new THREE.PointsMaterial({
+                                size: .016, vertexColors: true, transparent: true, opacity: .95, depthWrite: false
+                            }));
+                            globe.remove(abstractDots);
+                            globe.add(land);
+                        } catch (e) { console.error('land dots failed:', e) }
+                    };
+                    img.onerror = () => {
+                        if (img.src !== FALLBACK) img.src = FALLBACK;
+                    };
+                    img.src = SRC;
+                })();
+
+                // city nodes
+                function ll(lat, lng, r) {
+                    const p = (90 - lat) * Math.PI / 180, t = (lng + 180) * Math.PI / 180;
+                    return new THREE.Vector3(-r * Math.sin(p) * Math.cos(t), r * Math.cos(p), r * Math.sin(p) * Math.sin(t));
+                }
+                const cities = [
+                    { n: 'california', label: 'California · Primary', lat: 37.77, lng: -122.42, c: C_ACC, big: true },
+                    { n: 'tokyo', label: 'Tokyo · Acceleration', lat: 35.68, lng: 139.69, c: C_SKY, big: true },
+                    { n: 'frankfurt', label: 'Frankfurt', lat: 50.11, lng: 8.68, c: new THREE.Color('#8b93a3') },
+                    { n: 'singapore', label: 'Singapore', lat: 1.35, lng: 103.82, c: new THREE.Color('#8b93a3') },
+                    { n: 'sydney', label: 'Sydney', lat: -33.87, lng: 151.21, c: new THREE.Color('#8b93a3') },
+                    { n: 'virginia', label: 'Virginia', lat: 38.9, lng: -77.04, c: new THREE.Color('#8b93a3') }
+                ];
+                const markers = [];
+                cities.forEach(c => {
+                    const v = ll(c.lat, c.lng, R * 1.004);
+                    const m = new THREE.Mesh(
+                        new THREE.SphereGeometry(c.big ? .038 : .026, 12, 12),
+                        new THREE.MeshBasicMaterial({ color: c.c }));
+                    m.position.copy(v); globe.add(m);
+                    // pulsing halo ring
+                    const ring = new THREE.Mesh(
+                        new THREE.RingGeometry(.05, .06, 32),
+                        new THREE.MeshBasicMaterial({ color: c.c, transparent: true, opacity: .8, side: THREE.DoubleSide }));
+                    ring.position.copy(v);
+                    ring.lookAt(v.clone().multiplyScalar(2));
+                    globe.add(ring);
+                    markers.push({ ring, c: c.c });
+                    // camera-facing location label
+                    const lc = document.createElement('canvas'); lc.width = 384; lc.height = 64;
+                    const lg = lc.getContext('2d');
+                    const hex = '#' + c.c.getHexString();
+                    lg.font = '600 30px ui-monospace,Consolas,monospace';
+                    lg.textAlign = 'center'; lg.textBaseline = 'middle';
+                    lg.shadowColor = hex; lg.shadowBlur = 10;
+                    lg.fillStyle = hex;
+                    lg.fillText(c.label, 192, 34);
+                    const lbl = new THREE.Sprite(new THREE.SpriteMaterial({
+                        map: new THREE.CanvasTexture(lc), transparent: true, depthWrite: false
+                    }));
+                    lbl.position.copy(v.clone().normalize().multiplyScalar(R * 1.24));
+                    const ls = c.big ? 1 : .78;
+                    lbl.scale.set(1.15 * ls, .19 * ls, 1);
+                    globe.add(lbl);
+                });
+
+                // arcs with animated packets
+                const arcs = [];
+                const pairs = [[0, 1], [0, 5], [1, 3], [1, 4], [0, 2]];
+                pairs.forEach(([a, b], k) => {
+                    const va = ll(cities[a].lat, cities[a].lng, R * 1.004);
+                    const vb = ll(cities[b].lat, cities[b].lng, R * 1.004);
+                    const mid = va.clone().add(vb).multiplyScalar(.5).normalize()
+                        .multiplyScalar(R + va.distanceTo(vb) * .42);
+                    const curve = new THREE.QuadraticBezierCurve3(va, mid, vb);
+                    const pts = curve.getPoints(64);
+                    const line = new THREE.Line(
+                        new THREE.BufferGeometry().setFromPoints(pts),
+                        new THREE.LineBasicMaterial({ color: k === 0 ? 0x10b981 : 0x7dd3fc, transparent: true, opacity: .6 }));
+                    globe.add(line);
+                    // packet
+                    const pkt = new THREE.Mesh(new THREE.SphereGeometry(.024, 8, 8),
+                        new THREE.MeshBasicMaterial({ color: k === 0 ? 0xffffff : 0x7dd3fc, transparent: true }));
+                    globe.add(pkt);
+                    arcs.push({ curve, pkt, off: Math.random(), speed: .12 + Math.random() * .1 });
+                });
+
+                // orbiting satellite ring
+                const orbit = new THREE.Group();
+                orbit.add(new THREE.Mesh(new THREE.TorusGeometry(2.3, .005, 8, 160),
+                    new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: .35 })));
+                const sats = [];
+                for (let i = 0; i < 2; i++) {
+                    const sat = new THREE.Mesh(new THREE.SphereGeometry(.035, 10, 10),
+                        new THREE.MeshBasicMaterial({ color: i ? 0x10b981 : 0xffffff }));
+                    orbit.add(sat);
+                    sats.push({ sat, a: i * Math.PI });
+                }
+                orbit.rotation.set(Math.PI / 2.25, .35, 0);
+                scene.add(orbit);
+
+                // drag rotate
+                let dragging = false, lx = 0, ly = 0, vy = 0, vx = 0;
+                cv.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY });
+                addEventListener('pointerup', () => dragging = false);
+                addEventListener('pointermove', e => {
+                    if (!dragging) return;
+                    vy = (e.clientX - lx) * .005; vx = (e.clientY - ly) * .005;
+                    globe.rotation.y += vy; globe.rotation.x += vx;
+                    lx = e.clientX; ly = e.clientY;
+                });
+
+                // bloom postprocessing
+                const composer = new THREE.EffectComposer(renderer);
+                composer.addPass(new THREE.RenderPass(scene, cam));
+                const bloom = new THREE.UnrealBloomPass(new THREE.Vector2(1, 1), .85, .7, .08);
+                composer.addPass(bloom);
+
+                function resize() {
+                    const w = cv.clientWidth, h = cv.clientHeight;
+                    if (!w || !h) return;
+                    renderer.setSize(w, h, false); composer.setSize(w, h);
+                    cam.aspect = w / h; cam.updateProjectionMatrix();
+                }
+                resize(); addEventListener('resize', resize);
+
+                let visible = false, t = 0;
+                new IntersectionObserver(es => visible = es[0].isIntersecting).observe(cv);
+                (function loop() {
+                    requestAnimationFrame(loop);
+                    if (!visible) return;
+                    t += .016;
+                    resize();
+                    if (!dragging) {
+                        globe.rotation.y += .0022;
+                        globe.rotation.x += (0 - globe.rotation.x) * .01 + vx * .02;
+                        vx *= .95; vy *= .95;
+                    }
+                    markers.forEach((m, i) => {
+                        const s = 1 + Math.sin(t * 2.2 + i * 1.3) * .45;
+                        m.ring.scale.set(s, s, 1);
+                        m.ring.material.opacity = .75 - Math.sin(t * 2.2 + i * 1.3) * .4;
+                    });
+                    arcs.forEach(a => {
+                        a.off = (a.off + a.speed * .016) % 1;
+                        a.pkt.position.copy(a.curve.getPoint(a.off));
+                        const f = 1 - a.off;
+                        a.pkt.material.opacity = f > .5 ? 1 : f * 2;
+                    });
+                    sats.forEach((s, i) => {
+                        s.a += .008 + i * .003;
+                        s.sat.position.set(Math.cos(s.a) * 2.3, Math.sin(s.a) * 2.3, 0);
+                    });
+                    orbit.rotation.z += .0004;
+                    composer.render();
+                })();
+            }
+
+            /* ---------- CDN-robust boot: jsdelivr -> unpkg -> cdnjs, isolated per scene ---------- */
+            (async function boot() {
+                const cores = [
+                    'https://cdn.jsdelivr.net/npm/three@' + V + '/build/three.min.js',
+                    'https://unpkg.com/three@' + V + '/build/three.min.js',
+                    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r147/three.min.js'];
+                for (const c of cores) {
+                    try { await load(c); if (window.THREE) break } catch (e) { }
+                }
+                if (!window.THREE) { document.body.classList.add('no-webgl'); return }
+                C_ACC = new THREE.Color('#10b981');
+                C_SKY = new THREE.Color('#7dd3fc');
+                const exBases = [
+                    'https://cdn.jsdelivr.net/npm/three@' + V,
+                    'https://unpkg.com/three@' + V];
+                const extras = [
+                    'examples/js/shaders/CopyShader.js',
+                    'examples/js/shaders/LuminosityHighPassShader.js',
+                    'examples/js/postprocessing/EffectComposer.js',
+                    'examples/js/postprocessing/RenderPass.js',
+                    'examples/js/postprocessing/ShaderPass.js',
+                    'examples/js/postprocessing/UnrealBloomPass.js'];
+                for (const f of extras) {
+                    let ok = false;
+                    for (const b of exBases) {
+                        try { await load(b + '/' + f); ok = true; break } catch (e) { }
+                    }
+                    if (!ok) { document.body.classList.add('no-webgl'); return }
+                }
+                // each scene isolated — one failing must not kill the other
+                try { initHero() } catch (e) { console.error('hero fx failed:', e) }
+                try { initGlobe() } catch (e) { console.error('globe fx failed:', e) }
+            })();
+        })();
+    </script>
+</body>
+
+</html>

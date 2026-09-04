@@ -8,7 +8,10 @@ import enAdminResources from '../locales/en/admin/resources'
 import enAdminSettings from '../locales/en/admin/settings'
 import enCommon from '../locales/en/common'
 import enDashboard from '../locales/en/dashboard'
-import enLanding from '../locales/en/landing'
+import enHome from '../locales/en/home'
+import enKeyUsage from '../locales/en/keyUsage'
+import enSetup from '../locales/en/setup'
+import enBatchImageGuide from '../locales/en/batchImageGuide'
 import enMisc from '../locales/en/misc'
 import zhAdminAccounts from '../locales/zh/admin/accounts'
 import zhAdminChannels from '../locales/zh/admin/channels'
@@ -18,7 +21,10 @@ import zhAdminResources from '../locales/zh/admin/resources'
 import zhAdminSettings from '../locales/zh/admin/settings'
 import zhCommon from '../locales/zh/common'
 import zhDashboard from '../locales/zh/dashboard'
-import zhLanding from '../locales/zh/landing'
+import zhHome from '../locales/zh/home'
+import zhKeyUsage from '../locales/zh/keyUsage'
+import zhSetup from '../locales/zh/setup'
+import zhBatchImageGuide from '../locales/zh/batchImageGuide'
 import zhMisc from '../locales/zh/misc'
 
 // locales/{zh,en}/index.ts 与 admin/index.ts 使用对象展开聚合各域模块，
@@ -42,8 +48,8 @@ function collisions(modules: Modules): string[] {
 }
 
 const roots: Record<string, Modules> = {
-  zh: { landing: zhLanding, common: zhCommon, dashboard: zhDashboard, misc: zhMisc },
-  en: { landing: enLanding, common: enCommon, dashboard: enDashboard, misc: enMisc }
+  zh: { home: zhHome, keyUsage: zhKeyUsage, setup: zhSetup, batchImageGuide: zhBatchImageGuide, common: zhCommon, dashboard: zhDashboard, misc: zhMisc },
+  en: { home: enHome, keyUsage: enKeyUsage, setup: enSetup, batchImageGuide: enBatchImageGuide, common: enCommon, dashboard: enDashboard, misc: enMisc }
 }
 
 const admins: Record<string, Modules> = {
