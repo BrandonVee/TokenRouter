@@ -223,7 +223,7 @@ home: {
         labels: { california: '加州 · 主节点', tokyo: '东京 · 加速节点', frankfurt: '法兰克福', singapore: '新加坡', sydney: '悉尼', virginia: '弗吉尼亚' },
         metrics: {
           routedMonthly: '月度路由量',
-          routedMonthlyValue: '1T tokens'
+          routedMonthlyValue: '100T tokens'
         }
       },
       pipeline: {

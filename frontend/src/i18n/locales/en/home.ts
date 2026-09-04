@@ -223,7 +223,7 @@ home: {
         labels: { california: 'California · Primary', tokyo: 'Tokyo · Acceleration', frankfurt: 'Frankfurt', singapore: 'Singapore', sydney: 'Sydney', virginia: 'Virginia' },
         metrics: {
           routedMonthly: 'ROUTED MONTHLY',
-          routedMonthlyValue: '1T tokens'
+          routedMonthlyValue: '100T tokens'
         }
       },
       pipeline: {
