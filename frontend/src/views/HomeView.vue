@@ -56,17 +56,22 @@ const marketplaceError = ref(false);
 const statsError = ref(false);
 const totalModelCount = computed(() => marketplaceGroups.value.reduce((total, group) => total + group.models.length, 0));
 const providerRowsFromApi = computed(() => {
-  // 市场上架分组全部参与展示（最多 20 组），并与静态兜底列表按名称去重合并，
-  // 保证跑马灯始终包含完整的服务商集合。
-  const rows = marketplaceGroups.value
-    .filter((group) => group.models.length > 0)
-    .slice(0, 20)
-    .map((group) => {
-      const label = group.display_brand?.trim() || group.name.trim() || group.platform;
-      return [label, providerColor(label), label.slice(0, 2).toUpperCase()] as [string, string, string];
-    });
-  const seen = new Set(rows.map((row) => row[0].toLowerCase()));
-  return [...rows, ...providers.filter((p) => !seen.has(p[0].toLowerCase()))];
+  // 上架分组与静态兜底列表按名称统一去重（含分组之间的重名），
+  // 避免跑马灯里同名供应商连续出现。
+  const seen = new Set<string>();
+  const rows: Array<[string, string, string]> = [];
+  const pushRow = (label: string, color: string, tag: string) => {
+    const key = label.trim().toLowerCase();
+    if (!label.trim() || seen.has(key)) return;
+    seen.add(key);
+    rows.push([label.trim(), color, tag]);
+  };
+  for (const group of marketplaceGroups.value.filter((g) => g.models.length > 0).slice(0, 20)) {
+    const label = group.display_brand?.trim() || group.name.trim() || group.platform;
+    pushRow(label, providerColor(label), label.slice(0, 2).toUpperCase());
+  }
+  for (const p of providers) pushRow(p[0], p[1], p[2]);
+  return rows;
 });
 const displayProviderRows = computed(() => {
   const base = providerRowsFromApi.value;
@@ -963,17 +968,21 @@ nav.scrolled {
   color: var(--txt);
   text-decoration: none;
 }
-/* 站点 Logo：无底色，直接展示图标本身。 */
+/* 站点 Logo：无底色，直接展示图标本身；固定像素上限，任何尺寸的图片都不会被放大。 */
 .logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
   height: 24px;
-  position: relative;
   flex: none;
+  overflow: hidden;
 }
 .logo-mark img {
-  display: block;
-  width: 100%;
-  height: 100%;
+  max-width: 24px;
+  max-height: 24px;
+  width: auto;
+  height: auto;
   object-fit: contain;
   border-radius: 6px;
 }
