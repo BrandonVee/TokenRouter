@@ -6,6 +6,7 @@ import ops from './ops'
 import settings from './settings'
 import audit from './audit'
 import invoices from './invoices'
+import dashboardAds from './dashboardAds'
 
 export default {
   ...overview,
@@ -16,4 +17,5 @@ export default {
   ...settings,
   ...audit,
   ...invoices,
+  ...dashboardAds,
 }

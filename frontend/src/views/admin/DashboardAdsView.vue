@@ -2,70 +2,81 @@
   <div class="mx-auto max-w-6xl space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">仪表盘广告</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">管理用户仪表盘展示的广告内容与有效期。</p>
+        <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboardAds.title') }}</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('admin.dashboardAds.description') }}</p>
       </div>
-      <button class="btn btn-primary" :disabled="saving || loading || loadFailed" @click="save">保存广告</button>
+      <button class="btn btn-primary" :disabled="saving || loading || loadFailed" @click="save">{{ t('admin.dashboardAds.save') }}</button>
     </div>
 
-    <div v-if="loading" class="py-12 text-center text-gray-500">加载中…</div>
+    <div v-if="loading" class="py-12 text-center text-gray-500">{{ t('common.loading') }}</div>
     <div v-else-if="loadFailed" class="card p-10 text-center text-gray-500">
-      <p>广告加载失败，请重试。</p>
-      <button class="btn btn-secondary mt-4" type="button" @click="load">重试</button>
+      <p>{{ t('admin.dashboardAds.loadFailed') }}</p>
+      <button class="btn btn-secondary mt-4" type="button" @click="load">{{ t('admin.dashboardAds.retry') }}</button>
     </div>
     <div v-else class="space-y-4">
       <div v-for="(ad, index) in ads" :key="ad.id" class="card p-5">
         <div class="mb-4 flex items-center justify-between">
-          <h2 class="font-medium text-gray-900 dark:text-white">广告 {{ index + 1 }}</h2>
+          <h2 class="font-medium text-gray-900 dark:text-white">{{ t('admin.dashboardAds.adIndex', { index: index + 1 }) }}</h2>
           <div class="flex items-center gap-2">
-            <button class="btn btn-secondary btn-sm" :disabled="index === 0" title="上移" @click="move(index, -1)">↑</button>
-            <button class="btn btn-secondary btn-sm" :disabled="index === ads.length - 1" title="下移" @click="move(index, 1)">↓</button>
-            <button class="btn btn-secondary btn-sm text-red-600" title="删除" @click="remove(index)">删除</button>
+            <button class="btn btn-secondary btn-sm" :disabled="index === 0" :aria-label="t('admin.dashboardAds.moveUp')" :title="t('admin.dashboardAds.moveUp')" @click="move(index, -1)">↑</button>
+            <button class="btn btn-secondary btn-sm" :disabled="index === ads.length - 1" :aria-label="t('admin.dashboardAds.moveDown')" :title="t('admin.dashboardAds.moveDown')" @click="move(index, 1)">↓</button>
+            <button class="btn btn-secondary btn-sm text-red-600" @click="remove(index)">{{ t('common.delete') }}</button>
           </div>
         </div>
         <div class="grid gap-5 lg:grid-cols-[240px_1fr]">
           <div class="space-y-3">
-            <ImageUpload v-model="ad.image_url" size="md" :max-size="5 * 1024 * 1024" upload-label="选择图片" remove-label="移除" hint="最大 5 MB，上传后自动压缩" />
-            <label class="block"><span class="input-label">或使用图片地址</span><input v-model.trim="ad.image_url" class="input" type="url" placeholder="https://cdn.example.com/banner.jpg" /></label>
+            <ImageUpload
+              v-model="ad.image_url"
+              size="md"
+              :max-size="5 * 1024 * 1024"
+              :upload-label="t('admin.dashboardAds.imageUploadLabel')"
+              :remove-label="t('admin.dashboardAds.imageRemoveLabel')"
+              :hint="t('admin.dashboardAds.imageHint')"
+            />
+            <label class="block"><span class="input-label">{{ t('admin.dashboardAds.orUseImageUrl') }}</span><input v-model.trim="ad.image_url" class="input" type="url" :placeholder="t('admin.dashboardAds.imageUrlPlaceholder')" /></label>
           </div>
           <div class="grid content-start gap-4 sm:grid-cols-2">
-            <label class="sm:col-span-2"><span class="input-label">跳转链接</span><input v-model.trim="ad.link_url" class="input" type="url" placeholder="https://example.com" /></label>
+            <label class="sm:col-span-2"><span class="input-label">{{ t('admin.dashboardAds.linkUrl') }}</span><input v-model.trim="ad.link_url" class="input" type="url" :placeholder="t('admin.dashboardAds.linkUrlPlaceholder')" /></label>
             <label>
-              <span class="input-label">图片适应方式</span>
-              <Select v-model="ad.fit_mode" :options="fitModeOptions" aria-label="图片适应方式" />
+              <span class="input-label">{{ t('admin.dashboardAds.fitMode') }}</span>
+              <Select v-model="ad.fit_mode" :options="fitModeOptions" :aria-label="t('admin.dashboardAds.fitMode')" />
             </label>
-            <label><span class="input-label">开始时间</span><input v-model="ad.starts_at" class="input" type="datetime-local" /></label>
-            <label><span class="input-label">过期时间</span><input v-model="ad.ends_at" class="input" type="datetime-local" /></label>
+            <label><span class="input-label">{{ t('admin.dashboardAds.startsAt') }}</span><input v-model="ad.starts_at" class="input" type="datetime-local" /></label>
+            <label><span class="input-label">{{ t('admin.dashboardAds.endsAt') }}</span><input v-model="ad.ends_at" class="input" type="datetime-local" /></label>
             <button type="button" class="flex items-center gap-3 sm:col-span-2" @click="ad.enabled = !ad.enabled">
               <span class="relative inline-flex h-6 w-11 rounded-full transition" :class="ad.enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-dark-600'"><span class="absolute top-1 h-4 w-4 rounded-full bg-white transition" :class="ad.enabled ? 'left-6' : 'left-1'"></span></span>
-              <span class="text-sm text-gray-700 dark:text-gray-300">{{ ad.enabled ? '已启用' : '已停用' }}</span>
+              <span class="text-sm text-gray-700 dark:text-gray-300">{{ ad.enabled ? t('common.enabled') : t('common.disabled') }}</span>
             </button>
           </div>
         </div>
       </div>
-      <div v-if="!ads.length" class="card p-10 text-center text-gray-500">暂无广告，点击下方按钮添加。</div>
-      <button class="btn btn-secondary w-full" @click="add">＋ 添加广告</button>
+      <div v-if="!ads.length" class="card p-10 text-center text-gray-500">{{ t('admin.dashboardAds.empty') }}</div>
+      <button class="btn btn-secondary w-full" @click="add">＋ {{ t('admin.dashboardAds.add') }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import Select from '@/components/common/Select.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import { normalizeDashboardAdFitMode, type DashboardAd, type DashboardAdFitMode } from '@/types/dashboardAd'
 
+const { t } = useI18n()
+
 const ads = ref<DashboardAd[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const loadFailed = ref(false)
-const fitModeOptions: SelectOption[] = [
-  { value: 'adaptive', label: '自适应（保持比例）' },
-  { value: 'cover', label: '填充（裁剪超出部分）' },
-  { value: 'fill', label: '拉伸（铺满区域）' },
-]
+// 适应方式选项跟随语言切换重新计算，避免切换语言后仍是旧语言标签。
+const fitModeOptions = computed<SelectOption[]>(() => [
+  { value: 'adaptive', label: t('admin.dashboardAds.fitModes.adaptive') },
+  { value: 'cover', label: t('admin.dashboardAds.fitModes.cover') },
+  { value: 'fill', label: t('admin.dashboardAds.fitModes.fill') },
+])
 
 function localDateTimeNow() {
   const date = new Date()

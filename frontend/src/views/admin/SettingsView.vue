@@ -1,5 +1,5 @@
 <template>
-    <div class="mx-auto max-w-6xl space-y-6">
+    <div class="mx-auto max-w-[1400px] space-y-6">
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <div

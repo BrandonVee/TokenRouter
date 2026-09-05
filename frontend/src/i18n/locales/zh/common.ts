@@ -147,7 +147,11 @@ export default {
     paymentDashboard: '支付概览',
     paymentConfig: '支付配置',
     paymentPlans: '订阅套餐',
+    invoiceRequests: '发票申请',
+    invoiceManagement: '发票管理',
     riskControl: '风控中心',
+    contentManagement: '内容管理',
+    dashboardAds: '仪表盘广告',
     auditLogs: '操作日志'
   },
 // Auth

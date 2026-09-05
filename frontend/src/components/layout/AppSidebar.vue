@@ -694,7 +694,7 @@ const userNavItems = computed((): NavItem[] => {
           },
           {
             path: '/invoices',
-            label: t('nav.invoiceRequests', '发票申请'),
+            label: t('nav.invoiceRequests'),
             icon: InvoiceIcon,
             hideInSimpleMode: true
           },
@@ -758,7 +758,7 @@ const personalNavItems = computed((): NavItem[] => {
           },
           {
             path: '/invoices',
-            label: t('nav.invoiceRequests', '发票申请'),
+            label: t('nav.invoiceRequests'),
             icon: InvoiceIcon,
             hideInSimpleMode: true
           },
@@ -817,7 +817,7 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/users', label: t('nav.users'), icon: UserManagementIcon, hideInSimpleMode: true },
     { path: '/admin/teams', label: t('nav.teams'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagTeamAccess },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
-    { path: '/admin/channels', label: t('nav.channels', '渠道管理'), icon: ChannelIcon, hideInSimpleMode: true },
+    { path: '/admin/channels', label: t('nav.channels'), icon: ChannelIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: SubscriptionIcon, hideInSimpleMode: true },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
@@ -855,7 +855,7 @@ const adminNavItems = computed((): NavItem[] => {
               { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
               { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderListIcon },
               { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
-              { path: '/admin/orders/invoices', label: t('nav.invoiceManagement', '发票管理'), icon: InvoiceIcon },
+              { path: '/admin/orders/invoices', label: t('nav.invoiceManagement'), icon: InvoiceIcon },
             ],
           },
         ]
@@ -863,11 +863,11 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
     {
       path: '/admin/content',
-      label: t('nav.contentManagement', '内容管理'),
+      label: t('nav.contentManagement'),
       icon: ContentManagementIcon,
       children: [
         { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
-        { path: '/admin/dashboard-ads', label: t('nav.dashboardAds', '仪表盘广告'), icon: DashboardAdsIcon },
+        { path: '/admin/dashboard-ads', label: t('nav.dashboardAds'), icon: DashboardAdsIcon },
       ],
     },
     { path: '/admin/data-sharing', label: t('nav.dataSharing'), icon: DatabaseIcon, hideInSimpleMode: true, featureFlag: flagDataSharingAccess },

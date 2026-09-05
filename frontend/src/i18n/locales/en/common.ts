@@ -147,7 +147,11 @@ export default {
     paymentDashboard: 'Payment Dashboard',
     paymentConfig: 'Payment Config',
     paymentPlans: 'Plans',
+    invoiceRequests: 'Invoice Requests',
+    invoiceManagement: 'Invoice Management',
     riskControl: 'Risk Control',
+    contentManagement: 'Content Management',
+    dashboardAds: 'Dashboard Ads',
     auditLogs: 'Audit Logs'
   },
 // Auth
