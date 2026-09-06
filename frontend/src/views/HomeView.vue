@@ -81,9 +81,8 @@ const displayProviderRows = computed(() => {
   return rows;
 });
 const statValue = (value: number | undefined, fallback: string) => (value == null ? fallback : new Intl.NumberFormat(isZh.value ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value));
+// 每日用量与累计用量暂不对外展示，统计带只保留活跃用户与模型数量。
 const displayStats = computed(() => [
-  [statValue(marketplaceStats.value?.today_tokens, "..."), t("home.meteor.stats.tokensToday")],
-  [statValue(marketplaceStats.value?.total_tokens, "..."), t("home.meteor.stats.tokensRouted")],
   [statValue(marketplaceStats.value?.total_users, "..."), t("home.meteor.stats.activeUsers")],
   [marketplaceLoading.value ? "..." : new Intl.NumberFormat(isZh.value ? "zh-CN" : "en-US").format(totalModelCount.value), t("home.meteor.stats.supportedModels")],
 ]);
@@ -1549,7 +1548,8 @@ section.block {
 /* ---------- 统计带 ---------- */
 .stats-band {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 统计带当前只渲染两个单元格，两列等宽铺满整条带。 */
+  grid-template-columns: repeat(2, 1fr);
   gap: 0;
   margin-top: 56px;
   border: 1px solid var(--line);
@@ -2079,9 +2079,6 @@ footer {
   }
   .stats-band .cell:nth-child(2) {
     border-right: none;
-  }
-  .stats-band .cell:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--line);
   }
   .net-grid {
     grid-template-columns: 1fr;
