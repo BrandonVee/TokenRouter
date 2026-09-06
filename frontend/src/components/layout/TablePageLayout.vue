@@ -44,10 +44,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 桌面端：Flexbox 布局 */
+/* 桌面端布局 */
 .table-page-layout {
   @apply flex flex-col gap-6;
-  height: calc(100vh - 64px - 4rem); /* 减去 header + lg:p-8 的上下padding */
+  /* 占满 main 剩余视口高度：flex 自适应替代按 header/padding 固定像素扣减，
+     头部实际高度（含边框）或浏览器缩放取整变化时也不会挤出整页滚动条。 */
+  flex: 1 1 0%;
+  min-height: 0;
 }
 
 .layout-section-fixed {
@@ -93,7 +96,8 @@ onUnmounted(() => {
 
 /* 移动端：恢复正常滚动 */
 .table-page-layout.mobile-mode {
-  /* 移动端表格卡片高度由内容决定，避免固定视口高度导致后续区域被溢出内容覆盖。 */
+  /* 移动端表格卡片高度由内容决定，不参与 main 的弹性填充。 */
+  flex: none;
   height: auto;
 }
 

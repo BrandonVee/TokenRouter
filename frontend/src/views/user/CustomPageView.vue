@@ -365,7 +365,9 @@ onUnmounted(() => {
 <style scoped>
 .custom-page-layout {
   @apply flex flex-col;
-  height: calc(100vh - 64px - 4rem);
+  /* 占满 main 剩余视口高度，内部目录与正文各自滚动；替代原先按像素扣减的写法。 */
+  flex: 1 1 0%;
+  min-height: 0;
 }
 
 .toc-sidebar {
