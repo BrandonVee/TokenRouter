@@ -1118,6 +1118,85 @@ func TestGetModelPricing_Grok46OfficialFallback(t *testing.T) {
 	}
 }
 
+// 远程 LiteLLM 价格卡已改用 *_above_272k_tokens 新式分档字段，不再携带
+// long_context_* 旧字段；gpt-6（Astra）必须与 gpt-5.6 一样由策略补齐长上下文
+// 参数，否则同步远程价格后长上下文计费会静默失效。
+func TestGetModelPricing_GPT6AstraRemoteCardBackfillsLongContext(t *testing.T) {
+	pricingSvc := &PricingService{}
+	// 字段取自上游 model-price-repo 的 gpt-6-astra 实际条目（无 long_context_*）。
+	data, err := pricingSvc.parsePricingData([]byte(`{
+		"gpt-6-astra": {
+			"input_cost_per_token": 0.00001,
+			"input_cost_per_token_priority": 0.00002,
+			"output_cost_per_token": 0.00005,
+			"output_cost_per_token_priority": 0.0001,
+			"cache_creation_input_token_cost": 0.0000125,
+			"cache_creation_input_token_cost_priority": 0.000025,
+			"cache_read_input_token_cost": 0.000001,
+			"cache_read_input_token_cost_priority": 0.000002,
+			"litellm_provider": "openai",
+			"mode": "chat",
+			"supports_prompt_caching": true
+		}
+	}`))
+	require.NoError(t, err)
+	pricingSvc.pricingData = data
+	svc := NewBillingService(&config.Config{}, pricingSvc)
+
+	for _, model := range []string{"gpt-6", "gpt-6-astra"} {
+		pricing, err := svc.GetModelPricing(model)
+		require.NoError(t, err, "model %s", model)
+		require.InDelta(t, 1e-5, pricing.InputPricePerToken, 1e-12, model)
+		require.InDelta(t, 5e-5, pricing.OutputPricePerToken, 1e-12, model)
+		require.InDelta(t, 1.25e-5, pricing.CacheCreationPricePerToken, 1e-12, model)
+		require.InDelta(t, 1e-6, pricing.CacheReadPricePerToken, 1e-12, model)
+		require.Equal(t, openAIGPT54LongContextInputThreshold, pricing.LongContextInputThreshold, model)
+		require.InDelta(t, openAIGPT54LongContextInputMultiplier, pricing.LongContextInputMultiplier, 1e-12, model)
+		require.InDelta(t, openAIGPT54LongContextOutputMultiplier, pricing.LongContextOutputMultiplier, 1e-12, model)
+	}
+}
+
+// gpt-6 长上下文计费行为：超过 272k 阈值后整次请求输入按 2 倍、输出按 1.5 倍结算。
+func TestCalculateCostUnified_GPT6AstraAppliesLongContext(t *testing.T) {
+	pricingSvc := &PricingService{}
+	data, err := pricingSvc.parsePricingData([]byte(`{
+		"gpt-6-astra": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		}
+	}`))
+	require.NoError(t, err)
+	pricingSvc.pricingData = data
+	svc := NewBillingService(&config.Config{}, pricingSvc)
+	resolver := NewModelPricingResolver(nil, svc)
+	group := &Group{LongContextPricingEnabled: true}
+
+	short, err := svc.CalculateCostUnified(CostInput{
+		Model: "gpt-6", Group: group, Tokens: UsageTokens{InputTokens: 100000, OutputTokens: 1000}, RateMultiplier: 1, Resolver: resolver,
+	})
+	require.NoError(t, err)
+	require.False(t, short.LongContextBillingApplied)
+	require.InDelta(t, 1.0, short.InputCost, 1e-9) // 100k × $10/MTok
+
+	long, err := svc.CalculateCostUnified(CostInput{
+		Model: "gpt-6", Group: group, Tokens: UsageTokens{InputTokens: 300000, OutputTokens: 1000}, RateMultiplier: 1, Resolver: resolver,
+	})
+	require.NoError(t, err)
+	require.True(t, long.LongContextBillingApplied)
+	require.InDelta(t, 6.0, long.InputCost, 1e-9)    // 300k × $10/MTok × 2
+	require.InDelta(t, 0.075, long.OutputCost, 1e-9) // 1k × $50/MTok × 1.5
+
+	// 分组关闭长上下文定价时不应用倍率。
+	disabled, err := svc.CalculateCostUnified(CostInput{
+		Model: "gpt-6", Group: &Group{LongContextPricingEnabled: false}, Tokens: UsageTokens{InputTokens: 300000, OutputTokens: 1000}, RateMultiplier: 1, Resolver: resolver,
+	})
+	require.NoError(t, err)
+	require.False(t, disabled.LongContextBillingApplied)
+	require.InDelta(t, 3.0, disabled.InputCost, 1e-9)
+}
+
 func TestCalculateCostUnified_GroupLongContextToggleUsesPresetLadder(t *testing.T) {
 	svc := newTestBillingService()
 	resolver := NewModelPricingResolver(nil, svc)
