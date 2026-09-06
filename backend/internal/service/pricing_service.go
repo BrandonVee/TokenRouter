@@ -74,10 +74,10 @@ var (
 	}
 	// OpenAI GPT-6 Astra（官方公开价格静态兜底，移植上游 3c8be0013）。
 	openAIGPT6AstraPricing = &LiteLLMModelPricing{
-		InputCostPerToken:                   1e-05,   // $10 per MTok
-		InputCostPerTokenPriority:           2e-05,   // $20 per MTok
-		OutputCostPerToken:                  5e-05,   // $50 per MTok
-		OutputCostPerTokenPriority:          1e-04,   // $100 per MTok
+		InputCostPerToken:                   1e-05,    // $10 per MTok
+		InputCostPerTokenPriority:           2e-05,    // $20 per MTok
+		OutputCostPerToken:                  5e-05,    // $50 per MTok
+		OutputCostPerTokenPriority:          1e-04,    // $100 per MTok
 		CacheCreationInputTokenCost:         1.25e-05, // $12.5 per MTok
 		CacheCreationInputTokenCostPriority: 2.5e-05,  // $25 per MTok
 		CacheReadInputTokenCost:             1e-06,    // $1 per MTok

@@ -22,20 +22,20 @@ import (
 
 // Cancel rate limit configuration constants.
 const (
-	rateLimitUnitDay           = "day"
-	rateLimitUnitMinute        = "minute"
-	rateLimitUnitHour          = "hour"
-	rateLimitModeFixed         = "fixed"
-	checkPaidResultAlreadyPaid = "already_paid"
-	checkPaidResultCancelled   = "cancelled"
-	checkPaidResultProcessing  = "processing"
-	checkPaidResultFailed      = "failed"
-	checkPaidResultUncertain   = "uncertain"
+	rateLimitUnitDay             = "day"
+	rateLimitUnitMinute          = "minute"
+	rateLimitUnitHour            = "hour"
+	rateLimitModeFixed           = "fixed"
+	checkPaidResultAlreadyPaid   = "already_paid"
+	checkPaidResultCancelled     = "cancelled"
+	checkPaidResultProcessing    = "processing"
+	checkPaidResultFailed        = "failed"
+	checkPaidResultUncertain     = "uncertain"
 	pendingPaymentReconcileLimit = 20
-	processingReconcileLimit   = 20
-	fulfillmentReconcileLimit  = 20
-	fulfillmentRetryDelay      = time.Minute
-	processingStaleAfter       = 24 * time.Hour
+	processingReconcileLimit     = 20
+	fulfillmentReconcileLimit    = 20
+	fulfillmentRetryDelay        = time.Minute
+	processingStaleAfter         = 24 * time.Hour
 )
 
 var createPaymentProviderFromInstance = provider.CreateProvider

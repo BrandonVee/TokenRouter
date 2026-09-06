@@ -1518,47 +1518,6 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 	return &cloned
 }
 
-// openAIModelFastPricingRatio 返回业务口径下 OpenAI GPT-5.x 模型 Fast/priority
-// 的标准价倍率：gpt-5.6 系列与 gpt-5.4 为 2x，gpt-5.5 为 2.5x。未定义 Fast
-// 档的模型（如 gpt-5.5-pro、gpt-5.4-mini/nano）返回 0。
-func openAIModelFastPricingRatio(normalized string) float64 {
-	switch normalized {
-	case "gpt-6-astra", "gpt-5.4", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna":
-		return 2.0
-	case "gpt-5.5":
-		return 2.5
-	default:
-		return 0
-	}
-}
-
-// enforceOpenAIFastPricingRatio 把 priority 档价格改写为「标准价 × ratio」。
-// 本地/远程 LiteLLM 目录可能只带官方旧口径（如 gpt-5.5 priority 仍标 2x），
-// 直接采用会导致 Fast 模式少计费；这里按业务倍率兜底修正，且对已正确的
-// fallback 条目（2x/2.5x）是幂等的。computeTokenBreakdown 在 priority 价格
-// 存在时走显式档位价、不再叠加通用 tier 倍率，因此不会重复乘价。
-func enforceOpenAIFastPricingRatio(pricing *ModelPricing, ratio float64) {
-	if pricing == nil || ratio <= 0 {
-		return
-	}
-	pricing.InputPricePerTokenPriority = pricing.InputPricePerToken * ratio
-	pricing.OutputPricePerTokenPriority = pricing.OutputPricePerToken * ratio
-	if pricing.CacheReadPricePerToken > 0 {
-		pricing.CacheReadPricePerTokenPriority = pricing.CacheReadPricePerToken * ratio
-	}
-	if pricing.CacheCreationPricePerToken > 0 {
-		pricing.CacheCreationPricePerTokenPriority = pricing.CacheCreationPricePerToken * ratio
-	}
-}
-
-// longContextMultiplierOrOne 把未配置（≤0）的长上下文倍率归一为 1。
-func longContextMultiplierOrOne(m float64) float64 {
-	if m <= 0 {
-		return 1
-	}
-	return m
-}
-
 func (s *BillingService) shouldApplySessionLongContextPricing(tokens UsageTokens, pricing *ModelPricing) bool {
 	if pricing == nil || pricing.LongContextInputThreshold <= 0 {
 		return false
