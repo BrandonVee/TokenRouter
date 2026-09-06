@@ -20,6 +20,9 @@ describe('useModelWhitelist', () => {
     const models = getModelsByPlatform('openai')
 
 		expect(models).toEqual([
+			// GPT-6 系列（gpt-6 是 Astra 的公开别名）
+			'gpt-6',
+			'gpt-6-astra',
 			'gpt-5.2',
 			'gpt-5.3',
 			'gpt-5.3-spark',
@@ -32,6 +35,13 @@ describe('useModelWhitelist', () => {
 			'gpt-5.4-mini',
 			'gpt-5.5'
 		])
+  })
+
+  it('openai 预设映射包含 GPT-6 别名和 Astra', () => {
+    expect(getPresetMappingsByPlatform('openai')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'GPT-6', from: 'gpt-6', to: 'gpt-6' }),
+      expect.objectContaining({ label: 'GPT-6 Astra', from: 'gpt-6-astra', to: 'gpt-6-astra' })
+    ]))
   })
 
   it('openai 模型列表不再暴露旧快照、Codex、音频和图片模型', () => {

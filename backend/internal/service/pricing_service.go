@@ -72,6 +72,24 @@ var (
 		Mode:                                "chat",
 		SupportsPromptCaching:               true,
 	}
+	// OpenAI GPT-6 Astra（官方公开价格静态兜底，移植上游 3c8be0013）。
+	openAIGPT6AstraPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   1e-05,   // $10 per MTok
+		InputCostPerTokenPriority:           2e-05,   // $20 per MTok
+		OutputCostPerToken:                  5e-05,   // $50 per MTok
+		OutputCostPerTokenPriority:          1e-04,   // $100 per MTok
+		CacheCreationInputTokenCost:         1.25e-05, // $12.5 per MTok
+		CacheCreationInputTokenCostPriority: 2.5e-05,  // $25 per MTok
+		CacheReadInputTokenCost:             1e-06,    // $1 per MTok
+		CacheReadInputTokenCostPriority:     2e-06,    // $2 per MTok
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
+	}
 	openAIGPT56TerraPricing = &LiteLLMModelPricing{
 		InputCostPerToken:                   2e-06,   // 每百万 token $2
 		InputCostPerTokenPriority:           4e-06,   // 每百万 token $4
@@ -817,6 +835,10 @@ func normalizeModelNameForPricing(model string) string {
 
 	model = strings.TrimLeft(model, "/")
 	if canonical := canonicalizeOpenAIModelAliasSpelling(model); canonical != "" {
+		// gpt-6 是 Astra 的公开别名，计价统一落到 astra 条目。
+		if canonical == "gpt-6" {
+			return "gpt-6-astra"
+		}
 		if canonical == "gpt-5.6" {
 			return "gpt-5.6-sol"
 		}
@@ -1018,6 +1040,12 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 		}
 	}
 
+	// GPT-6 Astra 使用官方公开价格静态兜底，需放在 gpt-5.6 前缀匹配之前。
+	if isOpenAIGPT6AstraModel(model) {
+		logger.With(zap.String("component", "service.pricing")).
+			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-6-astra(static)"))
+		return openAIGPT6AstraPricing
+	}
 	// GPT-5.6 使用官方公开价格静态兜底，避免动态价格缺失时错误降级。
 	if strings.HasPrefix(model, "gpt-5.6-sol") {
 		logger.With(zap.String("component", "service.pricing")).
