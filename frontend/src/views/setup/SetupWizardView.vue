@@ -58,7 +58,8 @@
       </div>
 
       <!-- Step Content -->
-      <div class="rounded-2xl bg-white p-8 shadow-xl dark:bg-dark-800">
+      <!-- 主卡使用统一玻璃表面，与全站卡片质感一致 -->
+      <div class="card rounded-2xl p-8">
         <!-- Step 1: Database -->
         <div v-if="currentStep === 0" class="space-y-6">
           <div class="mb-6 text-center">

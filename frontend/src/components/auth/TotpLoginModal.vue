@@ -3,7 +3,8 @@
     <div class="flex min-h-full items-center justify-center p-4">
       <div class="fixed inset-0 bg-black/50 transition-opacity"></div>
 
-      <div class="relative w-full max-w-md transform rounded-xl bg-white p-6 shadow-xl transition-all dark:bg-dark-800">
+      <!-- 弹窗容器使用统一 modal-content 玻璃材质 -->
+      <div class="modal-content relative w-full max-w-md transform rounded-xl p-6 shadow-xl transition-all">
         <!-- Header -->
         <div class="mb-6 text-center">
           <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">

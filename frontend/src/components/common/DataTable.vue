@@ -960,9 +960,9 @@ defineExpose({
   --select-col-width: 52px; /* 勾选列宽度：px-6 (24px*2) + checkbox (16px) */
   --sticky-boundary-line-color: rgb(228 228 231);
   /* 固定列沿用全局玻璃材质，避免滚动时露出纯白底。 */
-  --sticky-header-bg: rgba(246, 251, 253, 0.72);
-  --sticky-col-bg: rgba(250, 253, 255, 0.72);
-  --sticky-col-hover-bg: rgba(236, 246, 250, 0.76);
+  --sticky-header-bg: rgba(246, 251, 253, 0.62);
+  --sticky-col-bg: rgba(250, 253, 255, 0.6);
+  --sticky-col-hover-bg: rgba(236, 246, 250, 0.7);
   position: relative;
   overflow-x: auto;
   overflow-y: auto;
@@ -974,7 +974,7 @@ defineExpose({
 .dark .table-wrapper {
   --sticky-boundary-line-color: rgb(51 51 56);
   --sticky-header-bg: rgba(38, 47, 54, 0.62);
-  --sticky-col-bg: rgba(29, 35, 41, 0.7);
+  --sticky-col-bg: rgba(29, 35, 41, 0.6);
   --sticky-col-hover-bg: rgba(57, 79, 91, 0.3);
 }
 
