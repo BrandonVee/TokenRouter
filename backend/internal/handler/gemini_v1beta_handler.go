@@ -69,6 +69,13 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return
 	}
 
+	// 分组启用自定义模型列表时直接返回配置的原生列表，
+	// 不再依赖账号可用性与上游转发（移植上游 28f673e4c）。
+	if models, ok := customGeminiModelsList(apiKey.Group); ok {
+		writeGeminiModelsListWithAPIKeyAliases(c, models, apiKey)
+		return
+	}
+
 	account, err := h.geminiCompatService.SelectAccountForAIStudioEndpoints(c.Request.Context(), apiKey.GroupID)
 	if err != nil {
 		// 没有 gemini 账户，检查是否有 antigravity 账户可用
@@ -164,6 +171,19 @@ func appendAPIKeyAliasesToGeminiModelsJSON(body []byte, mapping map[string]strin
 		return body
 	}
 	return updated
+}
+
+// customGeminiModelsList 读取分组的自定义原生模型列表配置；
+// 未启用或配置为空时返回 false，保持原有转发/兜底流程。
+func customGeminiModelsList(group *service.Group) (gemini.ModelsListResponse, bool) {
+	if group == nil || !group.CustomModelsListEnabled() {
+		return gemini.ModelsListResponse{}, false
+	}
+	models := make([]gemini.Model, 0, len(group.ModelsListConfig.Models))
+	for _, modelID := range group.ModelsListConfig.Models {
+		models = append(models, gemini.FallbackModel(modelID))
+	}
+	return gemini.ModelsListResponse{Models: models}, true
 }
 
 // GeminiV1BetaGetModel proxies:
