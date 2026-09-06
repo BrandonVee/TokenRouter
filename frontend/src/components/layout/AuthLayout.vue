@@ -38,7 +38,7 @@ import { sanitizeUrl } from '@/utils/url'
 const appStore = useAppStore()
 const { locale } = useI18n()
 
-const siteName = computed(() => appStore.siteName || 'Sub2API')
+const siteName = computed(() => appStore.siteName || 'TokenRouter')
 const siteLogo = computed(() => sanitizeUrl(appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const siteSubtitle = computed(() => {
   const settings = appStore.cachedPublicSettings

@@ -26,7 +26,7 @@ export const useAppStore = defineStore('app', () => {
   // 公共设置缓存状态
   const publicSettingsLoaded = ref<boolean>(false)
   const publicSettingsLoading = ref<boolean>(false)
-  const defaultSiteName = ref<string>('Sub2API')
+  const defaultSiteName = ref<string>('TokenRouter')
   const siteLogo = ref<string>('')
   const siteVersion = ref<string>('')
   const contactInfo = ref<string>('')
@@ -55,7 +55,7 @@ export const useAppStore = defineStore('app', () => {
     resolveLocalizedText(
       cachedPublicSettings.value?.site_name_zh,
       cachedPublicSettings.value?.site_name_en,
-      cachedPublicSettings.value?.site_name || defaultSiteName.value || 'Sub2API'
+      cachedPublicSettings.value?.site_name || defaultSiteName.value || 'TokenRouter'
     )
   )
 
@@ -297,7 +297,7 @@ export const useAppStore = defineStore('app', () => {
     const isZh = String(i18n.global.locale.value).toLowerCase().startsWith('zh')
     const primary = isZh ? zhText : enText
     const secondary = isZh ? enText : zhText
-    return firstConfiguredText(primary, secondary, fallback) || 'Sub2API'
+    return firstConfiguredText(primary, secondary, fallback) || 'TokenRouter'
   }
 
   function firstConfiguredText(...values: Array<string | undefined>): string {
@@ -318,7 +318,7 @@ export const useAppStore = defineStore('app', () => {
       window.__APP_CONFIG__ = { ...config }
     }
     cachedPublicSettings.value = config
-    defaultSiteName.value = config.site_name || 'Sub2API'
+    defaultSiteName.value = config.site_name || 'TokenRouter'
     siteLogo.value = config.site_logo || ''
     siteVersion.value = config.version || ''
     contactInfo.value = config.contact_info || ''

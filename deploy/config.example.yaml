@@ -1,5 +1,5 @@
-# Sub2API Configuration File
-# Sub2API 配置文件
+# TokenRouter Configuration File
+# TokenRouter 配置文件
 #
 # Copy this file to /etc/sub2api/config.yaml and modify as needed
 # 复制此文件到 /etc/sub2api/config.yaml 并根据需要修改
@@ -37,10 +37,10 @@ server:
   # Keep-Alive 空闲连接超时（秒）。
   idle_timeout: 120
   # Trusted proxies used when security.trust_forwarded_ip_for_api_key_acl is false.
-  # List only the exact proxy addresses that connect directly to Sub2API.
+  # List only the exact proxy addresses that connect directly to TokenRouter.
   # Set [] explicitly to disable forwarded-IP trust in high-security mode.
   # security.trust_forwarded_ip_for_api_key_acl=false 时使用的可信代理。
-  # 只填写直接连接 Sub2API 的精确代理地址；显式设置 [] 可在高安全模式下
+  # 只填写直接连接 TokenRouter 的精确代理地址；显式设置 [] 可在高安全模式下
   # 禁用转发 IP 信任。
   trusted_proxies:
     - 127.0.0.1/32
@@ -82,10 +82,10 @@ server:
 # 填写浏览器访问使用的完整 Origin。
 webauthn:
   enabled: false
-  rp_display_name: "Sub2API"
-  # Example / 示例: "sub2api.example.com"
+  rp_display_name: "TokenRouter"
+  # Example / 示例: "tokenrouter.example.com"
   rp_id: ""
-  # Example / 示例: ["https://sub2api.example.com"]
+  # Example / 示例: ["https://tokenrouter.example.com"]
   rp_origins: []
 
 # =============================================================================
@@ -905,7 +905,7 @@ totp:
 
 # =============================================================================
 # LinuxDo Connect OAuth Login (SSO)
-# LinuxDo Connect OAuth 登录（用于 Sub2API 用户登录）
+# LinuxDo Connect OAuth 登录（用于 TokenRouter 用户登录）
 # =============================================================================
 linuxdo_connect:
   enabled: false
@@ -930,7 +930,7 @@ linuxdo_connect:
 
 # =============================================================================
 # Generic OIDC OAuth Login (SSO)
-# 通用 OIDC OAuth 登录（用于 Sub2API 用户登录）
+# 通用 OIDC OAuth 登录（用于 TokenRouter 用户登录）
 # =============================================================================
 oidc_connect:
   enabled: false
@@ -1069,8 +1069,8 @@ turnstile:
 # Gemini OAuth (Required for Gemini accounts)
 # Gemini OAuth 配置（Gemini 账户必需）
 # =============================================================================
-# Sub2API supports TWO Gemini OAuth modes:
-# Sub2API 支持两种 Gemini OAuth 模式：
+# TokenRouter supports TWO Gemini OAuth modes:
+# TokenRouter 支持两种 Gemini OAuth 模式：
 #
 # 1. Code Assist OAuth (requires GCP project_id)
 # 1. Code Assist OAuth（需要 GCP project_id）
