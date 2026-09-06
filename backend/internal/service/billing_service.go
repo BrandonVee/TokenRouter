@@ -1483,6 +1483,14 @@ func (s *BillingService) applyModelSpecificPricingPolicyEx(model string, pricing
 		return &cloned
 	}
 	normalized := normalizeKnownOpenAICodexModel(model)
+	if normalized == "" {
+		// 未知 Codex 归一化结果（如 gpt-6-astra-20260901 这类快照变体）时，
+		// 回退到拼写归一名继续匹配策略族。
+		normalized = canonicalizeOpenAIModelAliasSpelling(model)
+	}
+	// 剥离日期快照后缀（如 -20260901），让 dated 变体与基础名命中同一策略族；
+	// 与定价查找使用的 openAIModelDatePattern 语义保持一致。
+	normalized = openAIModelDatePattern.ReplaceAllString(normalized, "")
 	isGPT56 := isOpenAIGPT56Model(normalized)
 	// gpt-6（Astra）与 gpt-5.6 共用同一长上下文规则：上游 LiteLLM 价格卡已改用
 	// *_above_272k_tokens 新式分档字段且不含旧 long_context_* 字段，若不在策略

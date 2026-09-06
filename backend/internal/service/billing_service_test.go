@@ -1143,7 +1143,7 @@ func TestGetModelPricing_GPT6AstraRemoteCardBackfillsLongContext(t *testing.T) {
 	pricingSvc.pricingData = data
 	svc := NewBillingService(&config.Config{}, pricingSvc)
 
-	for _, model := range []string{"gpt-6", "gpt-6-astra"} {
+	for _, model := range []string{"gpt-6", "gpt-6-astra", "gpt-6-astra-20260901", "openai/gpt-6-astra"} {
 		pricing, err := svc.GetModelPricing(model)
 		require.NoError(t, err, "model %s", model)
 		require.InDelta(t, 1e-5, pricing.InputPricePerToken, 1e-12, model)
