@@ -6,6 +6,7 @@ const concretePlatforms = [
   'openai',
   'gemini',
   'antigravity',
+  'qoder',
   'grok',
   'kimi',
   'zhipu',

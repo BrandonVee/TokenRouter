@@ -57,6 +57,19 @@
         />
         <p class="input-hint">{{ t('admin.users.form.rpmLimitHint') }}</p>
       </div>
+      <div>
+        <label class="input-label">{{ t('admin.users.form.apiKeyLimit') }}</label>
+        <input
+          v-model="form.api_key_limit"
+          type="number"
+          min="0"
+          step="1"
+          class="input"
+          data-test="api-key-limit-input"
+          :placeholder="t('admin.users.form.apiKeyLimitEditPlaceholder')"
+        />
+        <p class="input-hint">{{ t('admin.users.form.apiKeyLimitEditHint') }}</p>
+      </div>
       <UserAttributeForm v-model="form.customAttributes" :user-id="user?.id" />
     </form>
     <template #footer>
@@ -79,6 +92,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
+import { MAX_USER_API_KEY_LIMIT } from '@/constants/user'
 import type { AdminUser, UserAttributeValuesMap } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -104,12 +118,14 @@ const form = reactive({
   role: 'user' as AdminUser['role'],
   concurrency: 1,
   rpm_limit: 0,
+  // API Key 数量上限：保留字符串空态以区分「清空」与「显式 0」。
+  api_key_limit: '' as number | '',
   customAttributes: {} as UserAttributeValuesMap
 })
 
 watch(() => props.user, (u) => {
   if (u) {
-    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role || 'user', concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
+    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role || 'user', concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, api_key_limit: u.api_key_limit ?? 0, customAttributes: {} })
     passwordCopied.value = false
   }
 }, { immediate: true })
@@ -136,10 +152,22 @@ const handleUpdateUser = async () => {
     appStore.showError(t('admin.users.concurrencyMin'))
     return
   }
+  // API Key 数量上限校验：必须是 0..MAX_USER_API_KEY_LIMIT 的整数；留空表示不修改。
+  const rawAPIKeyLimit = String(form.api_key_limit).trim()
+  let apiKeyLimitValue: number | undefined
+  if (rawAPIKeyLimit !== '') {
+    const parsed = Number(rawAPIKeyLimit)
+    if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > MAX_USER_API_KEY_LIMIT) {
+      appStore.showError(t('admin.users.form.apiKeyLimitInvalid'))
+      return
+    }
+    apiKeyLimitValue = parsed
+  }
   const userId = props.user.id
   submitting.value = true
   try {
     const data: any = { email: form.email, username: form.username, notes: form.notes, role: form.role, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    if (apiKeyLimitValue !== undefined) data.api_key_limit = apiKeyLimitValue
     if (form.password.trim()) data.password = form.password.trim()
     // 提升为管理员属敏感操作：后端返回 STEP_UP_REQUIRED 时弹 TOTP 验证并重试
     await stepUp.run(() => adminAPI.users.update(userId, data))
