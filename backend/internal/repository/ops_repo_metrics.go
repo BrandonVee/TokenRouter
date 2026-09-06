@@ -117,23 +117,23 @@ INSERT INTO ops_system_metrics (
 		opsNullFloat64(input.QPS),
 		opsNullFloat64(input.TPS),
 
-		opsNullInt(input.DurationP50Ms),
-		opsNullInt(input.DurationP90Ms),
-		opsNullInt(input.DurationP95Ms),
-		opsNullInt(input.DurationP99Ms),
+		opsNullMetricInt(input.DurationP50Ms),
+		opsNullMetricInt(input.DurationP90Ms),
+		opsNullMetricInt(input.DurationP95Ms),
+		opsNullMetricInt(input.DurationP99Ms),
 		opsNullFloat64(input.DurationAvgMs),
-		opsNullInt(input.DurationMaxMs),
+		opsNullMetricInt(input.DurationMaxMs),
 
-		opsNullInt(input.TTFTP50Ms),
-		opsNullInt(input.TTFTP90Ms),
-		opsNullInt(input.TTFTP95Ms),
-		opsNullInt(input.TTFTP99Ms),
+		opsNullMetricInt(input.TTFTP50Ms),
+		opsNullMetricInt(input.TTFTP90Ms),
+		opsNullMetricInt(input.TTFTP95Ms),
+		opsNullMetricInt(input.TTFTP99Ms),
 		opsNullFloat64(input.TTFTAvgMs),
-		opsNullInt(input.TTFTMaxMs),
+		opsNullMetricInt(input.TTFTMaxMs),
 
 		opsNullFloat64(input.CPUUsagePercent),
-		opsNullInt(input.MemoryUsedMB),
-		opsNullInt(input.MemoryTotalMB),
+		opsNullMetricInt64(input.MemoryUsedMB),
+		opsNullMetricInt64(input.MemoryTotalMB),
 		opsNullFloat64(input.MemoryUsagePercent),
 		opsNullInt(input.DiskUsedMB),
 		opsNullInt(input.DiskTotalMB),
@@ -142,16 +142,16 @@ INSERT INTO ops_system_metrics (
 		opsNullBool(input.DBOK),
 		opsNullBool(input.RedisOK),
 
-		opsNullInt(input.RedisConnTotal),
-		opsNullInt(input.RedisConnIdle),
+		opsNullMetricInt(input.RedisConnTotal),
+		opsNullMetricInt(input.RedisConnIdle),
 
 		// 连接池计数的零值表示当前没有连接，不能按缺失值写成 NULL。
 		opsNullableIntPointer(input.DBConnActive),
 		opsNullableIntPointer(input.DBConnIdle),
 		opsNullableIntPointer(input.DBConnWaiting),
 
-		opsNullInt(input.GoroutineCount),
-		opsNullInt(input.ConcurrencyQueueDepth),
+		opsNullMetricInt(input.GoroutineCount),
+		opsNullMetricInt(input.ConcurrencyQueueDepth),
 	)
 	return err
 }
@@ -463,6 +463,20 @@ func opsNullFloat64(v *float64) any {
 		return sql.NullFloat64{}
 	}
 	return sql.NullFloat64{Float64: *v, Valid: true}
+}
+
+func opsNullMetricInt(v *int) any {
+	if v == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(*v), Valid: true}
+}
+
+func opsNullMetricInt64(v *int64) any {
+	if v == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: *v, Valid: true}
 }
 
 func opsNullTime(v *time.Time) any {
