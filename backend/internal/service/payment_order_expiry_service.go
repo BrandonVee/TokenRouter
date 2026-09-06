@@ -90,12 +90,13 @@ func (s *PaymentOrderExpiryService) runOnce() {
 	defer release()
 
 	reconcileCtx, cancel := context.WithTimeout(context.Background(), expiryCheckTimeout)
-	recovered, err := s.paymentSvc.ReconcilePendingWxpayOrders(reconcileCtx)
+	// 对账范围覆盖支付宝与微信：任一渠道回调延迟或丢失都不应让订单长期待支付。
+	recovered, err := s.paymentSvc.ReconcilePendingPaymentOrders(reconcileCtx)
 	cancel()
 	if err != nil {
-		slog.Warn("[PaymentOrderExpiry] failed to reconcile pending wxpay orders", "error", err)
+		slog.Warn("[PaymentOrderExpiry] failed to reconcile pending payment orders", "error", err)
 	} else if recovered > 0 {
-		slog.Info("[PaymentOrderExpiry] reconciled paid wxpay orders", "count", recovered)
+		slog.Info("[PaymentOrderExpiry] reconciled paid pending orders", "count", recovered)
 	}
 
 	processingCtx, processingCancel := context.WithTimeout(context.Background(), expiryCheckTimeout)
