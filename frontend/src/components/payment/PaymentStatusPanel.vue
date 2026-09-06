@@ -364,7 +364,8 @@ function isSuccessStatus(status: string | null | undefined): boolean {
 }
 
 function upstreamVerificationOutTradeNo(): string {
-  if (props.paymentType !== 'stripe' && !isWxpay.value && !isMobileAlipayDeepLink.value) return ''
+  // 支付宝全场景允许携带 out_trade_no 做上游查单（与 tryRecoverPendingOrder 范围一致）。
+  if (props.paymentType !== 'stripe' && !isWxpay.value && !isAlipay.value) return ''
   return props.outTradeNo || ''
 }
 
@@ -480,7 +481,9 @@ async function verifyOrderWithUpstream(outTradeNo: string): Promise<PaymentOrder
 }
 
 async function tryRecoverPendingOrder(order: PaymentOrder | null): Promise<PaymentOrder | null> {
-  if (!order || (!isWxpay.value && !isMobileAlipayDeepLink.value)) return order
+  // 支付宝全场景（含 PC 扫码当面付）pending 时都主动向上游查单，
+  // 不再局限于移动端 deep-link（移植上游 de8d756af）。
+  if (!order || (!isWxpay.value && !isAlipay.value)) return order
   const outTradeNo = String(order.out_trade_no || props.outTradeNo || '').trim()
   if (!outTradeNo) return order
   if (String(order.status || '').trim().toUpperCase() !== 'PENDING') return order

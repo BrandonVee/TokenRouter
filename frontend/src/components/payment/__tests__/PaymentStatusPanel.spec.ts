@@ -231,6 +231,39 @@ describe('PaymentStatusPanel', () => {
     expect(wrapper.text()).toContain('payment.result.success')
   })
 
+  it('actively verifies a pending desktop Alipay order', async () => {
+    // PC 扫码（当面付）的支付宝订单 pending 时同样要主动向上游查单（移植上游 de8d756af）。
+    pollOrderStatus.mockResolvedValue(orderFactory('PENDING'))
+    verifyOrder.mockResolvedValue({ data: orderFactory('COMPLETED') })
+
+    const wrapper = mount(PaymentStatusPanel, {
+      props: {
+        orderId: 42,
+        amount: 88,
+        payAmount: 88,
+        qrCode: 'https://qr.alipay.com/desktop-order-42',
+        expiresAt: '2099-01-01T12:30:00Z',
+        paymentType: 'alipay',
+        orderType: 'balance',
+        outTradeNo: 'sub2_20260420abcd1234',
+      },
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+
+    expect(verifyOrder).toHaveBeenCalledWith('sub2_20260420abcd1234')
+    expect(wrapper.emitted('success')).toHaveLength(1)
+
+    wrapper.unmount()
+  })
+
   it('keeps non-stripe payment polling read-only even when out_trade_no is available', async () => {
     pollOrderStatus.mockResolvedValue(orderFactory('RECHARGING'))
     const wrapper = mount(PaymentStatusPanel, {
