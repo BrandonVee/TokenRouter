@@ -560,6 +560,8 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	// 避免大 tools 请求重复扫描。
 	// 该判断已排除 Codex 被动 image_gen namespace，避免 CC-only 账号被误过滤（#4476）。
 	requiredCapability := openAIResponsesRequiredCapability(imageIntent, requestPlatform)
+	// 调度使用渠道映射后的上游模型 C，避免选中不支持该模型的账号（移植上游 5e4958c88）。
+	forwardModel := openAIChannelMappedModel(reqModel, channelMapping)
 
 	for {
 		// 流式 Forward 会主动分离上游请求，以便客户端断开后继续回收用量；每次账号尝试前
@@ -574,7 +576,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			apiKey.GroupID,
 			previousResponseID,
 			sessionHash,
-			reqModel,
+			forwardModel,
 			failedAccountIDs,
 			service.OpenAIUpstreamTransportAny,
 			requiredCapability,
@@ -1979,6 +1981,8 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	if imageIntent && requestPlatform == service.PlatformOpenAI {
 		requiredCapability = service.OpenAIEndpointCapabilityResponses
 	}
+	// 调度使用渠道映射后的上游模型 C，避免选中不支持该模型的账号（移植上游 5e4958c88）。
+	wsForwardModel := openAIChannelMappedModel(reqModel, channelMappingWS)
 
 	for {
 		if ctx.Err() != nil {
@@ -1990,7 +1994,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			apiKey.GroupID,
 			previousResponseID,
 			sessionHash,
-			reqModel,
+			wsForwardModel,
 			failedAccountIDs,
 			service.OpenAIUpstreamTransportResponsesWebsocketV2Ingress,
 			requiredCapability,

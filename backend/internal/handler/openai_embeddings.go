@@ -81,6 +81,8 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeSync))
 
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	// 调度必须使用渠道映射后的上游模型 C，否则会选中不支持该模型的账号（移植上游 5e4958c88）。
+	forwardModel := openAIChannelMappedModel(reqModel, channelMapping)
 
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
@@ -118,7 +120,7 @@ func (h *OpenAIGatewayHandler) Embeddings(c *gin.Context) {
 			apiKey.GroupID,
 			"",
 			"",
-			reqModel,
+			forwardModel,
 			failedAccountIDs,
 			service.OpenAIUpstreamTransportHTTPSSE,
 			service.OpenAIEndpointCapabilityEmbeddings,
