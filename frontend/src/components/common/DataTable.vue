@@ -36,7 +36,7 @@
         <label class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300">
           <input
             type="checkbox"
-            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
+            class="h-5 w-5 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
             :checked="allVisibleSelected"
             :indeterminate="someVisibleSelected"
             data-test="select-all-mobile"
@@ -59,7 +59,7 @@
           <div v-if="selectable" class="flex justify-end">
             <input
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
+              class="h-5 w-5 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
               :checked="isRowSelected(row, index)"
               :aria-label="getRowSelectionLabel(row, index)"
               data-test="select-row"
@@ -105,11 +105,11 @@
           <th
             v-if="selectable"
             scope="col"
-            class="sticky-header-cell w-11 min-w-11 px-3 py-3 text-center"
+            class="sticky-header-cell w-12 min-w-12 px-3 py-3 text-center"
           >
             <input
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
+              class="h-5 w-5 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
               :checked="allVisibleSelected"
               :indeterminate="someVisibleSelected"
               :aria-label="t('common.selectAll')"
@@ -220,10 +220,10 @@
             }"
             @click="clickableRows && emit('rowClick', item.row)"
           >
-            <td v-if="selectable" class="w-11 min-w-11 px-3 py-4 text-center">
+            <td v-if="selectable" class="w-12 min-w-12 px-3 py-4 text-center">
               <input
                 type="checkbox"
-                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
+                class="h-5 w-5 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
                 :checked="isRowSelected(item.row, item.index)"
                 :aria-label="getRowSelectionLabel(item.row, item.index)"
                 data-test="select-row"
@@ -957,7 +957,7 @@ defineExpose({
 <style scoped>
 /* 表格横向滚动 */
 .table-wrapper {
-  --select-col-width: 52px; /* 勾选列宽度：px-6 (24px*2) + checkbox (16px) */
+  --select-col-width: 56px; /* 勾选列宽度：px-3 (12px*2) + checkbox (20px) + 边框余量 */
   --sticky-boundary-line-color: rgb(228 228 231);
   /* 固定列沿用全局玻璃材质，避免滚动时露出纯白底。 */
   --sticky-header-bg: rgba(246, 251, 253, 0.62);
