@@ -32,7 +32,9 @@ const (
 	claudeCLIUserAgentProduct = "claude-cli"
 	// 限制持久化 User-Agent 长度，避免异常客户端把超长值写入账号缓存。
 	maxFingerprintUserAgentLength = 256
-	// 为 Claude CLI 预留两个大版本升级窗口，同时拒绝 999 等哨兵版本。
+	// maxClaudeCLIMajorVersionSkew 是 claude-cli 主版本号相对本网关自身伪装
+	// 版本（claude.CLIVersion()）允许的最大超前量。给足两个大版本的升级
+	// 窗口，同时挡掉 999 这类哨兵版本号。
 	maxClaudeCLIMajorVersionSkew = 2
 )
 
@@ -55,7 +57,7 @@ func isAcceptableFingerprintUserAgent(userAgent string) bool {
 	if !ok {
 		return false
 	}
-	currentMajor, _, _, currentOK := parseUserAgentVersion(claudeCLIUserAgentProduct + "/" + claude.CLICurrentVersion)
+	currentMajor, _, _, currentOK := parseUserAgentVersion(claudeCLIUserAgentProduct + "/" + claude.CLIVersion())
 	if !currentOK {
 		return true
 	}
@@ -64,7 +66,7 @@ func isAcceptableFingerprintUserAgent(userAgent string) bool {
 
 // 默认指纹值（当客户端未提供时使用）
 var defaultFingerprint = Fingerprint{
-	UserAgent:               "claude-cli/" + claude.CLICurrentVersion + " (external, cli)",
+	UserAgent:               "claude-cli/" + claude.CLIVersion() + " (external, cli)",
 	StainlessLang:           "js",
 	StainlessPackageVersion: "0.94.0",
 	StainlessOS:             "Linux",
