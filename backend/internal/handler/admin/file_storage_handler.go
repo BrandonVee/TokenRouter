@@ -1,10 +1,25 @@
 package admin
 
 import (
+	"errors"
+
 	"github.com/BrandonVee/TokenRouter/internal/pkg/response"
+	infraerrors "github.com/BrandonVee/TokenRouter/internal/pkg/errors"
 	"github.com/BrandonVee/TokenRouter/internal/service"
 	"github.com/gin-gonic/gin"
 )
+
+// connectionTestErrorMessage 把连接测试失败转换为用户可读消息：
+// 业务校验错误（如 FILE_STORAGE_PREFIX_INVALID）只返回干净的 message，
+// 避免把 "error: code=... reason=..." 的内部错误串直接透给前端；
+// 其余网络/IO 错误保留原始错误串以便排障。
+func connectionTestErrorMessage(err error) string {
+	var appErr *infraerrors.ApplicationError
+	if errors.As(err, &appErr) {
+		return appErr.Message
+	}
+	return err.Error()
+}
 
 // FileStorageHandler 提供统一文件存储目录的管理接口。
 type FileStorageHandler struct{ service *service.FileStorageService }
@@ -42,7 +57,7 @@ func (h *FileStorageHandler) TestInvoiceAttachmentStorageConnection(c *gin.Conte
 		return
 	}
 	if err := h.service.TestInvoiceAttachmentStorageConnection(c.Request.Context(), input); err != nil {
-		response.Success(c, gin.H{"ok": false, "message": err.Error()})
+		response.Success(c, gin.H{"ok": false, "message": connectionTestErrorMessage(err)})
 		return
 	}
 	response.Success(c, gin.H{"ok": true, "message": "connection successful"})

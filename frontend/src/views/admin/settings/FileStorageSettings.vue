@@ -173,9 +173,16 @@
             <div class="flex items-center justify-between gap-4 md:col-span-2"><span class="text-sm text-gray-700 dark:text-gray-300">{{ t('admin.settings.fileStorage.images.forcePathStyle') }}</span><Toggle v-model="invoiceForm.profile.s3.force_path_style" /></div>
           </div>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.settings.fileStorage.invoice.versionHint') }}</p>
+          <p
+            v-if="invoiceValidationError"
+            class="text-xs text-red-600 dark:text-red-400"
+            data-testid="invoice-storage-validation-error"
+          >
+            {{ t(invoiceValidationError) }}
+          </p>
           <div class="flex justify-end gap-2 border-t border-gray-100 pt-5 dark:border-dark-700">
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="invoiceTesting" @click="testInvoiceStorage"><Icon name="cloud" size="sm" />{{ invoiceTesting ? t('common.loading') : t('admin.settings.fileStorage.images.test') }}</button>
-            <button type="button" class="btn btn-primary btn-sm" :disabled="invoiceSaving" @click="saveInvoiceStorage"><Icon name="check" size="sm" />{{ invoiceSaving ? t('common.saving') : t('common.save') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="invoiceTesting || Boolean(invoiceValidationError)" @click="testInvoiceStorage"><Icon name="cloud" size="sm" />{{ invoiceTesting ? t('common.loading') : t('admin.settings.fileStorage.images.test') }}</button>
+            <button type="button" class="btn btn-primary btn-sm" :disabled="invoiceSaving || Boolean(invoiceValidationError)" @click="saveInvoiceStorage"><Icon name="check" size="sm" />{{ invoiceSaving ? t('common.saving') : t('common.save') }}</button>
           </div>
         </div>
       </div>
@@ -308,7 +315,23 @@ function invoicePayload(): FileStorageDirectoryConfig {
   return { ...invoiceForm, profile: { ...invoiceForm.profile, s3: { ...invoiceForm.profile.s3, region: invoiceForm.profile.s3.region || 'auto', secret_access_key: invoiceForm.profile.s3.secret_access_key || '' } } }
 }
 
+// S3 表单的本地校验，与后端 prepareProfile 的约束保持一致：
+// prefix 必须是安全的非空路径，bucket/access key/secret 缺一不可。
+const invoiceValidationError = computed<string | null>(() => {
+  if (invoiceForm.profile.type !== 's3') return null
+  const s3 = invoiceForm.profile.s3
+  const prefix = s3.prefix.trim().replace(/^\/+|\/+$/g, '')
+  if (!prefix || prefix === '.' || prefix.includes('..')) {
+    return 'admin.settings.fileStorage.invoice.prefixInvalid'
+  }
+  if (!s3.bucket.trim() || !s3.access_key_id.trim() || (!s3.secret_access_key?.trim() && !invoiceForm.profile.secret_configured)) {
+    return 'admin.settings.fileStorage.invoice.s3Incomplete'
+  }
+  return null
+})
+
 async function saveInvoiceStorage(): Promise<void> {
+  if (invoiceValidationError.value) return
   invoiceSaving.value = true
   try {
     const updated = await storageStepUp.run(() => adminAPI.fileStorage.updateInvoiceAttachmentStorageConfig(invoicePayload()))
@@ -321,6 +344,7 @@ async function saveInvoiceStorage(): Promise<void> {
 }
 
 async function testInvoiceStorage(): Promise<void> {
+  if (invoiceValidationError.value) return
   invoiceTesting.value = true
   try {
     const result = await adminAPI.fileStorage.testInvoiceAttachmentStorageConnection(invoicePayload())

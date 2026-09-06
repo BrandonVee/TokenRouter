@@ -8,6 +8,9 @@ const {
   getConfig,
   updateConfig,
   testConnection,
+  getInvoiceConfig,
+  updateInvoiceConfig,
+  testInvoiceConnection,
   showError,
   showSuccess,
   runStepUp,
@@ -15,6 +18,9 @@ const {
   getConfig: vi.fn(),
   updateConfig: vi.fn(),
   testConnection: vi.fn(),
+  getInvoiceConfig: vi.fn(),
+  updateInvoiceConfig: vi.fn(),
+  testInvoiceConnection: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
   runStepUp: vi.fn((operation: () => Promise<unknown>) => operation()),
@@ -26,6 +32,9 @@ vi.mock('@/api', () => ({
       getImageHistoryStorageConfig: getConfig,
       updateImageHistoryStorageConfig: updateConfig,
       testImageHistoryStorageConnection: testConnection,
+      getInvoiceAttachmentStorageConfig: getInvoiceConfig,
+      updateInvoiceAttachmentStorageConfig: updateInvoiceConfig,
+      testInvoiceAttachmentStorageConnection: testInvoiceConnection,
     },
   },
 }))
@@ -60,6 +69,19 @@ const databaseConfig: ImageHistoryStorageConfig = {
   encryption_key_ready: true,
 }
 
+// 发票目录默认返回本地档案，S3 字段为空。
+const localInvoiceConfig = {
+  directory: 'invoice_attachments' as const,
+  profile: {
+    id: 'local-default',
+    type: 'local' as const,
+    local_path: '/data/invoice-attachments',
+    s3: { endpoint: '', region: 'auto', bucket: '', access_key_id: '', prefix: 'invoice-attachments', force_path_style: false },
+    secret_configured: false,
+    encryption_key_ready: true,
+  },
+}
+
 function mountView() {
   return mount(FileStorageSettings, {
     global: {
@@ -77,6 +99,9 @@ describe('FileStorageSettings', () => {
     getConfig.mockResolvedValue(structuredClone(databaseConfig))
     updateConfig.mockResolvedValue(structuredClone(databaseConfig))
     testConnection.mockResolvedValue({ ok: true, message: 'connection successful' })
+    getInvoiceConfig.mockResolvedValue(structuredClone(localInvoiceConfig))
+    updateInvoiceConfig.mockResolvedValue(structuredClone(localInvoiceConfig))
+    testInvoiceConnection.mockResolvedValue({ ok: true, message: 'connection successful' })
   })
 
   it('loads the effective config and keeps the saved Secret when testing and saving', async () => {
@@ -139,6 +164,49 @@ describe('FileStorageSettings', () => {
 
     expect(testConnection).toHaveBeenCalledOnce()
     expect(updateConfig).not.toHaveBeenCalled()
+  })
+
+  it('blocks testing and saving an incomplete invoice S3 form before hitting the API', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const attachmentsTab = wrapper
+      .findAll('[role="tab"]')
+      .find((button) => button.text().includes('fileStorage.sections.attachments'))
+    await attachmentsTab!.trigger('click')
+
+    // 切到 S3 后表单为空，本地校验应直接拦截，不发请求。
+    const s3Toggle = wrapper.findAll('button').find((button) => button.text() === 'S3')
+    await s3Toggle!.trigger('click')
+    await flushPromises()
+
+    // 默认 prefix 合法，首个错误是必填项缺失；清空 prefix 后应切换为路径校验错误。
+    expect(wrapper.get('[data-testid="invoice-storage-validation-error"]').text()).toContain('s3Incomplete')
+    const prefixInput = wrapper.findAll('input').find((input) => input.element.placeholder === 'invoice-attachments')!
+    await prefixInput.setValue('')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="invoice-storage-validation-error"]').text()).toContain('prefixInvalid')
+    const disabledButtons = wrapper.findAll('button').filter((button) => button.attributes('disabled') !== undefined)
+    expect(disabledButtons.length).toBeGreaterThan(0)
+
+    await prefixInput.setValue('invoice-attachments')
+    const textInputs = wrapper.findAll('input[type="text"], input:not([type])')
+    // 依次填写 bucket 与 access key（端点/区域之后的前两个必填输入框）。
+    await textInputs[2].setValue('invoices')
+    await textInputs[3].setValue('access-key')
+    await wrapper.get('input[type="password"]').setValue('secret-key')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="invoice-storage-validation-error"]').exists()).toBe(false)
+
+    const invoiceTestButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('fileStorage.images.test'))
+    await invoiceTestButton!.trigger('click')
+    await flushPromises()
+
+    expect(testInvoiceConnection).toHaveBeenCalledOnce()
+    expect(testConnection).not.toHaveBeenCalled()
   })
 
   it('keeps other file stores independent and links to their existing settings', async () => {

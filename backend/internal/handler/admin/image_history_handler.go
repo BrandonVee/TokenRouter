@@ -44,7 +44,7 @@ func (h *ImageHistoryHandler) TestStorageConnection(c *gin.Context) {
 		return
 	}
 	if err := h.service.TestStorageConnection(c.Request.Context(), req); err != nil {
-		response.Success(c, gin.H{"ok": false, "message": err.Error()})
+		response.Success(c, gin.H{"ok": false, "message": connectionTestErrorMessage(err)})
 		return
 	}
 	response.Success(c, gin.H{"ok": true, "message": "connection successful"})

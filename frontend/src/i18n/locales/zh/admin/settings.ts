@@ -73,6 +73,8 @@ dataSharing: {
 	  description: '为后续上传的发票附件选择本地目录或私有 S3 兼容存储。',
 	  local: '本地存储',
 	  versionHint: '保存会创建新的存储档案；既有附件始终使用其原档案读取，不受换桶影响。',
+	  prefixInvalid: '存储目录必须为安全的非空路径，且不能包含 ".."。',
+	  s3Incomplete: 'S3 配置不完整：需要填写存储桶、Access Key ID 和 Secret Access Key。',
 	  saved: '发票附件存储已保存并生效',
 	  saveFailed: '保存发票附件存储失败'
 	},

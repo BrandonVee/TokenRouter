@@ -73,6 +73,8 @@ dataSharing: {
 	  description: 'Choose local storage or private S3-compatible storage for newly uploaded invoice attachments.',
 	  local: 'Local storage',
 	  versionHint: 'Saving creates a new storage profile. Existing attachments always use their original profile.',
+	  prefixInvalid: 'Storage prefix must be a safe non-empty path and cannot contain "..".',
+	  s3Incomplete: 'S3 config is incomplete: bucket, Access Key ID and Secret Access Key are required.',
 	  saved: 'Invoice attachment storage saved and applied',
 	  saveFailed: 'Failed to save invoice attachment storage'
 	},
