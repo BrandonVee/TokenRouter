@@ -671,9 +671,10 @@ describe('user KeysView column settings', () => {
     const dialog = wrapper.findComponent({ name: 'BaseDialog' })
     const form = wrapper.get('form#key-form')
 
-    expect(dialog.props('width')).toBe('normal')
+    // 两列布局需要更宽的弹窗壳，窄屏仍靠 min-w-0/max-w-full 收缩。
+    expect(dialog.props('width')).toBe('wide')
     expect(dialog.props('bodyClass')).toBe('modal-body-scrollbar-hidden')
-    expect(form.classes()).toEqual(expect.arrayContaining(['min-w-0', 'max-w-full']))
+    expect(form.classes()).toEqual(expect.arrayContaining(['min-w-0', 'max-w-full', 'md:grid-cols-2']))
   })
 
   it('用户侧分组选择器不展示或投影容量数据', async () => {
@@ -1217,6 +1218,23 @@ describe('user KeysView column settings', () => {
     expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
       model_mapping: { 'codex-auto-review': 'gpt-5.6-luna' },
     }))
+  })
+
+  it('切换到自定义预设当直接修改过期日期时间', async () => {
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Create API Key').trigger('click')
+    await wrapper.get('[data-test="expiration-toggle"]').trigger('click')
+    await wrapper.get('[data-test="expiration-preset-30"]').trigger('click')
+    expect(wrapper.get('[data-test="expiration-preset-30"]').classes()).toContain('bg-primary-100')
+
+    // 直接用日期选择器改时间后，快捷天数不再对应，预设应回落到自定义。
+    const dateInput = wrapper.get('[data-test="expiration-date-input"]')
+    await dateInput.setValue('2026-12-31T23:59')
+    await dateInput.trigger('change')
+
+    expect(wrapper.get('[data-test="expiration-preset-30"]').classes()).not.toContain('bg-primary-100')
+    expect(wrapper.get('[data-test="expiration-preset-custom"]').classes()).toContain('bg-primary-100')
   })
 
   it('loads and clears model redirect rules while editing', async () => {

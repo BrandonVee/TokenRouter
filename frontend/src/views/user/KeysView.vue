@@ -492,11 +492,16 @@
     <BaseDialog
       :show="showCreateModal || showEditModal"
       :title="showEditModal ? t('keys.editKey') : t('keys.createKey')"
-      width="normal"
+      width="wide"
       body-class="modal-body-scrollbar-hidden"
       @close="closeModals"
     >
-      <form id="key-form" @submit.prevent="handleSubmit" class="min-w-0 max-w-full space-y-5">
+      <!-- 表单按两列栅格排布：短字段各占半行，分组/映射/限制类区块占满整行。 -->
+      <form
+        id="key-form"
+        class="grid min-w-0 max-w-full grid-cols-1 items-start gap-5 md:grid-cols-2"
+        @submit.prevent="handleSubmit"
+      >
         <div>
           <label class="input-label">{{ t('keys.nameLabel') }}</label>
           <input
@@ -506,20 +511,6 @@
             class="input"
             :placeholder="t('keys.namePlaceholder')"
             data-tour="key-form-name"
-          />
-        </div>
-
-        <!-- 复合模式使用项目 Toggle，切换后改为完整映射编辑。 -->
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <label class="input-label mb-0">{{ t('keys.composite.label') }}</label>
-            <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('keys.composite.hint') }}</p>
-          </div>
-          <Toggle
-            :model-value="formData.is_composite"
-            size="sm"
-            data-test="composite-key-toggle"
-            @update:model-value="onCompositeModeChange"
           />
         </div>
 
@@ -547,7 +538,21 @@
           </div>
         </div>
 
-        <div v-if="!formData.is_composite" class="space-y-5" data-test="routing-strategy-editor">
+        <!-- 复合模式使用项目 Toggle；整行展示并紧挨分组编辑器，切换后改为完整映射编辑。 -->
+        <div class="flex items-center justify-between gap-4 md:col-span-2">
+          <div>
+            <label class="input-label mb-0">{{ t('keys.composite.label') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('keys.composite.hint') }}</p>
+          </div>
+          <Toggle
+            :model-value="formData.is_composite"
+            size="sm"
+            data-test="composite-key-toggle"
+            @update:model-value="onCompositeModeChange"
+          />
+        </div>
+
+        <div v-if="!formData.is_composite" class="space-y-5 md:col-span-2" data-test="routing-strategy-editor">
           <section class="space-y-3" data-test="priority-group-editor">
             <div class="flex items-end justify-between gap-3">
               <div>
@@ -655,7 +660,7 @@
           </section>
         </div>
 
-        <div v-else class="space-y-3" data-test="composite-group-editor">
+        <div v-else class="space-y-3 md:col-span-2" data-test="composite-group-editor">
           <div
             v-for="(binding, index) in formData.composite_groups"
             :key="binding.local_id"
@@ -731,14 +736,16 @@
           />
         </div>
 
-        <!-- 分组停用时的请求级自动降级开关。 -->
-        <div class="flex items-center justify-between">
-          <label class="input-label mb-0">{{ t('keys.fallbackToDefaultGroupWhenUnavailable') }}</label>
-          <Toggle v-model="formData.fallback_to_default_group_when_unavailable" size="sm" />
+        <!-- 分组停用时的请求级自动降级开关；标签独占一行，开关落在与同行输入框一致的控件线上。 -->
+        <div>
+          <label class="input-label">{{ t('keys.fallbackToDefaultGroupWhenUnavailable') }}</label>
+          <div class="flex h-[2.625rem] items-center">
+            <Toggle v-model="formData.fallback_to_default_group_when_unavailable" size="sm" />
+          </div>
         </div>
 
         <!-- 模型重定向按行编辑，删除全部行会在更新时提交空对象。 -->
-        <div class="space-y-3" data-test="model-mapping-editor">
+        <div class="space-y-3 md:col-span-2" data-test="model-mapping-editor">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <label class="input-label mb-0">{{ t('keys.modelRedirect.label') }}</label>
@@ -815,7 +822,7 @@
         </div>
 
         <!-- Custom Key Section (only for create) -->
-        <div v-if="!showEditModal" class="space-y-3">
+        <div v-if="!showEditModal" class="space-y-3 md:col-span-2">
           <div class="flex items-center justify-between">
             <label class="input-label mb-0">{{ t('keys.customKeyLabel') }}</label>
             <button
@@ -847,7 +854,7 @@
           </div>
         </div>
 
-        <div v-if="showEditModal">
+        <div v-if="showEditModal" class="md:col-span-2">
           <label class="input-label">{{ t('keys.statusLabel') }}</label>
           <Select
             v-model="formData.status"
@@ -868,7 +875,7 @@
         </div>
 
         <!-- IP Restriction Section -->
-        <div class="space-y-3">
+        <div class="space-y-3 md:col-span-2">
           <div class="flex items-center justify-between">
             <label class="input-label mb-0">{{ t('keys.ipRestriction') }}</label>
             <button
@@ -888,7 +895,8 @@
             </button>
           </div>
 
-          <div v-if="formData.enable_ip_restriction" class="space-y-4 pt-2">
+          <!-- 白名单与黑名单结构相同，整行区块内并排展示以压缩弹窗高度。 -->
+          <div v-if="formData.enable_ip_restriction" class="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
             <div>
               <label class="input-label">{{ t('keys.ipWhitelist') }}</label>
               <textarea
@@ -913,32 +921,99 @@
           </div>
         </div>
 
-        <!-- Quota Limit Section -->
-        <div class="space-y-3">
-          <label class="input-label">{{ t('keys.quotaLimit') }}</label>
-          <!-- Switch commented out - always show input, 0 = unlimited
-          <div class="flex items-center justify-between">
-            <label class="input-label mb-0">{{ t('keys.quotaLimit') }}</label>
-            <button
-              type="button"
-              @click="formData.enable_quota = !formData.enable_quota"
-              :class="[
-                'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_quota ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
-              ]"
-            >
-              <span
+        <!-- Expiration Section -->
+        <div class="space-y-3 md:col-span-2">
+          <!-- 与相邻列保持同一节奏：标签一行，开关单独落在控件线上。 -->
+          <div>
+            <label class="input-label">{{ t('keys.expiration') }}</label>
+            <div class="flex h-[2.625rem] items-center">
+              <button
+                type="button"
+                data-test="expiration-toggle"
+                @click="formData.enable_expiration = !formData.enable_expiration"
                 :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                  formData.enable_quota ? 'translate-x-4' : 'translate-x-0'
+                  'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
+                  formData.enable_expiration ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
                 ]"
-              />
-            </button>
+              >
+                <span
+                  :class="[
+                    'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                    formData.enable_expiration ? 'translate-x-4' : 'translate-x-0'
+                  ]"
+                />
+              </button>
+            </div>
           </div>
-          -->
 
-          <div class="space-y-4">
+          <!-- 快捷选择与精确日期并排，整行区块内不再上下堆叠。 -->
+          <div v-if="formData.enable_expiration" class="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
             <div>
+              <label class="input-label">{{ t('keys.quickSelect') }}</label>
+              <!-- 四等分避免宽度参差。 -->
+              <div class="grid grid-cols-4 gap-2">
+                <button
+                  v-for="days in ['7', '30', '90']"
+                  :key="days"
+                  type="button"
+                  :data-test="`expiration-preset-${days}`"
+                  @click="setExpirationDays(parseInt(days))"
+                  :class="[
+                    'rounded-lg px-2 py-1.5 text-center text-sm transition-colors',
+                    formData.expiration_preset === days
+                      ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
+                  ]"
+                >
+                  {{ showEditModal ? t('keys.extendDays', { days }) : t('keys.expiresInDays', { days }) }}
+                </button>
+                <button
+                  type="button"
+                  data-test="expiration-preset-custom"
+                  @click="formData.expiration_preset = 'custom'"
+                  :class="[
+                    'rounded-lg px-2 py-1.5 text-center text-sm transition-colors',
+                    formData.expiration_preset === 'custom'
+                      ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
+                  ]"
+                >
+                  {{ t('keys.customDate') }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Date picker (always show for precise adjustment) -->
+            <div>
+              <label class="input-label">{{ t('keys.expirationDate') }}</label>
+              <input
+                v-model="formData.expiration_date"
+                type="datetime-local"
+                class="input"
+                data-test="expiration-date-input"
+                @change="onExpirationDateChange"
+              />
+              <p class="input-hint">{{ t('keys.expirationDateHint') }}</p>
+            </div>
+
+            <!-- Current expiration display (only in edit mode) -->
+            <div v-if="showEditModal && selectedKey?.expires_at" class="text-sm md:col-span-2">
+              <span class="text-gray-500 dark:text-gray-400">{{ t('keys.currentExpiration') }}: </span>
+              <span class="font-medium text-gray-900 dark:text-white">
+                {{ formatDateTime(selectedKey.expires_at) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 余额消费限额：总限额与时间窗口限额同属消费上限，合并为一个区块统一编辑。 -->
+        <div class="space-y-4 md:col-span-2">
+          <label class="input-label mb-0">{{ t('keys.rateLimitSection') }}</label>
+
+          <!-- 总限额与已用额度并排，编辑态右列展示已用进度。 -->
+          <div class="grid grid-cols-1 items-start gap-x-5 gap-y-3 md:grid-cols-2">
+            <div>
+              <label class="input-label">{{ t('keys.quotaLimit') }}</label>
               <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
                 <input
@@ -956,290 +1031,235 @@
             <!-- Quota used display (only in edit mode) -->
             <div v-if="showEditModal && selectedKey && selectedKey.quota > 0">
               <label class="input-label">{{ t('keys.quotaUsed') }}</label>
-              <div class="flex items-center gap-2">
-                <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700">
-                  <span class="font-medium text-gray-900 dark:text-white">
-                    {{ formatBalanceAmount(selectedKey.quota_used, { fractionDigits: 4 }) }}
+              <!-- 已用额度与重置按钮收进同一张卡片，进度条沿用时间窗口的配色规则。 -->
+              <div class="rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700">
+                <div class="flex items-center justify-between gap-3 text-sm">
+                  <span class="min-w-0 truncate">
+                    <span class="font-medium text-gray-900 dark:text-white">
+                      {{ formatBalanceAmount(selectedKey.quota_used, { fractionDigits: 4 }) }}
+                    </span>
+                    <span class="mx-1.5 text-gray-400">/</span>
+                    <span class="text-gray-500 dark:text-gray-400">
+                      {{ formatBalanceAmount(selectedKey.quota, { fractionDigits: 2 }) }}
+                    </span>
                   </span>
-                  <span class="mx-2 text-gray-400">/</span>
-                  <span class="text-gray-500 dark:text-gray-400">
-                    {{ formatBalanceAmount(selectedKey.quota, { fractionDigits: 2 }) }}
-                  </span>
+                  <button
+                    type="button"
+                    @click="confirmResetQuota"
+                    class="btn btn-secondary shrink-0 px-2.5 py-1 text-xs"
+                    :title="t('keys.resetQuotaUsed')"
+                  >
+                    {{ t('keys.reset') }}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  @click="confirmResetQuota"
-                  class="btn btn-secondary text-sm"
-                  :title="t('keys.resetQuotaUsed')"
-                >
-                  {{ t('keys.reset') }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rate Limit Section -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <label class="input-label mb-0">{{ t('keys.rateLimitSection') }}</label>
-            <button
-              type="button"
-              @click="formData.enable_rate_limit = !formData.enable_rate_limit"
-              :class="[
-                'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_rate_limit ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
-              ]"
-            >
-              <span
-                :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                  formData.enable_rate_limit ? 'translate-x-4' : 'translate-x-0'
-                ]"
-              />
-            </button>
-          </div>
-
-          <div v-if="formData.enable_rate_limit" class="space-y-4 pt-2">
-            <p class="input-hint -mt-2">{{ t('keys.rateLimitHint') }}</p>
-            <!-- 5-Hour Limit -->
-            <div>
-              <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
-                <input
-                  v-model.number="formData.rate_limit_5h"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input pl-7"
-                  :placeholder="'0'"
-                />
-              </div>
-              <!-- Usage info (edit mode only) -->
-              <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_5h > 0" class="mt-2">
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
-                    <span :class="[
-                      'font-medium',
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'text-red-500' :
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'text-yellow-500' :
-                      'text-gray-900 dark:text-white'
-                    ]">
-                      {{ formatBalanceAmount(selectedKey.usage_5h, { fractionDigits: 4 }) }}
-                    </span>
-                    <span class="mx-2 text-gray-400">/</span>
-                    <span class="text-gray-500 dark:text-gray-400">
-                      {{ formatBalanceAmount(selectedKey.rate_limit_5h, { fractionDigits: 2 }) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
                   <div
                     :class="[
                       'h-full rounded-full transition-all',
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'bg-red-500' :
-                      selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'bg-yellow-500' :
+                      selectedKey.quota_used >= selectedKey.quota ? 'bg-red-500' :
+                      selectedKey.quota_used >= selectedKey.quota * 0.8 ? 'bg-yellow-500' :
                       'bg-green-500'
                     ]"
-                    :style="{ width: Math.min((selectedKey.usage_5h / selectedKey.rate_limit_5h) * 100, 100) + '%' }"
+                    :style="{ width: Math.min((selectedKey.quota_used / selectedKey.quota) * 100, 100) + '%' }"
                   />
                 </div>
               </div>
             </div>
-
-            <!-- Daily Limit -->
-            <div>
-              <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
-                <input
-                  v-model.number="formData.rate_limit_1d"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input pl-7"
-                  :placeholder="'0'"
-                />
-              </div>
-              <!-- Usage info (edit mode only) -->
-              <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_1d > 0" class="mt-2">
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
-                    <span :class="[
-                      'font-medium',
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'text-red-500' :
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'text-yellow-500' :
-                      'text-gray-900 dark:text-white'
-                    ]">
-                      {{ formatBalanceAmount(selectedKey.usage_1d, { fractionDigits: 4 }) }}
-                    </span>
-                    <span class="mx-2 text-gray-400">/</span>
-                    <span class="text-gray-500 dark:text-gray-400">
-                      {{ formatBalanceAmount(selectedKey.rate_limit_1d, { fractionDigits: 2 }) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
-                  <div
-                    :class="[
-                      'h-full rounded-full transition-all',
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'bg-red-500' :
-                      selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'bg-yellow-500' :
-                      'bg-green-500'
-                    ]"
-                    :style="{ width: Math.min((selectedKey.usage_1d / selectedKey.rate_limit_1d) * 100, 100) + '%' }"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- 7-Day Limit -->
-            <div>
-              <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
-                <input
-                  v-model.number="formData.rate_limit_7d"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  class="input pl-7"
-                  :placeholder="'0'"
-                />
-              </div>
-              <!-- Usage info (edit mode only) -->
-              <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_7d > 0" class="mt-2">
-                <div class="flex items-center gap-2">
-                  <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
-                    <span :class="[
-                      'font-medium',
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'text-red-500' :
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'text-yellow-500' :
-                      'text-gray-900 dark:text-white'
-                    ]">
-                      {{ formatBalanceAmount(selectedKey.usage_7d, { fractionDigits: 4 }) }}
-                    </span>
-                    <span class="mx-2 text-gray-400">/</span>
-                    <span class="text-gray-500 dark:text-gray-400">
-                      {{ formatBalanceAmount(selectedKey.rate_limit_7d, { fractionDigits: 2 }) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
-                  <div
-                    :class="[
-                      'h-full rounded-full transition-all',
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'bg-red-500' :
-                      selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'bg-yellow-500' :
-                      'bg-green-500'
-                    ]"
-                    :style="{ width: Math.min((selectedKey.usage_7d / selectedKey.rate_limit_7d) * 100, 100) + '%' }"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <!-- 30-Day Limit -->
-            <div>
-              <label class="input-label">{{ t('keys.rateLimit30d') }}</label>
-              <div class="relative">
-                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
-                <input v-model.number="formData.rate_limit_30d" type="number" step="0.01" min="0" class="input pl-7" :placeholder="'0'" />
-              </div>
-              <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_30d > 0" class="mt-2">
-                <div class="flex items-center justify-between text-xs mb-1">
-                  <span>{{ t('keys.rateLimitUsage') }}</span>
-                  <span>{{ formatBalancePair(selectedKey.usage_30d, selectedKey.rate_limit_30d, 2, 2) }}</span>
-                </div>
-                <div class="h-1.5 bg-gray-200 dark:bg-dark-700 rounded-full overflow-hidden">
-                  <div class="h-full bg-blue-500 rounded-full" :style="{ width: Math.min((selectedKey.usage_30d / selectedKey.rate_limit_30d) * 100, 100) + '%' }" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Reset Rate Limit button (edit mode only) -->
-            <div v-if="showEditModal && selectedKey && (selectedKey.rate_limit_5h > 0 || selectedKey.rate_limit_1d > 0 || selectedKey.rate_limit_7d > 0 || selectedKey.rate_limit_30d > 0)">
-              <button
-                type="button"
-                @click="confirmResetRateLimit"
-                class="btn btn-secondary text-sm"
-              >
-                {{ t('keys.resetRateLimitUsage') }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Expiration Section -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <label class="input-label mb-0">{{ t('keys.expiration') }}</label>
-            <button
-              type="button"
-              @click="formData.enable_expiration = !formData.enable_expiration"
-              :class="[
-                'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
-                formData.enable_expiration ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
-              ]"
-            >
-              <span
-                :class="[
-                  'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                  formData.enable_expiration ? 'translate-x-4' : 'translate-x-0'
-                ]"
-              />
-            </button>
           </div>
 
-          <div v-if="formData.enable_expiration" class="space-y-4 pt-2">
-            <!-- Quick select buttons (for both create and edit mode) -->
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="days in ['7', '30', '90']"
-                :key="days"
-                type="button"
-                @click="setExpirationDays(parseInt(days))"
-                :class="[
-                  'rounded-lg px-3 py-1.5 text-sm transition-colors',
-                  formData.expiration_preset === days
-                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
-                ]"
-              >
-                {{ showEditModal ? t('keys.extendDays', { days }) : t('keys.expiresInDays', { days }) }}
-              </button>
+          <!-- 时间窗口限额：留空或 0 即不限制，与总限额保持同一套约定。 -->
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-4">
+              <label class="input-label mb-0">{{ t('keys.windowLimit') }}</label>
               <button
                 type="button"
-                @click="formData.expiration_preset = 'custom'"
+                data-test="rate-limit-toggle"
+                @click="formData.enable_rate_limit = !formData.enable_rate_limit"
                 :class="[
-                  'rounded-lg px-3 py-1.5 text-sm transition-colors',
-                  formData.expiration_preset === 'custom'
-                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600'
+                  'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
+                  formData.enable_rate_limit ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
                 ]"
               >
-                {{ t('keys.customDate') }}
+                <span
+                  :class="[
+                    'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                    formData.enable_rate_limit ? 'translate-x-4' : 'translate-x-0'
+                  ]"
+                />
               </button>
             </div>
 
-            <!-- Date picker (always show for precise adjustment) -->
-            <div>
-              <label class="input-label">{{ t('keys.expirationDate') }}</label>
-              <input
-                v-model="formData.expiration_date"
-                type="datetime-local"
-                class="input"
-              />
-              <p class="input-hint">{{ t('keys.expirationDateHint') }}</p>
-            </div>
+            <!-- 四个窗口限额在整行内铺开，宽屏一行放完以压低弹窗高度。 -->
+            <div v-if="formData.enable_rate_limit" class="space-y-3">
+              <p class="input-hint -mt-1">{{ t('keys.rateLimitHint') }}</p>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <!-- 5-Hour Limit -->
+                <div>
+                  <label class="input-label">{{ t('keys.rateLimit5h') }}</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
+                    <input
+                      v-model.number="formData.rate_limit_5h"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input pl-7"
+                      :placeholder="'0'"
+                    />
+                  </div>
+                  <!-- Usage info (edit mode only) -->
+                  <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_5h > 0" class="mt-2">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
+                        <span :class="[
+                          'font-medium',
+                          selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'text-red-500' :
+                          selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'text-yellow-500' :
+                          'text-gray-900 dark:text-white'
+                        ]">
+                          {{ formatBalanceAmount(selectedKey.usage_5h, { fractionDigits: 4 }) }}
+                        </span>
+                        <span class="mx-2 text-gray-400">/</span>
+                        <span class="text-gray-500 dark:text-gray-400">
+                          {{ formatBalanceAmount(selectedKey.rate_limit_5h, { fractionDigits: 2 }) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                      <div
+                        :class="[
+                          'h-full rounded-full transition-all',
+                          selectedKey.usage_5h >= selectedKey.rate_limit_5h ? 'bg-red-500' :
+                          selectedKey.usage_5h >= selectedKey.rate_limit_5h * 0.8 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        ]"
+                        :style="{ width: Math.min((selectedKey.usage_5h / selectedKey.rate_limit_5h) * 100, 100) + '%' }"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-            <!-- Current expiration display (only in edit mode) -->
-            <div v-if="showEditModal && selectedKey?.expires_at" class="text-sm">
-              <span class="text-gray-500 dark:text-gray-400">{{ t('keys.currentExpiration') }}: </span>
-              <span class="font-medium text-gray-900 dark:text-white">
-                {{ formatDateTime(selectedKey.expires_at) }}
-              </span>
+                <!-- Daily Limit -->
+                <div>
+                  <label class="input-label">{{ t('keys.rateLimit1d') }}</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
+                    <input
+                      v-model.number="formData.rate_limit_1d"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input pl-7"
+                      :placeholder="'0'"
+                    />
+                  </div>
+                  <!-- Usage info (edit mode only) -->
+                  <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_1d > 0" class="mt-2">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
+                        <span :class="[
+                          'font-medium',
+                          selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'text-red-500' :
+                          selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'text-yellow-500' :
+                          'text-gray-900 dark:text-white'
+                        ]">
+                          {{ formatBalanceAmount(selectedKey.usage_1d, { fractionDigits: 4 }) }}
+                        </span>
+                        <span class="mx-2 text-gray-400">/</span>
+                        <span class="text-gray-500 dark:text-gray-400">
+                          {{ formatBalanceAmount(selectedKey.rate_limit_1d, { fractionDigits: 2 }) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                      <div
+                        :class="[
+                          'h-full rounded-full transition-all',
+                          selectedKey.usage_1d >= selectedKey.rate_limit_1d ? 'bg-red-500' :
+                          selectedKey.usage_1d >= selectedKey.rate_limit_1d * 0.8 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        ]"
+                        :style="{ width: Math.min((selectedKey.usage_1d / selectedKey.rate_limit_1d) * 100, 100) + '%' }"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 7-Day Limit -->
+                <div>
+                  <label class="input-label">{{ t('keys.rateLimit7d') }}</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
+                    <input
+                      v-model.number="formData.rate_limit_7d"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input pl-7"
+                      :placeholder="'0'"
+                    />
+                  </div>
+                  <!-- Usage info (edit mode only) -->
+                  <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_7d > 0" class="mt-2">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 rounded-lg bg-gray-100 px-3 py-2 dark:bg-dark-700 text-sm">
+                        <span :class="[
+                          'font-medium',
+                          selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'text-red-500' :
+                          selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'text-yellow-500' :
+                          'text-gray-900 dark:text-white'
+                        ]">
+                          {{ formatBalanceAmount(selectedKey.usage_7d, { fractionDigits: 4 }) }}
+                        </span>
+                        <span class="mx-2 text-gray-400">/</span>
+                        <span class="text-gray-500 dark:text-gray-400">
+                          {{ formatBalanceAmount(selectedKey.rate_limit_7d, { fractionDigits: 2 }) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-dark-600">
+                      <div
+                        :class="[
+                          'h-full rounded-full transition-all',
+                          selectedKey.usage_7d >= selectedKey.rate_limit_7d ? 'bg-red-500' :
+                          selectedKey.usage_7d >= selectedKey.rate_limit_7d * 0.8 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        ]"
+                        :style="{ width: Math.min((selectedKey.usage_7d / selectedKey.rate_limit_7d) * 100, 100) + '%' }"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 30-Day Limit -->
+                <div>
+                  <label class="input-label">{{ t('keys.rateLimit30d') }}</label>
+                  <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{{ balanceUnitSymbol }}</span>
+                    <input v-model.number="formData.rate_limit_30d" type="number" step="0.01" min="0" class="input pl-7" :placeholder="'0'" />
+                  </div>
+                  <div v-if="showEditModal && selectedKey && selectedKey.rate_limit_30d > 0" class="mt-2">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                      <span>{{ t('keys.rateLimitUsage') }}</span>
+                      <span>{{ formatBalancePair(selectedKey.usage_30d, selectedKey.rate_limit_30d, 2, 2) }}</span>
+                    </div>
+                    <div class="h-1.5 bg-gray-200 dark:bg-dark-700 rounded-full overflow-hidden">
+                      <div class="h-full bg-blue-500 rounded-full" :style="{ width: Math.min((selectedKey.usage_30d / selectedKey.rate_limit_30d) * 100, 100) + '%' }" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Reset Rate Limit button (edit mode only) -->
+                <div v-if="showEditModal && selectedKey && (selectedKey.rate_limit_5h > 0 || selectedKey.rate_limit_1d > 0 || selectedKey.rate_limit_7d > 0 || selectedKey.rate_limit_30d > 0)">
+                  <button
+                    type="button"
+                    @click="confirmResetRateLimit"
+                    class="btn btn-secondary text-sm"
+                  >
+                    {{ t('keys.resetRateLimitUsage') }}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3083,6 +3103,11 @@ const setExpirationDays = (days: number) => {
   const expDate = new Date()
   expDate.setDate(expDate.getDate() + days)
   formData.value.expiration_date = formatDateTimeLocal(expDate.toISOString())
+}
+
+// 手动改动日期时间后，快捷天数预设已不再对应，统一标记为自定义。
+const onExpirationDateChange = () => {
+  formData.value.expiration_preset = 'custom'
 }
 
 // 重置 API Key 已用额度。

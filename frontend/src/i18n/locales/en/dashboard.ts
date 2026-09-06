@@ -328,6 +328,8 @@ export default {
     failedToResetQuota: 'Failed to reset quota',
     rateLimitColumn: 'Spending Limits',
     rateLimitSection: 'Balance Spending Limits',
+    windowLimit: 'Time Window Limits',
+    quickSelect: 'Quick Select',
     resetUsage: 'Reset',
     rateLimit5h: '5-Hour Limit',
     rateLimit1d: 'Daily Limit',

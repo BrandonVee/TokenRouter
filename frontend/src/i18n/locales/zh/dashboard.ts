@@ -333,6 +333,8 @@ export default {
     failedToResetQuota: '重置额度失败',
     rateLimitColumn: '消费限额',
     rateLimitSection: '余额消费限额',
+    windowLimit: '时间窗口限额',
+    quickSelect: '快捷选择',
     resetUsage: '重置',
     rateLimit5h: '5小时限额',
     rateLimit1d: '日限额',
