@@ -835,6 +835,15 @@ describe("admin SettingsView payment visible method controls", () => {
     adminSettingsFetch.mockResolvedValue(undefined);
   });
 
+  it("系统设置在切换不同标签时保持通用设置的容器宽度", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining(["w-full", "min-w-0", "max-w-[1400px]"]),
+    );
+  });
+
   it("renders panel rate limit card and saves settings", async () => {
     getPanelRateLimitSettings.mockClear();
     updatePanelRateLimitSettings.mockClear();
