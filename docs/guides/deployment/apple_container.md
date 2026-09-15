@@ -107,6 +107,14 @@ APPLE_CONTAINER_POSTGRES_IMAGE=postgres:18-alpine
 APPLE_CONTAINER_REDIS_IMAGE=redis:8-alpine
 ```
 
+默认由 Apple `container` 自动选择私有 IPv4 网段。只有宿主机工具需要固定网络网关时，才在 `.env` 中配置：
+
+```dotenv
+APPLE_CONTAINER_NETWORK_SUBNET=172.31.250.0/24
+```
+
+所选 CIDR 不能与宿主机局域网或 VPN 重叠。该设置只在脚本创建 `sub2api-apple` 网络时应用；若现有受管网络使用其它网段，脚本会保留全部资源并停止。需要迁移时先运行 `./apple-container.sh destroy --yes` 删除受管容器和网络但保留命名卷，再重新执行 `./apple-container.sh up`。
+
 普通 `up` 命令会重新创建应用容器，因此应用环境变量会立即生效。修改 PostgreSQL、Redis 容器镜像或 Redis 运行配置时，应使用 `up --recreate`。持久化数据仍保留在命名卷中。
 
 `POSTGRES_USER`、`POSTGRES_PASSWORD` 和 `POSTGRES_DB` 只在 PostgreSQL 初始化空数据卷时应用。修改 `.env` 并重建容器不会改变现有数据库。密码应通过 `ALTER ROLE` 轮换，用户或数据库变更应制定明确的迁移方案。若确实需要初始化全新空数据库，先备份旧数据，再使用 `destroy --volumes`。

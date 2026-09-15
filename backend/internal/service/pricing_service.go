@@ -26,6 +26,16 @@ var (
 	pricingRemoteRequestTimeout = 30 * time.Second
 	openAIModelDatePattern      = regexp.MustCompile(`-\d{8}$`)
 	openAIModelBasePattern      = regexp.MustCompile(`^(gpt-\d+(?:\.\d+)?)(?:-|$)`)
+	// GPT Image 2.5 官方 token 价格兜底，避免远程价表滞后时沿用旧图片模型价格。
+	openAIGPTImage25FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:       5e-06,
+		CacheReadInputTokenCost: 1.25e-06,
+		InputCostPerImageToken:  8e-06,
+		OutputCostPerImageToken: 3e-05,
+		LiteLLMProvider:         "openai",
+		Mode:                    "image_generation",
+		SupportsPromptCaching:   true,
+	}
 	claudeOpus48FallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:                   5e-06,  // 每百万 token $5
 		OutputCostPerToken:                  25e-06, // 每百万 token $25
@@ -1086,6 +1096,12 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 		logger.With(zap.String("component", "service.pricing")).
 			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4(static)"))
 		return openAIGPT54FallbackPricing
+	}
+
+	for _, imageModel := range []string{"gpt-image-2.5-flare", "gpt-image-2.5-sunburst"} {
+		if model == imageModel || model == imageModel+"-2026-09-08" {
+			return openAIGPTImage25FallbackPricing
+		}
 	}
 
 	if isOpenAIImageGenerationModel(model) {

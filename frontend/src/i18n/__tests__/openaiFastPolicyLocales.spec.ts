@@ -12,7 +12,8 @@ describe('OpenAI Fast/Flex policy locale keys', () => {
       userSearchEmpty: '未找到匹配用户',
       userDeleted: '（已删除）',
       userIdFallback: '用户 #{id}',
-      removeUser: '移除用户'
+      removeUser: '移除用户',
+      tierUltrafast: 'ultrafast'
     })
   })
 
@@ -24,7 +25,8 @@ describe('OpenAI Fast/Flex policy locale keys', () => {
       userSearchEmpty: 'No matching users found',
       userDeleted: '(deleted)',
       userIdFallback: 'User #{id}',
-      removeUser: 'Remove user'
+      removeUser: 'Remove user',
+      tierUltrafast: 'ultrafast'
     })
   })
 })

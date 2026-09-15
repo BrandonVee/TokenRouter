@@ -22,11 +22,13 @@
 | 完整 Compose | `deploy/docker-compose.yml`、`docker-compose.local.yml` | 应用、PostgreSQL、Redis；分别使用命名卷或本地目录 |
 | 独立应用容器 | `deploy/docker-compose.standalone.yml` | PostgreSQL、Redis 由部署环境提供 |
 | 源码开发 Compose | `deploy/docker-compose.dev.yml` | 本地构建应用并启动配套依赖 |
-| Apple Container | `deploy/apple-container.sh` | 独立脚本管理容器、卷和健康状态 |
+| Apple Container | `deploy/apple-container.sh` | 独立脚本管理容器、卷和健康状态；可选固定私有 IPv4 网段 |
 
 应用至少依赖 PostgreSQL 和 Redis。`/app/data` 或等价 `DATA_DIR` 保存配置、安装锁及本地运维产物；数据库、Redis 和对象存储各有独立生命周期，不能只备份应用数据目录就宣称完成系统备份。
 
 逐步操作见 [中文部署指南](../guides/deployment/index.md)、[Docker 镜像说明](../../deploy/DOCKER.md) 和 [Apple Container 指南](../guides/deployment/apple_container.md)。这些是部署者手册，不替代本文的工程约束。
+
+Apple Container 的 `APPLE_CONTAINER_NETWORK_SUBNET` 只在创建受管网络时生效。已有网络与配置不一致时必须保留资源并停止，由运维显式执行保留命名卷的销毁与重建流程，不能静默替换网络。
 
 管理后台的数据管理功能还依赖一个通过 Unix Socket 通信的可选 `datamanagementd` 进程。本仓库保留主进程客户端、systemd unit 和安装脚本，但当前检出内容不包含 `datamanagement/` 源码目录，因此根 Makefile 的构建目标和安装脚本的 `--source` 模式不能在本仓库单独完成构建。只有在另行取得兼容二进制或完整源码时才应启用；现成二进制的部署步骤见 [datamanagementd 指南](../guides/deployment/datamanagementd.md)。
 

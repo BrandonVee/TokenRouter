@@ -152,10 +152,12 @@ apiClient.interceptors.response.use(
       // This handles TOKEN_EXPIRED, INVALID_TOKEN, TOKEN_REVOKED, etc.
       if (status === 401 && !originalRequest._retry) {
         const refreshToken = localStorage.getItem('refresh_token')
+        const isLogoutEndpoint = url.includes('/auth/logout')
         const isAuthEndpoint =
           url.includes('/auth/login') ||
           url.includes('/auth/register') ||
           url.includes('/auth/refresh') ||
+          isLogoutEndpoint ||
           url.includes('/auth/oauth/google/one-tap')
 
         // If we have a refresh token and this is not an auth endpoint, try to refresh
@@ -209,27 +211,29 @@ apiClient.interceptors.response.use(
           }
         }
 
-        // No refresh token or is auth endpoint - clear auth and redirect
-        const hasToken = !!localStorage.getItem('auth_token')
-        const headers = error.config?.headers as Record<string, unknown> | undefined
-        const authHeader = headers?.Authorization ?? headers?.authorization
-        const sentAuth =
-          typeof authHeader === 'string'
-            ? authHeader.trim() !== ''
-            : Array.isArray(authHeader)
-              ? authHeader.length > 0
-              : !!authHeader
+        // 旧登出请求可能在新会话建立后才返回，不能清除后来登录的凭据。
+        if (!isLogoutEndpoint) {
+          const hasToken = !!localStorage.getItem('auth_token')
+          const headers = error.config?.headers as Record<string, unknown> | undefined
+          const authHeader = headers?.Authorization ?? headers?.authorization
+          const sentAuth =
+            typeof authHeader === 'string'
+              ? authHeader.trim() !== ''
+              : Array.isArray(authHeader)
+                ? authHeader.length > 0
+                : !!authHeader
 
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('refresh_token')
-        localStorage.removeItem('auth_user')
-        localStorage.removeItem('token_expires_at')
-        if ((hasToken || sentAuth) && !isAuthEndpoint) {
-          sessionStorage.setItem('auth_expired', '1')
-        }
-        // 登录入口自己的 401 交给当前页面处理，不能误判为已有会话过期。
-        if (!isAuthEndpoint && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login'
+          localStorage.removeItem('auth_token')
+          localStorage.removeItem('refresh_token')
+          localStorage.removeItem('auth_user')
+          localStorage.removeItem('token_expires_at')
+          if ((hasToken || sentAuth) && !isAuthEndpoint) {
+            sessionStorage.setItem('auth_expired', '1')
+          }
+          // 登录入口自己的 401 交给当前页面处理，不能误判为已有会话过期。
+          if (!isAuthEndpoint && !window.location.pathname.includes('/login')) {
+            window.location.href = '/login'
+          }
         }
       }
 

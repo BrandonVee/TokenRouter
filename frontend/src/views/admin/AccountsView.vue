@@ -445,7 +445,7 @@
     <AdvancedSchedulerScoreModal :show="showAdvancedSchedulerScore" :account="advancedSchedulerScoreAcc" @close="closeAdvancedSchedulerScoreModal" />
     <CodexInviteResetModal :show="showInviteReset" :account="inviteResetAcc" @close="closeInviteResetModal" @updated="enterAutoRefreshSilentWindow" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
-    <AccountActionMenu :show="menu.show" :account="menu.acc" :position="menu.pos" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @advanced-scheduler-score="handleAdvancedSchedulerScore" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @invite-reset="handleInviteReset" @create-spark-shadow="handleCreateSparkShadow" />
+    <AccountActionMenu :show="menu.show" :account="menu.acc" :anchor-rect="menu.anchorRect" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @advanced-scheduler-score="handleAdvancedSchedulerScore" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @invite-reset="handleInviteReset" @create-spark-shadow="handleCreateSparkShadow" />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
     <ImportDataModal :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
@@ -613,7 +613,7 @@ const scheduleAcc = ref<Account | null>(null)
 const scheduleModelOptions = ref<SelectOption[]>([])
 const togglingSchedulable = ref<number | null>(null)
 const bulkUsageLoading = ref(false)
-const menu = reactive<{show:boolean, acc:Account|null, pos:{top:number, left:number}|null}>({ show: false, acc: null, pos: null })
+const menu = reactive<{show:boolean, acc:Account|null, anchorRect:DOMRect|null}>({ show: false, acc: null, anchorRect: null })
 const exportingData = ref(false)
 const openCreateAccount = (platform?: AccountPlatform) => {
   createInitialPlatform.value = platform
@@ -1761,53 +1761,8 @@ const handleEdit = async (a: AccountListItem) => {
 }
 const openMenu = (a: Account, e: MouseEvent) => {
   menu.acc = a
-
   const target = e.currentTarget as HTMLElement
-  if (target) {
-    const rect = target.getBoundingClientRect()
-    const menuWidth = 200
-    const menuHeight = 280
-    const padding = 8
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    let left: number
-    let top: number
-
-    if (viewportWidth < 768) {
-      // 居中显示,水平位置
-      left = Math.max(padding, Math.min(
-        rect.left + rect.width / 2 - menuWidth / 2,
-        viewportWidth - menuWidth - padding
-      ))
-
-      // 优先显示在按钮下方
-      top = rect.bottom + 4
-
-      // 如果下方空间不够,显示在上方
-      if (top + menuHeight > viewportHeight - padding) {
-        top = rect.top - menuHeight - 4
-        // 如果上方也不够,就贴在视口顶部
-        if (top < padding) {
-          top = padding
-        }
-      }
-    } else {
-      left = Math.max(padding, Math.min(
-        e.clientX - menuWidth,
-        viewportWidth - menuWidth - padding
-      ))
-      top = e.clientY
-      if (top + menuHeight > viewportHeight - padding) {
-        top = viewportHeight - menuHeight - padding
-      }
-    }
-
-    menu.pos = { top, left }
-  } else {
-    menu.pos = { top: e.clientY, left: e.clientX - 200 }
-  }
-
+  menu.anchorRect = target.getBoundingClientRect()
   menu.show = true
 }
 const toggleSelectAllVisible = (event: Event) => {
@@ -1853,10 +1808,16 @@ const handleBulkResetStatus = async () => {
 }
 const handleBulkRefreshToken = async () => {
   if (!confirm(t('common.confirm'))) return
+  const accountIds = [...selIds.value]
   try {
-    const result = await adminAPI.accounts.batchRefresh(selIds.value)
+    const result = await adminAPI.accounts.batchRefresh(accountIds)
     if (result.failed > 0) {
       appStore.showError(t('admin.accounts.bulkActions.partialSuccess', { success: result.success, failed: result.failed }))
+      // 失败项保留选中，便于修正凭据后直接重试；服务端未返回明细时保留原选择。
+      const failedIds = result.failed_ids?.length
+        ? result.failed_ids
+        : (result.errors?.map(error => error.account_id) ?? [])
+      setSelectedIds(failedIds.length > 0 ? failedIds : accountIds)
     } else {
       appStore.showSuccess(t('admin.accounts.bulkActions.refreshTokenSuccess', { count: result.success }))
       clearSelection()
@@ -2481,7 +2442,9 @@ const proxyExpiryText = (p: AccountProxy): string => {
 }
 
 // 滚动时关闭行内操作菜单，顶部下拉菜单保持打开但同步位置。
-const handleScroll = () => {
+const handleScroll = (event: Event) => {
+  // 菜单自身滚动不应触发全局关闭。
+  if (event.target instanceof Element && event.target.closest('.action-menu-content')) return
   menu.show = false
   updateTopDropdownPositions()
 }

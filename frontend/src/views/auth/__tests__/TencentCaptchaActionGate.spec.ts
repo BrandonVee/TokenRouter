@@ -15,6 +15,7 @@ const locationState = {
   protocol: 'http:',
   hostname: 'localhost'
 }
+let cachedPublicSettings: Record<string, unknown> | null = null
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -39,6 +40,8 @@ vi.mock('@/stores', () => ({
     loginWithPasskey: (...args: unknown[]) => loginWithPasskeyMock(...args)
   }),
   useAppStore: () => ({
+    cachedPublicSettings,
+    fetchPublicSettings: (...args: unknown[]) => getPublicSettingsMock(...args),
     showError: vi.fn(),
     showSuccess: vi.fn(),
     showWarning: vi.fn()
@@ -157,6 +160,7 @@ describe('Action captcha gate', () => {
     verifyActionMock.mockReset()
     captchaResetMock.mockReset()
     oneTapCancelMock.mockReset()
+    cachedPublicSettings = null
     getPublicSettingsMock.mockResolvedValue({
       turnstile_enabled: false,
       turnstile_site_key: '',
@@ -181,6 +185,55 @@ describe('Action captcha gate', () => {
       configurable: true,
       value: locationState
     })
+  })
+
+  it('已有公共设置缓存时无需等待后台请求即可输入', () => {
+    cachedPublicSettings = {
+      turnstile_enabled: false,
+      turnstile_site_key: '',
+      tencent_captcha_enabled: false,
+      aliyun_captcha_enabled: false,
+      linuxdo_oauth_enabled: false,
+      backend_mode_enabled: false,
+      oidc_oauth_enabled: false,
+      github_oauth_enabled: false,
+      google_oauth_enabled: false,
+      password_reset_enabled: false,
+      passkey_enabled: false
+    }
+    getPublicSettingsMock.mockReturnValue(new Promise(() => undefined))
+
+    const wrapper = mountLogin()
+
+    expect(wrapper.get('#email').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('#password').attributes('disabled')).toBeUndefined()
+  })
+
+  it('仅在公共设置允许注册时显示注册链接', async () => {
+    cachedPublicSettings = {
+      registration_enabled: false,
+      turnstile_enabled: false,
+      turnstile_site_key: '',
+      tencent_captcha_enabled: false,
+      aliyun_captcha_enabled: false,
+      linuxdo_oauth_enabled: false,
+      backend_mode_enabled: false,
+      oidc_oauth_enabled: false,
+      github_oauth_enabled: false,
+      google_oauth_enabled: false,
+      password_reset_enabled: false,
+      passkey_enabled: false
+    }
+    getPublicSettingsMock.mockReturnValue(new Promise(() => undefined))
+
+    const hiddenWrapper = mountLogin()
+    expect(hiddenWrapper.text()).not.toContain('auth.dontHaveAccount')
+    hiddenWrapper.unmount()
+
+    cachedPublicSettings = { ...cachedPublicSettings, registration_enabled: true }
+    const visibleWrapper = mountLogin()
+    await flushPromises()
+    expect(visibleWrapper.text()).toContain('auth.dontHaveAccount')
   })
 
   it('clicking login opens Tencent captcha before calling login', async () => {

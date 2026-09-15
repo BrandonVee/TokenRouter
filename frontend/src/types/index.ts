@@ -1709,6 +1709,16 @@ export interface UpdateAccountRequest {
   confirm_mixed_channel_risk?: boolean
 }
 
+export type GrokMediaEligibilityMode = 'auto' | 'enabled' | 'disabled'
+
+// Grok 媒体资格接口同时返回手工模式与根据当前账号状态计算出的有效判定。
+export interface GrokMediaEligibilityState {
+  account_id: number
+  mode: GrokMediaEligibilityMode
+  eligible: boolean
+  reason: string
+}
+
 export interface CheckMixedChannelRequest {
   platform: AccountPlatform
   group_ids: number[]

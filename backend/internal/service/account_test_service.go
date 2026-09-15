@@ -2465,6 +2465,9 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	}
 	applyOpenAIImagesDefaults(parsed)
 
+	// 同时显示 Responses 主控模型与实际图片模型，便于定位套餐门控或模型映射问题。
+	s.sendEvent(c, TestEvent{Type: "content", Text: fmt.Sprintf("Responses driver: %s; image model: %s\n", openAIImagesResponsesMainModelValue(), parsed.Model)})
+
 	responsesBody, err := buildOpenAIImagesResponsesRequest(parsed, parsed.Model)
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to build image request: %s", err.Error()))
@@ -2543,6 +2546,12 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse image response: %s", err.Error()))
 	}
 	if len(results) == 0 {
+		if upstreamErr := extractOpenAIImagesUpstreamError(body); upstreamErr != nil {
+			return s.sendErrorAndEnd(c, upstreamErr.clientMessage())
+		}
+		if refusal := extractOpenAIImagesModelRefusal(body); refusal != "" {
+			return s.sendErrorAndEnd(c, refusal)
+		}
 		return s.sendErrorAndEnd(c, "No images returned from responses API")
 	}
 

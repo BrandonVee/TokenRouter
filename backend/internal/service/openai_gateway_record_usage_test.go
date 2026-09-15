@@ -1498,10 +1498,9 @@ func TestNormalizeOpenAIServiceTier(t *testing.T) {
 	})
 
 	t.Run("openai official tiers preserved", func(t *testing.T) {
-		// OpenAI 官方文档定义的合法 tier 值都应被透传保留，避免因白名单过窄
-		// 静默剥离客户端显式发送的合法字段。Codex 客户端只发 priority/flex，
-		// 所以扩大白名单对 Codex 流量零影响（见 codex-rs/core/src/client.rs）。
-		for _, tier := range []string{"priority", "flex", "auto", "default", "scale"} {
+		// OpenAI 官方文档与 Codex 客户端定义的合法 tier 值都应被透传保留，
+		// 避免因白名单过窄而静默剥离客户端显式发送的合法字段。
+		for _, tier := range []string{"priority", "flex", "ultrafast", "auto", "default", "scale"} {
 			got := normalizeOpenAIServiceTier(tier)
 			require.NotNil(t, got, "tier %q should not be normalized to nil", tier)
 			require.Equal(t, tier, *got)

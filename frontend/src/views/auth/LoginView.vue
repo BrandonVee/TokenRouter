@@ -202,7 +202,7 @@
     </div>
 
     <!-- Footer -->
-    <template v-if="!backendModeEnabled" #footer>
+    <template v-if="!backendModeEnabled && publicSettingsLoaded && registrationEnabled" #footer>
       <p class="text-gray-500 dark:text-dark-400">
         {{ t('auth.dontHaveAccount') }}
         <router-link
@@ -244,7 +244,6 @@ import TurnstileWidget from '@/components/CaptchaChallenge.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
   buildOAuthLoginStartURL,
-  getPublicSettings,
   isTotp2FARequired,
   isWeChatWebOAuthEnabled,
   startOAuthLogin,
@@ -279,6 +278,7 @@ const showPassword = ref<boolean>(false)
 const publicSettingsLoaded = ref<boolean>(false)
 
 // Public settings
+const registrationEnabled = ref<boolean>(false)
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
 const tencentCaptchaEnabled = ref<boolean>(false)
@@ -406,6 +406,38 @@ watch(
 
 // ==================== Lifecycle ====================
 
+function applyPublicSettings(settings: NonNullable<typeof appStore.cachedPublicSettings>): void {
+  registrationEnabled.value = settings.registration_enabled === true
+  turnstileEnabled.value = settings.turnstile_enabled
+  turnstileSiteKey.value = settings.turnstile_site_key || ''
+  tencentCaptchaEnabled.value = settings.tencent_captcha_enabled === true
+  tencentCaptchaAppId.value = settings.tencent_captcha_app_id || ''
+  tencentCaptchaRegion.value = settings.tencent_captcha_region || 'cn'
+  aliyunCaptchaEnabled.value = settings.aliyun_captcha_enabled === true
+  aliyunCaptchaSceneId.value = settings.aliyun_captcha_scene_id || ''
+  aliyunCaptchaPrefix.value = settings.aliyun_captcha_prefix || ''
+  aliyunCaptchaRegion.value = settings.aliyun_captcha_region || 'cn'
+  linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
+  dingtalkOAuthEnabled.value = settings.dingtalk_oauth_enabled ?? false
+  wechatOAuthEnabled.value = isWeChatWebOAuthEnabled(settings)
+  backendModeEnabled.value = settings.backend_mode_enabled
+  oidcOAuthEnabled.value = settings.oidc_oauth_enabled
+  oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
+  githubOAuthEnabled.value = settings.github_oauth_enabled
+  googleOAuthEnabled.value = settings.google_oauth_enabled
+  googleOneTapEnabled.value = settings.google_one_tap_enabled === true
+  googleOneTapClientID.value = settings.google_oauth_client_id || ''
+  passwordResetEnabled.value = settings.password_reset_enabled
+  passkeyEnabled.value = settings.passkey_enabled === true
+  applyLoginAgreementSettings(settings)
+}
+
+// 退出登录后复用应用已加载的公共设置，让表单无需等待重复网络请求即可输入。
+if (appStore.cachedPublicSettings) {
+  applyPublicSettings(appStore.cachedPublicSettings)
+  publicSettingsLoaded.value = true
+}
+
 onMounted(async () => {
   const expiredFlag = sessionStorage.getItem('auth_expired')
   if (expiredFlag) {
@@ -416,30 +448,11 @@ onMounted(async () => {
   }
 
   try {
-    const settings = await getPublicSettings()
-    turnstileEnabled.value = settings.turnstile_enabled
-    turnstileSiteKey.value = settings.turnstile_site_key || ''
-    tencentCaptchaEnabled.value = settings.tencent_captcha_enabled === true
-    tencentCaptchaAppId.value = settings.tencent_captcha_app_id || ''
-    tencentCaptchaRegion.value = settings.tencent_captcha_region || 'cn'
-    aliyunCaptchaEnabled.value = settings.aliyun_captcha_enabled === true
-    aliyunCaptchaSceneId.value = settings.aliyun_captcha_scene_id || ''
-    aliyunCaptchaPrefix.value = settings.aliyun_captcha_prefix || ''
-    aliyunCaptchaRegion.value = settings.aliyun_captcha_region || 'cn'
-    linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
-    dingtalkOAuthEnabled.value = settings.dingtalk_oauth_enabled ?? false
-    wechatOAuthEnabled.value = isWeChatWebOAuthEnabled(settings)
-    backendModeEnabled.value = settings.backend_mode_enabled
-    oidcOAuthEnabled.value = settings.oidc_oauth_enabled
-    oidcOAuthProviderName.value = settings.oidc_oauth_provider_name || 'OIDC'
-    githubOAuthEnabled.value = settings.github_oauth_enabled
-    googleOAuthEnabled.value = settings.google_oauth_enabled
-    googleOneTapEnabled.value = settings.google_one_tap_enabled === true
-    googleOneTapClientID.value = settings.google_oauth_client_id || ''
-    backendModeEnabled.value = settings.backend_mode_enabled
-    passwordResetEnabled.value = settings.password_reset_enabled
-    passkeyEnabled.value = settings.passkey_enabled === true
-    applyLoginAgreementSettings(settings)
+    // 共享应用级请求和缓存，避免 AuthLayout、App 与登录页重复拉取设置。
+    const settings = await appStore.fetchPublicSettings()
+    if (settings) {
+      applyPublicSettings(settings)
+    }
   } catch (error) {
     console.error('Failed to load public settings:', error)
     loginAgreementEnabled.value = false

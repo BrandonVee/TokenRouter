@@ -211,27 +211,25 @@ export async function register(userData: RegisterRequest): Promise<AuthResponse>
  * @returns User profile data
  */
 export async function getCurrentUser() {
-  return apiClient.get<CurrentUserResponse>('/auth/me')
+  return apiClient.get<CurrentUserResponse>('/auth/me', {
+    // 当前用户响应包含会持续变化的余额，时间戳同时绕过配置不当的中间缓存。
+    params: { _fresh: Date.now() },
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache'
+    }
+  })
 }
 
 /**
  * User logout
- * Clears authentication token and user data from localStorage
- * Optionally revokes the refresh token on the server
+ * 在服务端撤销指定的 refresh token。
+ * 本地会话状态由认证 Store 同步清理，API 请求只负责服务端吊销。
  */
-export async function logout(): Promise<void> {
-  const refreshToken = getRefreshToken()
-
-  // Try to revoke the refresh token on the server
-  if (refreshToken) {
-    try {
-      await apiClient.post('/auth/logout', { refresh_token: refreshToken })
-    } catch {
-      // Ignore errors - we still want to clear local state
-    }
-  }
-
-  clearAuthToken()
+export async function logout(refreshToken?: string | null): Promise<void> {
+  await apiClient.post('/auth/logout', {
+    refresh_token: refreshToken || undefined
+  })
 }
 
 export interface OAuthTokenResponse {

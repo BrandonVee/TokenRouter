@@ -30,7 +30,8 @@ import { ref, onMounted, onUnmounted } from 'vue'
 const isMobile = ref(false)
 
 const checkMobile = () => {
-  isMobile.value = window.innerWidth < 1024
+  // 与 DataTable 的卡片/表格切换点保持一致，避免平板宽度下表格容器退化为内容高度。
+  isMobile.value = window.innerWidth < 768
 }
 
 onMounted(() => {

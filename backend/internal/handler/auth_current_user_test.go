@@ -55,6 +55,8 @@ func TestAuthHandlerGetCurrentUserReturnsProfileCompatibilityFields(t *testing.T
 	handler.GetCurrentUser(c)
 
 	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, "private, no-store, max-age=0", recorder.Header().Get("Cache-Control"))
+	require.Equal(t, "no-cache", recorder.Header().Get("Pragma"))
 
 	var resp struct {
 		Code int            `json:"code"`

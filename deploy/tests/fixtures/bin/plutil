@@ -18,6 +18,11 @@ case "${key_path}:${format}" in
         [[ -n "${address}" ]]
         printf '%s\n' "${address}"
         ;;
+    0.configuration.ipv4Subnet:raw)
+        subnet=$(printf '%s' "${input}" | sed -n 's/.*"ipv4Subnet":"\([^"]*\)".*/\1/p')
+        [[ -n "${subnet}" ]]
+        printf '%s\n' "${subnet}"
+        ;;
     *)
         printf 'Unsupported fake plutil extraction: %s (%s)\n' "${key_path}" "${format}" >&2
         exit 1

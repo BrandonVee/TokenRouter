@@ -874,12 +874,10 @@ func normalizeOpenAIServiceTier(raw string) *string {
 	if value == "fast" {
 		value = "priority"
 	}
-	// 放过 OpenAI 官方文档定义的所有合法 tier 值：priority/flex/auto/default/scale。
-	// 对 Codex 客户端零影响（Codex 只发 priority 或 flex，见 codex-rs/core/src/client.rs），
-	// 但能让直连 OpenAI SDK 的用户透传 auto/default/scale 以便抓包/调试。
-	// 真未知值仍返回 nil，由 normalizeResponsesBodyServiceTier 从 body 中删除。
+	// 放过 OpenAI 合法 tier 以及 Codex/API 的 ultrafast；直连 OpenAI SDK 的用户
+	// 可继续透传 auto/default/scale，真未知值则返回 nil 并从请求体删除。
 	switch value {
-	case "priority", "flex", "auto", "default", "scale":
+	case "priority", "flex", "auto", "default", "scale", OpenAIFastTierUltrafast:
 		return &value
 	default:
 		return nil

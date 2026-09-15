@@ -420,6 +420,10 @@ func (h *AuthHandler) Login2FA(c *gin.Context) {
 // GetCurrentUser handles getting current authenticated user
 // GET /api/v1/auth/me
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
+	// 当前用户资料包含实时余额和安全状态，禁止浏览器或中间代理复用旧响应。
+	c.Header("Cache-Control", "private, no-store, max-age=0")
+	c.Header("Pragma", "no-cache")
+
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")

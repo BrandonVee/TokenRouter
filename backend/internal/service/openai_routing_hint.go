@@ -39,7 +39,7 @@ func setOpenAICodexRoutingHint(headers http.Header, account *Account, model stri
 	// 当前回移不含 Codex 模型目录快照，无法校验任意层级 ID，因此只发送
 	// Codex 实际选择的两种有效层级；default、空值和其他兼容 API 值仅保留模型。
 	switch canonicalTier {
-	case OpenAIFastTierPriority, OpenAIFastTierFlex:
+	case OpenAIFastTierPriority, OpenAIFastTierFlex, OpenAIFastTierUltrafast:
 	default:
 		canonicalTier = ""
 	}

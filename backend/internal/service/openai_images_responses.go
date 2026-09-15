@@ -354,7 +354,8 @@ func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel st
 	}
 
 	req := []byte(`{"instructions":"","stream":true,"reasoning":{"effort":"medium","summary":"auto"},"parallel_tool_calls":true,"include":["reasoning.encrypted_content"],"model":"","store":false,"tool_choice":{"type":"image_generation"}}`)
-	req, _ = sjson.SetBytes(req, "model", openAIImagesResponsesMainModel)
+	req, _ = sjson.SetBytes(req, "model", openAIImagesResponsesMainModelValue())
+	req, _ = sjson.SetBytes(req, "instructions", openAIImagesVerbatimPromptInstructions)
 
 	input := []byte(`[{"type":"message","role":"user","content":[{"type":"input_text","text":""}]}]`)
 	input, _ = sjson.SetBytes(input, "0.content.0.text", prompt)
@@ -878,6 +879,15 @@ func (s *OpenAIGatewayService) handleOpenAIImagesErrorResponse(
 		return nil, wrapOpenAIUpstreamWarningIfCyber(resp.StatusCode, body, errMsg, fmt.Errorf("upstream error: %d message=%s", resp.StatusCode, errMsg))
 	}
 
+	// Responses 主控模型被套餐门控拒绝不代表图片模型额度失败，应直接暴露可操作错误而非冷却图片账号。
+	if account.IsOpenAI() && account.IsOAuth() &&
+		isOpenAICodexPlanGatedModelError(resp.StatusCode, body) &&
+		strings.Contains(extractUpstreamErrorMessage(body), "'"+openAIImagesResponsesMainModelValue()+"'") {
+		upErr := openAIImagesUpstreamErrorFromHTTP(resp.StatusCode, resp.Header, body)
+		writeOpenAIImagesUpstreamErrorResponse(c, upErr)
+		return nil, upErr
+	}
+
 	var modelForCooldown string
 	if len(requestedModel) > 0 {
 		modelForCooldown = strings.TrimSpace(requestedModel[0])
@@ -1121,6 +1131,9 @@ func openAIImagesToolUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 		if !imageInputOK {
 			return OpenAIUsage{}, false
 		}
+	}
+	if imageInputTokens > inputTokens {
+		imageInputTokens = inputTokens
 	}
 	return OpenAIUsage{
 		InputTokens:       inputTokens,

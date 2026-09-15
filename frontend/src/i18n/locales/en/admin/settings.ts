@@ -1211,7 +1211,7 @@ dataSharing: {
       },
       openaiFastPolicy: {
         title: 'OpenAI Fast/Flex Policy',
-        description: 'Intercept, filter, or pass OpenAI fast(priority) / flex requests based on the request body service_tier field. Applies to the OpenAI gateway only.',
+        description: 'Intercept, filter, or pass OpenAI fast(priority), ultrafast, or flex requests based on the request body service_tier field. Applies to the OpenAI gateway only.',
         empty: 'No rules configured. Click the button below to add one.',
         ruleHeader: 'Rule #{index}',
         removeRule: 'Remove rule',
@@ -1220,6 +1220,7 @@ dataSharing: {
         serviceTier: 'service_tier match',
         tierAll: 'All tiers',
         tierPriority: 'priority (fast)',
+        tierUltrafast: 'ultrafast',
         tierFlex: 'flex',
         action: 'Action',
         actionPass: 'Pass (keep service_tier)',

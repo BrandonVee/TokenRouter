@@ -45,7 +45,7 @@
 2. 否则按顺序搜索 `DATA_DIR`（若设置）、`/app/data`、当前目录、`./config`、`/etc/sub2api` 中的 `config.yaml`。
 3. 文件不存在允许继续使用默认值和环境变量；文件存在但 YAML 无法读取/解析则启动失败。
 
-环境变量把点分键转成大写下划线，例如 `database.host` 对应 `DATABASE_HOST`，`gateway.max_body_size` 对应 `GATEWAY_MAX_BODY_SIZE`。`setDefaults` 还负责把所有 struct 键注册进 Viper，使纯环境变量部署能被 `Unmarshal` 看到；新增字段不能只加 `mapstructure` tag 而不注册默认/可达键。少量变量有显式绑定或专用解析：`ENABLE_SERVER_TIMING`，逗号分隔的 `SERVER_TRUSTED_PROXIES` 和 `SECURITY_FORWARDED_CLIENT_IP_HEADERS`，以及受兼容条件约束的旧 WeChat 变量。
+环境变量把点分键转成大写下划线，例如 `database.host` 对应 `DATABASE_HOST`，`gateway.max_body_size` 对应 `GATEWAY_MAX_BODY_SIZE`。`setDefaults` 还负责把所有 struct 键注册进 Viper，使纯环境变量部署能被 `Unmarshal` 看到；新增字段不能只加 `mapstructure` tag 而不注册默认/可达键。少量变量有显式绑定或专用解析：`ENABLE_SERVER_TIMING`，逗号分隔的 `SERVER_TRUSTED_PROXIES` 和 `SECURITY_FORWARDED_CLIENT_IP_HEADERS`，以及受兼容条件约束的旧 WeChat 变量。OAuth Images 的 `SUB2API_IMAGES_MAIN_MODEL` 由生图 Responses 驱动在进程启动环境中直接读取，空值回退到内置主控模型；它不属于数据库设置，修改后需要重启应用实例。
 
 加载完成后会做字符串规范化、枚举回退、派生默认、文件读取和完整 `Validate`。无效安全 header、URL、数值范围、模式组合或必要 secret 会让启动失败；不应等到某个请求首次使用时才发现。数据库初始化随后补齐持久安全密钥：未显式配置 `TOTP_ENCRYPTION_KEY` 时，服务原子生成 32 字节密钥并保存到 `security_secrets`；后续重启和共享数据库的实例复用该记录，再将 `EncryptionKeyConfigured` 标记为可持久使用。显式配置首次启动也会写入同一记录；以后若环境值与数据库记录不一致，使用数据库记录维持已加密数据和多实例一致性。
 

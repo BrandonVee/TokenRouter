@@ -74,7 +74,7 @@ OAuth 的普通 Responses、原生 V2、旧版 Compact 和 WebSocket 握手共�
 
 官方 Codex WebSocket v2 会先发送 `generate=false` 的预热 `response.create`，再以预热响应 ID 作为业务请求的 `previous_response_id`。严格续接比较会忽略逐请求变化的 `client_metadata`、仅用于传输的 `stream_options`，并把 `generate=false` 与后续省略该字段视为等价；`generate=true` 以及 model、instructions、tools、reasoning、store 等上下文字段仍必须保持一致，避免把无关请求错误串接。
 
-OpenAI OAuth 的 HTTP、passthrough、旧版 Compact 与 WebSocket 出站会在模型映射和本地 fast 策略处理完成后，由网关生成 `x-codex-routing-hint`。提示至少包含最终上游模型；只有有效的 `priority` 或 `flex` 才附带 tier，`fast` 先规范化为 `priority`，`default`、未知值和空值均保持 model-only。旧版 Compact 规范化必须保留 `service_tier`，否则提示会丢失已经生效的路由层级。该头由网关独占控制：所有账号类型都会先删除调用方及账号覆盖提供的任意大小写变体，只有 OpenAI OAuth 路径会重新生成；API Key 路径不得透传伪造提示。OAuth HTTP 也不再自动注入或透传旧版 `responses=experimental` beta 标记，但同一头中的其它独立 beta 项仍保留。
+OpenAI OAuth 的 HTTP、passthrough、旧版 Compact 与 WebSocket 出站会在模型映射和本地 fast 策略处理完成后，由网关生成 `x-codex-routing-hint`。提示至少包含最终上游模型；只有有效的 `priority`、`ultrafast` 或 `flex` 才附带 tier，`fast` 先规范化为 `priority`，`default`、未知值和空值均保持 model-only。`ultrafast` 采用 Fast 的 2 倍计费倍率，并可由 OpenAI Fast/Flex 策略单独匹配。旧版 Compact 规范化必须保留 `service_tier`，否则提示会丢失已经生效的路由层级。该头由网关独占控制：所有账号类型都会先删除调用方及账号覆盖提供的任意大小写变体，只有 OpenAI OAuth 路径会重新生成；API Key 路径不得透传伪造提示。OAuth HTTP 也不再自动注入或透传旧版 `responses=experimental` beta 标记，但同一头中的其它独立 beta 项仍保留。
 
 WebSocket 连接池把 routing hint 视为拨号和普通复用的软亲和：优先复用相同提示建立的连接，池满时仍可在硬兼容连接上排队，显式 continuation 也不会仅因提示变化而断链。握手 beta feature 与本 fork 的 TLS fingerprint profile 仍是硬兼容键，任一变化都禁止复用，并会使尚未完成的旧目标预热拨号失效。路由诊断只记录网关推导的最终模型、规范化 tier、传输类型、账号 ID、是否生成提示和 WS 亲和决策，不记录提示头值、token 或凭据。
 
@@ -103,6 +103,8 @@ OpenAI API Key 账号以 `force_chat_completions` 承接 `/v1/messages` 时，Ch
 API Key endpoint capability 可通过探测或配置表达 `responses`、`chat_completions`、`embeddings` 等能力。OAuth/Codex 账号还可能包含 Realtime、WebSocket、旧版 Compact 端点状态和客户端身份限制。未知模型可以在管理员明确配置的兼容上游中透传，但没有定价或能力证据时不能虚构价格与功能。
 
 Images API 的流式与非流式上游请求都脱离客户端请求取消信号继续执行，并由上游响应超时控制最终回收。OpenAI API Key 账号连接测试复用相同的图片模型识别规则，命中后直接测试 `/v1/images/generations`。生图属于长耗时且上游可能已经产生实际成本的媒体任务；客户端中途断开不能取消上游并丢失已完成图片的计费结果。下游写失败不改变图片产出和结算事实。
+
+OAuth Images 通过 Responses 主控模型调用独立的 `image_generation` 工具模型：当前内置 GPT Image 2.5 Flare/Sunburst，主控模型默认 `gpt-5.6-luna`，可通过 `SUB2API_IMAGES_MAIN_MODEL` 运维覆盖。模型列表、账号测试、请求转换和计费均保留工具模型与主控模型的区分；远程价表尚未包含 GPT Image 2.5 时使用内置价格兜底，不能回退到旧图片模型价格。主控模型被套餐门控拒绝属于配置错误，不应冷却图片模型或账号。
 
 ## 额度与调度
 

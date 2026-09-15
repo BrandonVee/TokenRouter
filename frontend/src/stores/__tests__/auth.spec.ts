@@ -156,6 +156,47 @@ describe('useAuthStore', () => {
       expect(localStorage.getItem('refresh_token')).toBeNull()
       expect(localStorage.getItem('token_expires_at')).toBeNull()
     })
+
+    it('服务端吊销未完成时也立即清除本地会话', async () => {
+      let resolveLogout!: () => void
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      mockLogout.mockReturnValue(new Promise<void>((resolve) => {
+        resolveLogout = resolve
+      }))
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+
+      const logoutPromise = store.logout()
+
+      expect(store.token).toBeNull()
+      expect(store.user).toBeNull()
+      expect(store.isAuthenticated).toBe(false)
+      expect(localStorage.getItem('auth_token')).toBeNull()
+      expect(mockLogout).toHaveBeenCalledWith('refresh-token-456')
+      await logoutPromise
+
+      resolveLogout()
+      await Promise.resolve()
+    })
+
+    it('退出前发起的用户刷新完成后不会恢复旧会话', async () => {
+      let resolveCurrentUser!: (value: { data: typeof fakeUser }) => void
+      mockLogin.mockResolvedValue(fakeAuthResponse)
+      mockLogout.mockResolvedValue(undefined)
+      mockGetCurrentUser.mockReturnValue(new Promise((resolve) => {
+        resolveCurrentUser = resolve
+      }))
+      const store = useAuthStore()
+      await store.login({ email: 'test@example.com', password: '123456' })
+
+      const refreshPromise = store.refreshUser()
+      await store.logout()
+      resolveCurrentUser({ data: { ...fakeUser, balance: 999 } })
+
+      await expect(refreshPromise).rejects.toThrow('Authentication session changed')
+      expect(store.user).toBeNull()
+      expect(localStorage.getItem('auth_user')).toBeNull()
+    })
   })
 
   // --- checkAuth ---

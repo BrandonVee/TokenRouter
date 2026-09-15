@@ -363,6 +363,37 @@ describe('API Client', () => {
       }
     })
 
+    it('旧登出请求返回 401 时不清除后来建立的新会话', async () => {
+      sessionStorage.removeItem('auth_expired')
+      localStorage.setItem('auth_token', 'new-access-token')
+      localStorage.setItem('refresh_token', 'new-refresh-token')
+      localStorage.setItem('auth_user', JSON.stringify({ id: 8 }))
+      localStorage.setItem('token_expires_at', String(Date.now() + 60_000))
+      const refreshSpy = vi.spyOn(axios, 'post').mockRejectedValue(new Error('unexpected refresh'))
+
+      apiClient.defaults.adapter = vi.fn().mockRejectedValue({
+        response: {
+          status: 401,
+          data: { code: 'REFRESH_TOKEN_REVOKED', message: 'Refresh token already revoked' },
+        },
+        config: {
+          url: '/auth/logout',
+          headers: { Authorization: 'Bearer old-access-token' },
+        },
+        code: 'ERR_BAD_REQUEST',
+      })
+
+      await expect(
+        apiClient.post('/auth/logout', { refresh_token: 'old-refresh-token' })
+      ).rejects.toMatchObject({ status: 401, code: 'REFRESH_TOKEN_REVOKED' })
+
+      expect(refreshSpy).not.toHaveBeenCalled()
+      expect(localStorage.getItem('auth_token')).toBe('new-access-token')
+      expect(localStorage.getItem('refresh_token')).toBe('new-refresh-token')
+      expect(localStorage.getItem('auth_user')).toBe(JSON.stringify({ id: 8 }))
+      expect(sessionStorage.getItem('auth_expired')).toBeNull()
+    })
+
     it('有 refresh_token 时刷新并重试原请求', async () => {
       localStorage.setItem('auth_token', 'expired-token')
       localStorage.setItem('refresh_token', 'refresh-token')

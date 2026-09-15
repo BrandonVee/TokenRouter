@@ -10,6 +10,12 @@ const globalStylePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../
 const globalStyleSource = readFileSync(globalStylePath, 'utf8')
 
 describe('TablePageLayout responsive table scrolling', () => {
+  it('uses the same mobile breakpoint as DataTable', () => {
+    // 768-1023px 仍渲染桌面表格，外层不能提前切到内容高度模式。
+    expect(componentSource).toContain('window.innerWidth < 768')
+    expect(componentSource).not.toContain('window.innerWidth < 1024')
+  })
+
   it('does not disable the table horizontal scroll container in mobile mode', () => {
     // 单元测试环境不会编译 scoped Tailwind 样式，因此直接校验组件源码中的覆盖规则。
     const tableWrapperBlocks = Array.from(
