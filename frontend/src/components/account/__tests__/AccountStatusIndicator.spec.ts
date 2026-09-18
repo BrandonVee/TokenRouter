@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AccountStatusIndicator from '../AccountStatusIndicator.vue'
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import type { Account } from '@/types'
 
 vi.mock('vue-i18n', async () => {
@@ -52,6 +53,10 @@ function makeAccount(overrides: Partial<Account>): Account {
 }
 
 describe('AccountStatusIndicator', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
   // Sonnet 5 限流状态应保持紧凑，避免完整模型名撑开账号状态区域。
   it('Claude Sonnet 5 模型限流时显示短别名', () => {
     const wrapper = mount(AccountStatusIndicator, {
@@ -182,8 +187,36 @@ describe('AccountStatusIndicator', () => {
     })
 
     expect(wrapper.text()).toContain('2d 20h')
-    expect(wrapper.text()).toContain('admin.accounts.status.modelRateLimitedUntil:{"model":"CSon45","time":"2099/03/15 00:00"}')
-    expect(wrapper.find('.whitespace-nowrap').exists()).toBe(true)
+    const tooltip = document.body.querySelector('[role="tooltip"]')
+    expect(tooltip?.textContent).toContain('admin.accounts.status.modelRateLimitedUntil:{"model":"CSon45","time":"2099/03/15 00:00"}')
+    expect(tooltip?.classList).toContain('whitespace-nowrap')
+  })
+
+  it('错误详情悬浮层挂载到表格外，避免被滚动容器裁剪', async () => {
+    const wrapper = mount(AccountStatusIndicator, {
+      props: {
+        account: makeAccount({
+          status: 'error',
+          error_message: 'upstream error details'
+        })
+      },
+      global: {
+        stubs: {
+          Icon: true
+        }
+      }
+    })
+
+    const tooltipComponent = wrapper.getComponent(HelpTooltip)
+    await tooltipComponent.get('.group').trigger('mouseenter')
+
+    const tooltip = document.body.querySelector('[role="tooltip"]')
+    expect(tooltip).not.toBeNull()
+    expect(tooltip?.textContent).toContain('upstream error details')
+    expect(tooltip?.classList).toContain('fixed')
+    expect(wrapper.element.contains(tooltip)).toBe(false)
+
+    wrapper.unmount()
   })
 
   it('AICredits key 生效 → 显示积分已用尽 (credits_exhausted)', () => {

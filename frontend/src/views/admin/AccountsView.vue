@@ -428,7 +428,18 @@
         </DataTable>
         </div>
       </template>
-      <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
+      <template #pagination>
+        <!-- 分页条使用独立圆角卡片，与上方表格的轮廓保持协调。 -->
+        <Pagination
+          v-if="pagination.total > 0"
+          class="rounded-2xl border border-gray-200 shadow-sm dark:border-dark-600"
+          :page="pagination.page"
+          :total="pagination.total"
+          :page-size="pagination.page_size"
+          @update:page="handlePageChange"
+          @update:pageSize="handlePageSizeChange"
+        />
+      </template>
     </TablePageLayout>
     <CreateAccountModal
       :show="showCreate"

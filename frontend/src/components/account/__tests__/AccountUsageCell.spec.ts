@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import AccountUsageCell from '../AccountUsageCell.vue'
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import type { Account } from '@/types'
 
 const { getUsage } = vi.hoisted(() => ({
@@ -57,6 +58,7 @@ function makeAccount(overrides: Partial<Account>): Account {
 describe('AccountUsageCell', () => {
   beforeEach(() => {
     getUsage.mockReset()
+    document.body.innerHTML = ''
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation(() => ({
@@ -70,6 +72,41 @@ describe('AccountUsageCell', () => {
         dispatchEvent: vi.fn(),
       }))
     })
+  })
+
+  it('将账号额度警告悬浮层挂载到表格滚动容器外', async () => {
+    getUsage.mockResolvedValue({})
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          platform: 'antigravity',
+          type: 'oauth',
+          extra: {
+            load_code_assist: {
+              paidTier: { id: 'g1-pro-tier' },
+              ineligibleTiers: [{ id: 'g1-ultra-tier' }]
+            }
+          }
+        })
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+    await flushPromises()
+
+    const tooltipComponent = wrapper.getComponent(HelpTooltip)
+    await tooltipComponent.get('.group').trigger('mouseenter')
+
+    const tooltip = document.body.querySelector('[role="tooltip"]')
+    expect(tooltip?.textContent).toContain('admin.accounts.ineligibleWarning')
+    expect(tooltip?.classList).toContain('fixed')
+    expect(wrapper.element.contains(tooltip)).toBe(false)
+
+    wrapper.unmount()
   })
 
   it('renders eligible Ollama Cloud state inside the unified usage cell', () => {

@@ -32,53 +32,47 @@
       </span>
     </template>
 
-    <!-- Error Info Indicator -->
-    <div v-if="hasError && account.error_message" class="group/error relative">
-      <svg
-        class="h-4 w-4 cursor-help text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="2"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
-        />
-      </svg>
-      <!-- Tooltip - 向下显示 -->
-      <div
-        class="invisible absolute left-0 top-full z-[100] mt-1.5 min-w-[200px] max-w-[300px] rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 shadow-xl transition-all duration-200 group-hover/error:visible group-hover/error:opacity-100 dark:bg-gray-900"
-      >
-        <div class="whitespace-pre-wrap break-words leading-relaxed text-gray-300">
-          {{ account.error_message }}
-        </div>
-        <!-- 上方小三角 -->
-        <div
-          class="absolute bottom-full left-3 border-[6px] border-transparent border-b-gray-800 dark:border-b-gray-900"
-        ></div>
-      </div>
-    </div>
+    <!-- 状态提示挂载到 body，避免被账号表格的滚动容器裁剪。 -->
+    <HelpTooltip
+      v-if="hasError && account.error_message"
+      :content="account.error_message"
+      placement="bottom"
+      width-class="min-w-[200px] max-w-[300px] whitespace-pre-wrap break-words"
+      class="!ml-0"
+    >
+      <template #trigger>
+        <svg
+          class="h-4 w-4 cursor-help text-red-500 transition-colors hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
+          />
+        </svg>
+      </template>
+    </HelpTooltip>
 
     <!-- Rate Limit Indicator (429) -->
-    <div v-if="isRateLimited" class="group relative">
-      <span
-        class="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-      >
-        <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
-        429
-      </span>
-      <!-- Tooltip -->
-      <div
-        class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
-      >
-        {{ t('admin.accounts.status.rateLimitedUntil', { time: formatDateTime(account.rate_limit_reset_at) }) }}
-        <div
-          class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
-        ></div>
-      </div>
-    </div>
+    <HelpTooltip
+      v-if="isRateLimited"
+      :content="t('admin.accounts.status.rateLimitedUntil', { time: formatDateTime(account.rate_limit_reset_at) })"
+      width-class="w-56 text-center"
+      class="!ml-0"
+    >
+      <template #trigger>
+        <span
+          class="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+        >
+          <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
+          429
+        </span>
+      </template>
+    </HelpTooltip>
 
     <!-- Model Status Indicators (普通限流 / 超量请求中) -->
     <div
@@ -91,70 +85,61 @@
             : 'columns-3 gap-x-2'
       ]"
     >
-      <div v-for="item in activeModelStatuses" :key="`${item.kind}-${item.model}`" class="group relative mb-1 break-inside-avoid">
-        <!-- 积分已用尽 -->
-        <span
-          v-if="item.kind === 'credits_exhausted'"
-          class="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      <div v-for="item in activeModelStatuses" :key="`${item.kind}-${item.model}`" class="mb-1 break-inside-avoid">
+        <HelpTooltip
+          :content="modelStatusTooltip(item)"
+          width-class="w-max max-w-[320px] whitespace-nowrap text-center"
+          class="!ml-0"
         >
-          <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
-          {{ t('admin.accounts.status.creditsExhausted') }}
-          <span class="text-[10px] opacity-70">{{ formatCountdown(item.reset_at) }}</span>
-        </span>
-        <!-- 正在走积分（模型限流但积分可用）-->
-        <span
-          v-else-if="item.kind === 'credits_active'"
-          class="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-        >
-          <span>⚡</span>
-          {{ formatScopeName(item.model) }}
-          <span class="text-[10px] opacity-70">{{ formatCountdown(item.reset_at) }}</span>
-        </span>
-        <!-- 普通模型限流 -->
-        <span
-          v-else
-          class="inline-flex items-center gap-1 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-        >
-          <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
-          {{ formatScopeName(item.model) }}
-          <span class="text-[10px] opacity-70">{{ formatCountdown(item.reset_at) }}</span>
-        </span>
-        <!-- Tooltip -->
-        <div
-          class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-max max-w-[320px] -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
-        >
-          {{
-            item.kind === 'credits_exhausted'
-              ? t('admin.accounts.status.creditsExhaustedUntil', { time: formatDateTimeToMinute(item.reset_at) })
-              : item.kind === 'credits_active'
-                ? t('admin.accounts.status.modelCreditOveragesUntil', { model: formatScopeName(item.model), time: formatDateTimeToMinute(item.reset_at) })
-                : t('admin.accounts.status.modelRateLimitedUntil', { model: formatScopeName(item.model), time: formatDateTimeToMinute(item.reset_at) })
-          }}
-          <div
-            class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
-          ></div>
-        </div>
+          <template #trigger>
+            <!-- 积分已用尽 -->
+            <span
+              v-if="item.kind === 'credits_exhausted'"
+              class="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+            >
+              <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
+              {{ t('admin.accounts.status.creditsExhausted') }}
+              <span class="text-[10px] opacity-70">{{ formatCountdown(item.reset_at) }}</span>
+            </span>
+            <!-- 正在走积分（模型限流但积分可用）-->
+            <span
+              v-else-if="item.kind === 'credits_active'"
+              class="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+            >
+              <span>⚡</span>
+              {{ formatScopeName(item.model) }}
+              <span class="text-[10px] opacity-70">{{ formatCountdown(item.reset_at) }}</span>
+            </span>
+            <!-- 普通模型限流 -->
+            <span
+              v-else
+              class="inline-flex items-center gap-1 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+            >
+              <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
+              {{ formatScopeName(item.model) }}
+              <span class="text-[10px] opacity-70">{{ formatCountdown(item.reset_at) }}</span>
+            </span>
+          </template>
+        </HelpTooltip>
       </div>
     </div>
 
     <!-- Overload Indicator (529) -->
-    <div v-if="isOverloaded" class="group relative">
-      <span
-        class="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
-      >
-        <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
-        529
-      </span>
-      <!-- Tooltip -->
-      <div
-        class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 w-56 -translate-x-1/2 whitespace-normal rounded bg-gray-900 px-3 py-2 text-center text-xs leading-relaxed text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
-      >
-        {{ t('admin.accounts.status.overloadedUntil', { time: formatTime(account.overload_until) }) }}
-        <div
-          class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
-        ></div>
-      </div>
-    </div>
+    <HelpTooltip
+      v-if="isOverloaded"
+      :content="t('admin.accounts.status.overloadedUntil', { time: formatTime(account.overload_until) })"
+      width-class="w-56 text-center"
+      class="!ml-0"
+    >
+      <template #trigger>
+        <span
+          class="inline-flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400"
+        >
+          <Icon name="exclamationTriangle" size="xs" :stroke-width="2" />
+          529
+        </span>
+      </template>
+    </HelpTooltip>
   </div>
 </template>
 
@@ -162,6 +147,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import type { Account } from '@/types'
 import { formatCountdown, formatDateTime, formatDateTimeToMinute, formatCountdownWithSuffix, formatTime } from '@/utils/format'
 
@@ -185,6 +171,25 @@ type AccountModelStatusItem = {
   kind: 'rate_limit' | 'credits_exhausted' | 'credits_active'
   model: string
   reset_at: string
+}
+
+// 所有状态悬浮层共用同一套文本生成逻辑，交给 body 级浮层负责防裁剪定位。
+const modelStatusTooltip = (item: AccountModelStatusItem): string => {
+  if (item.kind === 'credits_exhausted') {
+    return t('admin.accounts.status.creditsExhaustedUntil', {
+      time: formatDateTimeToMinute(item.reset_at)
+    })
+  }
+  if (item.kind === 'credits_active') {
+    return t('admin.accounts.status.modelCreditOveragesUntil', {
+      model: formatScopeName(item.model),
+      time: formatDateTimeToMinute(item.reset_at)
+    })
+  }
+  return t('admin.accounts.status.modelRateLimitedUntil', {
+    model: formatScopeName(item.model),
+    time: formatDateTimeToMinute(item.reset_at)
+  })
 }
 
 // Computed: active model statuses (普通模型限流 + 积分耗尽 + 走积分中)

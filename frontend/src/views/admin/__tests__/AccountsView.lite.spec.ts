@@ -190,6 +190,17 @@ describe('admin AccountsView lite account list', () => {
     wrapper.unmount()
   })
 
+  it('renders the account pagination as a rounded card', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    const pagination = wrapper.get('pagination-stub')
+    expect(pagination.classes()).toContain('rounded-2xl')
+    expect(pagination.classes()).toContain('border')
+    expect(pagination.classes()).toContain('shadow-sm')
+    wrapper.unmount()
+  })
+
   it('keeps lite=1 on automatic ETag refreshes', async () => {
     vi.useFakeTimers()
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
