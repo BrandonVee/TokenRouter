@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/usagestats"
+	"github.com/BrandonVee/TokenRouter/internal/service"
 )
 
 type usageAnalyticsQuery struct {
@@ -466,14 +467,19 @@ func (r *usageLogRepository) getUserSpendingRankingFromAnalytics(ctx context.Con
 	return result, true, nil
 }
 
-// getUsageRankingFromAnalytics 从组合聚合源计算公开用量排行。
-func (r *usageLogRepository) getUsageRankingFromAnalytics(ctx context.Context, start, end time.Time, limit int) (*UsageRankingResponse, bool, error) {
+// getUsageRankingFromAnalytics 从组合聚合源按指定指标计算公开用量排行。
+func (r *usageLogRepository) getUsageRankingFromAnalytics(ctx context.Context, start, end time.Time, limit int, sortBy string) (*UsageRankingResponse, bool, error) {
 	query, ok, err := r.buildUsageAnalyticsQuery(ctx, UsageLogFilters{}, start, end, true)
 	if err != nil || !ok {
 		return nil, false, err
 	}
 	query.args = append(query.args, limit)
 	limitPosition := len(query.args)
+	orderBy := "actual_cost DESC, total_tokens DESC, requests DESC, user_id ASC"
+	if service.NormalizeUsageRankingSort(sortBy) == service.UsageRankingSortTokens {
+		orderBy = "total_tokens DESC, actual_cost DESC, requests DESC, user_id ASC"
+	}
+	// 排序片段只从固定白名单中选择，避免动态 SQL 接受任意输入。
 	rows, err := r.sql.QueryContext(ctx, query.cte+fmt.Sprintf(`,
 		user_usage AS (
 			SELECT user_id,
@@ -488,14 +494,14 @@ func (r *usageLogRepository) getUsageRankingFromAnalytics(ctx context.Context, s
 			GROUP BY user_id
 		),
 		ranked AS (
-			SELECT ROW_NUMBER() OVER (ORDER BY actual_cost DESC, total_tokens DESC, requests DESC, user_id ASC) AS rank,
+			SELECT ROW_NUMBER() OVER (ORDER BY %s) AS rank,
 			       user_id, requests, input_tokens, output_tokens, cache_creation_tokens,
 			       cache_read_tokens, total_tokens, actual_cost,
 			       COALESCE(SUM(requests) OVER (), 0) AS total_requests,
 			       COALESCE(SUM(total_tokens) OVER (), 0) AS ranking_total_tokens,
 			       COALESCE(SUM(actual_cost) OVER (), 0) AS total_actual_cost
 			FROM user_usage
-			ORDER BY actual_cost DESC, total_tokens DESC, requests DESC, user_id ASC
+			ORDER BY %s
 			LIMIT $%d
 		)
 		SELECT r.rank, r.user_id, COALESCE(u.email, ''), COALESCE(u.username, ''),
@@ -505,7 +511,7 @@ func (r *usageLogRepository) getUsageRankingFromAnalytics(ctx context.Context, s
 		FROM ranked r
 		LEFT JOIN users u ON u.id = r.user_id
 		LEFT JOIN user_avatars a ON a.user_id = r.user_id
-		ORDER BY r.rank ASC`, limitPosition), query.args...)
+		ORDER BY r.rank ASC`, orderBy, orderBy, limitPosition), query.args...)
 	if err != nil {
 		return nil, false, err
 	}

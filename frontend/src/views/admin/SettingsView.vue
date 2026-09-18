@@ -6353,6 +6353,21 @@
                       {{ t("admin.settings.site.usageRankingLimitHint") }}
                     </p>
                   </div>
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t("admin.settings.site.usageRankingSortBy") }}
+                    </label>
+                    <Select
+                      v-model="form.usage_ranking_sort_by"
+                      :options="usageRankingSortOptions"
+                      class="w-52"
+                      :disabled="!form.usage_ranking_data_visible"
+                      :aria-label="t('admin.settings.site.usageRankingSortBy')"
+                    />
+                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      {{ t("admin.settings.site.usageRankingSortByHint") }}
+                    </p>
+                  </div>
                   <!-- 两个排行榜开关在桌面端并排，窄屏时保持可读性自动换行。 -->
                   <div class="grid grid-cols-1 gap-3 md:col-span-3 md:grid-cols-2">
                     <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
@@ -6368,6 +6383,30 @@
                         <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingDataVisibleHint") }}</p>
                       </div>
                       <Toggle v-model="form.usage_ranking_data_visible" />
+                    </div>
+                  </div>
+                  <!-- 明细列开关只在排行榜数据启用时展示，避免管理员误解其作用范围。 -->
+                  <div v-if="form.usage_ranking_data_visible" class="grid grid-cols-1 gap-3 md:col-span-3 md:grid-cols-3">
+                    <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingShowTokens") }}</label>
+                        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingShowTokensHint") }}</p>
+                      </div>
+                      <Toggle v-model="form.usage_ranking_show_tokens" />
+                    </div>
+                    <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingShowRequests") }}</label>
+                        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingShowRequestsHint") }}</p>
+                      </div>
+                      <Toggle v-model="form.usage_ranking_show_requests" />
+                    </div>
+                    <div class="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-3 py-2.5 dark:border-dark-600">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.settings.site.usageRankingShowAmount") }}</label>
+                        <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.settings.site.usageRankingShowAmountHint") }}</p>
+                      </div>
+                      <Toggle v-model="form.usage_ranking_show_amount" />
                     </div>
                   </div>
                 </div>
@@ -9018,6 +9057,17 @@ const marketplaceAvailabilityBucketMinutesMin = 5;
 const marketplaceAvailabilityBucketMinutesMax = 1440;
 const marketplaceAvailabilityBucketMinutesDefault = 120;
 
+const usageRankingSortOptions = computed(() => [
+  {
+    value: "total_tokens",
+    label: t("admin.settings.site.usageRankingSortTokens"),
+  },
+  {
+    value: "actual_cost",
+    label: t("admin.settings.site.usageRankingSortAmount"),
+  },
+]);
+
 const marketplaceAvailabilityModeOptions = computed(() => [
   {
     value: "active",
@@ -9297,6 +9347,10 @@ const form = reactive<SettingsForm>({
   usage_ranking_limit: usageRankingLimitDefault,
   usage_ranking_enabled: true,
   usage_ranking_data_visible: true,
+  usage_ranking_sort_by: "actual_cost" as "actual_cost" | "total_tokens",
+  usage_ranking_show_tokens: true,
+  usage_ranking_show_requests: true,
+  usage_ranking_show_amount: true,
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
@@ -11150,6 +11204,10 @@ async function saveSettings() {
       usage_ranking_limit: form.usage_ranking_limit,
       usage_ranking_enabled: form.usage_ranking_enabled,
       usage_ranking_data_visible: form.usage_ranking_data_visible,
+      usage_ranking_sort_by: form.usage_ranking_sort_by,
+      usage_ranking_show_tokens: form.usage_ranking_show_tokens,
+      usage_ranking_show_requests: form.usage_ranking_show_requests,
+      usage_ranking_show_amount: form.usage_ranking_show_amount,
       // 保存兼容字段时优先使用已填写的双语名称，旧客户端仍可读取 label。
       custom_menu_items: form.custom_menu_items.map((item) => ({
         ...item,

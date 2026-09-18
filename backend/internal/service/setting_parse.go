@@ -88,6 +88,10 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyUsageRankingLimit:                         strconv.Itoa(DefaultUsageRankingLimit),
 		SettingKeyUsageRankingEnabled:                       "true",
 		SettingKeyUsageRankingDataVisible:                   "true",
+		SettingKeyUsageRankingSortBy:                        UsageRankingSortActualCost,
+		SettingKeyUsageRankingShowTokens:                    "true",
+		SettingKeyUsageRankingShowRequests:                  "true",
+		SettingKeyUsageRankingShowAmount:                    "true",
 		SettingKeyCustomMenuItems:                           "[]",
 		SettingKeyCustomEndpoints:                           "[]",
 		SettingKeyFooterLinks:                               "[]",
@@ -393,6 +397,10 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.UsageRankingLimit = normalizeUsageRankingLimitString(settings[SettingKeyUsageRankingLimit])
 	result.UsageRankingEnabled = settings[SettingKeyUsageRankingEnabled] != "false"
 	result.UsageRankingDataVisible = settings[SettingKeyUsageRankingDataVisible] != "false"
+	result.UsageRankingSortBy = NormalizeUsageRankingSort(settings[SettingKeyUsageRankingSortBy])
+	result.UsageRankingShowTokens = settings[SettingKeyUsageRankingShowTokens] != "false"
+	result.UsageRankingShowRequests = settings[SettingKeyUsageRankingShowRequests] != "false"
+	result.UsageRankingShowAmount = settings[SettingKeyUsageRankingShowAmount] != "false"
 
 	// 解析整数类型
 	if port, err := strconv.Atoi(settings[SettingKeySMTPPort]); err == nil {

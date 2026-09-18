@@ -296,7 +296,7 @@ func TestGetUsageRankingFromAnalyticsOrdersByActualCost(t *testing.T) {
 			AddRow(1, int64(7), "spend@example.com", "spender", "", int64(4), int64(100), int64(100), int64(0), int64(0), int64(200), 12.5, int64(13), int64(5200), 16.75).
 			AddRow(2, int64(8), "tokens@example.com", "tokens", "", int64(9), int64(2500), int64(2500), int64(0), int64(0), int64(5000), 4.25, int64(13), int64(5200), 16.75))
 
-	got, ok, err := repo.getUsageRankingFromAnalytics(context.Background(), start, end, 20)
+	got, ok, err := repo.getUsageRankingFromAnalytics(context.Background(), start, end, 20, service.UsageRankingSortActualCost)
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Len(t, got.Ranking, 2)

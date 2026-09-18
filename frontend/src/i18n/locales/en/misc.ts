@@ -76,7 +76,7 @@ marketplace: {
 // 用量排行
   usageRanking: {
     title: 'Usage Ranking',
-    description: 'See usage ranked by actual spend for this period',
+    description: 'See the usage ranking for this period',
     subtitle: 'Defaults to today',
     timeRange: 'Time Range',
     listTitle: 'Ranking List',
@@ -91,7 +91,7 @@ marketplace: {
     output: 'Output',
     cache: 'Cache',
     emptyTitle: 'No ranking data in this range',
-    emptyDescription: 'Usage ranked by actual spend will appear after requests are recorded in the selected time range.',
+    emptyDescription: 'The ranking will appear after requests are recorded in the selected time range.',
     loadError: 'Failed to load usage ranking'
   },
 // Subscription Progress (Header component)

@@ -859,7 +859,7 @@ func TestUsageLogRepositoryGetUsageRankingMasksEmail(t *testing.T) {
 		WithArgs(start, end, 20).
 		WillReturnRows(rows)
 
-	got, err := repo.GetUsageRanking(context.Background(), start, end, 20)
+	got, err := repo.GetUsageRanking(context.Background(), start, end, 20, service.UsageRankingSortActualCost)
 	require.NoError(t, err)
 	require.Equal(t, int64(17), got.TotalRequests)
 	require.Equal(t, int64(1700), got.TotalTokens)
@@ -868,6 +868,27 @@ func TestUsageLogRepositoryGetUsageRankingMasksEmail(t *testing.T) {
 		{Rank: 1, UserID: 2, DisplayName: "beta", AvatarURL: "https://cdn.example/beta.png", Requests: 9, InputTokens: 400, OutputTokens: 300, CacheCreationTokens: 100, CacheReadTokens: 100, TotalTokens: 900, ActualCost: 1.25},
 		{Rank: 2, UserID: 1, DisplayName: "a***a@example.com", Requests: 8, InputTokens: 300, OutputTokens: 300, CacheCreationTokens: 100, CacheReadTokens: 100, TotalTokens: 800, ActualCost: 0.75},
 	}, got.Ranking)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestUsageLogRepositoryGetUsageRankingOrdersByTokens 验证 Token 排序使用独立且稳定的次级排序字段。
+func TestUsageLogRepositoryGetUsageRankingOrdersByTokens(t *testing.T) {
+	db, mock := newSQLMock(t)
+	repo := &usageLogRepository{sql: db}
+	start := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+
+	rows := sqlmock.NewRows([]string{
+		"rank", "user_id", "email", "username", "avatar_url", "requests",
+		"input_tokens", "output_tokens", "cache_creation_tokens", "cache_read_tokens",
+		"total_tokens", "actual_cost", "total_requests", "ranking_total_tokens", "total_actual_cost",
+	})
+	mock.ExpectQuery("(?s)ROW_NUMBER\\(\\) OVER \\(ORDER BY total_tokens DESC, actual_cost DESC, requests DESC, user_id ASC\\).*ORDER BY total_tokens DESC, actual_cost DESC, requests DESC, user_id ASC").
+		WithArgs(start, end, 20).
+		WillReturnRows(rows)
+
+	_, err := repo.GetUsageRanking(context.Background(), start, end, 20, service.UsageRankingSortTokens)
+	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

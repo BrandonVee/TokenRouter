@@ -1085,6 +1085,10 @@ func TestAPIContracts(t *testing.T) {
 					"usage_ranking_data_visible": true,
 					"usage_ranking_enabled": true,
 					"usage_ranking_limit": 20,
+					"usage_ranking_sort_by": "actual_cost",
+					"usage_ranking_show_tokens": true,
+					"usage_ranking_show_requests": true,
+					"usage_ranking_show_amount": true,
 					"min_claude_code_version": "",
 					"max_claude_code_version": "",
 					"allow_ungrouped_key_scheduling": false,
@@ -1407,6 +1411,10 @@ func TestAPIContracts(t *testing.T) {
 					"usage_ranking_data_visible": true,
 					"usage_ranking_enabled": true,
 					"usage_ranking_limit": 20,
+					"usage_ranking_sort_by": "actual_cost",
+					"usage_ranking_show_tokens": true,
+					"usage_ranking_show_requests": true,
+					"usage_ranking_show_amount": true,
 					"custom_menu_items": [],
 					"cyber_session_block_enabled": false,
 					"cyber_session_block_ttl_seconds": 3600,
@@ -2964,7 +2972,7 @@ func (r *stubUsageLogRepo) GetUserSpendingRanking(ctx context.Context, startTime
 	return nil, errors.New("not implemented")
 }
 
-func (r *stubUsageLogRepo) GetUsageRanking(ctx context.Context, startTime, endTime time.Time, limit int) (*usagestats.UsageRankingResponse, error) {
+func (r *stubUsageLogRepo) GetUsageRanking(ctx context.Context, startTime, endTime time.Time, limit int, sortBy string) (*usagestats.UsageRankingResponse, error) {
 	return &usagestats.UsageRankingResponse{Ranking: []usagestats.UsageRankingItem{}}, nil
 }
 

@@ -178,6 +178,10 @@ type UpdateSettingsRequest struct {
 	UsageRankingLimit           int                    `json:"usage_ranking_limit"`
 	UsageRankingEnabled         bool                   `json:"usage_ranking_enabled"`
 	UsageRankingDataVisible     bool                   `json:"usage_ranking_data_visible"`
+	UsageRankingSortBy          string                 `json:"usage_ranking_sort_by"`
+	UsageRankingShowTokens      *bool                  `json:"usage_ranking_show_tokens"`
+	UsageRankingShowRequests    *bool                  `json:"usage_ranking_show_requests"`
+	UsageRankingShowAmount      *bool                  `json:"usage_ranking_show_amount"`
 	CustomMenuItems             *[]dto.CustomMenuItem  `json:"custom_menu_items"`
 	CustomEndpoints             *[]dto.CustomEndpoint  `json:"custom_endpoints"`
 	FooterLinks                 *[]dto.FooterLinkGroup `json:"footer_links"`
@@ -583,6 +587,21 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.UsageRankingLimit > service.MaxUsageRankingLimit {
 		req.UsageRankingLimit = service.MaxUsageRankingLimit
+	}
+	if strings.TrimSpace(req.UsageRankingSortBy) == "" {
+		req.UsageRankingSortBy = previousSettings.UsageRankingSortBy
+	}
+	usageRankingShowTokens := previousSettings.UsageRankingShowTokens
+	if req.UsageRankingShowTokens != nil {
+		usageRankingShowTokens = *req.UsageRankingShowTokens
+	}
+	usageRankingShowRequests := previousSettings.UsageRankingShowRequests
+	if req.UsageRankingShowRequests != nil {
+		usageRankingShowRequests = *req.UsageRankingShowRequests
+	}
+	usageRankingShowAmount := previousSettings.UsageRankingShowAmount
+	if req.UsageRankingShowAmount != nil {
+		usageRankingShowAmount = *req.UsageRankingShowAmount
 	}
 	req.SMTPHost = strings.TrimSpace(req.SMTPHost)
 	req.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
@@ -1760,6 +1779,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		UsageRankingLimit:            req.UsageRankingLimit,
 		UsageRankingEnabled:          req.UsageRankingEnabled,
 		UsageRankingDataVisible:      req.UsageRankingDataVisible,
+		UsageRankingSortBy:           service.NormalizeUsageRankingSort(req.UsageRankingSortBy),
+		UsageRankingShowTokens:       usageRankingShowTokens,
+		UsageRankingShowRequests:     usageRankingShowRequests,
+		UsageRankingShowAmount:       usageRankingShowAmount,
 		CustomMenuItems:              customMenuJSON,
 		CustomEndpoints:              customEndpointsJSON,
 		FooterLinks:                  footerLinksJSON,
@@ -2319,6 +2342,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		UsageRankingLimit:                                updatedSettings.UsageRankingLimit,
 		UsageRankingEnabled:                              updatedSettings.UsageRankingEnabled,
 		UsageRankingDataVisible:                          updatedSettings.UsageRankingDataVisible,
+		UsageRankingSortBy:                               updatedSettings.UsageRankingSortBy,
+		UsageRankingShowTokens:                           updatedSettings.UsageRankingShowTokens,
+		UsageRankingShowRequests:                         updatedSettings.UsageRankingShowRequests,
+		UsageRankingShowAmount:                           updatedSettings.UsageRankingShowAmount,
 		CustomMenuItems:                                  dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
 		CustomEndpoints:                                  dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		FooterLinks:                                      dto.ParseFooterLinks(updatedSettings.FooterLinks),

@@ -480,6 +480,33 @@ func (s *SettingService) IsUsageRankingDataVisible(ctx context.Context) bool {
 	return err != nil || value != "false"
 }
 
+// GetUsageRankingSortBy 返回用户侧排行榜使用的排序指标。
+func (s *SettingService) GetUsageRankingSortBy(ctx context.Context) string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageRankingSortBy)
+	if err != nil {
+		return UsageRankingSortActualCost
+	}
+	return NormalizeUsageRankingSort(value)
+}
+
+// IsUsageRankingTokensVisible 控制用户侧排行榜是否返回并展示 Token 数据。
+func (s *SettingService) IsUsageRankingTokensVisible(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageRankingShowTokens)
+	return err != nil || value != "false"
+}
+
+// IsUsageRankingRequestsVisible 控制用户侧排行榜是否返回并展示请求次数。
+func (s *SettingService) IsUsageRankingRequestsVisible(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageRankingShowRequests)
+	return err != nil || value != "false"
+}
+
+// IsUsageRankingAmountVisible 控制用户侧排行榜是否返回并展示消费金额。
+func (s *SettingService) IsUsageRankingAmountVisible(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyUsageRankingShowAmount)
+	return err != nil || value != "false"
+}
+
 // IsOpenAIAllowClaudeCodeCodexPluginEnabled 全局开关：是否额外放行 Claude Code 的 Codex 插件（默认关闭）。
 // 仅在调用方已确认账号 codex_cli_only 开启时读取，避免对非受限账号产生无谓查询。
 // 使用进程内 atomic.Value 缓存（60s TTL），避免在每个网关请求热路径上访问 DB。
@@ -750,6 +777,14 @@ func normalizeUsageRankingLimitString(raw string) int {
 	return normalizeUsageRankingLimit(value)
 }
 
+// NormalizeUsageRankingSort 把未知排序值收敛为兼容旧版本的金额排序。
+func NormalizeUsageRankingSort(raw string) string {
+	if strings.TrimSpace(raw) == UsageRankingSortTokens {
+		return UsageRankingSortTokens
+	}
+	return UsageRankingSortActualCost
+}
+
 func parseOpenAIQuotaAutoPauseSettingsFromRaw(raw string) OpsOpenAIAccountQuotaAutoPauseSettings {
 	cfg := defaultOpsAdvancedSettings()
 	if strings.TrimSpace(raw) != "" {
@@ -808,6 +843,10 @@ const (
 	DefaultUsageRankingLimit = 20
 	// MaxUsageRankingLimit 是用量排行允许展示的最大名次。
 	MaxUsageRankingLimit = 100
+	// UsageRankingSortActualCost 表示按实际消费金额排序。
+	UsageRankingSortActualCost = "actual_cost"
+	// UsageRankingSortTokens 表示按总 Token 数排序。
+	UsageRankingSortTokens = "total_tokens"
 )
 
 const openAIAllowCodexPluginCacheTTL = 60 * time.Second

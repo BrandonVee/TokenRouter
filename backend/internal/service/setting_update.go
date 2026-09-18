@@ -393,6 +393,10 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyUsageRankingLimit] = strconv.Itoa(normalizeUsageRankingLimit(settings.UsageRankingLimit))
 	updates[SettingKeyUsageRankingEnabled] = strconv.FormatBool(settings.UsageRankingEnabled)
 	updates[SettingKeyUsageRankingDataVisible] = strconv.FormatBool(settings.UsageRankingDataVisible)
+	updates[SettingKeyUsageRankingSortBy] = NormalizeUsageRankingSort(settings.UsageRankingSortBy)
+	updates[SettingKeyUsageRankingShowTokens] = strconv.FormatBool(settings.UsageRankingShowTokens)
+	updates[SettingKeyUsageRankingShowRequests] = strconv.FormatBool(settings.UsageRankingShowRequests)
+	updates[SettingKeyUsageRankingShowAmount] = strconv.FormatBool(settings.UsageRankingShowAmount)
 	updates[SettingKeyCustomMenuItems] = settings.CustomMenuItems
 	updates[SettingKeyCustomEndpoints] = settings.CustomEndpoints
 	updates[SettingKeyFooterLinks] = settings.FooterLinks

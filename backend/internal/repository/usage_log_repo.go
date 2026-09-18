@@ -272,18 +272,24 @@ func (r *usageLogRepository) GetDashboardPublicStats(ctx context.Context, start,
 	return stats, nil
 }
 
-// GetUsageRanking 返回用户侧按实际消费金额排序的用量排行。
-func (r *usageLogRepository) GetUsageRanking(ctx context.Context, startTime, endTime time.Time, limit int) (result *UsageRankingResponse, err error) {
+// GetUsageRanking 返回用户侧按指定指标排序的用量排行。
+func (r *usageLogRepository) GetUsageRanking(ctx context.Context, startTime, endTime time.Time, limit int, sortBy string) (result *UsageRankingResponse, err error) {
 	if limit <= 0 {
 		limit = service.DefaultUsageRankingLimit
 	}
-	if aggregated, ok, aggregateErr := r.getUsageRankingFromAnalytics(ctx, startTime, endTime, limit); aggregateErr == nil && ok {
+	sortBy = service.NormalizeUsageRankingSort(sortBy)
+	if aggregated, ok, aggregateErr := r.getUsageRankingFromAnalytics(ctx, startTime, endTime, limit, sortBy); aggregateErr == nil && ok {
 		return aggregated, nil
 	} else if aggregateErr != nil {
 		r.logUsageAnalyticsFallback("usage_ranking", aggregateErr)
 	}
 
-	query := `
+	orderBy := "actual_cost DESC, total_tokens DESC, requests DESC, user_id ASC"
+	if sortBy == service.UsageRankingSortTokens {
+		orderBy = "total_tokens DESC, actual_cost DESC, requests DESC, user_id ASC"
+	}
+	// 排序片段只从固定白名单中选择，不能拼接客户端输入。
+	query := fmt.Sprintf(`
 		WITH user_usage AS (
 			SELECT
 				u.user_id,
@@ -300,7 +306,7 @@ func (r *usageLogRepository) GetUsageRanking(ctx context.Context, startTime, end
 		),
 		ranked AS (
 			SELECT
-				ROW_NUMBER() OVER (ORDER BY actual_cost DESC, total_tokens DESC, requests DESC, user_id ASC) as rank,
+				ROW_NUMBER() OVER (ORDER BY %s) as rank,
 				user_id,
 				requests,
 				input_tokens,
@@ -313,7 +319,7 @@ func (r *usageLogRepository) GetUsageRanking(ctx context.Context, startTime, end
 				COALESCE(SUM(total_tokens) OVER (), 0) as ranking_total_tokens,
 				COALESCE(SUM(actual_cost) OVER (), 0) as total_actual_cost
 			FROM user_usage
-			ORDER BY actual_cost DESC, total_tokens DESC, requests DESC, user_id ASC
+			ORDER BY %s
 			LIMIT $3
 		)
 		SELECT
@@ -336,7 +342,7 @@ func (r *usageLogRepository) GetUsageRanking(ctx context.Context, startTime, end
 		LEFT JOIN users us ON r.user_id = us.id
 		LEFT JOIN user_avatars ua ON ua.user_id = r.user_id
 		ORDER BY r.rank ASC
-	`
+	`, orderBy, orderBy)
 
 	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, limit)
 	if err != nil {

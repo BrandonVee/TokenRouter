@@ -415,16 +415,30 @@ func (h *UsageHandler) Ranking(c *gin.Context) {
 		return
 	}
 	limit := service.DefaultUsageRankingLimit
+	sortBy := service.UsageRankingSortActualCost
 	if h.settingService != nil {
 		limit = h.settingService.GetUsageRankingLimit(c.Request.Context())
+		sortBy = h.settingService.GetUsageRankingSortBy(c.Request.Context())
 	}
 
-	ranking, err := h.usageService.GetUsageRanking(c.Request.Context(), startTime, endTime, limit)
+	ranking, err := h.usageService.GetUsageRanking(c.Request.Context(), startTime, endTime, limit, sortBy)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	if h.settingService != nil && !h.settingService.IsUsageRankingDataVisible(c.Request.Context()) {
+	dataVisible := true
+	showTokens, showRequests, showAmount := true, true, true
+	if h.settingService != nil {
+		dataVisible = h.settingService.IsUsageRankingDataVisible(c.Request.Context())
+		if dataVisible {
+			showTokens = h.settingService.IsUsageRankingTokensVisible(c.Request.Context())
+			showRequests = h.settingService.IsUsageRankingRequestsVisible(c.Request.Context())
+			showAmount = h.settingService.IsUsageRankingAmountVisible(c.Request.Context())
+		} else {
+			showTokens, showRequests, showAmount = false, false, false
+		}
+	}
+	if !dataVisible {
 		// 保留排名与用户标识，仅隐藏消费、请求数和 Token 明细。
 		for i := range ranking.Ranking {
 			ranking.Ranking[i].Requests = 0
@@ -436,6 +450,30 @@ func (h *UsageHandler) Ranking(c *gin.Context) {
 			ranking.Ranking[i].ActualCost = 0
 		}
 		ranking.TotalRequests, ranking.TotalTokens, ranking.TotalActualCost = 0, 0, 0
+	} else {
+		// 各指标开关同时作用于接口响应，避免只在前端隐藏敏感排行数据。
+		if !showTokens {
+			for i := range ranking.Ranking {
+				ranking.Ranking[i].InputTokens = 0
+				ranking.Ranking[i].OutputTokens = 0
+				ranking.Ranking[i].CacheCreationTokens = 0
+				ranking.Ranking[i].CacheReadTokens = 0
+				ranking.Ranking[i].TotalTokens = 0
+			}
+			ranking.TotalTokens = 0
+		}
+		if !showRequests {
+			for i := range ranking.Ranking {
+				ranking.Ranking[i].Requests = 0
+			}
+			ranking.TotalRequests = 0
+		}
+		if !showAmount {
+			for i := range ranking.Ranking {
+				ranking.Ranking[i].ActualCost = 0
+			}
+			ranking.TotalActualCost = 0
+		}
 	}
 
 	// 返回本次排行使用的时间范围，日期按用户时区格式化，便于前端展示。
@@ -447,6 +485,11 @@ func (h *UsageHandler) Ranking(c *gin.Context) {
 		"start_date":        startTime.Format("2006-01-02"),
 		"end_date":          usageRankingDisplayEndDate(endTime),
 		"limit":             limit,
+		"sort_by":           sortBy,
+		"data_visible":      dataVisible,
+		"show_tokens":       showTokens,
+		"show_requests":     showRequests,
+		"show_amount":       showAmount,
 	})
 }
 

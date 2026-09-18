@@ -532,6 +532,10 @@ export interface SystemSettings {
   usage_ranking_limit: number;
   usage_ranking_enabled: boolean;
   usage_ranking_data_visible: boolean;
+  usage_ranking_sort_by: 'actual_cost' | 'total_tokens';
+  usage_ranking_show_tokens: boolean;
+  usage_ranking_show_requests: boolean;
+  usage_ranking_show_amount: boolean;
   backend_mode_enabled: boolean;
   custom_menu_items: CustomMenuItem[];
   custom_endpoints: CustomEndpoint[];
@@ -860,6 +864,10 @@ export interface UpdateSettingsRequest {
   usage_ranking_limit?: number;
   usage_ranking_enabled?: boolean;
   usage_ranking_data_visible?: boolean;
+  usage_ranking_sort_by?: 'actual_cost' | 'total_tokens';
+  usage_ranking_show_tokens?: boolean;
+  usage_ranking_show_requests?: boolean;
+  usage_ranking_show_amount?: boolean;
   backend_mode_enabled?: boolean;
   custom_menu_items?: CustomMenuItem[];
   custom_endpoints?: CustomEndpoint[];

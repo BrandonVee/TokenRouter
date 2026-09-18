@@ -201,6 +201,10 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyUsageRankingLimit,
 		SettingKeyUsageRankingEnabled,
 		SettingKeyUsageRankingDataVisible,
+		SettingKeyUsageRankingSortBy,
+		SettingKeyUsageRankingShowTokens,
+		SettingKeyUsageRankingShowRequests,
+		SettingKeyUsageRankingShowAmount,
 		SettingKeyCustomMenuItems,
 		SettingKeyDashboardAds,
 		SettingKeyCustomEndpoints,
@@ -380,6 +384,10 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		UsageRankingLimit:                   usageRankingLimit,
 		UsageRankingEnabled:                 settings[SettingKeyUsageRankingEnabled] != "false",
 		UsageRankingDataVisible:             settings[SettingKeyUsageRankingDataVisible] != "false",
+		UsageRankingSortBy:                  NormalizeUsageRankingSort(settings[SettingKeyUsageRankingSortBy]),
+		UsageRankingShowTokens:              settings[SettingKeyUsageRankingShowTokens] != "false",
+		UsageRankingShowRequests:            settings[SettingKeyUsageRankingShowRequests] != "false",
+		UsageRankingShowAmount:              settings[SettingKeyUsageRankingShowAmount] != "false",
 		CustomMenuItems:                     settings[SettingKeyCustomMenuItems],
 		DashboardAds:                        dashboardAds,
 		CustomEndpoints:                     settings[SettingKeyCustomEndpoints],
@@ -499,6 +507,10 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		UsageRankingLimit                   int                      `json:"usage_ranking_limit"`
 		UsageRankingEnabled                 bool                     `json:"usage_ranking_enabled"`
 		UsageRankingDataVisible             bool                     `json:"usage_ranking_data_visible"`
+		UsageRankingSortBy                  string                   `json:"usage_ranking_sort_by"`
+		UsageRankingShowTokens              bool                     `json:"usage_ranking_show_tokens"`
+		UsageRankingShowRequests            bool                     `json:"usage_ranking_show_requests"`
+		UsageRankingShowAmount              bool                     `json:"usage_ranking_show_amount"`
 		CustomMenuItems                     json.RawMessage          `json:"custom_menu_items"`
 		CustomEndpoints                     json.RawMessage          `json:"custom_endpoints"`
 		FooterLinks                         json.RawMessage          `json:"footer_links"`
@@ -581,6 +593,10 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		UsageRankingLimit:                   settings.UsageRankingLimit,
 		UsageRankingEnabled:                 settings.UsageRankingEnabled,
 		UsageRankingDataVisible:             settings.UsageRankingDataVisible,
+		UsageRankingSortBy:                  settings.UsageRankingSortBy,
+		UsageRankingShowTokens:              settings.UsageRankingShowTokens,
+		UsageRankingShowRequests:            settings.UsageRankingShowRequests,
+		UsageRankingShowAmount:              settings.UsageRankingShowAmount,
 		CustomMenuItems:                     filterUserVisibleMenuItems(settings.CustomMenuItems),
 		CustomEndpoints:                     safeRawJSONArray(settings.CustomEndpoints),
 		FooterLinks:                         safeRawJSONArray(settings.FooterLinks),

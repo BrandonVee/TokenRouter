@@ -173,9 +173,9 @@ func (s *UsageService) GetDailyStats(ctx context.Context, userID int64, days int
 	return stats, nil
 }
 
-// GetUsageRanking 获取指定时间范围内按实际消费金额排序的用户用量排行。
-func (s *UsageService) GetUsageRanking(ctx context.Context, startTime, endTime time.Time, limit int) (*usagestats.UsageRankingResponse, error) {
-	ranking, err := s.usageRepo.GetUsageRanking(ctx, startTime, endTime, limit)
+// GetUsageRanking 获取指定时间范围内按系统设置指标排序的用户用量排行。
+func (s *UsageService) GetUsageRanking(ctx context.Context, startTime, endTime time.Time, limit int, sortBy string) (*usagestats.UsageRankingResponse, error) {
+	ranking, err := s.usageRepo.GetUsageRanking(ctx, startTime, endTime, limit, NormalizeUsageRankingSort(sortBy))
 	if err != nil {
 		return nil, fmt.Errorf("get usage ranking: %w", err)
 	}

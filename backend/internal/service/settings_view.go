@@ -175,6 +175,10 @@ type SystemSettings struct {
 	UsageRankingLimit           int
 	UsageRankingEnabled         bool
 	UsageRankingDataVisible     bool
+	UsageRankingSortBy          string
+	UsageRankingShowTokens      bool
+	UsageRankingShowRequests    bool
+	UsageRankingShowAmount      bool
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 	FooterLinks                 string // JSON array of footer link groups
@@ -375,6 +379,10 @@ type PublicSettings struct {
 	UsageRankingLimit           int
 	UsageRankingEnabled         bool
 	UsageRankingDataVisible     bool
+	UsageRankingSortBy          string
+	UsageRankingShowTokens      bool
+	UsageRankingShowRequests    bool
+	UsageRankingShowAmount      bool
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 	FooterLinks                 string // JSON array of footer link groups

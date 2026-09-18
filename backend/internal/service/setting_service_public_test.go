@@ -85,12 +85,16 @@ func TestSettingService_GetPublicSettings_ExposesTablePreferences(t *testing.T) 
 	require.Equal(t, []int{20, 50, 100}, settings.TablePageSizeOptions)
 }
 
-// 排行榜页面和明细开关必须同时注入公开配置，才能支持“显示排行榜但隐藏明细”。
+// 排行榜页面、排序和明细字段开关必须同时注入公开配置。
 func TestSettingService_GetPublicSettings_ExposesUsageRankingVisibility(t *testing.T) {
 	repo := &settingPublicRepoStub{
 		values: map[string]string{
-			SettingKeyUsageRankingEnabled:     "true",
-			SettingKeyUsageRankingDataVisible: "false",
+			SettingKeyUsageRankingEnabled:      "true",
+			SettingKeyUsageRankingDataVisible:  "false",
+			SettingKeyUsageRankingSortBy:       UsageRankingSortTokens,
+			SettingKeyUsageRankingShowTokens:   "true",
+			SettingKeyUsageRankingShowRequests: "false",
+			SettingKeyUsageRankingShowAmount:   "false",
 		},
 	}
 	svc := NewSettingService(repo, &config.Config{})
@@ -99,18 +103,30 @@ func TestSettingService_GetPublicSettings_ExposesUsageRankingVisibility(t *testi
 	require.NoError(t, err)
 	require.True(t, settings.UsageRankingEnabled)
 	require.False(t, settings.UsageRankingDataVisible)
+	require.Equal(t, UsageRankingSortTokens, settings.UsageRankingSortBy)
+	require.True(t, settings.UsageRankingShowTokens)
+	require.False(t, settings.UsageRankingShowRequests)
+	require.False(t, settings.UsageRankingShowAmount)
 
 	payload, err := svc.GetPublicSettingsForInjection(context.Background())
 	require.NoError(t, err)
 	encoded, err := json.Marshal(payload)
 	require.NoError(t, err)
 	var injected struct {
-		UsageRankingEnabled     bool `json:"usage_ranking_enabled"`
-		UsageRankingDataVisible bool `json:"usage_ranking_data_visible"`
+		UsageRankingEnabled      bool   `json:"usage_ranking_enabled"`
+		UsageRankingDataVisible  bool   `json:"usage_ranking_data_visible"`
+		UsageRankingSortBy       string `json:"usage_ranking_sort_by"`
+		UsageRankingShowTokens   bool   `json:"usage_ranking_show_tokens"`
+		UsageRankingShowRequests bool   `json:"usage_ranking_show_requests"`
+		UsageRankingShowAmount   bool   `json:"usage_ranking_show_amount"`
 	}
 	require.NoError(t, json.Unmarshal(encoded, &injected))
 	require.True(t, injected.UsageRankingEnabled)
 	require.False(t, injected.UsageRankingDataVisible)
+	require.Equal(t, UsageRankingSortTokens, injected.UsageRankingSortBy)
+	require.True(t, injected.UsageRankingShowTokens)
+	require.False(t, injected.UsageRankingShowRequests)
+	require.False(t, injected.UsageRankingShowAmount)
 }
 
 func TestSettingService_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t *testing.T) {

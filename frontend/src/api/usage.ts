@@ -105,6 +105,11 @@ export interface UsageRankingResponse {
   start_date: string
   end_date: string
   limit: number
+  sort_by: 'actual_cost' | 'total_tokens'
+  data_visible: boolean
+  show_tokens: boolean
+  show_requests: boolean
+  show_amount: boolean
 }
 
 export interface UsageRankingParams {

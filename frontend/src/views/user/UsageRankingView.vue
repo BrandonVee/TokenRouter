@@ -36,6 +36,10 @@
             :class="[topCardOrderClass(item.rank), topCards.length === 1 && item.rank === 1 ? 'md:col-start-2' : '']"
             :featured="item.rank === 1"
             :show-data="showRankingData"
+            :show-tokens="showTokens"
+            :show-requests="showRequests"
+            :show-amount="showAmount"
+            :sort-by="rankingSortBy"
           />
         </section>
 
@@ -50,7 +54,15 @@
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ dateRangeLabel }}</span>
           </div>
           <div class="divide-y divide-gray-100 dark:divide-dark-700">
-            <RankingRow v-for="item in ranking" :key="item.rank" :item="item" :show-data="showRankingData" />
+            <RankingRow
+              v-for="item in ranking"
+              :key="item.rank"
+              :item="item"
+              :show-data="showRankingData"
+              :show-tokens="showTokens"
+              :show-requests="showRequests"
+              :show-amount="showAmount"
+            />
           </div>
         </section>
 
@@ -81,7 +93,18 @@ import { formatCompactNumber, formatNumber } from '@/utils/format'
 const { t } = useI18n()
 const { balanceUnitName, formatBalanceAmount } = useBalanceDisplay()
 const appStore = useAppStore()
-const showRankingData = computed(() => appStore.cachedPublicSettings?.usage_ranking_data_visible !== false)
+const showRankingData = computed(() =>
+  response.value?.data_visible ?? appStore.cachedPublicSettings?.usage_ranking_data_visible !== false,
+)
+const showTokens = computed(() =>
+  showRankingData.value && (response.value?.show_tokens ?? appStore.cachedPublicSettings?.usage_ranking_show_tokens !== false),
+)
+const showRequests = computed(() =>
+  showRankingData.value && (response.value?.show_requests ?? appStore.cachedPublicSettings?.usage_ranking_show_requests !== false),
+)
+const showAmount = computed(() =>
+  showRankingData.value && (response.value?.show_amount ?? appStore.cachedPublicSettings?.usage_ranking_show_amount !== false),
+)
 
 const loading = ref(false)
 const response = ref<UsageRankingResponse | null>(null)
@@ -92,6 +115,14 @@ const startDate = ref(today)
 const endDate = ref(today)
 const ranking = computed(() => response.value?.ranking || [])
 const topCards = computed(() => ranking.value.slice(0, 3))
+const rankingSortBy = computed<'actual_cost' | 'total_tokens'>(() => {
+  // 接口返回值代表本次查询的真实排序，公开设置仅用于兼容旧接口。
+  if (response.value?.sort_by === 'total_tokens') return 'total_tokens'
+  if (response.value?.sort_by === 'actual_cost') return 'actual_cost'
+  return appStore.cachedPublicSettings?.usage_ranking_sort_by === 'total_tokens'
+    ? 'total_tokens'
+    : 'actual_cost'
+})
 const dateRangeLabel = computed(() => {
   const start = response.value?.start_date || startDate.value
   const end = response.value?.end_date || endDate.value
@@ -122,6 +153,44 @@ function initials(name: string): string {
 
 function rankLabel(rank: number): string {
   return `#${rank}`
+}
+
+type RankingMetricKey = 'actual_cost' | 'total_tokens' | 'requests'
+
+interface RankingMetric {
+  key: RankingMetricKey
+  value: string
+  label: string
+}
+
+// 根据系统设置生成可见指标，接口隐藏字段后页面也不会保留空占位。
+function rankingMetrics(
+  item: UsageRankingItem,
+  visibility: { amount: boolean; tokens: boolean; requests: boolean },
+): RankingMetric[] {
+  const metrics: RankingMetric[] = []
+  if (visibility.amount) {
+    metrics.push({
+      key: 'actual_cost',
+      value: formatBalanceAmount(item.actual_cost, { fractionDigits: 4 }),
+      label: t('usageRanking.reasoningCost', { unit: balanceUnitName.value }),
+    })
+  }
+  if (visibility.tokens) {
+    metrics.push({
+      key: 'total_tokens',
+      value: formatCompactNumber(item.total_tokens),
+      label: t('usageRanking.totalTokens'),
+    })
+  }
+  if (visibility.requests) {
+    metrics.push({
+      key: 'requests',
+      value: formatNumber(item.requests),
+      label: t('usageRanking.requests'),
+    })
+  }
+  return metrics
 }
 
 // 仅前三名使用独立主题，第四名之后保持普通列表样式。
@@ -213,10 +282,23 @@ const TopRankCard = defineComponent({
     item: { type: Object as PropType<UsageRankingItem>, required: true },
     featured: { type: Boolean, default: false },
     showData: { type: Boolean, default: true },
+    showTokens: { type: Boolean, default: true },
+    showRequests: { type: Boolean, default: true },
+    showAmount: { type: Boolean, default: true },
+    sortBy: { type: String as PropType<'actual_cost' | 'total_tokens'>, default: 'actual_cost' },
   },
   setup(props) {
     return () => {
       const theme = rankTheme(props.item.rank)
+      const metrics = props.showData
+        ? rankingMetrics(props.item, {
+            amount: props.showAmount,
+            tokens: props.showTokens,
+            requests: props.showRequests,
+          })
+        : []
+      const primaryMetric = metrics.find((metric) => metric.key === props.sortBy) || metrics[0]
+      const secondaryMetrics = metrics.filter((metric) => metric !== primaryMetric)
       return h(
         'article',
         {
@@ -237,13 +319,24 @@ const TopRankCard = defineComponent({
           h('div', { class: 'relative mt-7 flex flex-col items-center text-center' }, [
             h(UserAvatar, { item: props.item, size: 'lg' }),
             h('h3', { class: 'mt-4 max-w-full truncate text-lg font-semibold text-gray-900 dark:text-white' }, props.item.display_name),
-            props.showData ? h('p', { class: 'mt-2 text-3xl font-semibold text-gray-900 dark:text-white' }, formatBalanceAmount(props.item.actual_cost, { fractionDigits: 4 })) : null,
-            props.showData ? h('p', { class: 'mt-1 text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.reasoningCost', { unit: balanceUnitName.value })) : null,
+            primaryMetric ? h('p', { class: 'mt-2 text-3xl font-semibold text-gray-900 dark:text-white' }, primaryMetric.value) : null,
+            primaryMetric ? h('p', { class: 'mt-1 text-xs text-gray-500 dark:text-gray-400' }, primaryMetric.label) : null,
           ]),
-          h('div', { class: 'relative mt-6 grid grid-cols-2 gap-2 text-center text-xs text-gray-500 dark:text-gray-400' }, [
-            props.showData ? h('div', [h('p', { class: 'font-medium text-gray-900 dark:text-white' }, formatCompactNumber(props.item.total_tokens)), h('p', t('usageRanking.tokens'))]) : null,
-            props.showData ? h('div', [h('p', { class: 'font-medium text-gray-900 dark:text-white' }, formatNumber(props.item.requests)), h('p', t('usageRanking.requests'))]) : null,
-          ]),
+          secondaryMetrics.length > 0
+            ? h(
+                'div',
+                {
+                  class: 'relative mt-6 grid gap-2 text-center text-xs text-gray-500 dark:text-gray-400',
+                  style: { gridTemplateColumns: `repeat(${secondaryMetrics.length}, minmax(0, 1fr))` },
+                },
+                secondaryMetrics.map((metric) =>
+                  h('div', { key: metric.key }, [
+                    h('p', { class: 'font-medium text-gray-900 dark:text-white' }, metric.value),
+                    h('p', metric.label),
+                  ]),
+                ),
+              )
+            : null,
         ],
       )
     }
@@ -255,11 +348,21 @@ const RankingRow = defineComponent({
   props: {
     item: { type: Object as PropType<UsageRankingItem>, required: true },
     showData: { type: Boolean, default: true },
+    showTokens: { type: Boolean, default: true },
+    showRequests: { type: Boolean, default: true },
+    showAmount: { type: Boolean, default: true },
   },
   setup(props) {
     return () => {
       const theme = rankTheme(props.item.rank)
       const topClass = props.item.rank <= 3 ? theme.card : 'border-transparent bg-transparent'
+      const metrics = props.showData
+        ? rankingMetrics(props.item, {
+            amount: props.showAmount,
+            tokens: props.showTokens,
+            requests: props.showRequests,
+          })
+        : []
       return h(
         'div',
         {
@@ -273,20 +376,18 @@ const RankingRow = defineComponent({
               h('p', { class: 'truncate text-sm font-medium text-gray-900 dark:text-white' }, props.item.display_name),
             ]),
           ]),
-          props.showData ? h('div', { class: 'col-span-2 grid grid-cols-3 gap-3 text-sm sm:col-span-1 sm:grid-cols-[140px_130px_110px] sm:text-right' }, [
-            h('div', [
-              h('p', { class: 'font-semibold text-gray-900 dark:text-white' }, formatBalanceAmount(props.item.actual_cost, { fractionDigits: 4 })),
-              h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.reasoningCost', { unit: balanceUnitName.value })),
-            ]),
-            h('div', [
-              h('p', { class: 'font-semibold text-gray-900 dark:text-white' }, formatCompactNumber(props.item.total_tokens)),
-              h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.totalTokens')),
-            ]),
-            h('div', [
-              h('p', { class: 'font-semibold text-gray-900 dark:text-white' }, formatNumber(props.item.requests)),
-              h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, t('usageRanking.requests')),
-            ]),
-          ]) : null,
+          metrics.length > 0
+            ? h(
+                'div',
+                { class: 'col-span-2 flex flex-wrap justify-end gap-x-8 gap-y-3 text-sm sm:col-span-1 sm:text-right' },
+                metrics.map((metric) =>
+                  h('div', { key: metric.key, class: 'min-w-24' }, [
+                    h('p', { class: 'font-semibold text-gray-900 dark:text-white' }, metric.value),
+                    h('p', { class: 'text-xs text-gray-500 dark:text-gray-400' }, metric.label),
+                  ]),
+                ),
+              )
+            : null,
         ],
       )
     }

@@ -172,6 +172,10 @@ type SystemSettings struct {
 	UsageRankingLimit           int               `json:"usage_ranking_limit"`
 	UsageRankingEnabled         bool              `json:"usage_ranking_enabled"`
 	UsageRankingDataVisible     bool              `json:"usage_ranking_data_visible"`
+	UsageRankingSortBy          string            `json:"usage_ranking_sort_by"`
+	UsageRankingShowTokens      bool              `json:"usage_ranking_show_tokens"`
+	UsageRankingShowRequests    bool              `json:"usage_ranking_show_requests"`
+	UsageRankingShowAmount      bool              `json:"usage_ranking_show_amount"`
 	CustomMenuItems             []CustomMenuItem  `json:"custom_menu_items"`
 	CustomEndpoints             []CustomEndpoint  `json:"custom_endpoints"`
 	FooterLinks                 []FooterLinkGroup `json:"footer_links"`
@@ -385,6 +389,10 @@ type PublicSettings struct {
 	UsageRankingLimit                   int                      `json:"usage_ranking_limit"`
 	UsageRankingEnabled                 bool                     `json:"usage_ranking_enabled"`
 	UsageRankingDataVisible             bool                     `json:"usage_ranking_data_visible"`
+	UsageRankingSortBy                  string                   `json:"usage_ranking_sort_by"`
+	UsageRankingShowTokens              bool                     `json:"usage_ranking_show_tokens"`
+	UsageRankingShowRequests            bool                     `json:"usage_ranking_show_requests"`
+	UsageRankingShowAmount              bool                     `json:"usage_ranking_show_amount"`
 	CustomMenuItems                     []CustomMenuItem         `json:"custom_menu_items"`
 	CustomEndpoints                     []CustomEndpoint         `json:"custom_endpoints"`
 	FooterLinks                         []FooterLinkGroup        `json:"footer_links"`
