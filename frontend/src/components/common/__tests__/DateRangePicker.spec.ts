@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
+import dayjs, { type Dayjs } from 'dayjs'
+import DatePicker from 'ant-design-vue/es/date-picker'
 
 import DateRangePicker from '../DateRangePicker.vue'
 
@@ -17,130 +19,81 @@ const messages: Record<string, string> = {
   'dates.lastMonth': 'Last Month',
   'dates.startDate': 'Start Date',
   'dates.endDate': 'End Date',
-  'dates.apply': 'Apply',
-  'dates.selectDateRange': 'Select date range'
 }
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key: string) => messages[key] ?? key,
-    locale: ref('en')
-  })
+    locale: ref('en'),
+  }),
 }))
 
-const formatLocalDate = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+type RangePreset = {
+  label: string
+  value: [Dayjs, Dayjs]
 }
 
-const waitForTransition = () => new Promise((resolve) => window.setTimeout(resolve, 250))
+const mountPicker = () => mount(DateRangePicker, {
+  props: {
+    startDate: '2026-09-01',
+    endDate: '2026-09-20',
+  },
+})
 
 describe('DateRangePicker', () => {
-  it('使用 Ant Design Vue 双日历而不是浏览器原生日期输入框', async () => {
-    const today = formatLocalDate(new Date())
-    const wrapper = mount(DateRangePicker, {
-      props: { startDate: today, endDate: today },
-      global: { stubs: { Icon: true } }
-    })
+  it('直接渲染单层 Ant Design Vue 范围选择器和快捷项', () => {
+    const wrapper = mountPicker()
+    const picker = wrapper.findComponent(DatePicker.RangePicker)
 
-    await wrapper.find('.date-picker-trigger').trigger('click')
-    expect(document.body.querySelector('.ant-picker-range')).not.toBeNull()
-    expect(document.body.querySelector('input[type="date"]')).toBeNull()
-    wrapper.unmount()
+    expect(picker.exists()).toBe(true)
+    expect(wrapper.find('.date-picker-trigger').exists()).toBe(false)
+    expect((picker.props('presets') as RangePreset[]).map((preset) => preset.label)).toContain('Last 7 Days')
   })
 
-  it('uses last 24 hours as the default recognized preset', () => {
-    const now = new Date()
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-
-    const wrapper = mount(DateRangePicker, {
-      props: {
-        startDate: formatLocalDate(yesterday),
-        endDate: formatLocalDate(now)
-      },
-      global: {
-        stubs: {
-          Icon: true
-        }
-      }
-    })
-
-    expect(wrapper.text()).toContain('Last 24 Hours')
-  })
-
-  it('emits range updates with last24Hours preset when applied', async () => {
-    const now = new Date()
-    const today = formatLocalDate(now)
-
-    const wrapper = mount(DateRangePicker, {
-      props: {
-        startDate: today,
-        endDate: today
-      },
-      global: {
-        stubs: {
-          Icon: true
-        }
-      }
-    })
-
-    await wrapper.find('.date-picker-trigger').trigger('click')
-    const presetButton = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.date-picker-preset')).reverse()
-      .find((node) => node.textContent?.includes('Last 24 Hours'))
-    expect(presetButton).toBeDefined()
-
-    presetButton!.click()
-    await wrapper.vm.$nextTick()
-    document.body.querySelector<HTMLButtonElement>('.date-picker-apply')?.click()
-    await wrapper.vm.$nextTick()
-
-    const nowAfterClick = new Date()
-    const yesterdayAfterClick = new Date(nowAfterClick.getTime() - 24 * 60 * 60 * 1000)
-    const expectedStart = formatLocalDate(yesterdayAfterClick)
-    const expectedEnd = formatLocalDate(nowAfterClick)
-
-    expect(wrapper.emitted('update:startDate')?.[0]).toEqual([expectedStart])
-    expect(wrapper.emitted('update:endDate')?.[0]).toEqual([expectedEnd])
-    expect(wrapper.emitted('change')?.[0]).toEqual([
-      {
-        startDate: expectedStart,
-        endDate: expectedEnd,
-        preset: 'last24Hours'
-      }
+  it('完成手动范围选择后立即应用日期', async () => {
+    const wrapper = mountPicker()
+    wrapper.findComponent(DatePicker.RangePicker).vm.$emit('change', [
+      dayjs('2026-09-05'),
+      dayjs('2026-09-18'),
     ])
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('update:startDate')?.[0]).toEqual(['2026-09-05'])
+    expect(wrapper.emitted('update:endDate')?.[0]).toEqual(['2026-09-18'])
+    expect(wrapper.emitted('change')?.[0]).toEqual([{
+      startDate: '2026-09-05',
+      endDate: '2026-09-18',
+      preset: null,
+    }])
   })
 
-  it('can apply a preset immediately when applyOnPreset is enabled', async () => {
-    const now = new Date()
-    const today = formatLocalDate(now)
+  it('快捷日期由同一个面板直接应用并保留预设标识', async () => {
+    const wrapper = mountPicker()
+    const picker = wrapper.findComponent(DatePicker.RangePicker)
+    const preset = (picker.props('presets') as RangePreset[])
+      .find((item) => item.label === 'Last Month')
 
-    const wrapper = mount(DateRangePicker, {
-      props: {
-        startDate: today,
-        endDate: today,
-        applyOnPreset: true
-      },
-      global: {
-        stubs: {
-          Icon: true
-        }
-      }
-    })
-
-    await wrapper.find('.date-picker-trigger').trigger('click')
-    const presetButton = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.date-picker-preset')).reverse()
-      .find((node) => node.textContent?.includes('Last Month'))
-    expect(presetButton).toBeDefined()
-
-    presetButton!.click()
+    expect(preset).toBeDefined()
+    picker.vm.$emit('change', preset!.value)
     await wrapper.vm.$nextTick()
 
     expect(wrapper.emitted('change')?.[0]?.[0]).toMatchObject({
-      preset: 'lastMonth'
+      preset: 'lastMonth',
     })
-    await waitForTransition()
-    expect(document.body.querySelector('.date-picker-dropdown')).toBeNull()
+  })
+
+  it('分钟级快捷范围保留具体时间', async () => {
+    const wrapper = mountPicker()
+    const picker = wrapper.findComponent(DatePicker.RangePicker)
+    const preset = (picker.props('presets') as RangePreset[])
+      .find((item) => item.label === 'Last 15 Minutes')
+
+    picker.vm.$emit('change', preset!.value)
+    await wrapper.vm.$nextTick()
+
+    const emitted = wrapper.emitted('change')?.[0]?.[0] as { startDate: string; endDate: string; preset: string }
+    expect(emitted.preset).toBe('last15Minutes')
+    expect(emitted.startDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+    expect(emitted.endDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
   })
 })

@@ -8,7 +8,6 @@
             <DateRangePicker
               v-model:start-date="startDate"
               v-model:end-date="endDate"
-              apply-on-preset
               @change="onDateRangeChange"
             />
           </div>

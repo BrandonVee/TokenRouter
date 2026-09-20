@@ -1,73 +1,23 @@
 <template>
-  <div class="relative" ref="containerRef">
-    <button
-      type="button"
-      @click="toggle"
-      :class="['date-picker-trigger', isOpen && 'date-picker-trigger-open']"
-    >
-      <span class="date-picker-icon">
-        <Icon name="calendar" size="sm" />
-      </span>
-      <span class="date-picker-value">
-        {{ displayValue }}
-      </span>
-      <span class="date-picker-chevron">
-        <Icon
-          name="chevronDown"
-          size="sm"
-          :class="['transition-transform duration-200', isOpen && 'rotate-180']"
-        />
-      </span>
-    </button>
-
-    <Teleport to="body">
-      <Transition name="date-picker-dropdown">
-        <div v-if="isOpen" ref="dropdownRef" class="date-picker-dropdown" :style="dropdownStyle">
-          <!-- Quick presets -->
-          <div class="date-picker-presets">
-            <button
-              v-for="preset in presets"
-              :key="preset.value"
-              @click="selectPreset(preset)"
-              :class="['date-picker-preset', isPresetActive(preset) && 'date-picker-preset-active']"
-            >
-              {{ t(preset.labelKey) }}
-            </button>
-          </div>
-
-          <div class="date-picker-divider"></div>
-
-          <!-- Ant Design Vue 提供完整的双日历选择、键盘输入和月份跳转。 -->
-          <ConfigProvider :locale="antLocale" :theme="antTheme">
-            <div class="date-picker-custom">
-              <label class="date-picker-label">{{ t('dates.selectDateRange') }}</label>
-              <AntRangePicker
-                :value="calendarRange"
-                :allow-clear="false"
-                :disabled-date="disabledCalendarDate"
-                :format="rangeDisplayFormat"
-                :placeholder="[t('dates.startDate'), t('dates.endDate')]"
-                popup-class-name="tokenrouter-ant-date-popup"
-                class="date-picker-range-input"
-                @change="onCalendarRangeChange"
-              />
-            </div>
-          </ConfigProvider>
-
-          <!-- Apply button -->
-          <div class="date-picker-actions">
-            <button @click="apply" class="date-picker-apply">
-              {{ t('dates.apply') }}
-            </button>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-  </div>
+  <ConfigProvider :locale="antLocale" :theme="antTheme">
+    <!-- 直接使用单层范围面板，避免先打开自定义浮层、再打开日历的重复操作。 -->
+    <AntRangePicker
+      :value="calendarRange"
+      :allow-clear="false"
+      :disabled-date="disabledCalendarDate"
+      :format="rangeDisplayFormat"
+      :placeholder="[t('dates.startDate'), t('dates.endDate')]"
+      :presets="antPresets"
+      placement="bottomLeft"
+      popup-class-name="tokenrouter-ant-date-popup tokenrouter-ant-date-range-popup"
+      class="tokenrouter-date-range-picker"
+      @change="onCalendarRangeChange"
+    />
+  </ConfigProvider>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DatePicker from 'ant-design-vue/es/date-picker'
 import ConfigProvider from 'ant-design-vue/es/config-provider'
@@ -75,7 +25,6 @@ import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import enUS from 'ant-design-vue/es/locale/en_US'
 import theme from 'ant-design-vue/es/theme'
 import dayjs, { type Dayjs } from 'dayjs'
-import Icon from '@/components/icons/Icon.vue'
 import { useTheme } from '@/composables/useTheme'
 
 interface DatePreset {
@@ -88,13 +37,12 @@ interface DatePreset {
 interface Props {
   startDate: string
   endDate: string
-  applyOnPreset?: boolean
 }
 
 interface Emits {
-  (e: 'update:startDate', value: string): void
-  (e: 'update:endDate', value: string): void
-  (e: 'change', range: { startDate: string; endDate: string; preset: string | null }): void
+  (event: 'update:startDate', value: string): void
+  (event: 'update:endDate', value: string): void
+  (event: 'change', range: { startDate: string; endDate: string; preset: string | null }): void
 }
 
 const props = defineProps<Props>()
@@ -110,7 +58,7 @@ const antTheme = computed(() => ({
   token: {
     colorPrimary: '#2563eb',
     borderRadius: 8,
-    controlHeight: 38,
+    controlHeight: 40,
     fontSize: 14,
   },
 }))
@@ -118,43 +66,6 @@ const rangeDisplayFormat = computed(() => locale.value.toLowerCase().startsWith(
   ? 'YYYY年M月D日'
   : 'MMM D, YYYY')
 
-const isOpen = ref(false)
-const containerRef = ref<HTMLElement | null>(null)
-const dropdownRef = ref<HTMLElement | null>(null)
-const dropdownLeft = ref(0)
-const dropdownTop = ref(0)
-const localStartDate = ref(props.startDate)
-const localEndDate = ref(props.endDate)
-const activePreset = ref<string | null>('last24Hours')
-
-const dropdownWidth = 640
-const dropdownMargin = 12
-const dropdownHeight = 244
-
-const dropdownStyle = computed(() => ({
-  left: `${dropdownLeft.value}px`,
-  top: `${dropdownTop.value}px`,
-  width: `min(${dropdownWidth}px, calc(100vw - ${dropdownMargin * 2}px))`
-}))
-
-const today = computed(() => {
-  // Use local timezone to avoid UTC timezone issues
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-})
-
-// Tomorrow's date - used for max date to handle timezone differences
-// When user is in a timezone behind the server, "today" on server might be "tomorrow" locally
-const tomorrow = computed(() => {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return formatDateToString(d)
-})
-
-// Helper function to format date to YYYY-MM-DD using local timezone
 const formatDateToString = (date: Date): string => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -169,17 +80,14 @@ const formatDateTimeToString = (date: Date): string => {
   return `${formatDateToString(date)}T${hours}:${minutes}:${seconds}`
 }
 
-const dateInputValue = (value: string): string => {
-  return value.slice(0, 10)
-}
+const today = computed(() => formatDateToString(new Date()))
 
-const calendarRange = computed<[Dayjs, Dayjs] | undefined>(() => {
-  const start = dayjs(localStartDate.value)
-  const end = dayjs(localEndDate.value)
-  return start.isValid() && end.isValid() ? [start, end] : undefined
+// 服务端与浏览器可能跨时区，允许选择本地明天，保持原有查询边界。
+const tomorrow = computed(() => {
+  const date = new Date()
+  date.setDate(date.getDate() + 1)
+  return formatDateToString(date)
 })
-
-const disabledCalendarDate = (current: Dayjs) => current.startOf('day').isAfter(dayjs(tomorrow.value).endOf('day'))
 
 const presets: DatePreset[] = [
   {
@@ -188,12 +96,11 @@ const presets: DatePreset[] = [
     durationMs: 15 * 60 * 1000,
     getRange: () => {
       const end = new Date()
-      const start = new Date(end.getTime() - 15 * 60 * 1000)
       return {
-        start: formatDateTimeToString(start),
-        end: formatDateTimeToString(end)
+        start: formatDateTimeToString(new Date(end.getTime() - 15 * 60 * 1000)),
+        end: formatDateTimeToString(end),
       }
-    }
+    },
   },
   {
     labelKey: 'dates.last30Minutes',
@@ -201,163 +108,126 @@ const presets: DatePreset[] = [
     durationMs: 30 * 60 * 1000,
     getRange: () => {
       const end = new Date()
-      const start = new Date(end.getTime() - 30 * 60 * 1000)
       return {
-        start: formatDateTimeToString(start),
-        end: formatDateTimeToString(end)
+        start: formatDateTimeToString(new Date(end.getTime() - 30 * 60 * 1000)),
+        end: formatDateTimeToString(end),
       }
-    }
+    },
   },
   {
     labelKey: 'dates.today',
     value: 'today',
-    getRange: () => {
-      const t = today.value
-      return { start: t, end: t }
-    }
+    getRange: () => ({ start: today.value, end: today.value }),
   },
   {
     labelKey: 'dates.yesterday',
     value: 'yesterday',
     getRange: () => {
-      const d = new Date()
-      d.setDate(d.getDate() - 1)
-      const yesterday = formatDateToString(d)
-      return { start: yesterday, end: yesterday }
-    }
+      const date = new Date()
+      date.setDate(date.getDate() - 1)
+      const value = formatDateToString(date)
+      return { start: value, end: value }
+    },
   },
   {
     labelKey: 'dates.last24Hours',
     value: 'last24Hours',
     getRange: () => {
       const end = new Date()
-      const start = new Date(end.getTime() - 24 * 60 * 60 * 1000)
       return {
-        start: formatDateToString(start),
-        end: formatDateToString(end)
+        start: formatDateToString(new Date(end.getTime() - 24 * 60 * 60 * 1000)),
+        end: formatDateToString(end),
       }
-    }
+    },
   },
   {
     labelKey: 'dates.last7Days',
     value: '7days',
     getRange: () => {
-      const end = today.value
-      const d = new Date()
-      d.setDate(d.getDate() - 6)
-      const start = formatDateToString(d)
-      return { start, end }
-    }
+      const date = new Date()
+      date.setDate(date.getDate() - 6)
+      return { start: formatDateToString(date), end: today.value }
+    },
   },
   {
     labelKey: 'dates.last14Days',
     value: '14days',
     getRange: () => {
-      const end = today.value
-      const d = new Date()
-      d.setDate(d.getDate() - 13)
-      const start = formatDateToString(d)
-      return { start, end }
-    }
+      const date = new Date()
+      date.setDate(date.getDate() - 13)
+      return { start: formatDateToString(date), end: today.value }
+    },
   },
   {
     labelKey: 'dates.last30Days',
     value: '30days',
     getRange: () => {
-      const end = today.value
-      const d = new Date()
-      d.setDate(d.getDate() - 29)
-      const start = formatDateToString(d)
-      return { start, end }
-    }
+      const date = new Date()
+      date.setDate(date.getDate() - 29)
+      return { start: formatDateToString(date), end: today.value }
+    },
   },
   {
     labelKey: 'dates.thisMonth',
     value: 'thisMonth',
     getRange: () => {
       const now = new Date()
-      const start = formatDateToString(new Date(now.getFullYear(), now.getMonth(), 1))
-      return { start, end: today.value }
-    }
+      return {
+        start: formatDateToString(new Date(now.getFullYear(), now.getMonth(), 1)),
+        end: today.value,
+      }
+    },
   },
   {
     labelKey: 'dates.lastMonth',
     value: 'lastMonth',
     getRange: () => {
       const now = new Date()
-      const start = formatDateToString(new Date(now.getFullYear(), now.getMonth() - 1, 1))
-      const end = formatDateToString(new Date(now.getFullYear(), now.getMonth(), 0))
-      return { start, end }
-    }
-  }
+      return {
+        start: formatDateToString(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+        end: formatDateToString(new Date(now.getFullYear(), now.getMonth(), 0)),
+      }
+    },
+  },
 ]
 
-const displayValue = computed(() => {
-  if (activePreset.value) {
-    const preset = presets.find((p) => p.value === activePreset.value)
-    if (preset) return t(preset.labelKey)
-  }
-
-  if (localStartDate.value && localEndDate.value) {
-    if (localStartDate.value === localEndDate.value) {
-      return formatDate(localStartDate.value)
-    }
-    return `${formatDate(localStartDate.value)} - ${formatDate(localEndDate.value)}`
-  }
-
-  return t('dates.selectDateRange')
+const calendarRange = computed<[Dayjs, Dayjs] | undefined>(() => {
+  const start = dayjs(props.startDate)
+  const end = dayjs(props.endDate)
+  return start.isValid() && end.isValid() ? [start, end] : undefined
 })
 
-const formatDate = (dateStr: string): string => {
-  const date = new Date(`${dateInputValue(dateStr)}T00:00:00`)
-  const dateLocale = locale.value === 'zh' ? 'zh-CN' : 'en-US'
-  return date.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' })
-}
+const antPresets = computed(() => presets.map((preset) => ({
+  label: t(preset.labelKey),
+  value: (() => {
+    const range = preset.getRange()
+    return [dayjs(range.start), dayjs(range.end)] as [Dayjs, Dayjs]
+  })(),
+})))
 
-const isPresetActive = (preset: DatePreset): boolean => {
-  return activePreset.value === preset.value
-}
+const disabledCalendarDate = (current: Dayjs) => current.startOf('day').isAfter(dayjs(tomorrow.value).endOf('day'))
 
 const parseRangeTime = (value: string): number | null => {
-  if (!value) return null
   const timestamp = new Date(value.length === 10 ? `${value}T00:00:00` : value).getTime()
   return Number.isFinite(timestamp) ? timestamp : null
 }
 
-const selectPreset = (preset: DatePreset) => {
-  const range = preset.getRange()
-  localStartDate.value = range.start
-  localEndDate.value = range.end
-  activePreset.value = preset.value
-  if (props.applyOnPreset) {
-    apply()
-  }
-}
+const resolvePreset = (startValue: string, endValue: string): DatePreset | null => {
+  const startMs = parseRangeTime(startValue)
+  const endMs = parseRangeTime(endValue)
 
-const presetMatchesRange = (preset: DatePreset): boolean => {
-  const range = preset.getRange()
-  if (!preset.durationMs) {
-    return range.start === localStartDate.value && range.end === localEndDate.value
-  }
-
-  const startMs = parseRangeTime(localStartDate.value)
-  const endMs = parseRangeTime(localEndDate.value)
-  if (startMs === null || endMs === null) return false
-
-  const durationDrift = Math.abs(endMs - startMs - preset.durationMs)
-  const endDrift = Math.abs(Date.now() - endMs)
-  return durationDrift <= 1000 && endDrift <= 90 * 1000
-}
-
-const onDateChange = () => {
-  // Check if current dates match any preset
-  activePreset.value = null
   for (const preset of presets) {
-    if (presetMatchesRange(preset)) {
-      activePreset.value = preset.value
-      break
+    const range = preset.getRange()
+    if (!preset.durationMs && range.start === startValue.slice(0, 10) && range.end === endValue.slice(0, 10)) {
+      return preset
+    }
+    if (preset.durationMs && startMs !== null && endMs !== null) {
+      const durationDrift = Math.abs(endMs - startMs - preset.durationMs)
+      const endDrift = Math.abs(Date.now() - endMs)
+      if (durationDrift <= 1000 && endDrift <= 90 * 1000) return preset
     }
   }
+  return null
 }
 
 const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null) => {
@@ -365,219 +235,70 @@ const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null)
   const start = typeof values[0] === 'string' ? dayjs(values[0]) : values[0]
   const end = typeof values[1] === 'string' ? dayjs(values[1]) : values[1]
   if (!start.isValid() || !end.isValid()) return
-  localStartDate.value = start.format('YYYY-MM-DD')
-  localEndDate.value = end.format('YYYY-MM-DD')
-  onDateChange()
-}
 
-const toggle = () => {
-  isOpen.value = !isOpen.value
-  if (isOpen.value) {
-    updateDropdownPosition()
-  }
-}
+  const rawStart = start.format('YYYY-MM-DDTHH:mm:ss')
+  const rawEnd = end.format('YYYY-MM-DDTHH:mm:ss')
+  const preset = resolvePreset(rawStart, rawEnd)
+  const preserveTime = Boolean(preset?.durationMs)
+  const startDate = start.format(preserveTime ? 'YYYY-MM-DDTHH:mm:ss' : 'YYYY-MM-DD')
+  const endDate = end.format(preserveTime ? 'YYYY-MM-DDTHH:mm:ss' : 'YYYY-MM-DD')
 
-const apply = () => {
-  emit('update:startDate', localStartDate.value)
-  emit('update:endDate', localEndDate.value)
+  // 完成范围选择或点击快捷项后立即应用，省去第二层“应用”确认。
+  emit('update:startDate', startDate)
+  emit('update:endDate', endDate)
   emit('change', {
-    startDate: localStartDate.value,
-    endDate: localEndDate.value,
-    preset: activePreset.value
+    startDate,
+    endDate,
+    preset: preset?.value ?? null,
   })
-  isOpen.value = false
 }
-
-// 根据触发按钮位置计算弹层坐标，避免靠右或窄屏时被视口裁切。
-const updateDropdownPosition = () => {
-  const trigger = containerRef.value?.getBoundingClientRect()
-  if (!trigger) return
-  const maxLeft = Math.max(dropdownMargin, window.innerWidth - dropdownWidth - dropdownMargin)
-  const preferredLeft = trigger.left
-  dropdownLeft.value = Math.min(Math.max(dropdownMargin, preferredLeft), maxLeft)
-  const preferredTop = trigger.bottom + 8
-  const fitsBelow = preferredTop + dropdownHeight <= window.innerHeight - dropdownMargin
-  dropdownTop.value = fitsBelow
-    ? preferredTop
-    : Math.max(dropdownMargin, trigger.top - dropdownHeight - 8)
-}
-
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as Node
-  const targetElement = target instanceof Element ? target : target.parentElement
-  if (
-    containerRef.value &&
-    !containerRef.value.contains(target) &&
-    !dropdownRef.value?.contains(target) &&
-    !targetElement?.closest('.tokenrouter-ant-date-popup')
-  ) {
-    isOpen.value = false
-  }
-}
-
-const handleEscape = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && isOpen.value) {
-    isOpen.value = false
-  }
-}
-
-const handleViewportChange = () => {
-  if (isOpen.value) {
-    updateDropdownPosition()
-  }
-}
-
-// Sync local state with props
-watch(
-  () => props.startDate,
-  (val) => {
-    localStartDate.value = val
-    onDateChange()
-  }
-)
-
-watch(
-  () => props.endDate,
-  (val) => {
-    localEndDate.value = val
-    onDateChange()
-  }
-)
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-  document.addEventListener('keydown', handleEscape)
-  window.addEventListener('resize', handleViewportChange)
-  window.addEventListener('scroll', handleViewportChange, true)
-  // Initialize active preset detection
-  onDateChange()
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-  document.removeEventListener('keydown', handleEscape)
-  window.removeEventListener('resize', handleViewportChange)
-  window.removeEventListener('scroll', handleViewportChange, true)
-})
 </script>
 
 <style scoped>
-.date-picker-trigger {
-  /* 日期控件的结构边框使用中性灰，选中的快捷日期仍保留品牌蓝。 */
-  @apply flex items-center gap-2;
-  @apply rounded-lg px-3 py-2 text-sm;
-  @apply bg-white dark:bg-dark-950;
-  @apply border border-primary-900/10 dark:border-dark-600;
-  @apply text-gray-700 dark:text-gray-300;
-  @apply transition-all duration-200;
-  @apply focus:border-primary-900/10 focus:outline-none focus:ring-2 focus:ring-black/10 dark:focus:border-primary-500 dark:focus:ring-primary-500/30;
-  @apply hover:border-black/20 dark:hover:border-primary-500;
-  @apply cursor-pointer;
-}
-
-.date-picker-trigger-open {
-  @apply border-primary-900/10 ring-2 ring-black/10 dark:border-primary-500 dark:ring-primary-500/30;
-}
-
-.date-picker-icon {
-  @apply text-gray-400 dark:text-dark-400;
-}
-
-.date-picker-value {
-  @apply font-medium;
-}
-
-.date-picker-chevron {
-  @apply text-gray-400 dark:text-dark-400;
-}
-
-.date-picker-dropdown {
-  @apply fixed z-[10000];
-  @apply rounded-xl;
-  @apply border border-primary-900/10 dark:border-dark-600;
-  @apply shadow-lg shadow-black/10 dark:shadow-black/30;
-  @apply overflow-hidden;
-  @apply max-w-[calc(100vw-1.5rem)];
-  /* 弹出层保持近乎不透明，避免玻璃背景透出后影响日期文字辨识。 */
-  background-color: rgba(248, 252, 254, 0.96);
-  -webkit-backdrop-filter: blur(24px) saturate(135%);
-  backdrop-filter: blur(24px) saturate(135%);
-}
-
-.dark .date-picker-dropdown {
-  background-color: rgba(27, 33, 39, 0.96);
-}
-
-.date-picker-presets {
-  @apply grid grid-cols-2 gap-1 p-2;
-}
-
-.date-picker-preset {
-  @apply rounded-md px-3 py-1.5 text-xs font-medium;
-  @apply text-gray-600 dark:text-gray-400;
-  @apply hover:bg-gray-100 dark:hover:bg-dark-800;
-  @apply transition-colors duration-150;
-}
-
-.date-picker-preset-active {
-  @apply bg-primary-100 dark:bg-dark-700;
-  @apply text-primary-700 dark:text-primary-300;
-}
-
-.date-picker-divider {
-  @apply border-t border-primary-900/10 dark:border-dark-600;
-}
-
-.date-picker-custom {
-  @apply p-3;
-}
-
-.date-picker-label {
-  @apply mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400;
-}
-
-.date-picker-range-input {
-  width: 100%;
+.tokenrouter-date-range-picker {
+  min-width: 17rem;
   border-color: rgb(15 23 42 / 0.1);
-  background: rgb(255 255 255 / 0.82);
+  background: rgb(255 255 255);
   box-shadow: none;
 }
 
-.date-picker-range-input:hover,
-.date-picker-range-input.ant-picker-focused {
+.tokenrouter-date-range-picker:hover,
+.tokenrouter-date-range-picker.ant-picker-focused {
   border-color: rgb(37 99 235 / 0.65);
   box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
 }
 
-.dark .date-picker-range-input {
+:global(.dark) .tokenrouter-date-range-picker {
   border-color: rgb(71 85 105);
   background: rgb(15 23 42);
 }
 
-.date-picker-actions {
-  @apply flex justify-end p-2 pt-0;
-}
-
-.date-picker-apply {
-  @apply rounded-lg px-4 py-1.5 text-sm font-medium;
-  @apply bg-primary-600 text-white;
-  @apply hover:bg-primary-700;
-  @apply transition-colors duration-150;
-}
-
-/* Dropdown animation */
-.date-picker-dropdown-enter-active,
-.date-picker-dropdown-leave-active {
-  transition: all 0.2s ease;
-}
-
-.date-picker-dropdown-enter-from,
-.date-picker-dropdown-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
 :global(.tokenrouter-ant-date-popup) {
   z-index: 11000;
+}
+
+:global(.tokenrouter-ant-date-range-popup .ant-picker-presets) {
+  max-height: 21rem;
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .tokenrouter-date-range-picker {
+    min-width: min(17rem, calc(100vw - 2rem));
+  }
+
+  :global(.tokenrouter-ant-date-range-popup) {
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+  }
+
+  :global(.tokenrouter-ant-date-range-popup .ant-picker-panel-container) {
+    max-width: calc(100vw - 1.5rem);
+    overflow: auto;
+  }
+
+  :global(.tokenrouter-ant-date-range-popup .ant-picker-panels > :last-child) {
+    display: none;
+  }
 }
 </style>

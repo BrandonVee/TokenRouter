@@ -37,4 +37,39 @@ describe('DateTimePicker', () => {
 
     expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([null])
   })
+
+  it('同一天内禁用早于最小值的小时和分钟', () => {
+    const wrapper = mount(DateTimePicker, {
+      props: {
+        modelValue: '2026-09-20T09:45',
+        min: '2026-09-20T09:35',
+        showTime: true,
+      },
+    })
+    const picker = wrapper.findComponent(DatePicker)
+    const disabledTime = picker.props('disabledTime') as (value: dayjs.Dayjs) => {
+      disabledHours: () => number[]
+      disabledMinutes: (hour: number) => number[]
+    }
+    const disabled = disabledTime(dayjs('2026-09-20T09:45'))
+
+    expect(disabled.disabledHours()).toContain(8)
+    expect(disabled.disabledHours()).not.toContain(9)
+    expect(disabled.disabledMinutes(9)).toContain(34)
+    expect(disabled.disabledMinutes(9)).not.toContain(35)
+  })
+
+  it('输入越界时间时收敛到最小值', async () => {
+    const wrapper = mount(DateTimePicker, {
+      props: {
+        min: '2026-09-20T09:35',
+        showTime: true,
+      },
+    })
+
+    wrapper.findComponent(DatePicker).vm.$emit('change', dayjs('2026-09-20T08:00'))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual(['2026-09-20T09:35'])
+  })
 })
