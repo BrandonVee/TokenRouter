@@ -38,6 +38,19 @@ const formatLocalDate = (date: Date): string => {
 const waitForTransition = () => new Promise((resolve) => window.setTimeout(resolve, 250))
 
 describe('DateRangePicker', () => {
+  it('使用 Ant Design Vue 双日历而不是浏览器原生日期输入框', async () => {
+    const today = formatLocalDate(new Date())
+    const wrapper = mount(DateRangePicker, {
+      props: { startDate: today, endDate: today },
+      global: { stubs: { Icon: true } }
+    })
+
+    await wrapper.find('.date-picker-trigger').trigger('click')
+    expect(document.body.querySelector('.ant-picker-range')).not.toBeNull()
+    expect(document.body.querySelector('input[type="date"]')).toBeNull()
+    wrapper.unmount()
+  })
+
   it('uses last 24 hours as the default recognized preset', () => {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)

@@ -60,6 +60,10 @@ function mountView() {
         Select: {
           props: ['modelValue', 'options'],
           template: '<div data-testid="fit-mode-select"></div>'
+        },
+        DateTimePicker: {
+          props: ['modelValue', 'showTime', 'min'],
+          template: '<div data-testid="date-time-picker"></div>'
         }
       }
     }
@@ -78,10 +82,13 @@ describe('DashboardAdsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
+    expect(wrapper.classes()).toContain('max-w-[1600px]')
+    expect(wrapper.get('[data-testid="dashboard-ad-editor-grid"]').classes()).toContain('xl:grid-cols-[minmax(0,2fr)_23rem]')
     expect(wrapper.findAll('[data-testid^="dashboard-ad-card-"]')).toHaveLength(2)
     expect(wrapper.findAll('.dashboard-ad-preview')).toHaveLength(2)
     expect(wrapper.findAll('[data-testid="image-upload"]')).toHaveLength(2)
     expect(wrapper.findAll('[data-testid="fit-mode-select"]')).toHaveLength(2)
+    expect(wrapper.findAll('[data-testid="date-time-picker"]')).toHaveLength(4)
     expect(wrapper.text()).toContain('admin.dashboardAds.status.scheduled')
   })
 

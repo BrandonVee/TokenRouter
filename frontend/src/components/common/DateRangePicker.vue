@@ -37,33 +37,22 @@
 
           <div class="date-picker-divider"></div>
 
-          <!-- Custom date range inputs -->
-          <div class="date-picker-custom">
-            <div class="date-picker-field">
-              <label class="date-picker-label">{{ t('dates.startDate') }}</label>
-              <input
-                type="date"
-                :value="dateInputValue(localStartDate)"
-                :max="dateInputValue(localEndDate) || tomorrow"
-                class="date-picker-input"
-                @change="onStartDateInputChange"
+          <!-- Ant Design Vue 提供完整的双日历选择、键盘输入和月份跳转。 -->
+          <ConfigProvider :locale="antLocale" :theme="antTheme">
+            <div class="date-picker-custom">
+              <label class="date-picker-label">{{ t('dates.selectDateRange') }}</label>
+              <AntRangePicker
+                :value="calendarRange"
+                :allow-clear="false"
+                :disabled-date="disabledCalendarDate"
+                :format="rangeDisplayFormat"
+                :placeholder="[t('dates.startDate'), t('dates.endDate')]"
+                popup-class-name="tokenrouter-ant-date-popup"
+                class="date-picker-range-input"
+                @change="onCalendarRangeChange"
               />
             </div>
-            <div class="date-picker-separator">
-              <Icon name="arrowRight" size="sm" class="text-gray-400" />
-            </div>
-            <div class="date-picker-field">
-              <label class="date-picker-label">{{ t('dates.endDate') }}</label>
-              <input
-                type="date"
-                :value="dateInputValue(localEndDate)"
-                :min="dateInputValue(localStartDate)"
-                :max="tomorrow"
-                class="date-picker-input"
-                @change="onEndDateInputChange"
-              />
-            </div>
-          </div>
+          </ConfigProvider>
 
           <!-- Apply button -->
           <div class="date-picker-actions">
@@ -80,7 +69,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import DatePicker from 'ant-design-vue/es/date-picker'
+import ConfigProvider from 'ant-design-vue/es/config-provider'
+import zhCN from 'ant-design-vue/es/locale/zh_CN'
+import enUS from 'ant-design-vue/es/locale/en_US'
+import theme from 'ant-design-vue/es/theme'
+import dayjs, { type Dayjs } from 'dayjs'
 import Icon from '@/components/icons/Icon.vue'
+import { useTheme } from '@/composables/useTheme'
 
 interface DatePreset {
   labelKey: string
@@ -105,6 +101,22 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const { t, locale } = useI18n()
+const { isDark } = useTheme()
+const AntRangePicker = DatePicker.RangePicker
+
+const antLocale = computed(() => locale.value.toLowerCase().startsWith('zh') ? zhCN : enUS)
+const antTheme = computed(() => ({
+  algorithm: isDark.value ? theme.darkAlgorithm : theme.defaultAlgorithm,
+  token: {
+    colorPrimary: '#2563eb',
+    borderRadius: 8,
+    controlHeight: 38,
+    fontSize: 14,
+  },
+}))
+const rangeDisplayFormat = computed(() => locale.value.toLowerCase().startsWith('zh')
+  ? 'YYYY年M月D日'
+  : 'MMM D, YYYY')
 
 const isOpen = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
@@ -160,6 +172,14 @@ const formatDateTimeToString = (date: Date): string => {
 const dateInputValue = (value: string): string => {
   return value.slice(0, 10)
 }
+
+const calendarRange = computed<[Dayjs, Dayjs] | undefined>(() => {
+  const start = dayjs(localStartDate.value)
+  const end = dayjs(localEndDate.value)
+  return start.isValid() && end.isValid() ? [start, end] : undefined
+})
+
+const disabledCalendarDate = (current: Dayjs) => current.startOf('day').isAfter(dayjs(tomorrow.value).endOf('day'))
 
 const presets: DatePreset[] = [
   {
@@ -340,13 +360,13 @@ const onDateChange = () => {
   }
 }
 
-const onStartDateInputChange = (event: Event) => {
-  localStartDate.value = (event.target as HTMLInputElement).value
-  onDateChange()
-}
-
-const onEndDateInputChange = (event: Event) => {
-  localEndDate.value = (event.target as HTMLInputElement).value
+const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null) => {
+  if (!values) return
+  const start = typeof values[0] === 'string' ? dayjs(values[0]) : values[0]
+  const end = typeof values[1] === 'string' ? dayjs(values[1]) : values[1]
+  if (!start.isValid() || !end.isValid()) return
+  localStartDate.value = start.format('YYYY-MM-DD')
+  localEndDate.value = end.format('YYYY-MM-DD')
   onDateChange()
 }
 
@@ -384,10 +404,12 @@ const updateDropdownPosition = () => {
 
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as Node
+  const targetElement = target instanceof Element ? target : target.parentElement
   if (
     containerRef.value &&
     !containerRef.value.contains(target) &&
-    !dropdownRef.value?.contains(target)
+    !dropdownRef.value?.contains(target) &&
+    !targetElement?.closest('.tokenrouter-ant-date-popup')
   ) {
     isOpen.value = false
   }
@@ -507,36 +529,29 @@ onUnmounted(() => {
 }
 
 .date-picker-custom {
-  @apply flex items-end gap-2 p-3;
-}
-
-.date-picker-field {
-  @apply flex-1;
+  @apply p-3;
 }
 
 .date-picker-label {
   @apply mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400;
 }
 
-.date-picker-input {
-  @apply w-full rounded-md px-2 py-1.5 text-sm;
-  @apply bg-gray-50 dark:bg-dark-950;
-  @apply border border-primary-900/10 dark:border-dark-600;
-  @apply text-gray-900 dark:text-gray-100;
-  @apply focus:border-primary-900/10 focus:outline-none focus:ring-2 focus:ring-black/10 dark:focus:border-primary-500 dark:focus:ring-primary-500/30;
+.date-picker-range-input {
+  width: 100%;
+  border-color: rgb(15 23 42 / 0.1);
+  background: rgb(255 255 255 / 0.82);
+  box-shadow: none;
 }
 
-.date-picker-input::-webkit-calendar-picker-indicator {
-  @apply cursor-pointer opacity-60 hover:opacity-100;
-  filter: invert(0.5);
+.date-picker-range-input:hover,
+.date-picker-range-input.ant-picker-focused {
+  border-color: rgb(37 99 235 / 0.65);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
 }
 
-.dark .date-picker-input::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
-}
-
-.date-picker-separator {
-  @apply flex items-center justify-center pb-1;
+.dark .date-picker-range-input {
+  border-color: rgb(71 85 105);
+  background: rgb(15 23 42);
 }
 
 .date-picker-actions {
@@ -560,5 +575,9 @@ onUnmounted(() => {
 .date-picker-dropdown-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+:global(.tokenrouter-ant-date-popup) {
+  z-index: 11000;
 }
 </style>

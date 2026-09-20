@@ -851,6 +851,8 @@ affiliate: {
     startDate: '开始日期',
     endDate: '结束日期',
     apply: '应用',
+    selectDate: '选择日期',
+    selectDateTime: '选择日期和时间',
     selectDateRange: '选择日期范围'
   },
 }

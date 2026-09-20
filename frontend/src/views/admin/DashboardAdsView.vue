@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto max-w-7xl space-y-6 pb-8">
+  <div class="mx-auto max-w-[1600px] space-y-6 pb-8">
     <header
       class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-dark-700 dark:bg-dark-800"
     >
@@ -154,7 +154,7 @@
           </div>
         </div>
 
-        <div class="grid xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)]">
+        <div data-testid="dashboard-ad-editor-grid" class="grid xl:grid-cols-[minmax(0,2fr)_23rem] 2xl:grid-cols-[minmax(0,2.4fr)_24rem]">
           <section class="border-b border-gray-100 p-5 dark:border-dark-700 sm:p-6 xl:border-b-0 xl:border-r">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -278,11 +278,11 @@
                 <div class="mt-1 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
                   <label class="block">
                     <span class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('admin.dashboardAds.startsAt') }}</span>
-                    <input v-model="ad.starts_at" class="input" type="datetime-local" />
+                    <DateTimePicker v-model="ad.starts_at" show-time />
                   </label>
                   <label class="block">
                     <span class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('admin.dashboardAds.endsAt') }}</span>
-                    <input v-model="ad.ends_at" class="input" type="datetime-local" />
+                    <DateTimePicker v-model="ad.ends_at" show-time :min="ad.starts_at" />
                   </label>
                 </div>
                 <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.dashboardAds.scheduleHint') }}</p>
@@ -325,6 +325,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api'
 import Icon from '@/components/icons/Icon.vue'
+import DateTimePicker from '@/components/common/DateTimePicker.vue'
 import ImageUpload from '@/components/common/ImageUpload.vue'
 import Select from '@/components/common/Select.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
@@ -507,12 +508,14 @@ onMounted(load)
 }
 
 .dashboard-ad-preview--fixed {
-  height: clamp(11rem, 25vw, 16rem);
+  aspect-ratio: 4 / 1;
+  min-height: 10rem;
+  max-height: 18rem;
 }
 
 .dashboard-ad-preview--adaptive {
-  min-height: 11rem;
-  max-height: 16rem;
+  min-height: 10rem;
+  max-height: 18rem;
 }
 
 .dashboard-ad-preview-image {
@@ -522,7 +525,7 @@ onMounted(load)
 
 .dashboard-ad-preview-image--adaptive {
   height: auto;
-  max-height: 16rem;
+  max-height: 18rem;
   object-fit: contain;
 }
 

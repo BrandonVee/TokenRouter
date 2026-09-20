@@ -846,6 +846,8 @@ affiliate: {
     startDate: 'Start Date',
     endDate: 'End Date',
     apply: 'Apply',
+    selectDate: 'Select date',
+    selectDateTime: 'Select date and time',
     selectDateRange: 'Select date range'
   },
 }
