@@ -36,6 +36,8 @@ func TestNormalizeInboundEndpoint(t *testing.T) {
 		{"/v1/videos/edits", EndpointVideosEdits},
 		{"/v1/videos/extensions", EndpointVideosExtensions},
 		{"/v1/videos/req_123", EndpointVideos},
+		{"/api/v3/contents/generations/tasks", EndpointSeedanceTasks},
+		{"/v3/contents/generations/tasks/task-1", EndpointSeedanceTasks},
 		{"/v1beta/models", EndpointGeminiModels},
 
 		// 带平台前缀的根 Responses 路径。
@@ -122,6 +124,7 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"openai alpha search", EndpointAlphaSearch, "/backend-api/codex/alpha/search", service.PlatformOpenAI, EndpointAlphaSearch},
 		{"openai image generations", EndpointImagesGenerations, "/v1/images/generations", service.PlatformOpenAI, EndpointImagesGenerations},
 		{"openai image edits", EndpointImagesEdits, "/openai/v1/images/edits", service.PlatformOpenAI, EndpointImagesEdits},
+		{"openai seedance tasks", EndpointSeedanceTasks, "/api/v3/contents/generations/tasks/task-1", service.PlatformOpenAI, EndpointSeedanceTasks},
 		{"grok chat defaults to responses without runtime result", EndpointChatCompletions, "/v1/chat/completions", service.PlatformGrok, EndpointResponses},
 		{"grok responses", EndpointResponses, "/v1/responses", service.PlatformGrok, EndpointResponses},
 		{"grok video generations", EndpointVideosGenerations, "/v1/videos/generations", service.PlatformGrok, EndpointVideosGenerations},

@@ -53,6 +53,14 @@ func (h *OpenAIGatewayHandler) GrokVideoContent(c *gin.Context) {
 }
 
 func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.GrokMediaEndpoint, requestID string) {
+	platform := service.PlatformGrok
+	noAccountCode := "grok_media_no_eligible_account"
+	noAccountMessage := "No eligible Grok media accounts"
+	if endpoint.IsSeedance() {
+		platform = service.PlatformOpenAI
+		noAccountCode = "seedance_no_eligible_account"
+		noAccountMessage = "No eligible Seedance accounts"
+	}
 	streamStarted := false
 	defer h.recoverResponsesPanic(c, &streamStarted)
 
@@ -100,6 +108,13 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 
 	contentType := c.GetHeader("Content-Type")
 	requestInfo := service.ParseGrokMediaRequest(contentType, body)
+	if endpoint == service.SeedanceEndpointCreate {
+		requestInfo, err = service.ParseSeedanceRequest(body)
+		if err != nil {
+			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+			return
+		}
+	}
 	requestModel := requestInfo.Model
 	routingModel := service.NormalizeGrokMediaModelForEndpoint(endpoint, requestModel, requestInfo.HasInputImage())
 	if endpoint.IsGenerationRequest() && strings.TrimSpace(requestModel) == "" {
@@ -117,8 +132,8 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 	boundLookupAccountID := int64(0)
 	compositeIdentityLookup := endpoint.IsVideoLookupRequest() && apiKey.IsComposite && apiKey.GroupID == nil
 	if compositeIdentityLookup {
-		apiKey, boundLookupAccountID, err = h.resolveCompositeGrokVideoAPIKey(
-			c.Request.Context(), apiKey, requestID, subject.UserID,
+		apiKey, boundLookupAccountID, err = h.resolveCompositeMediaVideoAPIKey(
+			c.Request.Context(), apiKey, requestID, subject.UserID, platform,
 		)
 		if err != nil || apiKey == nil || boundLookupAccountID <= 0 {
 			reqLog.Info("grok_media.video_lookup_owner_binding_missing", zap.Error(err))
@@ -235,19 +250,27 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		if failoverClientGone(c) {
 			return
 		}
-		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
-			requestCtx,
-			apiKey.GroupID,
-			"",
-			sessionHash,
-			routingModel,
-			failedAccountIDs,
-			service.OpenAIUpstreamTransportHTTPSSE,
-			requiredCapability,
-			false,
-			false,
-			service.PlatformGrok,
-		)
+		var selection *service.AccountSelectionResult
+		var scheduleDecision service.OpenAIAccountScheduleDecision
+		if boundLookupAccountID > 0 {
+			selection, scheduleDecision, err = h.gatewayService.SelectMediaVideoRequestAccount(
+				requestCtx, apiKey.GroupID, sessionHash, boundLookupAccountID, routingModel, platform,
+			)
+		} else {
+			selection, scheduleDecision, err = h.gatewayService.SelectAccountWithSchedulerForCapability(
+				requestCtx,
+				apiKey.GroupID,
+				"",
+				sessionHash,
+				routingModel,
+				failedAccountIDs,
+				service.OpenAIUpstreamTransportHTTPSSE,
+				requiredCapability,
+				false,
+				false,
+				platform,
+			)
+		}
 		if err != nil {
 			if failoverClientGone(c) {
 				reqLog.Info("grok_media.account_select_aborted_client_disconnected", zap.Error(err))
@@ -260,11 +283,11 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			if endpoint.IsGenerationRequest() && errors.Is(err, service.ErrNoAvailableAccounts) &&
 				(len(failedAccountIDs) == 0 || (mediaEligibilityRejected && lastFailoverErr == nil)) {
 				markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
-				h.errorResponse(c, http.StatusServiceUnavailable, "grok_media_no_eligible_account", "No eligible Grok media accounts")
+				h.errorResponse(c, http.StatusServiceUnavailable, noAccountCode, noAccountMessage)
 				return
 			}
 			if len(failedAccountIDs) == 0 {
-				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, requestModel, routingModel, service.PlatformGrok)
+				cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, requestModel, routingModel, platform)
 				if !cls.ModelNotFound {
 					markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
 				}
@@ -281,10 +304,10 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		if selection == nil || selection.Account == nil {
 			if endpoint.IsGenerationRequest() {
 				markOpsRoutingCapacityLimited(c)
-				h.errorResponse(c, http.StatusServiceUnavailable, "grok_media_no_eligible_account", "No eligible Grok media accounts")
+				h.errorResponse(c, http.StatusServiceUnavailable, noAccountCode, noAccountMessage)
 				return
 			}
-			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, requestModel, routingModel, service.PlatformGrok)
+			cls := classifyNoAccountErrorFromGin(c, h.gatewayService, apiKey, requestModel, routingModel, platform)
 			if !cls.ModelNotFound {
 				markOpsRoutingCapacityLimited(c)
 			}
@@ -310,7 +333,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		)
 
 		account := selection.Account
-		if endpoint.IsGenerationRequest() {
+		if endpoint.IsGenerationRequest() && !endpoint.IsSeedance() {
 			eligible, eligibilityReason, eligibilityErr := h.ensureGrokMediaAccountEligibility(requestCtx, account)
 			if !eligible {
 				mediaEligibilityRejected = true
@@ -322,7 +345,7 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				)
 				if switchCount >= maxAccountSwitches {
 					markOpsRoutingCapacityLimited(c)
-					h.errorResponse(c, http.StatusServiceUnavailable, "grok_media_no_eligible_account", "No eligible Grok media accounts")
+					h.errorResponse(c, http.StatusServiceUnavailable, noAccountCode, noAccountMessage)
 					return
 				}
 				switchCount++
@@ -346,6 +369,9 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 					accountReleaseFunc()
 				}
 			}()
+			if endpoint.IsSeedance() {
+				return h.gatewayService.ForwardSeedance(requestCtx, c, account, endpoint, requestID, forwardBody)
+			}
 			return h.gatewayService.ForwardGrokMedia(requestCtx, c, account, endpoint, requestID, forwardBody, forwardContentType)
 		}()
 
@@ -469,7 +495,11 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 				}
 			}
 		}
-		if endpoint == service.GrokMediaEndpointVideoStatus || endpoint == service.GrokMediaEndpointVideoContent {
+		if endpoint == service.SeedanceEndpointStatus {
+			if billResult := prepareSeedanceCompletionBilling(requestCtx, h, apiKey, subject, requestID, result); billResult != nil {
+				recordGrokMediaUsage(c, h, reqLog, apiKey, subject, subscription, account, billResult, billResult.Model, channelMapping, body, requestID)
+			}
+		} else if endpoint == service.GrokMediaEndpointVideoStatus || endpoint == service.GrokMediaEndpointVideoContent {
 			taskID := strings.TrimSpace(requestID)
 			if billResult := prepareGrokVideoCompletionBilling(requestCtx, h, reqLog, apiKey, subject, taskID, result); billResult != nil {
 				recordGrokMediaUsage(c, h, reqLog, apiKey, subject, subscription, account, billResult, billResult.Model, channelMapping, body, taskID)
@@ -505,12 +535,23 @@ func applyGrokMediaChannelMapping(body []byte, contentType string, mapping servi
 	return service.RewriteGrokMediaRequestModel(body, contentType, mapping.MappedModel)
 }
 
-// resolveCompositeGrokVideoAPIKey 从任务绑定缓存中找回创建视频时使用的复合映射。
+// resolveCompositeGrokVideoAPIKey 从任务绑定缓存中找回创建 Grok 视频时使用的复合映射。
 func (h *OpenAIGatewayHandler) resolveCompositeGrokVideoAPIKey(
 	ctx context.Context,
 	apiKey *service.APIKey,
 	requestID string,
 	userID int64,
+) (*service.APIKey, int64, error) {
+	return h.resolveCompositeMediaVideoAPIKey(ctx, apiKey, requestID, userID, service.PlatformGrok)
+}
+
+// resolveCompositeMediaVideoAPIKey 从任务绑定缓存中找回异步媒体任务的复合映射。
+func (h *OpenAIGatewayHandler) resolveCompositeMediaVideoAPIKey(
+	ctx context.Context,
+	apiKey *service.APIKey,
+	requestID string,
+	userID int64,
+	platform string,
 ) (*service.APIKey, int64, error) {
 	if h == nil || h.gatewayService == nil || apiKey == nil {
 		return nil, 0, errors.New("grok video request binding is unavailable")
@@ -518,7 +559,7 @@ func (h *OpenAIGatewayHandler) resolveCompositeGrokVideoAPIKey(
 	var lookupErr error
 	ownerGroupID, err := h.gatewayService.ResolveGrokMediaVideoRequestGroup(ctx, requestID, userID, apiKey.ID)
 	if err == nil && ownerGroupID > 0 {
-		group := compositeGrokVideoGroupSnapshot(apiKey, ownerGroupID)
+		group := compositeMediaVideoGroupSnapshot(apiKey, ownerGroupID, platform)
 		groupID := ownerGroupID
 		accountID, accountErr := h.gatewayService.ResolveGrokMediaVideoRequestAccount(
 			ctx, &groupID, requestID, userID, apiKey.ID,
@@ -536,7 +577,7 @@ func (h *OpenAIGatewayHandler) resolveCompositeGrokVideoAPIKey(
 	// 兼容新增分组归属记录前创建的任务，最多扫描当前 Key 的 20 个映射。
 	for i := range apiKey.CompositeGroups {
 		binding := &apiKey.CompositeGroups[i]
-		if binding.Group == nil || binding.Group.Platform != service.PlatformGrok {
+		if binding.Group == nil || binding.Group.Platform != platform {
 			continue
 		}
 		groupID := binding.GroupID
@@ -563,15 +604,20 @@ func (h *OpenAIGatewayHandler) resolveCompositeGrokVideoAPIKey(
 
 // compositeGrokVideoGroupSnapshot 优先复用鉴权快照，映射已移除时构造仅供旧任务查询的最小分组视图。
 func compositeGrokVideoGroupSnapshot(apiKey *service.APIKey, groupID int64) *service.Group {
+	return compositeMediaVideoGroupSnapshot(apiKey, groupID, service.PlatformGrok)
+}
+
+// compositeMediaVideoGroupSnapshot 为异步媒体任务恢复指定平台的分组快照。
+func compositeMediaVideoGroupSnapshot(apiKey *service.APIKey, groupID int64, platform string) *service.Group {
 	if apiKey != nil {
 		for i := range apiKey.CompositeGroups {
 			binding := &apiKey.CompositeGroups[i]
-			if binding.GroupID == groupID && binding.Group != nil && binding.Group.Platform == service.PlatformGrok {
+			if binding.GroupID == groupID && binding.Group != nil && binding.Group.Platform == platform {
 				return binding.Group
 			}
 		}
 	}
-	return &service.Group{ID: groupID, Platform: service.PlatformGrok, Status: service.StatusActive, Hydrated: true}
+	return &service.Group{ID: groupID, Platform: platform, Status: service.StatusActive, Hydrated: true}
 }
 
 // ensureGrokMediaAccountEligibility 对尚无观测的 OAuth 账号执行一次请求路径探测。
@@ -591,6 +637,9 @@ func (h *OpenAIGatewayHandler) ensureGrokMediaAccountEligibility(ctx context.Con
 
 // grokMediaRequiredCapability 仅限制新的媒体生成请求，状态查询必须保持可路由。
 func grokMediaRequiredCapability(endpoint service.GrokMediaEndpoint) service.OpenAIEndpointCapability {
+	if endpoint.IsSeedance() {
+		return service.OpenAIEndpointCapabilitySeedance
+	}
 	if endpoint.IsGenerationRequest() {
 		return service.OpenAIEndpointCapabilityGrokMediaGeneration
 	}
@@ -609,7 +658,7 @@ func grokMediaScheduleModel(account *service.Account, routingModel string, resul
 
 func isGrokVideoCreateEndpoint(endpoint service.GrokMediaEndpoint) bool {
 	switch endpoint {
-	case service.GrokMediaEndpointVideosGenerations,
+	case service.SeedanceEndpointCreate, service.GrokMediaEndpointVideosGenerations,
 		service.GrokMediaEndpointVideosEdits,
 		service.GrokMediaEndpointVideosExtensions:
 		return true
@@ -772,7 +821,7 @@ func recordGrokMediaUsage(
 	quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 	channelUsageFields := clientRequestedUsageFields(c, channelMapping, requestModel, result.UpstreamModel)
 	videoTaskID := ""
-	if result.VideoCount > 0 {
+	if result.VideoCount > 0 || strings.HasPrefix(result.ResponseID, "seedance:") {
 		videoTaskID = strings.TrimSpace(firstNonEmptyString(requestID, result.ResponseID))
 		if stable := service.StableGrokVideoBillingRequestID(firstNonEmptyString(result.ResponseID, requestID)); stable != "" {
 			result.RequestID = stable

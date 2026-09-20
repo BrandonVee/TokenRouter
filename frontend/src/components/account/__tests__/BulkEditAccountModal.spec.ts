@@ -797,6 +797,20 @@ describe('BulkEditAccountModal', () => {
     expect(wrapper.find('[data-testid="bulk-edit-upstream-billing-auto-probe-select"]').exists()).toBe(false)
   })
 
+  it('批量编辑可保存 Seedance 端点能力', async () => {
+    const wrapper = mountModal({ selectedPlatforms: ['openai'], selectedTypes: ['apikey'] })
+
+    await wrapper.get('#bulk-edit-openai-endpoint-capabilities-enabled').setValue(true)
+    await wrapper.get('[data-testid="bulk-edit-openai-endpoint-capability-embeddings"]').setValue(false)
+    await wrapper.get('[data-testid="bulk-edit-openai-endpoint-capability-seedance"]').setValue(true)
+    await wrapper.get('#bulk-edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      credentials: { openai_capabilities: ['chat_completions', 'seedance'] }
+    })
+  })
+
   it('筛选 OpenAI 账号批量编辑应提交旧版 Compact 端点模式和专属模型映射', async () => {
     const wrapper = mountModal({
       accountIds: [],

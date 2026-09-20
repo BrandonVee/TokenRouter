@@ -41,10 +41,14 @@ func (e GrokMediaEndpoint) RequiresRequestBody() bool {
 }
 
 func (e GrokMediaEndpoint) IsVideoLookupRequest() bool {
-	return e == GrokMediaEndpointVideoStatus || e == GrokMediaEndpointVideoContent
+	return e == GrokMediaEndpointVideoStatus || e == GrokMediaEndpointVideoContent ||
+		e == SeedanceEndpointStatus || e == SeedanceEndpointDelete
 }
 
 func (e GrokMediaEndpoint) IsGenerationRequest() bool {
+	if e == SeedanceEndpointCreate {
+		return true
+	}
 	switch e {
 	case GrokMediaEndpointImagesGenerations, GrokMediaEndpointImagesEdits, GrokMediaEndpointVideosGenerations, GrokMediaEndpointVideosEdits, GrokMediaEndpointVideosExtensions:
 		return true
@@ -393,6 +397,45 @@ func (s *OpenAIGatewayService) ResolveGrokMediaVideoRequestAccount(
 		return 0, fmt.Errorf("grok video request binding is invalid")
 	}
 	return s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), cacheKey)
+}
+
+// SelectGrokMediaVideoRequestAccount 只允许已绑定的 Grok 任务账号处理查询，
+// 避免通用粘性回退切换账号并覆盖任务归属。
+func (s *OpenAIGatewayService) SelectGrokMediaVideoRequestAccount(
+	ctx context.Context, groupID *int64, sessionHash string, accountID int64, requestedModel string,
+) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	return s.SelectMediaVideoRequestAccount(ctx, groupID, sessionHash, accountID, requestedModel, PlatformGrok)
+}
+
+// SelectMediaVideoRequestAccount 按指定平台严格选择异步媒体任务的原提交账号。
+func (s *OpenAIGatewayService) SelectMediaVideoRequestAccount(
+	ctx context.Context, groupID *int64, sessionHash string, accountID int64, requestedModel, platform string,
+) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	decision := OpenAIAccountScheduleDecision{Layer: openAIAccountScheduleLayerSessionSticky}
+	if accountID <= 0 || strings.TrimSpace(sessionHash) == "" {
+		return nil, decision, ErrNoAvailableAccounts
+	}
+	scheduler := &defaultOpenAIAccountScheduler{service: s}
+	selection, _, err := scheduler.selectBySessionHash(ctx, OpenAIAccountScheduleRequest{
+		GroupID:               groupID,
+		Platform:              platform,
+		SessionHash:           sessionHash,
+		StickyAccountID:       accountID,
+		PreserveStickyBinding: true,
+		DisableStickyEscape:   true,
+		RequestedModel:        requestedModel,
+		RequiredTransport:     OpenAIUpstreamTransportHTTPSSE,
+	})
+	if err != nil {
+		return nil, decision, err
+	}
+	if selection == nil || selection.Account == nil {
+		return nil, decision, ErrNoAvailableAccounts
+	}
+	decision.StickySessionHit = true
+	decision.SelectedAccountID = selection.Account.ID
+	decision.SelectedAccountType = selection.Account.Type
+	return selection, decision, nil
 }
 
 // GrokVideoPendingBilling 是创建任务时保存的快照，用于状态轮询首次发现已完成视频地址时计费。

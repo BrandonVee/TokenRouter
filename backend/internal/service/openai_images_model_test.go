@@ -43,6 +43,40 @@ func TestOpenAIImagesResponsesDriverAndImageModels(t *testing.T) {
 	}
 }
 
+func TestDoubaoSeedreamModelsAreAcceptedByImagesEndpoint(t *testing.T) {
+	for _, model := range []string{
+		"doubao-seedream-3-0-t2i-250415",
+		"doubao-seedream-4-0-250828",
+		"doubao-seedream-4-5-251128",
+		"doubao-seedream-5-0-lite",
+	} {
+		require.NoError(t, validateOpenAIImagesModel(model), model)
+	}
+	require.Error(t, validateOpenAIImagesModel("doubao-seed-2-0-pro"))
+}
+
+func TestDoubaoSeedreamAllowsArkInferenceEndpointMapping(t *testing.T) {
+	require.True(t, isDoubaoSeedreamModel("Doubao-Seedream-4-5-251128"))
+	require.True(t, isArkInferenceEndpointModel("ep-20260920-example"))
+	require.False(t, isArkInferenceEndpointModel("seedream-endpoint"))
+}
+
+func TestParseOpenAIImagesRequestCollectsSeedreamReferenceImages(t *testing.T) {
+	req := &OpenAIImagesRequest{Endpoint: openAIImagesGenerationsEndpoint}
+	err := parseOpenAIImagesJSONRequest([]byte(`{
+		"model":"doubao-seedream-4-5-251128",
+		"prompt":"融合参考图",
+		"image":["https://example.com/a.png",{"url":"https://example.com/b.png"}],
+		"reference_images":{"image_url":{"url":"https://example.com/c.png"}}
+	}`), req)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"https://example.com/a.png",
+		"https://example.com/b.png",
+		"https://example.com/c.png",
+	}, req.InputImageURLs)
+}
+
 func TestNormalizeOpenAIResponsesImageOnlyModelUsesConfiguredDriver(t *testing.T) {
 	t.Setenv("SUB2API_IMAGES_MAIN_MODEL", "gpt-5.6-sol")
 	reqBody := map[string]any{

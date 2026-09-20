@@ -1,11 +1,12 @@
 # OpenAI 上游
 
-本文描述 OpenAI OAuth/API Key 账号，以及 Responses、Chat、Messages、Embeddings、Images、Realtime 和 Codex 兼容能力的当前契约。它不枚举会随上游变化的完整模型列表，也不把所有 OpenAI 形状的入口都解释为任意平台可用。
+本文描述 OpenAI OAuth/API Key 账号，以及 Responses、Chat、Messages、Embeddings、Images、Seedance、Realtime 和 Codex 兼容能力的当前契约。它不枚举会随上游变化的完整模型列表，也不把所有 OpenAI 形状的入口都解释为任意平台可用。
 
 ## 章节导航
 
 - [账号与凭据](#账号与凭据)：修改 OAuth、API Key、隐私或客户端限制时读取。
 - [协议与传输](#协议与传输)：修改 Responses、WebSocket、Realtime 或兼容转换时读取。
+- [Seedream 与 Seedance](#seedream-与-seedance)：修改火山方舟图片或视频任务兼容时读取。
 - [Images 历史捕获](#images-历史捕获)：修改同步图片响应或留存旁路时读取。
 - [远程压缩协议](#远程压缩协议)：区分原生 `remote_compaction_v2` 与旧版 `/responses/compact` 时读取。
 - [模型与能力](#模型与能力)：修改模型别名、endpoint capability 或推理参数时读取。
@@ -36,7 +37,8 @@ OpenAI 平台拥有以下正式协议族：
 | Chat Completions | 可原生转发或转换到 Responses；每次 attempt 重建协议状态；响应兼容 `reasoning` 推理别名 |
 | Anthropic Messages | 转换到 OpenAI 请求并把事件、工具、thinking/usage 恢复为 Anthropic 形状 |
 | Embeddings | 仅 OpenAI 分组，账号必须声明或探测到相应 endpoint capability |
-| Images | OpenAI 图片生成/编辑；OpenAI API Key 兼容上游按 `gemini-<数字版本>-<系列...>-image[-<后缀...>]` 结构识别 Gemini 生图模型，不维护具体模型名单；当前网关保留同步生命周期，批量图片由 Gemini/Vertex 专题定义 |
+| Images | OpenAI 图片生成/编辑；OpenAI API Key 兼容上游识别 GPT Image、Grok、Gemini Image 和 `doubao-seedream-*` 模型族；当前网关保留同步生命周期，批量图片由 Gemini/Vertex 专题定义 |
+| Seedance 原生任务 | OpenAI API Key 账号可显式启用 Ark Seedance 能力；创建、查询和删除保持火山方舟 `/api/v3/contents/generations/tasks` 协议 |
 | Realtime/Live/sideband、Alpha Search | 仅 OpenAI 分组，并受分组开关、账号类型和 transport capability 限制 |
 
 OpenAI 分组支持 Messages、Responses 和 Chat，新建时默认启用 Responses 与 Chat；三项都可关闭。已有分组迁移时仅在旧 `allow_messages_dispatch` 开启时加入 Messages。该旧字段只作为 Messages 的弃用兼容镜像，专用 `messages_dispatch_model_config` 仍只负责 Claude 到 GPT 模型映射；系列和精确映射都只在目标值非空时生效，全部留空时不执行分组层模型映射。Responses WebSocket 是 OpenAI/Grok 的原生传输能力，不因其它平台启用兼容 Responses 而开放。
@@ -44,6 +46,14 @@ OpenAI 分组支持 Messages、Responses 和 Chat，新建时默认启用 Respon
 OpenAI 兼容非流式响应的 usage 按 `usage`、`response.usage`、`data.usage`、`data.response.usage` 的顺序解析；前两条原生路径优先于 Cline 等兼容上游使用的 `data` envelope。同层的 hosted image usage 必须随对应路径读取，不能把不同 envelope 的 token 与图片用量混合。
 
 `/backend-api/codex` 和无 `/v1` 别名服务特定客户端兼容，但仍经过 TokenRouter Key 鉴权、分组准入、调度和结算。Responses WebSocket 不支持 Qoder；其它平台是否可进入 OpenAI 兼容处理器由路由和平台专题共同决定，不能仅凭 URL 推断。
+
+### Seedream 与 Seedance
+
+火山方舟作为 OpenAI API Key 兼容上游接入。账号 `base_url` 可填写 `https://ark.cn-beijing.volces.com/api/v3`，也可使用兼容代理的 `/api/v3` 或 `/v3` 地址；认证继续使用账号 API Key。Seedream 图片请求进入现有 `/v1/images/generations` 或 `/images/generations`，模型族按 `doubao-seedream-*` 识别，请求中的 `image`、`reference_images`、组图和其它 Ark 扩展字段原样透传，参考图同时进入内容审核。账号模型映射可把公开 Seedream 模型名映射到 `ep-*` 推理接入点；其它图片模型不能借此绕过图片模型校验。Ark 返回的图片数组和 token usage 继续走 Images 统一响应、历史捕获和计费路径。
+
+Seedance 使用 Ark 原生异步任务入口：`POST /api/v3/contents/generations/tasks` 创建，`GET` 或 `DELETE /api/v3/contents/generations/tasks/:task_id` 查询或删除；同时接受 `/v3`、`/v1` 和无版本前缀别名。创建请求的 `content[]`、图片、视频、音频、角色和扩展字段保持原生形状，只按渠道和账号模型映射改写 `model`。账号必须是 OpenAI `apikey`、配置非空自定义 Base URL，并在 `credentials.openai_capabilities` 中显式包含 `seedance`；该能力默认关闭，避免任务落到普通 OpenAI 账号。OpenAI 或 Composite 分组还必须开启图片生成媒体权限。
+
+Seedance 创建成功后，网关按用户、API Key、分组和原提交账号保存任务绑定，查询与删除禁止换号或逃逸到其它账号。创建阶段不扣 token；首次查询到 `succeeded` 且上游返回正数 `usage.completion_tokens` 时，使用创建时的模型快照和任务级稳定请求 ID 结算，重复轮询通过共享声明与持久化去重共同防重。任务绑定和待计费快照使用媒体任务 TTL；当前没有后台轮询，只依赖客户端查询发现完成状态。异步创建返回不明确时不自动重试，避免上游已经受理后重复创建付费任务。
 
 ### Images 历史捕获
 
@@ -100,7 +110,7 @@ OpenAI API Key 账号以 `force_chat_completions` 承接 `/v1/messages` 时，Ch
 
 客户端模型先经过 Key、渠道和账号层映射。OpenAI 内置别名、reasoning effort 归一化、旧版 Compact 端点支持、图像/embedding 能力和传输能力会影响候选账号；模型列表只公开当前分组可请求的结果。
 
-API Key endpoint capability 可通过探测或配置表达 `responses`、`chat_completions`、`embeddings` 等能力。OAuth/Codex 账号还可能包含 Realtime、WebSocket、旧版 Compact 端点状态和客户端身份限制。未知模型可以在管理员明确配置的兼容上游中透传，但没有定价或能力证据时不能虚构价格与功能。
+API Key endpoint capability 可通过探测或配置表达 `responses`、`chat_completions`、`embeddings` 等能力；`seedance` 只接受管理员显式配置，不由普通文本端点探测推断。OAuth/Codex 账号还可能包含 Realtime、WebSocket、旧版 Compact 端点状态和客户端身份限制。未知模型可以在管理员明确配置的兼容上游中透传，但没有定价或能力证据时不能虚构价格与功能。
 
 Images API 的流式与非流式上游请求都脱离客户端请求取消信号继续执行，并由上游响应超时控制最终回收。OpenAI API Key 账号连接测试复用相同的图片模型识别规则，命中后直接测试 `/v1/images/generations`。生图属于长耗时且上游可能已经产生实际成本的媒体任务；客户端中途断开不能取消上游并丢失已完成图片的计费结果。下游写失败不改变图片产出和结算事实。
 

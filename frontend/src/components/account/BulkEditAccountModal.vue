@@ -1126,7 +1126,56 @@
         </div>
       </div>
 
+      <!-- OpenAI API Key 端点能力 -->
       <!-- OpenAI API Key WS mode -->
+      <div v-if="allOpenAIAPIKey" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="mb-3 flex items-center justify-between gap-4">
+          <div class="flex-1">
+            <label
+              id="bulk-edit-openai-endpoint-capabilities-label"
+              class="input-label mb-0"
+              for="bulk-edit-openai-endpoint-capabilities-enabled"
+            >
+              {{ t('admin.accounts.openai.endpointCapabilities') }}
+            </label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.openai.endpointCapabilitiesDesc') }}
+            </p>
+          </div>
+          <input
+            v-model="enableOpenAIEndpointCapabilities"
+            id="bulk-edit-openai-endpoint-capabilities-enabled"
+            type="checkbox"
+            aria-controls="bulk-edit-openai-endpoint-capabilities-body"
+            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+        </div>
+        <div
+          id="bulk-edit-openai-endpoint-capabilities-body"
+          :class="!enableOpenAIEndpointCapabilities && 'pointer-events-none opacity-50'"
+          role="group"
+          aria-labelledby="bulk-edit-openai-endpoint-capabilities-label"
+        >
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label
+              v-for="option in openAIEndpointCapabilityOptions"
+              :key="option.value"
+              class="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-dark-600"
+            >
+              <input
+                type="checkbox"
+                :disabled="!enableOpenAIEndpointCapabilities"
+                class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500"
+                :data-testid="`bulk-edit-openai-endpoint-capability-${option.value}`"
+                :checked="openAIEndpointCapabilities.includes(option.value)"
+                @change="toggleOpenAIEndpointCapability(option.value, $event)"
+              />
+              <span class="text-gray-700 dark:text-gray-200">{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div v-if="allOpenAIAPIKey" class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <div class="mb-3 flex items-center justify-between">
           <label
@@ -1542,7 +1591,7 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
-import type { Proxy as ProxyConfig, AdminGroup, AccountPlatform, AccountType, Account, OpenAICompactMode, OpenAIOAuthClientPolicy } from '@/types'
+import type { Proxy as ProxyConfig, AdminGroup, AccountPlatform, AccountType, Account, OpenAICompactMode, OpenAIOAuthClientPolicy, OpenAIEndpointCapability } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
@@ -1741,6 +1790,7 @@ const enableGroups = ref(false)
 const enableOpenAIPassthrough = ref(false)
 const enableOpenAIFlattenNamespaces = ref(false)
 const enableCodexImageToolMode = ref(false)
+const enableOpenAIEndpointCapabilities = ref(false)
 const enableOpenAIWSMode = ref(false)
 const enableOpenAIAPIKeyWSMode = ref(false)
 const enableCodexCLIOnly = ref(false)
@@ -1797,6 +1847,10 @@ const codexFingerprintModeOptions = computed(() => [
   { value: 'full' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintFull') },
 ])
 const openAICompactMode = ref<OpenAICompactMode>('auto')
+const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>([
+  'chat_completions',
+  'embeddings'
+])
 const openAICompactModelMappings = ref<ModelMapping[]>([])
 const rpmLimitEnabled = ref(false)
 const bulkBaseRpm = ref<number | null>(null)
@@ -1864,6 +1918,42 @@ const openAICompactModeOptions = computed(() => [
   { value: 'force_on', label: t('admin.accounts.openai.compactModeForceOn') },
   { value: 'force_off', label: t('admin.accounts.openai.compactModeForceOff') }
 ])
+const openAIEndpointCapabilityOptions = computed<
+  Array<{ value: OpenAIEndpointCapability; label: string }>
+>(() => [
+  { value: 'chat_completions', label: t('admin.accounts.openai.capabilityTextAuto') },
+  { value: 'embeddings', label: t('admin.accounts.openai.capabilityEmbeddings') },
+  { value: 'seedance', label: 'Seedance (Ark)' }
+])
+
+const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) => {
+  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings', 'seedance']
+  const selected = allowed.filter((value) => values.includes(value))
+  return selected.length > 0
+    ? selected
+    : ['chat_completions', 'embeddings'] as OpenAIEndpointCapability[]
+}
+
+const toggleOpenAIEndpointCapability = (
+  capability: OpenAIEndpointCapability,
+  event?: Event
+) => {
+  if (openAIEndpointCapabilities.value.includes(capability)) {
+    if (openAIEndpointCapabilities.value.length <= 1) {
+      const input = event?.target as HTMLInputElement | null
+      if (input) input.checked = true
+      return
+    }
+    openAIEndpointCapabilities.value = openAIEndpointCapabilities.value.filter(
+      (value) => value !== capability
+    )
+    return
+  }
+  openAIEndpointCapabilities.value = normalizeOpenAIEndpointCapabilities([
+    ...openAIEndpointCapabilities.value,
+    capability
+  ])
+}
 const openAIWSModeConcurrencyHintKey = computed(() =>
   resolveOpenAIWSModeConcurrencyHintKey(openaiOAuthResponsesWebSocketV2Mode.value)
 )
@@ -2193,6 +2283,15 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     applyCodexImageToolMode(extra, codexImageToolMode.value, 'null')
   }
 
+  if (enableOpenAIEndpointCapabilities.value && allOpenAIAPIKey.value) {
+    credentials.openai_capabilities =
+      openAIEndpointCapabilities.value.length === 2 &&
+      !openAIEndpointCapabilities.value.includes('seedance')
+        ? null
+        : [...openAIEndpointCapabilities.value]
+    credentialsChanged = true
+  }
+
   if (enableModelRestriction.value && !isOpenAIModelRestrictionDisabled.value) {
     // Antigravity 账号仍使用 mapping-only 语义，批量修改不能给它写入普通账号的独立白名单字段。
     if (targetSelectedPlatforms.value.length === 1 && targetSelectedPlatforms.value[0] === 'antigravity') {
@@ -2396,6 +2495,7 @@ const handleSubmit = async () => {
     enableOpenAIPassthrough.value ||
     enableOpenAIFlattenNamespaces.value ||
     enableCodexImageToolMode.value ||
+    enableOpenAIEndpointCapabilities.value ||
     enableModelRestriction.value ||
     enableCustomErrorCodes.value ||
     enableInterceptWarmup.value ||
@@ -2544,6 +2644,7 @@ const resetBulkEditFormState = () => {
   enableOpenAIPassthrough.value = false
   enableOpenAIFlattenNamespaces.value = false
   enableCodexImageToolMode.value = false
+  enableOpenAIEndpointCapabilities.value = false
   enableOpenAIWSMode.value = false
   enableOpenAIAPIKeyWSMode.value = false
   enableCodexCLIOnly.value = false
@@ -2562,6 +2663,7 @@ const resetBulkEditFormState = () => {
   openaiPassthroughEnabled.value = false
   openaiFlattenNamespacesEnabled.value = false
   codexImageToolMode.value = 'inherit'
+  openAIEndpointCapabilities.value = ['chat_completions', 'embeddings']
   resetModelRestrictionDraft()
   selectedErrorCodes.value = []
   customErrorCodeInput.value = null

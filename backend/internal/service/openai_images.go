@@ -338,6 +338,25 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 	req.Moderation = strings.TrimSpace(gjson.GetBytes(body, "moderation").String())
 	req.InputFidelity = strings.TrimSpace(gjson.GetBytes(body, "input_fidelity").String())
 	req.Style = strings.TrimSpace(gjson.GetBytes(body, "style").String())
+	// Seedream 在 generations 端点通过 image/reference_images 接收参考图，
+	// 将这些扩展字段纳入内容审核，同时保持原始请求体透传。
+	for _, path := range []string{"image", "reference_images"} {
+		value := gjson.GetBytes(body, path)
+		if !value.Exists() {
+			continue
+		}
+		if value.IsArray() {
+			for _, item := range value.Array() {
+				if imageURL := extractGrokMediaImageURL(item); imageURL != "" {
+					req.InputImageURLs = append(req.InputImageURLs, imageURL)
+				}
+			}
+			continue
+		}
+		if imageURL := extractGrokMediaImageURL(value); imageURL != "" {
+			req.InputImageURLs = append(req.InputImageURLs, imageURL)
+		}
+	}
 	req.HasMask = gjson.GetBytes(body, "mask").Exists()
 	if outputCompression := gjson.GetBytes(body, "output_compression"); outputCompression.Exists() {
 		if outputCompression.Type != gjson.Number {
@@ -536,8 +555,20 @@ func applyOpenAIImagesDefaults(req *OpenAIImagesRequest) {
 
 func isOpenAIImageGenerationModel(model string) bool {
 	return IsGPTImageGenerationModel(model) ||
+		isDoubaoSeedreamModel(model) ||
 		isGrokImageGenerationModel(model) ||
 		isImageGenerationModel(model)
+}
+
+// isDoubaoSeedreamModel 识别火山方舟公开的豆包 Seedream 生图模型族。
+func isDoubaoSeedreamModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "doubao-seedream-")
+}
+
+// isArkInferenceEndpointModel 识别火山方舟控制台创建的推理接入点 ID。
+func isArkInferenceEndpointModel(model string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "ep-")
 }
 
 // IsGPTImageGenerationModel 判断模型是否属于 GPT 原生生图模型族。
@@ -670,7 +701,8 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 		return nil, err
 	}
 	upstreamModel := resolveOpenAIAccountUpstreamModelForRequest(account, requestModel, false, false)
-	if err := validateOpenAIImagesModel(upstreamModel); err != nil {
+	if err := validateOpenAIImagesModel(upstreamModel); err != nil &&
+		!(isDoubaoSeedreamModel(requestModel) && isArkInferenceEndpointModel(upstreamModel)) {
 		return nil, err
 	}
 	logger.LegacyPrintf(

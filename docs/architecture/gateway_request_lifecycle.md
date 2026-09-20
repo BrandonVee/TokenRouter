@@ -20,7 +20,7 @@
 
 | 入口族 | 主要用途 | 处理器分派 |
 | --- | --- | --- |
-| `/v1`、裸 `/models`/`responses` 等兼容别名 | Anthropic Messages、OpenAI Responses/Chat/Embeddings、图片、视频、模型与用量 | 根据所选分组平台进入 `GatewayHandler`、`OpenAIGatewayHandler` 或 `QoderGatewayHandler` |
+| `/v1`、裸 `/models`/`responses` 等兼容别名 | Anthropic Messages、OpenAI Responses/Chat/Embeddings、图片、视频、模型与用量；`/api/v3`、`/v3` 和兼容别名另承接 Ark Seedance 原生任务 | 根据所选分组平台进入 `GatewayHandler`、`OpenAIGatewayHandler` 或 `QoderGatewayHandler` |
 | `/v1beta` | Gemini 原生模型、生成、流式生成、token 统计 | Google 形状的 API Key 认证和 Gemini/Antigravity 兼容服务 |
 | `/antigravity/v1`、`/antigravity/v1beta` | 强制 Antigravity 平台的 Claude/Gemini 专用入口 | 在上下文写入 force platform，再复用通用 handler 与调度 |
 | `/backend-api/codex` | Codex/ChatGPT 风格 Responses、Realtime 和 sideband | OpenAI handler；部分路径有专用认证/路由限制 |

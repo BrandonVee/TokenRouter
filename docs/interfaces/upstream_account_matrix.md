@@ -71,9 +71,9 @@ Kimi、智谱 GLM、DeepSeek API Key 账号支持 `adaptive` 协议：同一账�
 | 模型与用量：`/v1/models`、`/models`、`/v1/usage` | 按 Key、分组、账号和渠道解析可请求模型与本地额度；不是上游模型列表或账单的原样代理 | [模型目录与市场](model_catalog_and_marketplace.md)及各平台专题 |
 | Embeddings：`/v1/embeddings`、`/embeddings` | 仅 OpenAI 分组 | [OpenAI 上游](openai_upstream.md) |
 | Realtime、Live 与 Alpha Search | Live/sideband、Codex realtime 和 alpha search 仅 OpenAI 平台；是否可用还受分组和账号能力限制 | [OpenAI 上游](openai_upstream.md) |
-| 同步图片生成/编辑 | 仅 OpenAI 与 Grok；分组图片开关和账号能力继续收窄范围 | [OpenAI 上游](openai_upstream.md)、[Grok / xAI 上游](grok_upstream.md) |
+| 同步图片生成/编辑 | 仅 OpenAI 与 Grok；OpenAI API Key 兼容上游包含 `doubao-seedream-*`，分组图片开关和账号能力继续收窄范围 | [OpenAI 上游](openai_upstream.md)、[Grok / xAI 上游](grok_upstream.md) |
 | 批量图片作业 | Gemini/Vertex 使用独立任务生命周期；供应商范围由批量图片领域契约定义 | [批量图片作业](../domains/batch_image_jobs.md) |
-| 视频生成、编辑、扩展、查询和下载 | 新任务仅 Grok；复合 Key 可凭持久任务绑定查询既有任务 | [Grok / xAI 上游](grok_upstream.md) |
+| 视频生成、编辑、扩展、查询和下载 | OpenAI API Key 可用显式 `seedance` 能力承接 Ark 原生创建/查询/删除；Grok 保留 OpenAI 风格生成、编辑、扩展、查询和下载；复合 Key 均凭持久任务绑定查询既有任务 | [OpenAI 上游](openai_upstream.md)、[Grok / xAI 上游](grok_upstream.md) |
 | Gemini v1beta：`/v1beta/models/*` | Gemini/Antigravity 分组允许 Gemini 协议时承接生成、流式生成和 token 统计；模型列表 GET 不受开关影响 | [Gemini 上游](gemini_upstream.md)、[Antigravity 上游](antigravity_upstream.md) |
 | Antigravity 专用入口：`/antigravity/*` | 强制只选择 Antigravity 账号，不参与混合调度 | [Antigravity 上游](antigravity_upstream.md) |
 
