@@ -723,11 +723,13 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 		testModelID = openai.DefaultTestModel
 	}
 
+	requestedModelID := testModelID
 	// 测试请求先应用普通账号模型映射；原生 v2 压缩不使用旧端点专属映射。
 	testModelID = account.GetMappedModel(testModelID)
 
-	// 图片模型始终优先走生图测试，避免客户端残留 compact 模式把它送入文本压缩探测。
-	if isOpenAIImageModel(testModelID) {
+	// 图片模型始终优先走生图测试。公开 Seedream 名可映射为 ep-* 接入点，
+	// 因此必须同时检查映射前的模型名，避免接入点 ID 被误送到 Chat 测试。
+	if isOpenAIImageModel(requestedModelID) || isOpenAIImageModel(testModelID) {
 		imagePrompt := strings.TrimSpace(prompt)
 		if imagePrompt == "" {
 			imagePrompt = defaultOpenAIImageTestPrompt

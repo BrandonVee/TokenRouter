@@ -303,7 +303,7 @@ const supportsGeminiImageTest = computed(() => {
 
 const supportsOpenAIImageTest = computed(() => {
   const modelID = selectedModelId.value.toLowerCase()
-  if (!modelID.startsWith('gpt-image-')) return false
+  if (!modelID.startsWith('gpt-image-') && !modelID.startsWith('doubao-seedream-')) return false
   return props.account?.platform === 'openai'
 })
 

@@ -112,7 +112,7 @@ OpenAI API Key 账号以 `force_chat_completions` 承接 `/v1/messages` 时，Ch
 
 API Key endpoint capability 可通过探测或配置表达 `responses`、`chat_completions`、`embeddings` 等能力；`seedance` 只接受管理员显式配置，不由普通文本端点探测推断。OAuth/Codex 账号还可能包含 Realtime、WebSocket、旧版 Compact 端点状态和客户端身份限制。未知模型可以在管理员明确配置的兼容上游中透传，但没有定价或能力证据时不能虚构价格与功能。
 
-Images API 的流式与非流式上游请求都脱离客户端请求取消信号继续执行，并由上游响应超时控制最终回收。OpenAI API Key 账号连接测试复用相同的图片模型识别规则，命中后直接测试 `/v1/images/generations`。生图属于长耗时且上游可能已经产生实际成本的媒体任务；客户端中途断开不能取消上游并丢失已完成图片的计费结果。下游写失败不改变图片产出和结算事实。
+Images API 的流式与非流式上游请求都脱离客户端请求取消信号继续执行，并由上游响应超时控制最终回收。OpenAI API Key 账号连接测试复用相同的图片模型识别规则，命中后直接测试 `/v1/images/generations`；`doubao-seedream-*` 映射为 Ark `ep-*` 接入点时仍按映射前的模型族选择 Images 测试。生图属于长耗时且上游可能已经产生实际成本的媒体任务；客户端中途断开不能取消上游并丢失已完成图片的计费结果。下游写失败不改变图片产出和结算事实。
 
 OAuth Images 通过 Responses 主控模型调用独立的 `image_generation` 工具模型：当前内置 GPT Image 2.5 Flare/Sunburst，主控模型默认 `gpt-5.6-luna`，可通过 `SUB2API_IMAGES_MAIN_MODEL` 运维覆盖。模型列表、账号测试、请求转换和计费均保留工具模型与主控模型的区分；远程价表尚未包含 GPT Image 2.5 时使用内置价格兜底，不能回退到旧图片模型价格。主控模型被套餐门控拒绝属于配置错误，不应冷却图片模型或账号。
 

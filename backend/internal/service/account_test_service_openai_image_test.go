@@ -19,6 +19,7 @@ func TestIsOpenAIImageModel_AllowsGeminiCompatibleImageModel(t *testing.T) {
 	require.True(t, isOpenAIImageModel("gemini-3-pro-image-c"))
 	require.False(t, isOpenAIImageModel("gemini-3-pro"))
 	require.True(t, isOpenAIImageModel("firefly-nano-banana2"))
+	require.True(t, isOpenAIImageModel("doubao-seedream-5-0-pro-260628"))
 }
 
 func TestAccountTestService_OpenAIImageOAuthHandlesOutputItemDoneFallback(t *testing.T) {
@@ -200,6 +201,43 @@ func TestAccountTestService_OpenAICompatibleGeminiImageUsesImagesEndpoint(t *tes
 	require.NotNil(t, upstream.lastReq)
 	require.Equal(t, "https://image-upstream.example/v1/images/generations", upstream.lastReq.URL.String())
 	require.Equal(t, "gemini-3-pro-image-c", gjson.GetBytes(upstream.lastBody, "model").String())
+}
+
+// TestAccountTestService_SeedreamMappedEndpointUsesImagesEndpoint 验证公开 Seedream 名映射为 Ark 接入点后仍走生图测试。
+func TestAccountTestService_SeedreamMappedEndpointUsesImagesEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/1/test", nil)
+
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"data":[{"url":"https://ark.example.test/seedream.png"}]}`)),
+		},
+	}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: &config.Config{}}
+	account := &Account{
+		ID:       59,
+		Name:     "ark-seedream",
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key":  "ark-test-key",
+			"base_url": "https://ark.cn-beijing.volces.com/api/v3",
+			"model_mapping": map[string]any{
+				"doubao-seedream-5-0-pro-260628": "ep-20260920-test",
+			},
+		},
+	}
+
+	err := svc.testOpenAIAccountConnection(c, account, "doubao-seedream-5-0-pro-260628", "draw a cat", AccountTestModeCompact)
+	require.NoError(t, err)
+	require.NotNil(t, upstream.lastReq)
+	require.Equal(t, "https://ark.cn-beijing.volces.com/api/v3/images/generations", upstream.lastReq.URL.String())
+	require.Equal(t, "ep-20260920-test", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.Equal(t, "draw a cat", gjson.GetBytes(upstream.lastBody, "prompt").String())
 }
 
 // TestAccountTestService_OpenAIImageAPIKeyPreservesURL 验证兼容供应商返回远程图片地址时仍能直接预览。

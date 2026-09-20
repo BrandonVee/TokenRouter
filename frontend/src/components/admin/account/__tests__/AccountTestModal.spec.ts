@@ -335,4 +335,39 @@ describe('AccountTestModal', () => {
       prompt: 'draw a tiny orange cat astronaut'
     })
   })
+
+  it('豆包 Seedream 模型使用生图测试并隐藏文本测试模式', async () => {
+    getAvailableModels.mockResolvedValue([
+      { id: 'doubao-seedream-5-0-pro-260628', display_name: 'Doubao Seedream 5.0 Pro' }
+    ])
+    global.fetch = vi.fn().mockResolvedValue(
+      createStreamResponse([
+        'data: {"type":"test_complete","success":true}\n'
+      ])
+    ) as any
+
+    const wrapper = mountModal({
+      id: 44,
+      name: 'Ark Seedream',
+      platform: 'openai',
+      type: 'apikey',
+      status: 'active'
+    })
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const promptInput = wrapper.find('textarea.textarea-stub')
+    expect(promptInput.exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('admin.accounts.openai.testMode')
+    await promptInput.setValue('draw a Seedream test image')
+
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    const [, request] = (global.fetch as any).mock.calls[0]
+    expect(JSON.parse(request.body)).toEqual({
+      model_id: 'doubao-seedream-5-0-pro-260628',
+      prompt: 'draw a Seedream test image'
+    })
+  })
 })

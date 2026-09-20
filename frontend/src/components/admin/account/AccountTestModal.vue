@@ -445,6 +445,7 @@ const supportsOpenAIImageTest = computed(() => {
   const modelID = selectedModelId.value.trim().toLowerCase()
   // 兼容供应商可能使用 Firefly/Nano Banana 命名，但返回标准 Images 响应。
   const isImageModel = modelID.startsWith('gpt-image-') ||
+    modelID.startsWith('doubao-seedream-') ||
     modelID.startsWith('firefly-') ||
     modelID.includes('nano-banana') ||
     isGeminiImageTestModel(modelID)
