@@ -602,11 +602,6 @@ func (h *OpenAIGatewayHandler) resolveCompositeMediaVideoAPIKey(
 	return nil, 0, lookupErr
 }
 
-// compositeGrokVideoGroupSnapshot 优先复用鉴权快照，映射已移除时构造仅供旧任务查询的最小分组视图。
-func compositeGrokVideoGroupSnapshot(apiKey *service.APIKey, groupID int64) *service.Group {
-	return compositeMediaVideoGroupSnapshot(apiKey, groupID, service.PlatformGrok)
-}
-
 // compositeMediaVideoGroupSnapshot 为异步媒体任务恢复指定平台的分组快照。
 func compositeMediaVideoGroupSnapshot(apiKey *service.APIKey, groupID int64, platform string) *service.Group {
 	if apiKey != nil {

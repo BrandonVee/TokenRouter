@@ -702,7 +702,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	}
 	upstreamModel := resolveOpenAIAccountUpstreamModelForRequest(account, requestModel, false, false)
 	if err := validateOpenAIImagesModel(upstreamModel); err != nil &&
-		!(isDoubaoSeedreamModel(requestModel) && isArkInferenceEndpointModel(upstreamModel)) {
+		(!isDoubaoSeedreamModel(requestModel) || !isArkInferenceEndpointModel(upstreamModel)) {
 		return nil, err
 	}
 	logger.LegacyPrintf(
