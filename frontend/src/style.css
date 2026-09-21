@@ -1375,3 +1375,102 @@ input[type='radio']:not(.sr-only) {
   accent-color: #12a7e8;
   cursor: pointer;
 }
+
+/* Ant 日期弹层挂载到 body，使用全局选择器确保明暗主题不会在 Teleport 边界丢失。 */
+.dark :is(.tokenrouter-date-time-picker, .tokenrouter-date-range-picker) {
+  color: #f2f3f5 !important;
+  background: #252a2f !important;
+  border-color: #4d535d !important;
+}
+
+.dark :is(.tokenrouter-date-time-picker, .tokenrouter-date-range-picker) .ant-picker-input > input {
+  color: #f2f3f5 !important;
+}
+
+.dark :is(.tokenrouter-date-time-picker, .tokenrouter-date-range-picker) .ant-picker-input > input::placeholder {
+  color: #848b97 !important;
+}
+
+.dark :is(.tokenrouter-date-time-picker, .tokenrouter-date-range-picker) :is(.ant-picker-suffix, .ant-picker-separator, .ant-picker-clear) {
+  color: #a7adb7 !important;
+  background: transparent !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-panel-container {
+  color: #f2f3f5 !important;
+  background: #2a2e35 !important;
+  border: 1px solid #4d535d;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.42) !important;
+}
+
+.dark .tokenrouter-ant-date-popup :is(.ant-picker-panel, .ant-picker-footer, .ant-picker-datetime-panel .ant-picker-time-panel) {
+  color: #f2f3f5 !important;
+  background: #2a2e35 !important;
+  border-color: #393e46 !important;
+}
+
+.dark .tokenrouter-ant-date-popup :is(.ant-picker-header, .ant-picker-header button, .ant-picker-content th) {
+  color: #c5c9d0 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-header button:hover {
+  color: #4dd4f6 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-cell {
+  color: #666e79 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-in-view {
+  color: #dee1e6 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-in-view.ant-picker-cell-in-range::before,
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-in-view.ant-picker-cell-range-start:not(.ant-picker-cell-range-start-single)::before,
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-in-view.ant-picker-cell-range-end:not(.ant-picker-cell-range-end-single)::before {
+  background: rgb(18 167 232 / 0.2) !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-cell .ant-picker-cell-inner:hover,
+.dark .tokenrouter-ant-date-popup .ant-picker-time-panel-column > li.ant-picker-time-panel-cell .ant-picker-time-panel-cell-inner:hover {
+  color: #f2f3f5 !important;
+  background: #393e46 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-selected .ant-picker-cell-inner,
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-range-start .ant-picker-cell-inner,
+.dark .tokenrouter-ant-date-popup .ant-picker-cell-range-end .ant-picker-cell-inner,
+.dark .tokenrouter-ant-date-popup .ant-picker-time-panel-cell-selected .ant-picker-time-panel-cell-inner {
+  color: #ffffff !important;
+  background: #0b8fd8 !important;
+}
+
+.dark .tokenrouter-ant-date-popup :is(.ant-picker-time-panel-column, .ant-picker-time-panel-cell-inner) {
+  color: #dee1e6 !important;
+  background: #2a2e35 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-time-panel-column:not(:first-child) {
+  border-color: #393e46 !important;
+}
+
+.dark .tokenrouter-ant-date-popup :is(.ant-picker-presets, .ant-picker-presets ul, .ant-picker-presets li) {
+  color: #dee1e6 !important;
+  background: #252a2f !important;
+  border-color: #393e46 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-presets li:hover {
+  color: #4dd4f6 !important;
+  background: #393e46 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-now-btn {
+  color: #4dd4f6 !important;
+}
+
+.dark .tokenrouter-ant-date-popup .ant-picker-ok button {
+  color: #ffffff !important;
+  background: #0b8fd8 !important;
+  border-color: #0b8fd8 !important;
+}

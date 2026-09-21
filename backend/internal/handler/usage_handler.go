@@ -280,21 +280,20 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 	// 日期范围使用半开区间 [start, end)，与用量列表语义一致。
 	userTZ := c.Query("timezone")
 	if startDateStr := c.Query("start_date"); startDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+		t, err := parseUsageErrorFilterTime(startDateStr, userTZ, false)
 		if err != nil {
-			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss")
 			return
 		}
-		filter.StartTime = &t
+		filter.StartTime = t
 	}
 	if endDateStr := c.Query("end_date"); endDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+		t, err := parseUsageErrorFilterTime(endDateStr, userTZ, true)
 		if err != nil {
-			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
+			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss")
 			return
 		}
-		t = t.AddDate(0, 0, 1)
-		filter.EndTime = &t
+		filter.EndTime = t
 	}
 
 	filter.Model = strings.TrimSpace(c.Query("model"))
@@ -334,6 +333,19 @@ func (h *UsageHandler) ListErrors(c *gin.Context) {
 		return
 	}
 	response.Paginated(c, result.Items, int64(result.Total), result.Page, result.PageSize)
+}
+
+// parseUsageErrorFilterTime 同时兼容旧版纯日期与新版日期时间筛选值。
+func parseUsageErrorFilterTime(raw, userTZ string, endBoundary bool) (*time.Time, error) {
+	parsed, dateOnly, err := timezone.ParseDateTimeInUserLocation(raw, userTZ)
+	if err != nil {
+		return nil, err
+	}
+	if endBoundary && dateOnly {
+		// 日期输入覆盖整天；日期时间输入按用户选择的精确时分作为排他结束边界。
+		parsed = parsed.AddDate(0, 0, 1)
+	}
+	return &parsed, nil
 }
 
 // GetErrorDetail 获取当前用户自己的单条失败请求脱敏详情。

@@ -26,9 +26,9 @@ import DatePicker from 'ant-design-vue/es/date-picker'
 import ConfigProvider from 'ant-design-vue/es/config-provider'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import enUS from 'ant-design-vue/es/locale/en_US'
-import theme from 'ant-design-vue/es/theme'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTheme } from '@/composables/useTheme'
+import { createDatePickerTheme } from './datePickerTheme'
 
 const props = withDefaults(defineProps<{
   modelValue?: string | null
@@ -57,15 +57,7 @@ const { t, locale } = useI18n()
 const { isDark } = useTheme()
 
 const antLocale = computed(() => locale.value.toLowerCase().startsWith('zh') ? zhCN : enUS)
-const antTheme = computed(() => ({
-  algorithm: isDark.value ? theme.darkAlgorithm : theme.defaultAlgorithm,
-  token: {
-    colorPrimary: '#2563eb',
-    borderRadius: 8,
-    controlHeight: 40,
-    fontSize: 14,
-  },
-}))
+const antTheme = computed(() => createDatePickerTheme(isDark.value))
 
 const pickerValue = computed(() => {
   const value = props.modelValue?.trim()
@@ -185,8 +177,8 @@ const handleChange = (value: Dayjs | string | null) => {
 }
 
 :global(.dark) .tokenrouter-date-time-picker {
-  border-color: rgb(71 85 105);
-  background: rgb(15 23 42);
+  border-color: #4d535d;
+  background: #252a2f;
 }
 
 :global(.tokenrouter-ant-date-popup) {

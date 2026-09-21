@@ -41,28 +41,29 @@ const mountPicker = () => mount(DateRangePicker, {
 })
 
 describe('DateRangePicker', () => {
-  it('直接渲染单层 Ant Design Vue 范围选择器和快捷项', () => {
+  it('直接渲染带时分选择的单层范围面板和快捷项', () => {
     const wrapper = mountPicker()
     const picker = wrapper.findComponent(DatePicker.RangePicker)
 
     expect(picker.exists()).toBe(true)
     expect(wrapper.find('.date-picker-trigger').exists()).toBe(false)
+    expect(picker.props('showTime')).toMatchObject({ format: 'HH:mm', minuteStep: 5 })
     expect((picker.props('presets') as RangePreset[]).map((preset) => preset.label)).toContain('Last 7 Days')
   })
 
-  it('完成手动范围选择后立即应用日期', async () => {
+  it('完成手动范围选择后立即应用日期和时分', async () => {
     const wrapper = mountPicker()
     wrapper.findComponent(DatePicker.RangePicker).vm.$emit('change', [
-      dayjs('2026-09-05'),
-      dayjs('2026-09-18'),
+      dayjs('2026-09-05T08:35:00'),
+      dayjs('2026-09-18T19:45:00'),
     ])
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.emitted('update:startDate')?.[0]).toEqual(['2026-09-05'])
-    expect(wrapper.emitted('update:endDate')?.[0]).toEqual(['2026-09-18'])
+    expect(wrapper.emitted('update:startDate')?.[0]).toEqual(['2026-09-05T08:35:00'])
+    expect(wrapper.emitted('update:endDate')?.[0]).toEqual(['2026-09-18T19:45:00'])
     expect(wrapper.emitted('change')?.[0]).toEqual([{
-      startDate: '2026-09-05',
-      endDate: '2026-09-18',
+      startDate: '2026-09-05T08:35:00',
+      endDate: '2026-09-18T19:45:00',
       preset: null,
     }])
   })
@@ -95,5 +96,22 @@ describe('DateRangePicker', () => {
     expect(emitted.preset).toBe('last15Minutes')
     expect(emitted.startDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
     expect(emitted.endDate).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+  })
+
+  it('显式关闭时间选择时保持仅日期输出', async () => {
+    const wrapper = mount(DateRangePicker, {
+      props: {
+        startDate: '2026-09-01',
+        endDate: '2026-09-20',
+        showTime: false,
+      },
+    })
+    const picker = wrapper.findComponent(DatePicker.RangePicker)
+    picker.vm.$emit('change', [dayjs('2026-09-05T08:35:00'), dayjs('2026-09-18T19:45:00')])
+    await wrapper.vm.$nextTick()
+
+    expect(picker.props('showTime')).toBe(false)
+    expect(wrapper.emitted('update:startDate')?.[0]).toEqual(['2026-09-05'])
+    expect(wrapper.emitted('update:endDate')?.[0]).toEqual(['2026-09-18'])
   })
 })

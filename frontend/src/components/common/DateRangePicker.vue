@@ -6,6 +6,7 @@
       :allow-clear="false"
       :disabled-date="disabledCalendarDate"
       :format="rangeDisplayFormat"
+      :show-time="rangeTimeOptions"
       :placeholder="[t('dates.startDate'), t('dates.endDate')]"
       :presets="antPresets"
       placement="bottomLeft"
@@ -23,9 +24,9 @@ import DatePicker from 'ant-design-vue/es/date-picker'
 import ConfigProvider from 'ant-design-vue/es/config-provider'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import enUS from 'ant-design-vue/es/locale/en_US'
-import theme from 'ant-design-vue/es/theme'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTheme } from '@/composables/useTheme'
+import { createDatePickerTheme } from './datePickerTheme'
 
 interface DatePreset {
   labelKey: string
@@ -37,6 +38,7 @@ interface DatePreset {
 interface Props {
   startDate: string
   endDate: string
+  showTime?: boolean
 }
 
 interface Emits {
@@ -45,7 +47,9 @@ interface Emits {
   (event: 'change', range: { startDate: string; endDate: string; preset: string | null }): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  showTime: true,
+})
 const emit = defineEmits<Emits>()
 
 const { t, locale } = useI18n()
@@ -53,18 +57,17 @@ const { isDark } = useTheme()
 const AntRangePicker = DatePicker.RangePicker
 
 const antLocale = computed(() => locale.value.toLowerCase().startsWith('zh') ? zhCN : enUS)
-const antTheme = computed(() => ({
-  algorithm: isDark.value ? theme.darkAlgorithm : theme.defaultAlgorithm,
-  token: {
-    colorPrimary: '#2563eb',
-    borderRadius: 8,
-    controlHeight: 40,
-    fontSize: 14,
-  },
-}))
-const rangeDisplayFormat = computed(() => locale.value.toLowerCase().startsWith('zh')
-  ? 'YYYY年M月D日'
-  : 'MMM D, YYYY')
+const antTheme = computed(() => createDatePickerTheme(isDark.value))
+const rangeDisplayFormat = computed(() => {
+  const isChinese = locale.value.toLowerCase().startsWith('zh')
+  if (props.showTime) return isChinese ? 'YYYY年M月D日 HH:mm' : 'MMM D, YYYY HH:mm'
+  return isChinese ? 'YYYY年M月D日' : 'MMM D, YYYY'
+})
+const rangeTimeOptions = computed(() => props.showTime ? {
+  format: 'HH:mm',
+  minuteStep: 5,
+  hideDisabledOptions: true,
+} : false)
 
 const formatDateToString = (date: Date): string => {
   const year = date.getFullYear()
@@ -117,7 +120,10 @@ const presets: DatePreset[] = [
   {
     labelKey: 'dates.today',
     value: 'today',
-    getRange: () => ({ start: today.value, end: today.value }),
+    getRange: () => ({
+      start: `${today.value}T00:00:00`,
+      end: formatDateTimeToString(new Date()),
+    }),
   },
   {
     labelKey: 'dates.yesterday',
@@ -126,17 +132,18 @@ const presets: DatePreset[] = [
       const date = new Date()
       date.setDate(date.getDate() - 1)
       const value = formatDateToString(date)
-      return { start: value, end: value }
+      return { start: `${value}T00:00:00`, end: `${value}T23:59:59` }
     },
   },
   {
     labelKey: 'dates.last24Hours',
     value: 'last24Hours',
+    durationMs: 24 * 60 * 60 * 1000,
     getRange: () => {
       const end = new Date()
       return {
-        start: formatDateToString(new Date(end.getTime() - 24 * 60 * 60 * 1000)),
-        end: formatDateToString(end),
+        start: formatDateTimeToString(new Date(end.getTime() - 24 * 60 * 60 * 1000)),
+        end: formatDateTimeToString(end),
       }
     },
   },
@@ -146,7 +153,7 @@ const presets: DatePreset[] = [
     getRange: () => {
       const date = new Date()
       date.setDate(date.getDate() - 6)
-      return { start: formatDateToString(date), end: today.value }
+      return { start: `${formatDateToString(date)}T00:00:00`, end: formatDateTimeToString(new Date()) }
     },
   },
   {
@@ -155,7 +162,7 @@ const presets: DatePreset[] = [
     getRange: () => {
       const date = new Date()
       date.setDate(date.getDate() - 13)
-      return { start: formatDateToString(date), end: today.value }
+      return { start: `${formatDateToString(date)}T00:00:00`, end: formatDateTimeToString(new Date()) }
     },
   },
   {
@@ -164,7 +171,7 @@ const presets: DatePreset[] = [
     getRange: () => {
       const date = new Date()
       date.setDate(date.getDate() - 29)
-      return { start: formatDateToString(date), end: today.value }
+      return { start: `${formatDateToString(date)}T00:00:00`, end: formatDateTimeToString(new Date()) }
     },
   },
   {
@@ -173,8 +180,8 @@ const presets: DatePreset[] = [
     getRange: () => {
       const now = new Date()
       return {
-        start: formatDateToString(new Date(now.getFullYear(), now.getMonth(), 1)),
-        end: today.value,
+        start: `${formatDateToString(new Date(now.getFullYear(), now.getMonth(), 1))}T00:00:00`,
+        end: formatDateTimeToString(now),
       }
     },
   },
@@ -184,8 +191,8 @@ const presets: DatePreset[] = [
     getRange: () => {
       const now = new Date()
       return {
-        start: formatDateToString(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-        end: formatDateToString(new Date(now.getFullYear(), now.getMonth(), 0)),
+        start: `${formatDateToString(new Date(now.getFullYear(), now.getMonth() - 1, 1))}T00:00:00`,
+        end: `${formatDateToString(new Date(now.getFullYear(), now.getMonth(), 0))}T23:59:59`,
       }
     },
   },
@@ -201,7 +208,11 @@ const antPresets = computed(() => presets.map((preset) => ({
   label: t(preset.labelKey),
   value: (() => {
     const range = preset.getRange()
-    return [dayjs(range.start), dayjs(range.end)] as [Dayjs, Dayjs]
+    const start = dayjs(range.start)
+    const end = dayjs(range.end)
+    return props.showTime
+      ? [start, end] as [Dayjs, Dayjs]
+      : [start.startOf('day'), end.startOf('day')] as [Dayjs, Dayjs]
   })(),
 })))
 
@@ -218,13 +229,23 @@ const resolvePreset = (startValue: string, endValue: string): DatePreset | null 
 
   for (const preset of presets) {
     const range = preset.getRange()
-    if (!preset.durationMs && range.start === startValue.slice(0, 10) && range.end === endValue.slice(0, 10)) {
+    if (!props.showTime && range.start.slice(0, 10) === startValue.slice(0, 10) && range.end.slice(0, 10) === endValue.slice(0, 10)) {
       return preset
     }
-    if (preset.durationMs && startMs !== null && endMs !== null) {
+    if (props.showTime && preset.durationMs && startMs !== null && endMs !== null) {
       const durationDrift = Math.abs(endMs - startMs - preset.durationMs)
       const endDrift = Math.abs(Date.now() - endMs)
       if (durationDrift <= 1000 && endDrift <= 90 * 1000) return preset
+    }
+    if (props.showTime && !preset.durationMs && startMs !== null && endMs !== null) {
+      const presetStartMs = parseRangeTime(range.start)
+      const presetEndMs = parseRangeTime(range.end)
+      if (
+        presetStartMs !== null &&
+        presetEndMs !== null &&
+        Math.abs(presetStartMs - startMs) <= 1000 &&
+        Math.abs(presetEndMs - endMs) <= 90 * 1000
+      ) return preset
     }
   }
   return null
@@ -239,9 +260,9 @@ const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null)
   const rawStart = start.format('YYYY-MM-DDTHH:mm:ss')
   const rawEnd = end.format('YYYY-MM-DDTHH:mm:ss')
   const preset = resolvePreset(rawStart, rawEnd)
-  const preserveTime = Boolean(preset?.durationMs)
-  const startDate = start.format(preserveTime ? 'YYYY-MM-DDTHH:mm:ss' : 'YYYY-MM-DD')
-  const endDate = end.format(preserveTime ? 'YYYY-MM-DDTHH:mm:ss' : 'YYYY-MM-DD')
+  const outputFormat = props.showTime ? 'YYYY-MM-DDTHH:mm:ss' : 'YYYY-MM-DD'
+  const startDate = start.format(outputFormat)
+  const endDate = end.format(outputFormat)
 
   // 完成范围选择或点击快捷项后立即应用，省去第二层“应用”确认。
   emit('update:startDate', startDate)
@@ -256,7 +277,7 @@ const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null)
 
 <style scoped>
 .tokenrouter-date-range-picker {
-  min-width: 17rem;
+  min-width: 25rem;
   border-color: rgb(15 23 42 / 0.1);
   background: rgb(255 255 255);
   box-shadow: none;
@@ -269,8 +290,8 @@ const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null)
 }
 
 :global(.dark) .tokenrouter-date-range-picker {
-  border-color: rgb(71 85 105);
-  background: rgb(15 23 42);
+  border-color: #4d535d;
+  background: #252a2f;
 }
 
 :global(.tokenrouter-ant-date-popup) {
@@ -284,7 +305,8 @@ const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null)
 
 @media (max-width: 640px) {
   .tokenrouter-date-range-picker {
-    min-width: min(17rem, calc(100vw - 2rem));
+    min-width: min(25rem, calc(100vw - 2rem));
+    width: min(25rem, calc(100vw - 2rem));
   }
 
   :global(.tokenrouter-ant-date-range-popup) {
