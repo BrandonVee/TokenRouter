@@ -831,24 +831,66 @@ func TestGetModelPricing_OpenAICompactAliasUsesStaticFallback(t *testing.T) {
 	require.InDelta(t, 3e-5, got.OutputCostPerToken, 1e-12)
 }
 
-func TestGetModelPricing_ClaudeOpus48UsesStaticFallbackWhenRemoteMissing(t *testing.T) {
+// 目录缺失新版本键时，族表必须沿显式 pricing 链回退到同价条目：缺失 claude-opus-5
+// 时回退 claude-opus-4-8，缺失 claude-opus-4-8 时回退 claude-opus-4-7；
+// 不能掉进 "opus-4" 系列按 $15/$75 计费（3 倍超收）。
+func TestGetModelPricing_ClaudeOpusFamilyFallsBackAlongPricingChain(t *testing.T) {
 	opus4Pricing := &LiteLLMModelPricing{InputCostPerToken: 15e-6, OutputCostPerToken: 75e-6}
-	svc := &PricingService{
-		pricingData: map[string]*LiteLLMModelPricing{
-			"claude-opus-4-20250514": opus4Pricing,
-		},
+	opus48Pricing := &LiteLLMModelPricing{
+		InputCostPerToken:                   5e-6,
+		OutputCostPerToken:                  25e-6,
+		CacheCreationInputTokenCost:         6.25e-6,
+		CacheCreationInputTokenCostAbove1hr: 10e-6,
+		CacheReadInputTokenCost:             0.5e-6,
+		SupportsPromptCaching:               true,
+		SupportsServiceTier:                 true,
 	}
 
-	got := svc.GetModelPricing("claude-opus-4-8")
-	require.NotNil(t, got)
-	require.NotSame(t, opus4Pricing, got)
-	require.InDelta(t, 5e-6, got.InputCostPerToken, 1e-12)
-	require.InDelta(t, 25e-6, got.OutputCostPerToken, 1e-12)
-	require.InDelta(t, 6.25e-6, got.CacheCreationInputTokenCost, 1e-12)
-	require.InDelta(t, 10e-6, got.CacheCreationInputTokenCostAbove1hr, 1e-12)
-	require.InDelta(t, 0.5e-6, got.CacheReadInputTokenCost, 1e-12)
-	require.True(t, got.SupportsPromptCaching)
-	require.True(t, got.SupportsServiceTier)
+	t.Run("缺少 claude-opus-4-8 时回退到 4.7", func(t *testing.T) {
+		svc := &PricingService{pricingData: map[string]*LiteLLMModelPricing{
+			"claude-opus-4-20250514": opus4Pricing,
+			"claude-opus-4-7":        opus48Pricing,
+		}}
+
+		got := svc.GetModelPricing("claude-opus-4-8")
+		require.NotNil(t, got)
+		require.NotSame(t, opus4Pricing, got)
+		require.InDelta(t, 5e-6, got.InputCostPerToken, 1e-12)
+		require.InDelta(t, 25e-6, got.OutputCostPerToken, 1e-12)
+		require.InDelta(t, 6.25e-6, got.CacheCreationInputTokenCost, 1e-12)
+		require.InDelta(t, 10e-6, got.CacheCreationInputTokenCostAbove1hr, 1e-12)
+		require.InDelta(t, 0.5e-6, got.CacheReadInputTokenCost, 1e-12)
+		require.True(t, got.SupportsPromptCaching)
+		require.True(t, got.SupportsServiceTier)
+	})
+
+	t.Run("缺少 claude-opus-5 时回退到 4.8", func(t *testing.T) {
+		svc := &PricingService{pricingData: map[string]*LiteLLMModelPricing{
+			"claude-opus-4-20250514": opus4Pricing,
+			"claude-opus-4-8":        opus48Pricing,
+		}}
+
+		for _, model := range []string{"claude-opus-5", "claude-opus-5-20260101", "claudeopus5"} {
+			got := svc.GetModelPricing(model)
+			require.NotNil(t, got, "model %s", model)
+			require.InDelta(t, 5e-6, got.InputCostPerToken, 1e-12, model)
+			require.InDelta(t, 25e-6, got.OutputCostPerToken, 1e-12, model)
+		}
+	})
+
+	t.Run("离线目录下 claude-opus-5 不按 opus-4 计费", func(t *testing.T) {
+		body, err := os.ReadFile(filepath.Join("..", "..", "resources", "model-pricing", "model_prices_and_context_window.json"))
+		require.NoError(t, err)
+		svc := &PricingService{}
+		pricingData, err := svc.parsePricingData(body)
+		require.NoError(t, err)
+		svc.pricingData = pricingData
+
+		got := svc.GetModelPricing("claude-opus-5")
+		require.NotNil(t, got)
+		require.InDelta(t, 5e-6, got.InputCostPerToken, 1e-12)
+		require.InDelta(t, 25e-6, got.OutputCostPerToken, 1e-12)
+	})
 }
 
 func TestPricingService_Gemini36FlashThinkingTiersUseBasePricing(t *testing.T) {

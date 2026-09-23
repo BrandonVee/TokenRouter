@@ -47,18 +47,6 @@ var (
 		Mode:                    "image_generation",
 		SupportsPromptCaching:   true,
 	}
-	claudeOpus48FallbackPricing = &LiteLLMModelPricing{
-		InputCostPerToken:                   5e-06,  // 每百万 token $5
-		OutputCostPerToken:                  25e-06, // 每百万 token $25
-		CacheCreationInputTokenCost:         6.25e-06,
-		CacheCreationInputTokenCostAbove1hr: 10e-06,
-		CacheReadInputTokenCost:             0.5e-06,
-		LiteLLMProvider:                     "anthropic",
-		Mode:                                "chat",
-		SupportsPromptCaching:               true,
-		// Claude Opus 4.8 Fast mode 官方价格是常规定价的 2 倍，复用通用 service_tier 倍率即可。
-		SupportsServiceTier: true,
-	}
 	openAIGPT55FallbackPricing = &LiteLLMModelPricing{
 		InputCostPerToken:               5e-06,    // $5 per MTok
 		InputCostPerTokenPriority:       12.5e-06, // $12.5 per MTok
@@ -964,14 +952,6 @@ func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing 
 		}
 	}
 
-	// Claude Opus 4.8 刚发布时 LiteLLM 价格文件可能尚未同步；这里用代码级兜底，
-	// 避免继续落入泛化的 Opus 4 系列模糊匹配而拿到旧价格。
-	for _, candidate := range lookupCandidates {
-		if isClaudeOpus48Model(candidate) {
-			return claudeOpus48FallbackPricing
-		}
-	}
-
 	// 4. 基于模型系列匹配（Claude）
 	if pricing := s.matchByModelFamily(lookupCandidates[0]); pricing != nil {
 		return pricing
@@ -983,14 +963,6 @@ func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing 
 	}
 
 	return nil
-}
-
-func isClaudeOpus48Model(model string) bool {
-	model = strings.ToLower(strings.TrimSpace(model))
-	if model == "" || !strings.Contains(model, "opus") {
-		return false
-	}
-	return strings.Contains(model, "4.8") || strings.Contains(model, "4-8")
 }
 
 func (s *PricingService) buildModelLookupCandidates(modelLower string) []string {
@@ -1119,6 +1091,10 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 	// 因子串关系误匹配 "claude-opus-4-7"（opus-4.7 系列）。
 	// 注意：原 map 实现存在 Go map 迭代随机性导致的同类 bug，此处改为有序切片修复。
 	families := []modelFamily{
+		// Opus 5 与 Opus 4.8 同价（$5/$25 per MTok）。定价数据缺失 claude-opus-5 时
+		// 必须回退到 4.8，否则会掉进 "opus-4" 系列按 $15/$75 计费（3 倍超收）。
+		{name: "opus-5", match: []string{"claude-opus-5"}, pricing: []string{"claude-opus-5", "claude-opus-4-8"}},
+		{name: "opus-4.8", match: []string{"claude-opus-4-8", "claude-opus-4.8"}, pricing: []string{"claude-opus-4-8", "claude-opus-4.8", "claude-opus-4-7"}},
 		{name: "opus-4.7", match: []string{"claude-opus-4-7", "claude-opus-4.7"}, pricing: []string{"claude-opus-4-7", "claude-opus-4.7", "claude-opus-4-6"}},
 		{name: "opus-4.6", match: []string{"claude-opus-4-6", "claude-opus-4.6"}},
 		{name: "opus-4.5", match: []string{"claude-opus-4-5", "claude-opus-4.5"}},
@@ -1151,6 +1127,11 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 		switch {
 		case strings.Contains(model, "opus"):
 			switch {
+			// "opus-5" 必须先判：不能用裸 "5" 匹配，否则 claude-opus-4-5 会被误判。
+			case strings.Contains(model, "opus-5") || strings.Contains(model, "opus5"):
+				fallbackName = "opus-5"
+			case strings.Contains(model, "4.8") || strings.Contains(model, "4-8"):
+				fallbackName = "opus-4.8"
 			case strings.Contains(model, "4.7") || strings.Contains(model, "4-7"):
 				fallbackName = "opus-4.7"
 			case strings.Contains(model, "4.6") || strings.Contains(model, "4-6"):
