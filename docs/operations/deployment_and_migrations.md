@@ -123,6 +123,14 @@ Apple Container 的 `APPLE_CONTAINER_NETWORK_SUBNET` 只在创建受管网络时
 
 启动日志中的 `[Pricing] Warning:` 行是这条链路的哨兵：折算出单侧附加费阶梯、cache above 档缺基础价、以及重载后阶梯丢失都会告警，出现后应核对目录数据。本变更只改代码，不涉及迁移和数据库恢复；回退旧二进制即恢复旧口径。混跑期间同一模型可能因命中不同版本实例而价格不同，应避免。
 
+### 定价覆盖补丁文件
+
+`pricing.override_file`（环境变量 `PRICING_OVERRIDE_FILE`，默认空即关闭）是远程目录、本地回退文件之上的第三层数据：按模型 ID 索引的 JSON 对象，条目按字段浅合并覆盖下层同名字段，`null` 表示删除该字段。它让目录尚未收录的模型、或需要临时改价的模型不必等应用发版，适用于上游价格仓库滞后、以及只能从离线回退文件启动的部署。
+
+`pricing.fallback_file` 与 `pricing.override_file` 任一非空时，进程会在每个 `pricing.hash_check_interval_minutes`（下限 10 分钟）周期比对两个文件的内容指纹并热重载内存价格表，不需要重启；远程同步门槛也随之放宽——只配本地文件、不配 `remote_url` 时调度器照常运行。删除文件等于清空该层。文件存在但不可读或不是 JSON 对象时保留当前数据、不推进指纹，下一轮重试并重复告警。
+
+该层有两条专属告警，出现即说明预期与实际计费脱节：`override entry %q skipped: not a JSON object`（补丁不是对象），以及 `override had no effect for N model(s)`（模型名拼错，或纯补丁条目落在不存在的模型上，被有效性过滤丢弃）。本变更同样只改代码，不涉及迁移；需要回滚时直接移除该配置键即可回到两层数据。
+
 ### 通用高级调度器迁移
 
 迁移 `238_generalize_advanced_scheduler.sql` 为 `groups` 增加受约束的 `scheduler_type`，默认 `basic`，并把旧 OpenAI 实验调度器转换为按分组选择的通用高级调度器。旧 `openai_advanced_scheduler_enabled=true` 时，仅既有 OpenAI 与 Grok 分组回填为 `advanced`；开关为 false 或不存在时，所有存量分组保持基础。其它平台不会被自动升级，新建分组始终为基础。

@@ -128,6 +128,14 @@ SMTP 的测试连接与实际发送共用同一建连路径和超时。`smtp_use
 
 不要把需要唯一约束、外键、状态机、列表查询或原子计数的数据编码成一个巨大 settings JSON。相反，只被单个进程组件启动时读取的连接池大小也不应新建业务表。
 
+## 定价目录与覆盖层
+
+模型定价由三层数据合成，优先级从低到高为远程目录（`pricing.remote_url`）、本地回退文件（`pricing.fallback_file`）和覆盖补丁文件（`pricing.override_file`）。三层都经过同一个解析器，因此覆盖层同样能修补 `*_above_<N>k_tokens` 长上下文档位与显式 `long_context_*` 字段，并参与同一次阶梯折算。
+
+`pricing.override_file` 默认空串即关闭，环境变量 `PRICING_OVERRIDE_FILE`。文件是按模型 ID 索引的 JSON 对象，条目按字段浅合并覆盖下层同名字段；字段值为 `null` 表示从合并结果中删除该字段，可用它显式关闭某模型的阶梯或缓存价。目录与回退都没有的模型也可以在覆盖层单独声明，但条目必须自带价格字段，否则会被有效性过滤丢弃。
+
+`pricing.fallback_file` 与 `pricing.override_file` 任一非空时，进程会按 `pricing.hash_check_interval_minutes`（下限 10 分钟）比对两个文件的内容指纹并热重载，不需要重启；删除文件视为清空该层。文件存在但不可读或不是 JSON 对象时保留当前内存数据、不推进指纹，并在下一轮重试时重复告警。覆盖层未生效的条目（模型名拼错，或纯补丁条目落在不存在的模型上）会打 `override had no effect` 告警。
+
 ## 前端变量
 
 Vite 在构建/dev server 启动时读取 `VITE_API_BASE_URL`、`VITE_WS_BASE_URL`、`VITE_DEV_PROXY_TARGET` 和 `VITE_DEV_PORT`。默认 API base 是 `/api/v1`，dev proxy target 是 `http://localhost:8080`，dev port 是 `3000`。

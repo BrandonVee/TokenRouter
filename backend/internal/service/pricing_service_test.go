@@ -1238,3 +1238,229 @@ func TestListModelNamesByProvider_EmptyCatalog(t *testing.T) {
 	require.NotNil(t, got)
 	require.Empty(t, got)
 }
+
+// newOverridePricingService 构造一个带 fallback + override 临时文件的定价服务。
+func newOverridePricingService(t *testing.T, fallbackBody, overrideBody string) (*PricingService, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	fallbackFile := filepath.Join(dir, "fallback.json")
+	overrideFile := filepath.Join(dir, "override.json")
+	require.NoError(t, os.WriteFile(fallbackFile, []byte(fallbackBody), 0644))
+	require.NoError(t, os.WriteFile(overrideFile, []byte(overrideBody), 0644))
+
+	cfg := &config.Config{}
+	cfg.Pricing.DataDir = dir
+	cfg.Pricing.FallbackFile = fallbackFile
+	cfg.Pricing.OverrideFile = overrideFile
+
+	svc := NewPricingService(cfg, nil)
+	return svc, fallbackFile, overrideFile
+}
+
+// loadViaBuild 走主加载路径，返回合并结果并把指纹记录进服务，模拟启动加载后的状态。
+func loadViaBuild(t *testing.T, svc *PricingService, body string) map[string]*LiteLLMModelPricing {
+	t.Helper()
+	data, fingerprint, err := svc.buildPricingData([]byte(body))
+	require.NoError(t, err)
+	svc.mu.Lock()
+	svc.pricingData = data
+	svc.customFilesHash = fingerprint
+	svc.mu.Unlock()
+	return data
+}
+
+// override 按字段浅合并覆盖目录/回退数据，并参与同一次 above 档阶梯折算。
+func TestPricingOverrides_PatchExistingEntryAndDeriveAboveTier(t *testing.T) {
+	svc, _, _ := newOverridePricingService(t, `{
+		"fallback-only": {
+			"input_cost_per_token": 0.000002,
+			"output_cost_per_token": 0.00001,
+			"litellm_provider": "test",
+			"mode": "chat"
+		}
+	}`, `{
+		"patched": {
+			"input_cost_per_token": 0.000004,
+			"input_cost_per_token_above_272k_tokens": 0.000008,
+			"output_cost_per_token_above_272k_tokens": 0.000015,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		}
+	}`)
+
+	data := loadViaBuild(t, svc, `{
+		"patched": {
+			"input_cost_per_token": 0.000001,
+			"output_cost_per_token": 0.00001,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		}
+	}`)
+
+	patched := data["patched"]
+	require.NotNil(t, patched)
+	require.InDelta(t, 4e-6, patched.InputCostPerToken, 1e-12, "override 应覆盖目录价")
+	require.Equal(t, 272000, patched.LongContextInputTokenThreshold)
+	require.InDelta(t, 2.0, patched.LongContextInputCostMultiplier, 1e-12)
+	require.InDelta(t, 1.5, patched.LongContextOutputCostMultiplier, 1e-12)
+	require.NotNil(t, data["fallback-only"], "回退层仍应参与合并")
+}
+
+// 未在目录/回退出现的模型可由 override 自带价格声明，并同样走有效性过滤与阶梯折算。
+func TestPricingOverrides_DeclaresModelAbsentFromCatalog(t *testing.T) {
+	svc, _, _ := newOverridePricingService(t, `{}`, `{
+		"override-only": {
+			"input_cost_per_token": 0.000003,
+			"output_cost_per_token": 0.000015,
+			"input_cost_per_token_above_200k_tokens": 0.000006,
+			"output_cost_per_token_above_200k_tokens": 0.0000225,
+			"litellm_provider": "anthropic",
+			"mode": "chat"
+		}
+	}`)
+
+	data := loadViaBuild(t, svc, `{
+		"catalog": {"input_cost_per_token": 0.000001, "mode": "chat"}
+	}`)
+
+	declared := data["override-only"]
+	require.NotNil(t, declared)
+	require.InDelta(t, 3e-6, declared.InputCostPerToken, 1e-12)
+	require.Equal(t, 200000, declared.LongContextInputTokenThreshold)
+	require.InDelta(t, 2.0, declared.LongContextInputCostMultiplier, 1e-12)
+	require.InDelta(t, 1.5, declared.LongContextOutputCostMultiplier, 1e-12)
+}
+
+// patch 值为 null 表示删除字段；删掉阶梯阈值即显式关闭该模型的内置阶梯。
+func TestPricingOverrides_NullDeletesField(t *testing.T) {
+	svc, _, _ := newOverridePricingService(t, `{}`, `{
+		"m": {"long_context_input_token_threshold": null}
+	}`)
+
+	data := loadViaBuild(t, svc, `{
+		"m": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"long_context_input_token_threshold": 272000,
+			"long_context_input_cost_multiplier": 2,
+			"long_context_output_cost_multiplier": 1.5,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		}
+	}`)
+
+	require.Equal(t, 0, data["m"].LongContextInputTokenThreshold)
+	require.InDelta(t, 1e-5, data["m"].InputCostPerToken, 1e-12)
+}
+
+// 补丁不是 JSON 对象时跳过该条目并告警，其余条目照常生效。
+func TestPricingOverrides_SkipsNonObjectEntryWithWarning(t *testing.T) {
+	logSink, restore := captureStructuredLog(t)
+	defer restore()
+
+	svc, _, _ := newOverridePricingService(t, `{}`, `{
+		"broken": "not-an-object",
+		"ok": {"input_cost_per_token": 0.000009}
+	}`)
+
+	data := loadViaBuild(t, svc, `{
+		"broken": {"input_cost_per_token": 0.000001, "mode": "chat"},
+		"ok": {"input_cost_per_token": 0.000001, "mode": "chat"}
+	}`)
+
+	require.InDelta(t, 1e-6, data["broken"].InputCostPerToken, 1e-12)
+	require.InDelta(t, 9e-6, data["ok"].InputCostPerToken, 1e-12)
+	require.True(t, logSink.ContainsMessageAtLevel(`override entry "broken" skipped: not a JSON object`, "warn"))
+}
+
+// 拼错模型名、或纯补丁条目缺价格字段时覆盖层不生效，必须留下哨兵告警。
+func TestPricingOverrides_WarnsWhenOverrideHasNoEffect(t *testing.T) {
+	logSink, restore := captureStructuredLog(t)
+	defer restore()
+
+	svc, _, _ := newOverridePricingService(t, `{}`, `{
+		"claude-sonnet-5-preview": {"input_cost_per_token_above_200k_tokens": 0.000006}
+	}`)
+
+	loadViaBuild(t, svc, `{
+		"catalog": {"input_cost_per_token": 0.000001, "mode": "chat"}
+	}`)
+
+	require.True(t, logSink.ContainsMessageAtLevel("override had no effect for 1 model(s): claude-sonnet-5-preview", "warn"))
+}
+
+// 两个本地文件的内容指纹变化会触发热重载；指纹不变时不重建内存数据。
+func TestPricingOverrides_HotReloadsOnFingerprintChange(t *testing.T) {
+	svc, fallbackFile, overrideFile := newOverridePricingService(t, `{
+		"m": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.00001, "mode": "chat"}
+	}`, `{
+		"m": {"input_cost_per_token": 0.000002}
+	}`)
+	require.NoError(t, os.WriteFile(filepath.Join(svc.cfg.Pricing.DataDir, "model_pricing.json"), []byte(`{
+		"m": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.00001, "mode": "chat"}
+	}`), 0644))
+
+	loadViaBuild(t, svc, `{
+		"m": {"input_cost_per_token": 0.000001, "output_cost_per_token": 0.00001, "mode": "chat"}
+	}`)
+	require.InDelta(t, 2e-6, svc.GetModelPricing("m").InputCostPerToken, 1e-12)
+
+	// 指纹未变：不重建，手工塞入的哨兵条目必须存活。
+	svc.pricingData["sentinel"] = &LiteLLMModelPricing{}
+	svc.reloadIfCustomFilesChanged()
+	require.NotNil(t, svc.pricingData["sentinel"])
+
+	// 改 override 文件后指纹变化，重载应拿到新价。
+	require.NoError(t, os.WriteFile(overrideFile, []byte(`{"m": {"input_cost_per_token": 0.000007}}`), 0644))
+	svc.reloadIfCustomFilesChanged()
+	require.InDelta(t, 7e-6, svc.GetModelPricing("m").InputCostPerToken, 1e-12)
+
+	// 回退文件变化同样触发重载。
+	require.NoError(t, os.WriteFile(fallbackFile, []byte(`{"extra": {"input_cost_per_token": 0.000003, "mode": "chat"}}`), 0644))
+	svc.reloadIfCustomFilesChanged()
+	require.NotNil(t, svc.GetModelPricing("extra"))
+}
+
+// override 文件损坏时保留当前内存数据与指纹，下一轮继续重试并告警。
+func TestPricingOverrides_InvalidOverrideFileKeepsCurrentData(t *testing.T) {
+	logSink, restore := captureStructuredLog(t)
+	defer restore()
+
+	svc, _, overrideFile := newOverridePricingService(t, `{}`, `{
+		"m": {"input_cost_per_token": 0.000002, "mode": "chat"}
+	}`)
+	loadViaBuild(t, svc, `{
+		"m": {"input_cost_per_token": 0.000001, "mode": "chat"}
+	}`)
+	before := svc.customFilesHash
+	require.InDelta(t, 2e-6, svc.GetModelPricing("m").InputCostPerToken, 1e-12)
+
+	require.NoError(t, os.WriteFile(overrideFile, []byte(`{not json`), 0644))
+	svc.reloadIfCustomFilesChanged()
+
+	require.InDelta(t, 2e-6, svc.GetModelPricing("m").InputCostPerToken, 1e-12)
+	require.Equal(t, before, svc.customFilesHash, "损坏文件不得推进指纹")
+	require.True(t, logSink.ContainsMessageAtLevel("Custom pricing file changed but reload failed", "error"))
+}
+
+// 只配置本地覆盖文件、不配远程 URL 时，调度器也必须启动以承载热重载。
+func TestPricingSchedulerStartsWithOnlyCustomFiles(t *testing.T) {
+	svc, _, _ := newOverridePricingService(t, `{}`, `{}`)
+	svc.cfg.Pricing.DataDir = t.TempDir()
+	svc.cfg.Pricing.RemoteURL = ""
+
+	svc.startUpdateScheduler()
+	defer svc.Stop()
+
+	require.True(t, svc.hasCustomPricingFiles())
+	done := make(chan struct{})
+	go func() {
+		svc.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		t.Fatal("只配置本地文件时调度器不应立即退出")
+	case <-time.After(50 * time.Millisecond):
+	}
+}

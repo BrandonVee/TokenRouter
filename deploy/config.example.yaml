@@ -1023,6 +1023,15 @@ pricing:
   # Fallback pricing file
   # 备用定价文件
   fallback_file: "./resources/model-pricing/model_prices_and_context_window.json"
+  # Override patch file (optional, empty disables). Entries are shallow-merged by JSON
+  # field over the catalog/fallback data, so this layer has the highest priority;
+  # a null field value deletes that field from the merged entry. Files are re-read
+  # on the hash check interval above without restart, so new models can be priced
+  # without a release.
+  # 覆盖补丁文件（可选，留空即关闭）。条目按 JSON 字段浅合并覆盖目录/回退数据，
+  # 因此该层优先级最高；字段值为 null 表示从合并结果中删除该字段。文件按上面的
+  # 哈希检查间隔热重载，不需要重启就能给新模型定价。
+  override_file: ""
   # Update interval in hours
   # 更新间隔（小时）
   update_interval_hours: 24
