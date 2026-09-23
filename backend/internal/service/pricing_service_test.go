@@ -164,9 +164,6 @@ func TestBillingService_GPT56CacheWritePricingUsesOfficialMultiplier(t *testing.
 			require.NoError(t, err)
 			require.InDelta(t, tt.input*1.25, pricing.CacheCreationPricePerToken, 1e-12)
 			require.InDelta(t, tt.inputPriority*1.25, pricing.CacheCreationPricePerTokenPriority, 1e-12)
-			require.Equal(t, 272000, pricing.LongContextInputThreshold)
-			require.InDelta(t, 2.0, pricing.LongContextInputMultiplier, 1e-12)
-			require.InDelta(t, 1.5, pricing.LongContextOutputMultiplier, 1e-12)
 
 			tokens := UsageTokens{InputTokens: 700, OutputTokens: 50, CacheCreationTokens: 200, CacheReadTokens: 100}
 			standard, err := svc.CalculateCostWithServiceTier(tt.model, tokens, 1, "")
@@ -182,6 +179,273 @@ func TestBillingService_GPT56CacheWritePricingUsesOfficialMultiplier(t *testing.
 			require.InDelta(t, 200*tt.input*1.25*0.5, flex.CacheCreationCost, 1e-12)
 		})
 	}
+}
+
+// 目录条目的 *_above_<N>k_tokens 绝对价档折算成 long_context_* 阈值+倍率，
+// 使阶梯完全由数据驱动、不再依赖代码级模型名清单。
+func TestParsePricingData_DerivesLongContextFromAboveTierFields(t *testing.T) {
+	svc := &PricingService{}
+	data, err := svc.parsePricingData([]byte(`{
+		"derived-272k": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.00002,
+			"output_cost_per_token_above_272k_tokens": 0.000075
+		},
+		"derived-200k": {
+			"input_cost_per_token": 0.0000025,
+			"output_cost_per_token": 0.000015,
+			"input_cost_per_token_above_200k_tokens": 0.000006,
+			"output_cost_per_token_above_200k_tokens": 0.0000225
+		},
+		"multi-threshold": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_128k_tokens": 0.00002,
+			"output_cost_per_token_above_128k_tokens": 0.000075,
+			"input_cost_per_token_above_272k_tokens": 0.00003,
+			"output_cost_per_token_above_272k_tokens": 0.0001
+		},
+		"explicit-wins": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.00002,
+			"output_cost_per_token_above_272k_tokens": 0.000075,
+			"long_context_input_token_threshold": 0,
+			"long_context_input_cost_multiplier": 1,
+			"long_context_output_cost_multiplier": 1
+		},
+		"no-surcharge": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.00001,
+			"output_cost_per_token_above_272k_tokens": 0.00005
+		},
+		"cache-only-above": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"cache_read_input_token_cost": 0.000001,
+			"cache_read_input_token_cost_above_272k_tokens": 0.000002
+		},
+		"service-tier-variants-ignored": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens_priority": 0.00002,
+			"output_cost_per_token_above_272k_tokens_priority": 0.0001,
+			"input_cost_per_token_above_272k_tokens_flex": 0.00002,
+			"output_cost_per_token_above_272k_tokens_flex": 0.0001,
+			"input_cost_per_token_above_272k_tokens_batches": 0.00002,
+			"output_cost_per_token_above_272k_tokens_batches": 0.0001
+		}
+	}`))
+	require.NoError(t, err)
+
+	tests := []struct {
+		model            string
+		threshold        int
+		inputMultiplier  float64
+		outputMultiplier float64
+	}{
+		{model: "derived-272k", threshold: 272000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		{model: "derived-200k", threshold: 200000, inputMultiplier: 2.4, outputMultiplier: 1.5},
+		{model: "multi-threshold", threshold: 128000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		// 显式 long_context_* 优先（显式 0 阈值与 1 倍率可关闭该模型的内置阶梯）。
+		{model: "explicit-wins", threshold: 0, inputMultiplier: 1.0, outputMultiplier: 1.0},
+		{model: "no-surcharge", threshold: 0, inputMultiplier: 0, outputMultiplier: 0},
+		{model: "cache-only-above", threshold: 0, inputMultiplier: 0, outputMultiplier: 0},
+		{model: "service-tier-variants-ignored", threshold: 0, inputMultiplier: 0, outputMultiplier: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			pricing := data[tt.model]
+			require.NotNil(t, pricing)
+			require.Equal(t, tt.threshold, pricing.LongContextInputTokenThreshold)
+			require.InDelta(t, tt.inputMultiplier, pricing.LongContextInputCostMultiplier, 1e-12)
+			require.InDelta(t, tt.outputMultiplier, pricing.LongContextOutputCostMultiplier, 1e-12)
+		})
+	}
+}
+
+func TestParsePricingData_WarnsOrphanCacheTierFields(t *testing.T) {
+	logSink, restore := captureStructuredLog(t)
+	defer restore()
+
+	svc := &PricingService{}
+	_, err := svc.parsePricingData([]byte(`{
+		"orphan-model": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"cache_creation_input_token_cost_above_200k_tokens": 0.000002
+		},
+		"complete-model": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"cache_creation_input_token_cost": 0.000001,
+			"cache_creation_input_token_cost_above_200k_tokens": 0.000002
+		},
+		"priority-variant-with-standard-base": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"cache_read_input_token_cost": 0.00000002,
+			"cache_read_input_token_cost_above_272k_tokens_priority": 0.00000004
+		},
+		"hourly-tier-orphan": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"cache_creation_input_token_cost_above_1hr_above_200k_tokens": 0.000002
+		}
+	}`))
+	require.NoError(t, err)
+
+	require.True(t, logSink.ContainsMessageAtLevel("orphan-model(cache_creation_input_token_cost_above_200k_tokens)", "warn"))
+	require.True(t, logSink.ContainsMessageAtLevel("hourly-tier-orphan(cache_creation_input_token_cost_above_1hr_above_200k_tokens)", "warn"))
+	require.False(t, logSink.ContainsMessage("complete-model(cache_creation_input_token_cost_above_200k_tokens)"))
+	require.False(t, logSink.ContainsMessage("priority-variant-with-standard-base(cache_read_input_token_cost_above_272k_tokens_priority)"))
+}
+
+func TestParsePricingData_WarnsLopsidedLongContextLadder(t *testing.T) {
+	logSink, restore := captureStructuredLog(t)
+	defer restore()
+
+	svc := &PricingService{}
+	data, err := svc.parsePricingData([]byte(`{
+		"mixed-versions": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.000016,
+			"output_cost_per_token_above_272k_tokens": 0.00005
+		},
+		"consistent": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.00002,
+			"output_cost_per_token_above_272k_tokens": 0.000075
+		},
+		"explicit-input-only": {
+			"input_cost_per_token": 0.00001,
+			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.00002,
+			"output_cost_per_token_above_272k_tokens": 0.000075,
+			"long_context_input_cost_multiplier": 1.5
+		}
+	}`))
+	require.NoError(t, err)
+
+	require.Equal(t, 272000, data["mixed-versions"].LongContextInputTokenThreshold)
+	require.InDelta(t, 1.6, data["mixed-versions"].LongContextInputCostMultiplier, 1e-12)
+	require.True(t, logSink.ContainsMessageAtLevel("mixed-versions(input x1.60, output x1.00)", "warn"))
+	require.False(t, logSink.ContainsMessage("consistent(input"))
+	require.False(t, logSink.ContainsMessage("explicit-input-only(input"))
+}
+
+func TestWarnDroppedLongContextLadders(t *testing.T) {
+	logSink, restore := captureStructuredLog(t)
+	defer restore()
+
+	old := map[string]*LiteLLMModelPricing{
+		"kept":    {LongContextInputTokenThreshold: 272000},
+		"dropped": {LongContextInputTokenThreshold: 272000},
+		"no-tier": {},
+	}
+	next := map[string]*LiteLLMModelPricing{
+		"kept":    {LongContextInputTokenThreshold: 272000},
+		"dropped": {},
+		"no-tier": {},
+	}
+	warnDroppedLongContextLadders(old, next)
+
+	require.True(t, logSink.ContainsMessageAtLevel("long-context ladder dropped for 1 model(s) after reload: dropped", "warn"))
+	require.False(t, logSink.ContainsMessage("after reload: kept"))
+}
+
+// 离线目录里的阶梯全部来自数据：Claude / Gemini 的 200k 档、gpt-5.4 的 272k 档由
+// above 档折算，gpt-5.6 系列则保留显式 long_context_* 字段。
+func TestDefaultCatalogDerivesLongContextLadders(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "resources", "model-pricing", "model_prices_and_context_window.json"))
+	require.NoError(t, err)
+
+	svc := &PricingService{}
+	pricingData, err := svc.parsePricingData(data)
+	require.NoError(t, err)
+
+	tests := []struct {
+		model            string
+		threshold        int
+		inputMultiplier  float64
+		outputMultiplier float64
+	}{
+		{model: "gpt-5.4", threshold: 272000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		{model: "gpt-5.5-pro", threshold: 272000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		{model: "claude-sonnet-4-5", threshold: 200000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		{model: "gemini-2.5-pro", threshold: 200000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		{model: "gpt-5.6-luna", threshold: 272000, inputMultiplier: 2.0, outputMultiplier: 1.5},
+		{model: "codex-auto-review", threshold: 0, inputMultiplier: 0, outputMultiplier: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.model, func(t *testing.T) {
+			pricing := pricingData[tt.model]
+			require.NotNil(t, pricing)
+			require.Equal(t, tt.threshold, pricing.LongContextInputTokenThreshold)
+			require.InDelta(t, tt.inputMultiplier, pricing.LongContextInputCostMultiplier, 1e-12)
+			require.InDelta(t, tt.outputMultiplier, pricing.LongContextOutputCostMultiplier, 1e-12)
+		})
+	}
+}
+
+// Fast/priority 档按业务倍率改写：目录只带官方旧口径（gpt-5.5 标 2x）时也要收 2.5x。
+func TestGetModelPricing_EnforcesOpenAIFastPricingRatio(t *testing.T) {
+	pricingSvc := &PricingService{}
+	data, err := pricingSvc.parsePricingData([]byte(`{
+		"gpt-5.5": {
+			"input_cost_per_token": 0.000005,
+			"input_cost_per_token_priority": 0.00001,
+			"output_cost_per_token": 0.00003,
+			"output_cost_per_token_priority": 0.00006,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		},
+		"gpt-6-luna": {
+			"input_cost_per_token": 0.0000001,
+			"input_cost_per_token_priority": 0.0000002,
+			"output_cost_per_token": 0.0000005,
+			"output_cost_per_token_priority": 0.000001,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		},
+		"gpt-5.5-pro": {
+			"input_cost_per_token": 0.00003,
+			"output_cost_per_token": 0.00018,
+			"litellm_provider": "openai",
+			"mode": "responses"
+		}
+	}`))
+	require.NoError(t, err)
+	pricingSvc.pricingData = data
+	svc := NewBillingService(&config.Config{}, pricingSvc)
+
+	// gpt-5.5 业务倍率为 2.5x，目录的 2x 被改写。
+	pro, err := svc.GetModelPricing("gpt-5.5")
+	require.NoError(t, err)
+	require.InDelta(t, 12.5e-6, pro.InputPricePerTokenPriority, 1e-12)
+	require.InDelta(t, 75e-6, pro.OutputPricePerTokenPriority, 1e-12)
+
+	tokens := UsageTokens{InputTokens: 1000, OutputTokens: 100}
+	priority, err := svc.CalculateCostWithServiceTier("gpt-5.5", tokens, 1, "priority")
+	require.NoError(t, err)
+	require.InDelta(t, 1000*12.5e-6, priority.InputCost, 1e-12)
+	require.InDelta(t, 100*75e-6, priority.OutputCost, 1e-12)
+
+	// gpt-6-luna 业务倍率为 2x，与目录一致，改写是幂等的。
+	luna, err := svc.GetModelPricing("gpt-6-luna")
+	require.NoError(t, err)
+	require.InDelta(t, 2e-7, luna.InputPricePerTokenPriority, 1e-12)
+	require.InDelta(t, 1e-6, luna.OutputPricePerTokenPriority, 1e-12)
+
+	// gpt-5.5-pro 未定义 Fast 档，保持无 priority 价。
+	proOnly, err := svc.GetModelPricing("gpt-5.5-pro")
+	require.NoError(t, err)
+	require.Zero(t, proOnly.InputPricePerTokenPriority)
+	require.Zero(t, proOnly.OutputPricePerTokenPriority)
 }
 
 func TestBillingService_GPT56UsesLongContextPricingAcrossModelsAndTiers(t *testing.T) {

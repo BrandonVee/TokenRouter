@@ -1118,10 +1118,9 @@ func TestGetModelPricing_Grok46OfficialFallback(t *testing.T) {
 	}
 }
 
-// 远程 LiteLLM 价格卡已改用 *_above_272k_tokens 新式分档字段，不再携带
-// long_context_* 旧字段；gpt-6（Astra）必须与 gpt-5.6 一样由策略补齐长上下文
-// 参数，否则同步远程价格后长上下文计费会静默失效。
-func TestGetModelPricing_GPT6AstraRemoteCardBackfillsLongContext(t *testing.T) {
+// 价格目录已改用 *_above_272k_tokens 新式分档字段，不再携带 long_context_* 旧字段；
+// gpt-6（Astra）与 gpt-5.6 一样由目录数据折算长上下文参数，不再依赖代码级模型名兜底。
+func TestGetModelPricing_GPT6AstraDerivesLongContextFromAboveTierFields(t *testing.T) {
 	pricingSvc := &PricingService{}
 	// 字段取自上游 model-price-repo 的 gpt-6-astra 实际条目（无 long_context_*）。
 	data, err := pricingSvc.parsePricingData([]byte(`{
@@ -1134,6 +1133,8 @@ func TestGetModelPricing_GPT6AstraRemoteCardBackfillsLongContext(t *testing.T) {
 			"cache_creation_input_token_cost_priority": 0.000025,
 			"cache_read_input_token_cost": 0.000001,
 			"cache_read_input_token_cost_priority": 0.000002,
+			"input_cost_per_token_above_272k_tokens": 0.00002,
+			"output_cost_per_token_above_272k_tokens": 0.000075,
 			"litellm_provider": "openai",
 			"mode": "chat",
 			"supports_prompt_caching": true
@@ -1150,9 +1151,9 @@ func TestGetModelPricing_GPT6AstraRemoteCardBackfillsLongContext(t *testing.T) {
 		require.InDelta(t, 5e-5, pricing.OutputPricePerToken, 1e-12, model)
 		require.InDelta(t, 1.25e-5, pricing.CacheCreationPricePerToken, 1e-12, model)
 		require.InDelta(t, 1e-6, pricing.CacheReadPricePerToken, 1e-12, model)
-		require.Equal(t, openAIGPT54LongContextInputThreshold, pricing.LongContextInputThreshold, model)
-		require.InDelta(t, openAIGPT54LongContextInputMultiplier, pricing.LongContextInputMultiplier, 1e-12, model)
-		require.InDelta(t, openAIGPT54LongContextOutputMultiplier, pricing.LongContextOutputMultiplier, 1e-12, model)
+		require.Equal(t, 272000, pricing.LongContextInputThreshold, model)
+		require.InDelta(t, 2.0, pricing.LongContextInputMultiplier, 1e-12, model)
+		require.InDelta(t, 1.5, pricing.LongContextOutputMultiplier, 1e-12, model)
 	}
 }
 
@@ -1163,6 +1164,8 @@ func TestCalculateCostUnified_GPT6AstraAppliesLongContext(t *testing.T) {
 		"gpt-6-astra": {
 			"input_cost_per_token": 0.00001,
 			"output_cost_per_token": 0.00005,
+			"input_cost_per_token_above_272k_tokens": 0.00002,
+			"output_cost_per_token_above_272k_tokens": 0.000075,
 			"litellm_provider": "openai",
 			"mode": "chat"
 		}
