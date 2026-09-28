@@ -70,6 +70,20 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			body = liteBody
 		}
 	}
+	if account.Platform == PlatformOpenAI && account.Type == AccountTypeAPIKey {
+		// API Key 出站统一使用顶层 tools，移除 Codex 的 additional_tools 载体。
+		promotedBody, changed, promoteErr := promoteOpenAIResponsesAdditionalTools(body)
+		if promoteErr != nil {
+			setOpsUpstreamError(c, http.StatusBadRequest, promoteErr.Error(), "")
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{
+				"type": "invalid_request_error", "message": promoteErr.Error(), "param": "additional_tools",
+			}})
+			return nil, promoteErr
+		}
+		if changed {
+			body = promotedBody
+		}
+	}
 	wsDecision := s.getOpenAIWSProtocolResolver().Resolve(account)
 	// 仅允许 WS 入站请求走 WS 上游，避免出现 HTTP -> WS 协议混用。
 	wsDecision = resolveOpenAIWSDecisionByClientTransport(wsDecision, GetOpenAIClientTransport(c))

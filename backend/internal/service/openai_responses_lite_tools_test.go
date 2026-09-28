@@ -449,3 +449,75 @@ func TestOpenAIGatewayServiceForward_DisablesResponsesLiteParallelToolCallsForAP
 		})
 	}
 }
+
+func TestOpenAIGatewayServiceForward_PromotesAdditionalToolsForAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, passthrough := range []bool{false, true} {
+		name := "managed"
+		if passthrough {
+			name = "passthrough"
+		}
+		t.Run(name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			c.Request.Header.Set(responsesLiteHeader, "true")
+			SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
+			upstream := &httpUpstreamRecorder{resp: &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body: io.NopCloser(strings.NewReader(
+					`{"id":"resp_tools","object":"response","model":"gpt-5.6-terra","status":"completed","output":[],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}`,
+				)),
+			}}
+			cfg := &config.Config{}
+			cfg.Security.URLAllowlist.Enabled = false
+			svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: upstream}
+			account := &Account{
+				ID: 503, Name: "additional-tools-apikey", Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
+				Concurrency: 1, Status: StatusActive, Schedulable: true, RateMultiplier: f64p(1),
+				Credentials: map[string]any{"api_key": "sk-test", "base_url": "https://example.com"},
+				Extra:       map[string]any{"openai_passthrough": passthrough, "openai_responses_supported": true},
+			}
+			body := []byte(`{
+				"model":"gpt-5.6-terra","stream":false,"parallel_tool_calls":true,
+				"tools":[{"type":"function","name":"existing","parameters":{"type":"object"}}],
+				"additional_tools":[{"type":"function","name":"read_file","parameters":{"type":"object"}}],
+				"input":[
+					{"type":"additional_tools","role":"developer","tools":[{"type":"custom","name":"exec","format":{"type":"text"}}]},
+					{"type":"message","role":"user","content":"inspect files"}
+				]
+			}`)
+
+			result, err := svc.Forward(context.Background(), c, account, body)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, "existing", gjson.GetBytes(upstream.lastBody, "tools.0.name").String())
+			require.Equal(t, "read_file", gjson.GetBytes(upstream.lastBody, "tools.1.name").String())
+			require.Equal(t, "exec", gjson.GetBytes(upstream.lastBody, "tools.2.name").String())
+			require.False(t, gjson.GetBytes(upstream.lastBody, "additional_tools").Exists())
+			require.False(t, gjson.GetBytes(upstream.lastBody, `input.#(type=="additional_tools")`).Exists())
+			require.Equal(t, "message", gjson.GetBytes(upstream.lastBody, "input.0.type").String())
+			require.True(t, gjson.GetBytes(upstream.lastBody, "parallel_tool_calls").Bool())
+		})
+	}
+}
+
+func TestPromoteOpenAIResponsesAdditionalTools_InputOnly(t *testing.T) {
+	body := []byte(`{
+		"model":"gpt-5.6-terra",
+		"input":[
+			{"type":"additional_tools","role":"developer","tools":[{"type":"custom","name":"exec","format":{"type":"text"}}]},
+			{"type":"message","role":"user","content":"read a file"}
+		]
+	}`)
+
+	updated, changed, err := promoteOpenAIResponsesAdditionalTools(body)
+
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, "exec", gjson.GetBytes(updated, "tools.0.name").String())
+	require.False(t, gjson.GetBytes(updated, `input.#(type=="additional_tools")`).Exists())
+	require.Equal(t, "message", gjson.GetBytes(updated, "input.0.type").String())
+}

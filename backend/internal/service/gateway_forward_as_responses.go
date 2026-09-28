@@ -223,16 +223,33 @@ func adaptResponsesClientToolsForAnthropic(body []byte) ([]byte, apicompat.Respo
 	return rebuilt, mapping, nil
 }
 
-// liftResponsesAdditionalTools 把 input 中的 additional_tools 提升到顶层工具列表。
+// liftResponsesAdditionalTools 把顶层及 input 中的 additional_tools 合并到 tools。
 func liftResponsesAdditionalTools(requestBody map[string]any) (bool, error) {
+	tools, _ := requestBody["tools"].([]any)
+	if rawTools, exists := requestBody["tools"]; exists && rawTools != nil {
+		if _, ok := rawTools.([]any); !ok {
+			return false, fmt.Errorf("tools must be an array")
+		}
+	}
+	changed := false
+	if rawAdditional, exists := requestBody["additional_tools"]; exists {
+		additional, ok := rawAdditional.([]any)
+		if !ok {
+			return false, fmt.Errorf("additional_tools must be an array")
+		}
+		tools = append(tools, additional...)
+		delete(requestBody, "additional_tools")
+		changed = true
+	}
 	input, ok := requestBody["input"].([]any)
 	if !ok {
-		return false, nil
+		if changed {
+			requestBody["tools"] = tools
+		}
+		return changed, nil
 	}
 
-	tools, _ := requestBody["tools"].([]any)
 	kept := make([]any, 0, len(input))
-	changed := false
 	for _, raw := range input {
 		item, ok := raw.(map[string]any)
 		if !ok || strings.TrimSpace(fmt.Sprint(item["type"])) != "additional_tools" {
@@ -250,7 +267,9 @@ func liftResponsesAdditionalTools(requestBody map[string]any) (bool, error) {
 		return false, nil
 	}
 	requestBody["tools"] = tools
-	requestBody["input"] = kept
+	if len(kept) != len(input) {
+		requestBody["input"] = kept
+	}
 	return true, nil
 }
 

@@ -283,12 +283,42 @@ func normalizeOpenAIResponsesLiteParallelToolCallsPayload(body []byte) ([]byte, 
 	if !gjson.ParseBytes(body).IsObject() {
 		return body, false, fmt.Errorf("responses Lite request body must be a JSON object")
 	}
-	if parallelToolCalls := gjson.GetBytes(body, "parallel_tool_calls"); parallelToolCalls.Type == gjson.False {
+	parallelToolCalls := gjson.GetBytes(body, "parallel_tool_calls")
+	if parallelToolCalls.Type == gjson.False {
+		return body, false, nil
+	}
+	// Codex 的 additional_tools 请求会显式选择并行模式，API Key 路径也需保留。
+	if parallelToolCalls.Type == gjson.True &&
+		(gjson.GetBytes(body, `input.#(type=="additional_tools")`).Exists() ||
+			gjson.GetBytes(body, "additional_tools").Exists()) {
 		return body, false, nil
 	}
 	rebuilt, err := sjson.SetBytes(body, "parallel_tool_calls", false)
 	if err != nil {
 		return body, false, fmt.Errorf("encode responses Lite request body: %w", err)
+	}
+	return rebuilt, true, nil
+}
+
+// promoteOpenAIResponsesAdditionalTools 将 Codex 的工具声明并入标准 Responses tools，
+// 供 OpenAI API Key 原生端点使用；OAuth Lite 仍保留 input.additional_tools 协议。
+func promoteOpenAIResponsesAdditionalTools(body []byte) ([]byte, bool, error) {
+	if !bytes.Contains(body, []byte(`"additional_tools"`)) {
+		return body, false, nil
+	}
+	var requestBody map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&requestBody); err != nil {
+		return body, false, fmt.Errorf("decode Responses additional tools: %w", err)
+	}
+	changed, err := liftResponsesAdditionalTools(requestBody)
+	if err != nil || !changed {
+		return body, false, err
+	}
+	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
+	if err != nil {
+		return body, false, fmt.Errorf("encode Responses additional tools: %w", err)
 	}
 	return rebuilt, true, nil
 }
