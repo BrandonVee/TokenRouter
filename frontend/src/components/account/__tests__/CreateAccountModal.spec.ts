@@ -39,6 +39,9 @@ vi.mock('@/api/admin', () => ({
     tlsFingerprintProfiles: {
       list: vi.fn().mockResolvedValue([]),
     },
+    tlsFingerprintRouters: {
+      list: vi.fn().mockResolvedValue([]),
+    },
   },
 }))
 
@@ -137,9 +140,6 @@ async function selectButtonByText(wrapper: ReturnType<typeof mountModal>, text: 
 async function submitApiKeyAccount(platform: 'openai' | 'anthropic') {
   const wrapper = mountModal()
   await selectButtonByText(wrapper, platform === 'openai' ? 'OpenAI' : 'admin.accounts.claudeConsole')
-  if (platform === 'openai') {
-    await selectButtonByText(wrapper, 'API Key')
-  }
   await wrapper.get('form#create-account-form input[type="text"]').setValue(`${platform} account`)
   await wrapper.get('form#create-account-form input[type="password"]').setValue('test-api-key')
   await wrapper.get('form#create-account-form').trigger('submit.prevent')
@@ -150,6 +150,7 @@ async function submitApiKeyAccount(platform: 'openai' | 'anthropic') {
 async function openCodexImportStep() {
   const wrapper = mountModal()
   await selectButtonByText(wrapper, 'OpenAI')
+  await selectButtonByText(wrapper, 'OAuth')
   await wrapper.get('form#create-account-form input[type="text"]').setValue('Codex import')
   await wrapper.get('form#create-account-form').trigger('submit.prevent')
   return wrapper
@@ -169,11 +170,34 @@ describe('CreateAccountModal OpenAI account options', () => {
     createOpenAICodexPATMock.mockReset().mockResolvedValue({})
   })
 
+  // 切换平台时按该平台的默认账号类型重新选择，OAuth 仍可手动进入。
+  it('defaults supported platforms to API Key while keeping OAuth selectable', async () => {
+    const wrapper = mountModal()
+    expect(wrapper.find('form#create-account-form input[type="password"]').exists()).toBe(true)
+
+    await selectButtonByText(wrapper, 'OpenAI')
+    expect(wrapper.find('form#create-account-form input[type="password"]').exists()).toBe(true)
+
+    await selectButtonByText(wrapper, 'OAuth')
+    expect(wrapper.find('form#create-account-form input[type="password"]').exists()).toBe(false)
+
+    await selectButtonByText(wrapper, 'Grok')
+    expect(wrapper.find('form#create-account-form input[type="password"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="create-account-platform-gemini"]').trigger('click')
+    expect(wrapper.find('form#create-account-form input[type="password"]').exists()).toBe(true)
+
+    await wrapper.setProps({ show: false })
+    await wrapper.setProps({ show: true })
+    expect(wrapper.find('form#create-account-form input[type="password"]').exists()).toBe(true)
+  })
+
   it('does not render or submit the removed account-level long-context setting', async () => {
     const wrapper = await submitApiKeyAccount('openai')
 
     expect(wrapper.find('[data-testid="openai-long-context-billing-toggle"]').exists()).toBe(false)
     expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]?.type).toBe('apikey')
     expect(createAccountMock.mock.calls[0]?.[0]?.extra?.openai_long_context_billing_enabled).toBeUndefined()
   })
 
@@ -210,6 +234,9 @@ describe('CreateAccountModal OpenAI account options', () => {
     const wrapper = mountModal()
     await selectButtonByText(wrapper, 'OpenAI')
 
+    expect(wrapper.find('[data-testid="create-openai-flatten-namespaces-toggle"]').exists()).toBe(false)
+    await selectButtonByText(wrapper, 'OAuth')
+
     expect(wrapper.find('[data-testid="create-openai-flatten-namespaces-toggle"]').exists()).toBe(true)
 
     await selectButtonByText(wrapper, 'API Key')
@@ -219,6 +246,7 @@ describe('CreateAccountModal OpenAI account options', () => {
   it('exposes Agent Identity in the OpenAI authorization methods', async () => {
     const wrapper = mountModal()
     await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'OAuth')
     await wrapper.get('form#create-account-form input[type="text"]').setValue('OpenAI account')
     await wrapper.get('form#create-account-form').trigger('submit.prevent')
 
@@ -272,6 +300,7 @@ describe('CreateAccountModal OpenAI account options', () => {
   it('submits an explicit Codex fingerprint mode for OAuth imports', async () => {
     const wrapper = mountModal()
     await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'OAuth')
 
     const modeSelect = wrapper.get<HTMLSelectElement>(
       '[data-testid="create-codex-fingerprint-mode-select"]'

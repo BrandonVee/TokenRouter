@@ -4329,7 +4329,8 @@ interface TempUnschedRuleForm {
 // State
 const step = ref(1)
 const submitting = ref(false)
-const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_account'>('oauth-based') // UI selection for account category
+// 支持 API Key 的平台默认使用 API 账号；仅平台专属流程保留自己的默认类型。
+const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_account'>('apikey')
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const accountMode = ref<CnAccountMode>('payg')
@@ -5028,7 +5029,7 @@ const form = reactive({
   name: '',
   notes: '',
   platform: 'anthropic' as AccountPlatform,
-  type: 'oauth' as AccountType, // Will be 'oauth', 'setup-token', or 'apikey'
+  type: 'apikey' as AccountType, // 实际类型会随平台和账号分类同步。
   credentials: {} as Record<string, unknown>,
   proxy_id: null as number | null,
   concurrency: 10,
@@ -5171,6 +5172,7 @@ watch(
 watch(
   () => form.platform,
   (newPlatform) => {
+    accountCategory.value = 'apikey'
     accountMode.value = 'payg'
     apiProtocol.value = ['kimi', 'zhipu', 'deepseek'].includes(newPlatform) ? 'adaptive' : 'chat_completions'
     if (['kimi', 'zhipu', 'deepseek'].includes(newPlatform)) {
@@ -5229,7 +5231,6 @@ watch(
       qoderUserType.value = 'personal_standard'
     }
     if (newPlatform === 'grok') {
-      accountCategory.value = 'oauth-based'
       addMethod.value = 'oauth'
       modelRestrictionMode.value = 'mapping'
       form.concurrency = 1
@@ -5238,12 +5239,6 @@ watch(
     if (newPlatform === 'kimi' || newPlatform === 'zhipu' || newPlatform === 'deepseek') {
       accountCategory.value = 'apikey'
       modelRestrictionMode.value = 'whitelist'
-    }
-    if (newPlatform !== 'gemini' && newPlatform !== 'anthropic' && accountCategory.value === 'service_account') {
-      accountCategory.value = 'oauth-based'
-    }
-    if (newPlatform !== 'anthropic' && accountCategory.value === 'bedrock') {
-      accountCategory.value = 'oauth-based'
     }
     // Reset Bedrock fields when switching platforms
     bedrockAccessKeyId.value = ''
@@ -5705,7 +5700,7 @@ const resetForm = () => {
   form.name = ''
   form.notes = ''
   form.platform = 'anthropic'
-  form.type = 'oauth'
+  form.type = 'apikey'
   form.credentials = {}
   form.proxy_id = null
   form.concurrency = 10
@@ -5714,7 +5709,7 @@ const resetForm = () => {
   form.rate_multiplier = 1
   form.group_ids = []
   form.expires_at = null
-  accountCategory.value = 'oauth-based'
+  accountCategory.value = 'apikey'
   addMethod.value = 'oauth'
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
