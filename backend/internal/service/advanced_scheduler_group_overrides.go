@@ -277,14 +277,22 @@ func (s *OpenAIGatewayService) advancedSchedulerEffectiveSettingsForGroup(
 		s.advancedSchedulerRuntimeSettings(ctx),
 		overrides,
 	)
-	// Key 级策略只调整本次请求的基础评分权重，不修改管理员的全局配置。
-	switch APIKeyRoutingStrategyFromContext(ctx) {
+	// 智能策略必须进入评分，不能被默认硬粘性提前短路；不可移动的上一响应仍由适配层硬绑定。
+	strategy := APIKeyRoutingStrategyFromContext(ctx)
+	if strategy != APIKeyRoutingStrategyManual {
+		effective.stickyWeightedEnabled = true
+	}
+	// 明确目标使用独立权重，避免管理员优先级、粘性和订阅偏好盖过 Key 的选择。
+	switch strategy {
 	case APIKeyRoutingStrategySpeed:
-		effective.weights.TTFT = 10
-		effective.weights.ErrorRate = 3
+		effective.weights = GatewayAdvancedSchedulerScoreWeightsView{TTFT: 1}
 	case APIKeyRoutingStrategySuccessRate:
-		effective.weights.ErrorRate = 10
-		effective.weights.TTFT = 2
+		effective.weights = GatewayAdvancedSchedulerScoreWeightsView{ErrorRate: 1}
+	case APIKeyRoutingStrategyPrice:
+		effective.weights = GatewayAdvancedSchedulerScoreWeightsView{}
+	}
+	if isAPIKeyDirectionalRoutingStrategy(strategy) {
+		effective.subscriptionPriorityEnabled = false
 	}
 	return effective
 }

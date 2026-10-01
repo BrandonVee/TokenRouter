@@ -273,7 +273,7 @@ type advancedSchedulerScoreRanges struct {
 
 type advancedSchedulerCandidateHeap []advancedSchedulerCandidateScore
 
-// applyAPIKeyPriceRoutingScores 使用账号成本倍率覆盖最终分数，并保留统一 Top-K 选择流程。
+// applyAPIKeyPriceRoutingScores 使用账号成本倍率覆盖最终分数。
 func applyAPIKeyPriceRoutingScores(ctx context.Context, candidates []advancedSchedulerCandidateScore) {
 	if APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyPrice {
 		return
@@ -374,6 +374,7 @@ func sortAdvancedSchedulerCandidates(candidates []advancedSchedulerCandidateScor
 
 // advancedSchedulerSelectionInput 只携带平台无关的可选调度信号。
 type advancedSchedulerSelectionInput struct {
+	RoutingStrategy         string
 	GroupID                 *int64
 	SessionHash             string
 	PreviousResponseID      string
@@ -687,6 +688,12 @@ func buildAdvancedWeightedSelectionOrder(candidates []advancedSchedulerCandidate
 func buildAdvancedSchedulerSelectionOrder(candidates []advancedSchedulerCandidateScore, input advancedSchedulerSelectionInput) []advancedSchedulerCandidateScore {
 	if len(candidates) == 0 {
 		return nil
+	}
+	if isAPIKeyDirectionalRoutingStrategy(input.RoutingStrategy) {
+		// 明确目标按分数顺序复核全部候选，最优账号满槽时继续尝试下一名，不能随机置首或截断兜底。
+		ordered := append([]advancedSchedulerCandidateScore(nil), candidates...)
+		sortAdvancedSchedulerCandidates(ordered)
+		return ordered
 	}
 	topK := input.TopK
 	if topK <= 0 {

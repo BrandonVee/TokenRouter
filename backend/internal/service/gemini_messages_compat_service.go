@@ -119,7 +119,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 	}
 
 	cacheKey := "gemini:" + sessionHash
-	usesAdvancedScheduler := group != nil && (group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual)
+	usesAdvancedScheduler := APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual || (group != nil && group.UsesAdvancedScheduler())
 	advancedSettings := s.advancedSchedulerEffectiveSettingsForRequest(ctx, groupID)
 
 	// 2. 尝试粘性会话命中
@@ -381,9 +381,15 @@ func (s *GeminiMessagesCompatService) selectBestGeminiAccountFromEligible(eligib
 	return selected
 }
 
-// groupUsesAdvancedScheduler 只让最终分组显式选择高级模式；无分组路径保持基础调度。
+// groupUsesAdvancedScheduler 执行显式 Key 策略，手动且无分组时保持基础调度。
 func (s *GeminiMessagesCompatService) groupUsesAdvancedScheduler(ctx context.Context, groupID *int64, hasForcePlatform bool) bool {
-	if s == nil || groupID == nil || *groupID <= 0 {
+	if s == nil {
+		return false
+	}
+	if APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual {
+		return true
+	}
+	if groupID == nil || *groupID <= 0 {
 		return false
 	}
 	if group, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(group) && group.ID == *groupID {
@@ -439,6 +445,7 @@ func (s *GeminiMessagesCompatService) selectAdvancedGeminiAccount(
 		stickyAccountID, _ = s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), cacheKey)
 	}
 	input := advancedSchedulerSelectionInput{
+		RoutingStrategy: APIKeyRoutingStrategyFromContext(ctx),
 		GroupID:         groupID,
 		SessionHash:     cacheKey,
 		StickyAccountID: stickyAccountID,

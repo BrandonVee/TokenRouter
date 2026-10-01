@@ -53,11 +53,11 @@ Group 可以启用模型路由、默认映射和 OpenAI Messages 专用模型配
 
 Group 的 fallback 包括普通 fallback、invalid-request fallback 和 unavailable fallback。它们是显式的跨分组策略：目标分组仍要重新执行平台、Key、模型、权限、计费和 `scheduler_type` 约束，不能只把原账号列表替换掉。循环、目标失效或策略不匹配必须终止。
 
-普通 Key 的 `group_ids` 是用户显式选择的候选模型分组和认证选组优先级，不是另一套账号评分器：服务按顺序跳过停用或用户不可访问的候选，选中最终分组后才执行账号调度。空列表沿用入口对应的默认分组。`routing_strategy=manual` 保持分组调度模式；其它策略只覆盖最终分组内的账号排序，不能选中 `group_ids` 以外的分组。该列表和智能策略都不把任意上游错误升级为跨组重试；请求已经进入最终分组后，是否切组仍只由显式 fallback 和错误分类决定。
+普通 Key 的 `group_ids` 是用户显式选择的候选模型分组和认证选组优先级，不是另一套账号评分器：服务按顺序跳过停用或用户不可访问的候选，选中最终分组后才执行账号调度。空列表沿用入口对应的默认分组。`routing_strategy=manual` 保持分组调度模式；其它策略只覆盖当前候选范围内的账号排序，不能选中 `group_ids` 以外的分组。该列表和智能策略都不把任意上游错误升级为跨组重试；请求已经进入最终分组后，是否切组仍只由显式 fallback 和错误分类决定。
 
 `scheduler_type` 仅属于 Group，`basic` 为默认值，`advanced` 表示该分组在硬过滤后使用通用高级评分。高级调度的 Top-K、评分权重、粘性加权和订阅优先是网关通用设置，不存在管理员全局启用开关；普通设置不能把基础分组隐式切换为高级。API Key 的非手动 `routing_strategy` 是显式请求级覆盖，可以在基础分组内启用同一评分核心，但仍不能让 OpenAI/Grok 特有能力作用于不具备该能力的账号。
 
-请求体 `provider.sort` 拥有高于 Key 的优先级：`price/cost`、`latency/speed/throughput`、`success/success_rate/reliability` 和 `auto/balanced` 分别映射到四种智能策略；模型后缀 `:floor` 与 `:nitro` 分别映射价格和速度。解析器消费并移除这些扩展后再转发。速度和成功率使用账号近期 TTFT、错误率 EWMA，价格使用账号成本倍率；指标缺失时沿用高级调度的中性或稳定决胜规则。
+请求体 `provider.sort` 拥有高于 Key 的优先级：`price/cost`、`latency/speed/throughput`、`success/success_rate/reliability` 和 `auto/balanced` 分别映射到四种智能策略；模型后缀 `:floor` 与 `:nitro` 分别映射价格和速度。解析器消费并移除这些扩展后再转发。速度和成功率只按账号近期 TTFT、错误率 EWMA 排序，价格只按账号成本倍率排序；三种明确目标依次尝试全部合格账号，不叠加其它权重、粘性加成或订阅优先，不随机抽样。自动策略保留综合评分和 Top-K 抽样。普通会话绑定不能在评分前短路智能策略，不可移动的上一响应绑定仍须保留；指标缺失时沿用高级调度的中性或稳定决胜规则。
 
 高级分组可在 `advanced_scheduler_overrides` 保存稀疏参数覆盖。每个未出现的字段依次继承数据库通用设置和 `gateway.advanced_scheduler` 配置默认值；出现的字段（包括 `false` 和 `0`）以分组值为准。空对象表示全部恢复继承。基础分组即使历史上留有该对象也不读取它，切换为高级后才重新生效。
 

@@ -131,6 +131,7 @@ type openAIAccountSchedulerMetrics struct {
 }
 
 type openAIAccountLoadPlan struct {
+	routingStrategy           string
 	allCandidates             []openAIAccountCandidateScore
 	candidates                []openAIAccountCandidateScore
 	staleSnapshotCompactRetry []openAIAccountCandidateScore
@@ -599,6 +600,7 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	}
 
 	plan := openAIAccountLoadPlan{
+		routingStrategy:           APIKeyRoutingStrategyFromContext(ctx),
 		allCandidates:             allCandidates,
 		candidates:                candidates,
 		staleSnapshotCompactRetry: staleSnapshotCompactRetry,
@@ -640,6 +642,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 	applyAPIKeyPriceRoutingScores(ctx, plan.candidates)
 
 	plan.topK = effectiveSettings.topK
+	if isAPIKeyDirectionalRoutingStrategy(plan.routingStrategy) {
+		plan.topK = len(plan.candidates)
+	}
 	if plan.topK > len(plan.candidates) {
 		plan.topK = len(plan.candidates)
 	}
@@ -658,6 +663,9 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAISelectionOrder(
 	buildSelectionOrder := func(pool []openAIAccountCandidateScore) []openAIAccountCandidateScore {
 		if len(pool) == 0 || plan.topK <= 0 {
 			return nil
+		}
+		if isAPIKeyDirectionalRoutingStrategy(plan.routingStrategy) {
+			return buildAdvancedSchedulerSelectionOrder(pool, advancedSchedulerSelectionInput{RoutingStrategy: plan.routingStrategy})
 		}
 		groupTopK := plan.topK
 		if groupTopK > len(pool) {
@@ -1450,9 +1458,15 @@ func cloneAdvancedSchedulerWeightOverrides(in map[string]float64) map[string]flo
 	return out
 }
 
-// groupUsesAdvancedScheduler 只依据最终解析后的分组决定调度模式。
+// groupUsesAdvancedScheduler 优先执行显式 Key 策略，手动模式再依据最终分组。
 func (s *OpenAIGatewayService) groupUsesAdvancedScheduler(ctx context.Context, groupID *int64) bool {
-	if s == nil || groupID == nil || *groupID <= 0 {
+	if s == nil {
+		return false
+	}
+	if APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual {
+		return true
+	}
+	if groupID == nil || *groupID <= 0 {
 		return false
 	}
 	if group, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(group) && group.ID == *groupID {

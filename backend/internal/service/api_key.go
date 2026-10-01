@@ -78,6 +78,11 @@ func APIKeyRoutingStrategyFromContext(ctx context.Context) string {
 	return strategy
 }
 
+// isAPIKeyDirectionalRoutingStrategy 区分明确目标排序与综合加权抽样。
+func isAPIKeyDirectionalRoutingStrategy(strategy string) bool {
+	return strategy == APIKeyRoutingStrategySpeed || strategy == APIKeyRoutingStrategyPrice || strategy == APIKeyRoutingStrategySuccessRate
+}
+
 // WithAPIKeyRoutingStrategy 覆盖当前请求的 Key 路由策略，供请求解析层使用。
 func WithAPIKeyRoutingStrategy(ctx context.Context, strategy string) context.Context {
 	if ctx == nil {

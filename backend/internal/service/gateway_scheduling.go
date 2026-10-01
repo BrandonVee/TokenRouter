@@ -76,7 +76,7 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 
 	// count_tokens 与可用性探测不占并发槽，但高级分组仍必须复用与主请求相同的
 	// 最终分组、硬过滤和评分逻辑，不能退回基础排序。
-	if resolvedGroup != nil && (resolvedGroup.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual) {
+	if APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual || (resolvedGroup != nil && resolvedGroup.UsesAdvancedScheduler()) {
 		selection, err := s.SelectAccountWithLoadAwareness(
 			withAdvancedSchedulerNoSlotSelection(ctx),
 			groupID,
@@ -149,7 +149,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return nil, err
 	}
 	ctx = s.withGroupContext(ctx, group)
-	usesAdvancedScheduler := group != nil && (group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual)
+	usesAdvancedScheduler := APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual || (group != nil && group.UsesAdvancedScheduler())
 	// 高级调度开启粘性加权后，旧硬粘性不能抢在评分前返回；否则 session
 	// 粘性不会作为统一候选评分的一部分。关闭加权时保留原有硬粘性语义。
 	advancedStickyWeighted := usesAdvancedScheduler && s.advancedSchedulerEffectiveSettingsForRequest(ctx, groupID).stickyWeightedEnabled
@@ -949,6 +949,7 @@ func (s *GatewayService) tryAcquireByAdvancedScheduler(
 	)
 	applyAPIKeyPriceRoutingScores(ctx, candidates)
 	selectionOrder := buildAdvancedSchedulerSelectionOrder(candidates, advancedSchedulerSelectionInput{
+		RoutingStrategy: APIKeyRoutingStrategyFromContext(ctx),
 		GroupID:         groupID,
 		SessionHash:     sessionHash,
 		StickyAccountID: stickyAccountID,
@@ -1835,7 +1836,8 @@ func (s *GatewayService) newSelectionResult(ctx context.Context, account *Accoun
 		ReleaseFunc: release,
 		WaitPlan:    waitPlan,
 	}
-	if group, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(group) && (group.UsesAdvancedScheduler() || APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual) {
+	group, _ := ctx.Value(ctxkey.Group).(*Group)
+	if APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual || (IsGroupContextValid(group) && group.UsesAdvancedScheduler()) {
 		// 让转发层只依据选择结果写入高级运行时反馈，避免基础分组污染统计。
 		selection.AdvancedScheduler = true
 	}
