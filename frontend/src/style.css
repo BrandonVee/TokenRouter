@@ -1474,3 +1474,107 @@ input[type='radio']:not(.sr-only) {
   background: #0b8fd8 !important;
   border-color: #0b8fd8 !important;
 }
+
+/* 手机端将日期、时间和快捷项纵向排列；完整面板可滚动，确认按钮始终可见。 */
+@media (max-width: 640px) {
+  .tokenrouter-ant-date-popup {
+    position: fixed !important;
+    inset: auto 0.75rem max(0.75rem, env(safe-area-inset-bottom)) !important;
+    width: auto;
+    max-width: calc(100vw - 1.5rem);
+    padding: 0 !important;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container {
+    width: 100%;
+    max-height: calc(100vh - 1.5rem);
+    max-height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom));
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container :is(.ant-picker-panel-layout, .ant-picker-panels, .ant-picker-datetime-panel) {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container :is(.ant-picker-panel, .ant-picker-date-panel, .ant-picker-time-panel) {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-content {
+    width: 100%;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-date-panel table {
+    table-layout: fixed;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-date-panel :is(th, td) {
+    width: auto;
+    min-width: 0;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-time-panel .ant-picker-content {
+    height: 8rem;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-time-panel {
+    border-inline-start: 0;
+    border-top: 1px solid rgb(128 128 128 / 0.2);
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-time-panel-column {
+    flex: 1;
+    width: auto;
+    height: 8rem;
+    overflow-y: auto;
+    touch-action: pan-y;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-time-panel-cell-inner {
+    min-height: 2.5rem;
+    line-height: 2.5rem;
+    text-align: center;
+    padding: 0;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-presets {
+    min-width: 0;
+    max-width: none;
+    max-height: 8rem;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-presets ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    height: auto;
+    border-inline-end: 0;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-presets ul li {
+    margin: 0;
+    padding: 0.5rem;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-panel-container .ant-picker-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: #fff;
+  }
+
+  .tokenrouter-ant-date-popup .ant-picker-range-arrow {
+    display: none !important;
+  }
+
+  /* 只读输入无需软键盘，保留足够字号以避免 iOS 自动放大页面。 */
+  :is(.tokenrouter-date-time-picker, .tokenrouter-date-range-picker) .ant-picker-input > input {
+    font-size: 16px;
+  }
+}

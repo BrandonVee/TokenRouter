@@ -127,7 +127,7 @@ export default {
       smartHint: '智能路由已开启，将按所选策略在当前分组内选择渠道。',
       manualMode: '手动选择',
       autoMode: '智能自动',
-      autoHint: '综合价格、速度、成功率自动选择',
+      autoHint: '综合优先级、负载、速度与成功率选择',
       speedMode: '速度优先',
       speedHint: '优先选择响应更快的渠道',
       priceMode: '价格优先',

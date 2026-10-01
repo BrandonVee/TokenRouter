@@ -4,6 +4,7 @@
       :value="pickerValue"
       :allow-clear="allowClear"
       :disabled="disabled"
+      :input-read-only="isMobile"
       :format="displayFormat"
       :placeholder="placeholder || defaultPlaceholder"
       :show-time="timeOptions"
@@ -21,6 +22,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import DatePicker from 'ant-design-vue/es/date-picker'
 import ConfigProvider from 'ant-design-vue/es/config-provider'
@@ -55,6 +57,8 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const { isDark } = useTheme()
+// 手机端通过面板选择，避免软键盘挤压日历和时间列。
+const isMobile = useMediaQuery('(max-width: 640px)')
 
 const antLocale = computed(() => locale.value.toLowerCase().startsWith('zh') ? zhCN : enUS)
 const antTheme = computed(() => createDatePickerTheme(isDark.value))
@@ -185,14 +189,4 @@ const handleChange = (value: Dayjs | string | null) => {
   z-index: 11000;
 }
 
-@media (max-width: 640px) {
-  :global(.tokenrouter-ant-date-popup) {
-    max-width: calc(100vw - 1.5rem);
-  }
-
-  :global(.tokenrouter-ant-date-popup .ant-picker-panel-container) {
-    max-width: calc(100vw - 1.5rem);
-    overflow: auto;
-  }
-}
 </style>

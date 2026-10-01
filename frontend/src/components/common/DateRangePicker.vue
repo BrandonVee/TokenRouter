@@ -4,6 +4,7 @@
     <AntRangePicker
       :value="calendarRange"
       :allow-clear="false"
+      :input-read-only="isMobile"
       :disabled-date="disabledCalendarDate"
       :format="rangeDisplayFormat"
       :show-time="rangeTimeOptions"
@@ -19,6 +20,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import DatePicker from 'ant-design-vue/es/date-picker'
 import ConfigProvider from 'ant-design-vue/es/config-provider'
@@ -54,11 +56,14 @@ const emit = defineEmits<Emits>()
 
 const { t, locale } = useI18n()
 const { isDark } = useTheme()
+// 手机端禁止唤起软键盘，完整日期仍由面板选择并回显。
+const isMobile = useMediaQuery('(max-width: 640px)')
 const AntRangePicker = DatePicker.RangePicker
 
 const antLocale = computed(() => locale.value.toLowerCase().startsWith('zh') ? zhCN : enUS)
 const antTheme = computed(() => createDatePickerTheme(isDark.value))
 const rangeDisplayFormat = computed(() => {
+  if (isMobile.value) return props.showTime ? 'MM-DD HH:mm' : 'YYYY-MM-DD'
   const isChinese = locale.value.toLowerCase().startsWith('zh')
   if (props.showTime) return isChinese ? 'YYYY年M月D日 HH:mm' : 'MMM D, YYYY HH:mm'
   return isChinese ? 'YYYY年M月D日' : 'MMM D, YYYY'
@@ -305,22 +310,9 @@ const onCalendarRangeChange = (values: [Dayjs, Dayjs] | [string, string] | null)
 
 @media (max-width: 640px) {
   .tokenrouter-date-range-picker {
-    min-width: min(25rem, calc(100vw - 2rem));
-    width: min(25rem, calc(100vw - 2rem));
-  }
-
-  :global(.tokenrouter-ant-date-range-popup) {
-    left: 0.75rem !important;
-    right: 0.75rem !important;
-  }
-
-  :global(.tokenrouter-ant-date-range-popup .ant-picker-panel-container) {
-    max-width: calc(100vw - 1.5rem);
-    overflow: auto;
-  }
-
-  :global(.tokenrouter-ant-date-range-popup .ant-picker-panels > :last-child) {
-    display: none;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
   }
 }
 </style>

@@ -127,7 +127,7 @@ export default {
       smartHint: 'Smart routing is enabled and selects a channel within the active group using this strategy.',
       manualMode: 'Manual selection',
       autoMode: 'Smart automatic',
-      autoHint: 'Balance price, speed, and success rate',
+      autoHint: 'Balance priority, load, speed, and success rate',
       speedMode: 'Speed first',
       speedHint: 'Prefer channels with faster responses',
       priceMode: 'Price first',
