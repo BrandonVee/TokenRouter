@@ -1696,13 +1696,16 @@ func userExistsForBilling(ctx context.Context, tx *sql.Tx, userID int64) (bool, 
 
 func incrementUsageBillingAPIKeyQuota(ctx context.Context, tx *sql.Tx, apiKeyID int64, amount float64) (bool, error) {
 	// 配额列与余额列共享 8 位金额刻度，派生金额也必须在 SQL 前量化。
+	// 已通过鉴权的请求在结算前若被删除 Key，仍需按原 ID 更新软删除记录完成整笔结算，
+	// 否则 Key 用量更新返回 ErrAPIKeyNotFound 会连同已执行的余额/订阅扣减一起回滚。
+	// 因此这里放开 deleted_at 过滤，但不改变已删除 Key 的状态，也不把它报为新耗尽。
 	amount = service.QuantizeUsageBillingAmount(amount)
 	var exhausted bool
 	err := tx.QueryRowContext(ctx, `
 		UPDATE api_keys
 		SET quota_used = quota_used + $1,
 			status = CASE
-				WHEN quota > 0
+				WHEN deleted_at IS NULL AND quota > 0
 					AND status = $3
 					AND quota_used < quota
 					AND quota_used + $1 >= quota
@@ -1710,8 +1713,8 @@ func incrementUsageBillingAPIKeyQuota(ctx context.Context, tx *sql.Tx, apiKeyID 
 				ELSE status
 			END,
 			updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
-		RETURNING quota > 0 AND quota_used >= quota AND quota_used - $1 < quota
+		WHERE id = $2
+		RETURNING deleted_at IS NULL AND quota > 0 AND quota_used >= quota AND quota_used - $1 < quota
 	`, amount, apiKeyID, service.StatusAPIKeyActive, service.StatusAPIKeyQuotaExhausted).Scan(&exhausted)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, service.ErrAPIKeyNotFound
@@ -1723,6 +1726,7 @@ func incrementUsageBillingAPIKeyQuota(ctx context.Context, tx *sql.Tx, apiKeyID 
 }
 
 func incrementUsageBillingAPIKeyRateLimit(ctx context.Context, tx *sql.Tx, apiKeyID int64, cost float64) error {
+	// 与总额度同理：Key 被软删除不应回滚已受理请求的余额/订阅扣费，故按 ID 更新保留行。
 	cost = service.QuantizeUsageBillingAmount(cost)
 	res, err := tx.ExecContext(ctx, `
 		UPDATE api_keys SET
@@ -1735,7 +1739,7 @@ func incrementUsageBillingAPIKeyRateLimit(ctx context.Context, tx *sql.Tx, apiKe
 			window_7d_start = CASE WHEN window_7d_start IS NULL OR window_7d_start + INTERVAL '7 days' <= NOW() THEN date_trunc('day', NOW()) ELSE window_7d_start END,
 			window_30d_start = CASE WHEN window_30d_start IS NULL OR window_30d_start + INTERVAL '30 days' <= NOW() THEN date_trunc('day', NOW()) ELSE window_30d_start END,
 			updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
+		WHERE id = $2
 	`, cost, apiKeyID)
 	if err != nil {
 		return err

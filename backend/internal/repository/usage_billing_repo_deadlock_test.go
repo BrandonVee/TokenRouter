@@ -16,7 +16,7 @@ const (
 	usageBillingArchiveSQL       = `(?s)SELECT request_fingerprint.*FROM usage_billing_dedup_archive`
 	usageBillingUserLockSQL      = `(?s)SELECT id\s+FROM users\s+WHERE id = \$1 AND deleted_at IS NULL\s+FOR NO KEY UPDATE`
 	usageBillingBalanceDeductSQL = `(?s)WITH locked_user AS.*FOR NO KEY UPDATE.*UPDATE users.*RETURNING users.balance`
-	usageBillingAPIKeyQuotaSQL   = `(?s)UPDATE api_keys.*quota_used = quota_used \+ \$1.*RETURNING quota > 0`
+	usageBillingAPIKeyQuotaSQL   = `(?s)UPDATE api_keys.*quota_used = quota_used \+ \$1.*RETURNING deleted_at IS NULL AND quota > 0`
 )
 
 func TestUsageBillingRepositoryApply_DeadlockRestartsWholeTransaction(t *testing.T) {
