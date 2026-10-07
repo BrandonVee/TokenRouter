@@ -33,6 +33,24 @@ const (
 	deviceMobile           = "mobile"
 )
 
+// easyPayNotifyAllowedParams 是异步通知允许携带的参数白名单。
+// 真实易支付通知只包含这些固定字段；任何白名单外参数（哪怕是空值）都直接拒绝，
+// 防止利用"签名串拼接不转义"把参数走私进签名计算（拼接走私类攻击的整类设防）。
+// 万一非主流克隆平台的真实通知带了白名单外字段被拒，订单也不会丢：
+// 前端 verify 和后台 reconcile 会主动调上游 api.php 查单补入账。
+var easyPayNotifyAllowedParams = map[string]bool{
+	"pid":          true,
+	"trade_no":     true,
+	"out_trade_no": true,
+	"type":         true,
+	"name":         true,
+	"money":        true,
+	"trade_status": true,
+	"param":        true,
+	"sign":         true,
+	"sign_type":    true,
+}
+
 // EasyPay implements payment.Provider for the EasyPay aggregation platform.
 type EasyPay struct {
 	instanceID string
@@ -349,6 +367,11 @@ func (e *EasyPay) VerifyNotification(_ context.Context, rawBody string, _ map[st
 	// url.ParseQuery already decodes values — no additional decode needed.
 	params := make(map[string]string)
 	for k := range values {
+		// 验签前先做参数白名单校验：签名基础串按 key 排序拼接且值不转义，
+		// 多出来的参数会参与签名重算，可被用于拼接走私伪造 trade_status。
+		if !easyPayNotifyAllowedParams[k] {
+			return nil, fmt.Errorf("unexpected notify param: %s", k)
+		}
 		params[k] = values.Get(k)
 	}
 	sign := params["sign"]
