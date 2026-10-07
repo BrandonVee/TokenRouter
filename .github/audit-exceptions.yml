@@ -3,16 +3,16 @@ exceptions:
   - package: xlsx
     advisory: "GHSA-4r6h-8v6p-xvw6"
     severity: high
-    reason: "Admin export only; switched to dynamic import to reduce exposure (CVE-2023-30533)"
+    reason: "Admin export only; switched to dynamic import to reduce exposure (CVE-2023-30533). npm 包已停维护且无修复版，换官方 CDN 源前暂用缓解措施"
     mitigation: "Load only on export; restrict export permissions and data scope"
-    expires_on: "2026-10-06"
+    expires_on: "2027-04-06"
     owner: "security@your-domain"
   - package: xlsx
     advisory: "GHSA-5pgg-2g8v-p4x9"
     severity: high
-    reason: "Admin export only; switched to dynamic import to reduce exposure (CVE-2024-22363)"
+    reason: "Admin export only; switched to dynamic import to reduce exposure (CVE-2024-22363). npm 包已停维护且无修复版，换官方 CDN 源前暂用缓解措施"
     mitigation: "Load only on export; restrict export permissions and data scope"
-    expires_on: "2026-10-06"
+    expires_on: "2027-04-06"
     owner: "security@your-domain"
   - package: lodash
     advisory: "GHSA-r5fr-rjxr-66jc"
