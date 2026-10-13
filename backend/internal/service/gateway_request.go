@@ -187,7 +187,6 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 	}
 
 	// 只在当前函数内零拷贝读取 JSON 字段；ReplaceBody 后必须重新进入本函数刷新派生状态。
-	jsonStr := *(*string)(unsafe.Pointer(&bodyBytes))
 	clearGatewayRequestDerivedState(parsed)
 	parsed.protocol = protocol
 
@@ -199,7 +198,7 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 	parsed.RoutingStrategy = strategy
 	parsed.Body.Replace(normalizedBody)
 	bodyBytes = normalizedBody
-	jsonStr = *(*string)(unsafe.Pointer(&bodyBytes))
+	jsonStr := *(*string)(unsafe.Pointer(&bodyBytes))
 	modelResult := gjson.Get(jsonStr, "model")
 	if modelResult.Exists() {
 		if modelResult.Type != gjson.String {

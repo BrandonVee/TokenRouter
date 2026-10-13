@@ -16,7 +16,7 @@
 
 | 工具 | 当前来源 | 当前约束 |
 | --- | --- | --- |
-| Go | `backend/go.mod`、CI | `1.27.0` |
+| Go | `backend/go.mod`、CI | `1.27.2` |
 | Node.js | `.github/workflows/backend-ci.yml` | `20` |
 | pnpm | CI 与根 Makefile | `9`；根命令默认使用 `npx --yes pnpm@9` |
 | golangci-lint | CI | `v2.13`，配置在 `backend/.golangci.yml` |
