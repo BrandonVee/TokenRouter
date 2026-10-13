@@ -1,6 +1,14 @@
 version: "2"
 
 linters:
+  exclusions:
+    rules:
+      # 保留已验证的 uTLS HTTP/2 与 h2c 兼容实现；仅豁免 x/net 新增的弃用提示。
+      # 升级到标准库传输需单独验证指纹拨号、PING 和 h2c，不在安全补丁发布中改变协议行为。
+      - path: 'internal/(repository/http_upstream(_test)?|server/http)\.go$'
+        linters:
+          - staticcheck
+        text: 'SA1019: .*golang\.org/x/net/http2\.(Transport|ConfigureTransports|ConfigureServer|Server).* is deprecated:'
   default: none
   enable:
     - depguard

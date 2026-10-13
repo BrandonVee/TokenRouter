@@ -30,6 +30,8 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 升级 Go 时必须同时修改 `backend/go.mod`，以及 `backend-ci.yml`（两处）、`release.yml`（两处）和 `security-scan.yml` 中的 `go version` 硬断言；workflow 都通过 `go-version-file: backend/go.mod` 安装工具链，任一断言遗漏都会在版本校验步骤失败。
 
+Ent schema 加载依赖的 `golang.org/x/tools` 至少为 `v0.50.0`，以读取 Go 1.27.2 的导出数据。当前 uTLS HTTP/2 与 h2c 兼容实现保留 x/net 接口；Lint 仅对 `http_upstream.go`、对应测试与 `server/http.go` 的这些接口弃用提示设置精确例外，迁移标准库实现前需验证指纹拨号、PING 与 h2c 行为。
+
 不要把个人数据库路径、固定密码或某台机器的服务配置写入工程文档。开发配置使用未提交的环境文件或 `backend/config.yaml`；可提交样例在 `deploy/`。前端开发服务器默认通过 `VITE_DEV_PROXY_TARGET` 代理后端，端口由 `VITE_DEV_PORT` 控制。
 
 常用入口：
