@@ -191,22 +191,21 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 	clearGatewayRequestDerivedState(parsed)
 	parsed.protocol = protocol
 
+	// 所有 JSON 入口共用路由扩展解析，避免平台专用处理器遗漏请求级覆盖。
+	normalizedBody, strategy, err := NormalizeGatewayRoutingOverrides(bodyBytes)
+	if err != nil {
+		return err
+	}
+	parsed.RoutingStrategy = strategy
+	parsed.Body.Replace(normalizedBody)
+	bodyBytes = normalizedBody
+	jsonStr = *(*string)(unsafe.Pointer(&bodyBytes))
 	modelResult := gjson.Get(jsonStr, "model")
 	if modelResult.Exists() {
 		if modelResult.Type != gjson.String {
 			return fmt.Errorf("invalid model field type")
 		}
-		parsed.Model = modelResult.String()
-		parsed.Model, parsed.RoutingStrategy = normalizeProviderRoutingOverride(parsed.Model)
-		if parsed.RoutingStrategy != "" {
-			normalizedBody, err := sjson.SetBytes(bodyBytes, "model", parsed.Model)
-			if err != nil {
-				return fmt.Errorf("normalize provider model suffix: %w", err)
-			}
-			parsed.Body.Replace(normalizedBody)
-			bodyBytes = normalizedBody
-			jsonStr = *(*string)(unsafe.Pointer(&bodyBytes))
-		}
+		parsed.Model = strings.TrimSpace(modelResult.String())
 		if protocol == domain.PlatformAnthropic {
 			normalizedModel := normalizeClaudeCodeLongContextModel(parsed.Model)
 			if normalizedModel != parsed.Model {
@@ -220,17 +219,6 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 				parsed.Model = normalizedModel
 			}
 		}
-	}
-	if strategy := normalizeProviderSort(strings.ToLower(strings.TrimSpace(gjson.Get(jsonStr, "provider.sort").String()))); strategy != "" {
-		parsed.RoutingStrategy = strategy
-		// provider 是路由器扩展字段，消费后不得继续发给上游协议。
-		normalizedBody, err := sjson.DeleteBytes(bodyBytes, "provider")
-		if err != nil {
-			return fmt.Errorf("remove provider routing field: %w", err)
-		}
-		parsed.Body.Replace(normalizedBody)
-		bodyBytes = normalizedBody
-		jsonStr = *(*string)(unsafe.Pointer(&bodyBytes))
 	}
 
 	streamResult := gjson.Get(jsonStr, "stream")
@@ -259,6 +247,35 @@ func parseGatewayRequestCurrentBody(parsed *ParsedRequest, protocol string) erro
 
 	setGatewayRequestRanges(parsed, protocol, jsonStr)
 	return nil
+}
+
+// NormalizeGatewayRoutingOverrides 消费模型后缀与 provider.sort，返回可转发正文和请求级策略。
+// 无扩展或非法 JSON 保持原文，由各协议入口继续执行原有校验和错误响应。
+func NormalizeGatewayRoutingOverrides(body []byte) ([]byte, string, error) {
+	if !gjson.ValidBytes(body) {
+		return body, "", nil
+	}
+	strategy := ""
+	if model := gjson.GetBytes(body, "model"); model.Type == gjson.String {
+		normalized, suffixStrategy := normalizeProviderRoutingOverride(model.String())
+		if suffixStrategy != "" {
+			var err error
+			body, err = sjson.SetBytes(body, "model", normalized)
+			if err != nil {
+				return nil, "", fmt.Errorf("normalize provider model suffix: %w", err)
+			}
+			strategy = suffixStrategy
+		}
+	}
+	if sort := normalizeProviderSort(strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "provider.sort").String()))); sort != "" {
+		strategy = sort
+		var err error
+		body, err = sjson.DeleteBytes(body, "provider")
+		if err != nil {
+			return nil, "", fmt.Errorf("remove provider routing field: %w", err)
+		}
+	}
+	return body, strategy, nil
 }
 
 // normalizeProviderRoutingOverride 支持 OpenRouter 风格的 :nitro/:floor 模型后缀。

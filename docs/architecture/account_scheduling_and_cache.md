@@ -74,7 +74,7 @@ OpenAI/Grok 是通用核心的能力适配者：在高级分组中，OpenAI 额�
 4. OAuth-only、privacy、客户端类型、站点/区域、媒体资格和所需 transport。
 5. 当前并发槽和等待策略。
 
-通过硬过滤后才比较优先级、近期使用、账号负载、排队、错误率、延迟、重置窗口或配额余量。高级核心提供跨平台的固定评分与 Top-K 选择机制，OpenAI/Grok 适配器只补充其请求确实具备的 Responses transport、WebSocket、旧版 `/responses/compact`、previous response、订阅和额度信号。原生 `remote_compaction_v2` 保持普通 Responses 调度，不读取旧版 Compact 端点状态。上游声明倍率、OAuth 参考倍率和 `upstream_cost` 权重不再参与候选排序或评分；账户本地 `rate_multiplier` 与渠道上游计费模型来源只属于结算。新增评分项不能绕过硬资格，也不能因缺少观测把账号永久降为不可用。
+通过硬过滤后才比较优先级、近期使用、账号负载、排队、错误率、延迟、重置窗口或配额余量。高级核心提供跨平台的固定评分与 Top-K 选择机制，OpenAI/Grok 适配器只补充其请求确实具备的 Responses transport、WebSocket、旧版 `/responses/compact`、previous response、订阅和额度信号。原生 `remote_compaction_v2` 保持普通 Responses 调度，不读取旧版 Compact 端点状态。上游声明倍率、OAuth 参考倍率和 `upstream_cost` 权重不再参与候选排序或评分；账户本地 `rate_multiplier` 与渠道上游计费模型来源默认只属于结算；Key 显式选择 `price` 时例外使用账号本地成本倍率排序。新增评分项不能绕过硬资格，也不能因缺少观测把账号永久降为不可用。
 
 ## 账号自动停调阈值
 

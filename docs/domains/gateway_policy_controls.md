@@ -57,7 +57,7 @@ Group 的 fallback 包括普通 fallback、invalid-request fallback 和 unavaila
 
 `scheduler_type` 仅属于 Group，`basic` 为默认值，`advanced` 表示该分组在硬过滤后使用通用高级评分。高级调度的 Top-K、评分权重、粘性加权和订阅优先是网关通用设置，不存在管理员全局启用开关；普通设置不能把基础分组隐式切换为高级。API Key 的非手动 `routing_strategy` 是显式请求级覆盖，可以在基础分组内启用同一评分核心，但仍不能让 OpenAI/Grok 特有能力作用于不具备该能力的账号。
 
-请求体 `provider.sort` 拥有高于 Key 的优先级：`price/cost`、`latency/speed/throughput`、`success/success_rate/reliability` 和 `auto/balanced` 分别映射到四种智能策略；模型后缀 `:floor` 与 `:nitro` 分别映射价格和速度。解析器消费并移除这些扩展后再转发。速度和成功率只按账号近期 TTFT、错误率 EWMA 排序，价格只按账号成本倍率排序；三种明确目标依次尝试全部合格账号，不叠加其它权重、粘性加成或订阅优先，不随机抽样。自动策略保留综合评分和 Top-K 抽样。普通会话绑定不能在评分前短路智能策略，不可移动的上一响应绑定仍须保留；指标缺失时沿用高级调度的中性或稳定决胜规则。
+Messages、Responses 和 Chat 的 HTTP JSON 入口（包括 OpenAI 和 Qoder 专用处理器）在模型校验、渠道映射和账号选择前统一消费路由扩展；这项请求级覆盖不代表 Gemini 原生 URL、媒体或 WebSocket 入口支持同样扩展。请求体 `provider.sort` 拥有高于 Key 和模型后缀的优先级：`price/cost`、`latency/speed/throughput`、`success/success_rate/reliability` 和 `auto/balanced` 分别映射到四种智能策略；模型后缀 `:floor` 与 `:nitro` 分别映射价格和速度。解析器消费并移除这些扩展后再转发。速度和成功率只按账号近期 TTFT、错误率 EWMA 排序，价格只按账号成本倍率排序；三种明确目标依次尝试全部合格账号，不叠加其它权重、粘性加成或订阅优先，不随机抽样。自动策略保留综合评分和 Top-K 抽样。普通会话绑定不能在评分前短路智能策略，不可移动的上一响应绑定仍须保留；指标缺失时沿用高级调度的中性或稳定决胜规则。只有一个合格账号或目标指标相同时，切换策略可能没有可见差异。“成本优先”比较管理员配置的账号成本倍率，不比较跨分组模型售价，也不保证用户账单降低。
 
 高级分组可在 `advanced_scheduler_overrides` 保存稀疏参数覆盖。每个未出现的字段依次继承数据库通用设置和 `gateway.advanced_scheduler` 配置默认值；出现的字段（包括 `false` 和 `0`）以分组值为准。空对象表示全部恢复继承。基础分组即使历史上留有该对象也不读取它，切换为高级后才重新生效。
 

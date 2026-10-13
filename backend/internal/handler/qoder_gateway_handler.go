@@ -98,6 +98,9 @@ func (h *QoderGatewayHandler) handle(c *gin.Context, endpoint qoderEndpoint) {
 	)
 
 	body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
+	if err == nil {
+		body, err = normalizeGatewayRoutingRequest(c.Request, body)
+	}
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit), endpoint)

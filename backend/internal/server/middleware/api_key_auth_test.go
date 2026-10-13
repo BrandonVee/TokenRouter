@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -2403,4 +2404,37 @@ func (r *stubUserSubscriptionRepo) IncrementUsage(ctx context.Context, id int64,
 
 func (r *stubUserSubscriptionRepo) BatchUpdateExpiredStatus(ctx context.Context) (int64, error) {
 	return 0, errors.New("not implemented")
+}
+
+// TestAPIKeyAuthRoutingStrategy 覆盖两类鉴权及两种运行模式，防止已保存策略在入口丢失。
+func TestAPIKeyAuthRoutingStrategy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, mode := range []string{config.RunModeSimple, config.RunModeStandard} {
+		for _, google := range []bool{false, true} {
+			for _, strategy := range []string{"manual", "auto", "speed", "price", "success_rate"} {
+				t.Run(fmt.Sprintf("%s/google=%t/%s", mode, google, strategy), func(t *testing.T) {
+					key := &service.APIKey{ID: 100, UserID: 7, Key: "test-key", Status: service.StatusActive, RoutingStrategy: strategy,
+						User: &service.User{ID: 7, Status: service.StatusActive, Role: service.RoleUser, Balance: 10}}
+					repo := &stubApiKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) { clone := *key; return &clone, nil }}
+					cfg := &config.Config{RunMode: mode}
+					svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+					router := gin.New()
+					if google {
+						router.Use(APIKeyAuthGoogle(svc, cfg))
+					} else {
+						router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+					}
+					router.POST("/t", func(c *gin.Context) {
+						require.Equal(t, strategy, service.APIKeyRoutingStrategyFromContext(c.Request.Context()))
+						c.Status(http.StatusOK)
+					})
+					req := httptest.NewRequest(http.MethodPost, "/t", nil)
+					req.Header.Set("Authorization", "Bearer test-key")
+					recorder := httptest.NewRecorder()
+					router.ServeHTTP(recorder, req)
+					require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
+				})
+			}
+		}
+	}
 }
