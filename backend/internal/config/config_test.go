@@ -2690,3 +2690,40 @@ func TestLoad_DefaultGatewayImageStreamConfig(t *testing.T) {
 		t.Fatalf("image stream timeout = %d, want greater than ordinary stream timeout %d", cfg.Gateway.ImageStreamDataIntervalTimeout, cfg.Gateway.StreamDataIntervalTimeout)
 	}
 }
+
+// 新增网关与创建限额配置必须同时支持环境变量、默认值和范围校验。
+func TestLoadReleaseAlignmentConfig(t *testing.T) {
+	t.Run("defaults", func(t *testing.T) {
+		resetViperWithJWTSecret(t)
+		cfg, err := Load()
+		require.NoError(t, err)
+		require.Equal(t, 128, cfg.Gateway.MinOutputTokens)
+		require.Equal(t, 4, cfg.Gateway.MaxSameAccountRetriesGemini)
+		require.Equal(t, 200, cfg.APIKeyCreate.MaxActivePerUser)
+		require.Equal(t, 60, cfg.APIKeyCreate.MaxPerUserPerHour)
+	})
+	t.Run("environment", func(t *testing.T) {
+		resetViperWithJWTSecret(t)
+		t.Setenv("GATEWAY_MIN_OUTPUT_TOKENS", "16")
+		t.Setenv("GATEWAY_MAX_SAME_ACCOUNT_RETRIES_GEMINI", "0")
+		t.Setenv("API_KEY_CREATE_MAX_ACTIVE_PER_USER", "0")
+		cfg, err := Load()
+		require.NoError(t, err)
+		require.Equal(t, 16, cfg.Gateway.MinOutputTokens)
+		require.Zero(t, cfg.Gateway.MaxSameAccountRetriesGemini)
+		require.Zero(t, cfg.APIKeyCreate.MaxActivePerUser)
+	})
+	for _, tc := range []struct{ key, value string }{
+		{"GATEWAY_MIN_OUTPUT_TOKENS", "15"},
+		{"GATEWAY_MAX_SAME_ACCOUNT_RETRIES_GEMINI", "-1"},
+		{"GATEWAY_MAX_SAME_ACCOUNT_RETRIES_GEMINI", "11"},
+		{"API_KEY_CREATE_MAX_PER_USER_PER_HOUR", "-1"},
+	} {
+		t.Run(tc.key+tc.value, func(t *testing.T) {
+			resetViperWithJWTSecret(t)
+			t.Setenv(tc.key, tc.value)
+			_, err := Load()
+			require.Error(t, err)
+		})
+	}
+}

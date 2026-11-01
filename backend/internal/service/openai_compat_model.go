@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 	"strings"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/apicompat"
@@ -80,6 +82,7 @@ func splitOpenAICompatReasoningModel(model string) (normalizedModel string, reas
 	last := strings.NewReplacer("-", "", "_", "", " ", "").Replace(parts[len(parts)-1])
 	switch last {
 	case "none", "minimal":
+		reasoningEffort = last
 	case "low", "medium", "high":
 		reasoningEffort = last
 	case "xhigh", "extrahigh":
@@ -100,7 +103,7 @@ func splitOpenAICompatReasoningModel(model string) (normalizedModel string, reas
 
 func openAIReasoningEffortToClaudeOutputEffort(effort string) string {
 	switch strings.TrimSpace(effort) {
-	case "low", "medium", "high":
+	case "none", "low", "medium", "high":
 		return effort
 	case "xhigh":
 		return "max"
@@ -124,4 +127,18 @@ func openAICompatAnthropicReasoningEffort(req *apicompat.AnthropicRequest, upstr
 		return "xhigh"
 	}
 	return convertedEffort
+}
+
+// validateOpenAIChatToolCompatibility 拒绝丢失新模型推理历史的工具调用降级。
+func validateOpenAIChatToolCompatibility(model string, hasTools bool, effort string) error {
+	if err := openai.ValidateGPT61SolReasoningEffort(model, effort); err != nil {
+		return err
+	}
+	if !hasTools {
+		return nil
+	}
+	if openai.RequiresResponsesForToolCalls(model) || (openai.IsGPT6SolOrLunaModelSpelling(model) && effort != "none") {
+		return fmt.Errorf("%s requires a Responses-capable account for tool calls with this reasoning mode", model)
+	}
+	return nil
 }

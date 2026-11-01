@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/claude"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/logger"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 	"github.com/BrandonVee/TokenRouter/internal/util/urlvalidator"
@@ -27,6 +28,97 @@ import (
 )
 
 var (
+	// 新模型静态兜底与稳定版目录一致；远程价表缺项时不降级到旧模型族。
+	openAIGPT61TerraFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   1e-6,
+		InputCostPerTokenPriority:           2e-6,
+		OutputCostPerToken:                  5e-6,
+		OutputCostPerTokenPriority:          10e-6,
+		CacheCreationInputTokenCost:         1.25e-6,
+		CacheCreationInputTokenCostPriority: 2.5e-6,
+		CacheReadInputTokenCost:             0.05e-6,
+		CacheReadInputTokenCostPriority:     0.1e-6,
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
+	}
+	openAIGPT61SolFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   2e-6,
+		InputCostPerTokenPriority:           4e-6,
+		OutputCostPerToken:                  10e-6,
+		OutputCostPerTokenPriority:          20e-6,
+		CacheCreationInputTokenCost:         2.5e-6,
+		CacheCreationInputTokenCostPriority: 5e-6,
+		CacheReadInputTokenCost:             0.1e-6,
+		CacheReadInputTokenCostPriority:     0.2e-6,
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
+	}
+	openAIGPT6SolFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   2e-6,
+		InputCostPerTokenPriority:           4e-6,
+		OutputCostPerToken:                  10e-6,
+		OutputCostPerTokenPriority:          20e-6,
+		CacheCreationInputTokenCost:         2.5e-6,
+		CacheCreationInputTokenCostPriority: 5e-6,
+		CacheReadInputTokenCost:             0.2e-6,
+		CacheReadInputTokenCostPriority:     0.4e-6,
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
+	}
+	openAIGPT6LunaFallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken:                   0.1e-6,
+		InputCostPerTokenPriority:           0.2e-6,
+		OutputCostPerToken:                  0.5e-6,
+		OutputCostPerTokenPriority:          1e-6,
+		CacheCreationInputTokenCost:         0.125e-6,
+		CacheCreationInputTokenCostPriority: 0.25e-6,
+		CacheReadInputTokenCost:             0.01e-6,
+		CacheReadInputTokenCostPriority:     0.02e-6,
+		LongContextInputTokenThreshold:      272_000,
+		LongContextInputCostMultiplier:      2,
+		LongContextOutputCostMultiplier:     1.5,
+		SupportsServiceTier:                 true,
+		LiteLLMProvider:                     "openai",
+		Mode:                                "chat",
+		SupportsPromptCaching:               true,
+	}
+	claudeOpus55FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken: 4e-6, OutputCostPerToken: 20e-6,
+		CacheCreationInputTokenCost: 5e-6, CacheCreationInputTokenCostAbove1hr: 8e-6,
+		CacheReadInputTokenCost:   0.2e-6,
+		InputCostPerTokenPriority: 8e-6, OutputCostPerTokenPriority: 40e-6,
+		CacheCreationInputTokenCostPriority: 10e-6, CacheReadInputTokenCostPriority: 0.4e-6,
+		SupportsServiceTier: true, LiteLLMProvider: "anthropic", Mode: "chat", SupportsPromptCaching: true,
+	}
+	claudeSonnet55FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken: 2e-6, OutputCostPerToken: 10e-6,
+		CacheCreationInputTokenCost: 2.5e-6, CacheCreationInputTokenCostAbove1hr: 4e-6,
+		CacheReadInputTokenCost: 0.2e-6,
+		LiteLLMProvider:         "anthropic", Mode: "chat", SupportsPromptCaching: true,
+	}
+	claudeHaiku55FallbackPricing = &LiteLLMModelPricing{
+		InputCostPerToken: 1e-7, OutputCostPerToken: 5e-7,
+		CacheCreationInputTokenCost: 1.25e-7, CacheCreationInputTokenCostAbove1hr: 2e-7,
+		CacheReadInputTokenCost:        1e-8,
+		LongContextInputTokenThreshold: 100000,
+		LongContextInputCostMultiplier: 5, LongContextOutputCostMultiplier: 5,
+		LiteLLMProvider: "anthropic", Mode: "chat", SupportsPromptCaching: true,
+	}
 	// 定价远程请求与 repository HTTP 客户端保持一致，避免 service 层提前取消请求。
 	pricingRemoteRequestTimeout = 30 * time.Second
 	openAIModelDatePattern      = regexp.MustCompile(`-\d{8}$`)
@@ -1230,6 +1322,30 @@ func (s *PricingService) GetModelPricing(modelName string) *LiteLLMModelPricing 
 		}
 	}
 
+	// 新模型族先于旧版本模糊匹配，避免远程价卡滞后时误用旧价格。
+	canonical := normalizeKnownOpenAICodexModel(modelName)
+	if pricing, ok := s.pricingData[canonical]; ok {
+		return pricing
+	}
+	switch canonical {
+	case "gpt-6.1-terra":
+		return openAIGPT61TerraFallbackPricing
+	case "gpt-6.1-sol":
+		return openAIGPT61SolFallbackPricing
+	case "gpt-6-sol":
+		return openAIGPT6SolFallbackPricing
+	case "gpt-6-luna":
+		return openAIGPT6LunaFallbackPricing
+	}
+	switch {
+	case claude.IsOpus55(modelName):
+		return claudeOpus55FallbackPricing
+	case claude.IsSonnet55(modelName):
+		return claudeSonnet55FallbackPricing
+	case claude.IsHaiku55(modelName):
+		return claudeHaiku55FallbackPricing
+	}
+
 	// 2. 处理常见的模型名称变体
 	// claude-opus-4-5-20251101 -> claude-opus-4.5-20251101
 	for _, candidate := range lookupCandidates {
@@ -1377,6 +1493,13 @@ func (s *PricingService) extractBaseName(model string) string {
 
 // matchByModelFamily 基于模型系列匹配
 func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
+	// 优先匹配新模型目录及其推理别名，避免降级为旧模型族。
+	if canonical := normalizeKnownOpenAICodexModel(model); canonical != "" {
+		if pricing, ok := s.pricingData[canonical]; ok {
+			return pricing
+		}
+	}
+
 	// modelFamily 定义一个模型系列的匹配和定价查找规则。
 	type modelFamily struct {
 		name    string   // 系列名称
@@ -1477,6 +1600,10 @@ func (s *PricingService) matchByModelFamily(model string) *LiteLLMModelPricing {
 	for _, pattern := range lookups {
 		for key, pricing := range s.pricingData {
 			keyLower := strings.ToLower(key)
+			// Opus 5.5 是独立价卡，不能作为旧 Opus 5 的同族兜底。
+			if matched.name == "opus-5" && claude.IsOpus55(keyLower) {
+				continue
+			}
 			if strings.Contains(keyLower, pattern) {
 				logger.LegacyPrintf("service.pricing", "[Pricing] Fuzzy matched %s -> %s", model, key)
 				return pricing

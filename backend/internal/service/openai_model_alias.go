@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 	"strconv"
 	"strings"
 )
@@ -143,6 +144,15 @@ func normalizeKnownOpenAICodexModel(model string) string {
 	}
 
 	switch {
+	case openai.IsGPT61TerraModelSpelling(normalized):
+		return "gpt-6.1-terra"
+	case openai.IsGPT61SolModelSpelling(normalized):
+		return "gpt-6.1-sol"
+	case openai.IsGPT6SolOrLunaModelSpelling(normalized):
+		if strings.HasPrefix(normalized, "gpt-6-sol") {
+			return "gpt-6-sol"
+		}
+		return "gpt-6-luna"
 	case isOpenAIGPT6AstraModel(normalized):
 		return "gpt-6-astra"
 	case strings.Contains(normalized, "gpt-5.6-sol"):

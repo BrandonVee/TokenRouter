@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 	"strings"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/apicompat"
@@ -16,7 +17,7 @@ func shouldAutoInjectPromptCacheKeyForCompat(model string) bool {
 	canonical := canonicalizeOpenAIModelAliasSpelling(trimmed)
 	// GPT-6 是 Astra 的公开别名；刻意只对 Astra 放行，
 	// 避免其它 GPT-6 家族继承 Messages 兼容状态。
-	if canonical == "gpt-6" || canonical == "gpt-6-astra" {
+	if canonical == "gpt-6" || canonical == "gpt-6-astra" || openai.IsGPT6SolOrLunaModelSpelling(canonical) || openai.IsGPT61SolModelSpelling(canonical) || openai.IsGPT61TerraModelSpelling(canonical) {
 		return true
 	}
 	// 仅对 Codex OAuth 路径支持的 GPT-5 族开启自动注入，避免 normalizeCodexModel

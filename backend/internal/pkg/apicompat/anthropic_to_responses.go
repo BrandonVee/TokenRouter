@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 )
 
 // AnthropicToResponses converts an Anthropic Messages request directly into
@@ -12,6 +14,14 @@ import (
 // Chat Completions intermediary round-trip (e.g. thinking, cache_control,
 // structured system prompts).
 func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
+	return AnthropicToResponsesWithMinOutputTokens(req, DefaultMinMaxOutputTokens)
+}
+
+// AnthropicToResponsesWithMinOutputTokens 按配置下限转换请求，保留原协议的推理与工具语义。
+func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int) (*ResponsesRequest, error) {
+	if minOutputTokens < 16 {
+		minOutputTokens = DefaultMinMaxOutputTokens
+	}
 	input, err := convertAnthropicToResponsesInput(req.System, req.Messages)
 	if err != nil {
 		return nil, err
@@ -35,7 +45,7 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 
 	// Responses API 的 gpt-5.x 推理模型不接受采样参数，携带 temperature/top_p 会触发 400。
 	// 因此只有非推理模型才透传这些参数。
-	if !isReasoningModel(req.Model) {
+	if !isReasoningModel(req.Model) || ((openai.IsGPT6SolOrLunaModelSpelling(req.Model) || openai.IsGPT61TerraModelSpelling(req.Model)) && req.OutputConfig != nil && req.OutputConfig.Effort == "none") {
 		out.Temperature = req.Temperature
 		out.TopP = req.TopP
 	}
@@ -48,8 +58,8 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 
 	if req.MaxTokens > 0 {
 		v := req.MaxTokens
-		if v < minMaxOutputTokens {
-			v = minMaxOutputTokens
+		if v < minOutputTokens {
+			v = minOutputTokens
 		}
 		out.MaxOutputTokens = &v
 	}
@@ -63,6 +73,9 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 	effort := "medium"
 	if req.OutputConfig != nil && req.OutputConfig.Effort != "" {
 		effort = req.OutputConfig.Effort
+	}
+	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, effort); err != nil {
+		return nil, err
 	}
 	if isUltraReasoningEffort(effort) {
 		return nil, fmt.Errorf("reasoning effort %q is not supported", strings.TrimSpace(effort))
@@ -300,7 +313,7 @@ func anthropicAssistantToResponses(raw json.RawMessage) ([]ResponsesInputItem, e
 		})
 	}
 
-	// Text content → assistant message with output_text content parts.
+	// 文本模型。
 	text := extractAnthropicTextFromBlocks(blocks)
 	if text != "" {
 		parts := []ResponsesContentPart{{Type: "output_text", Text: text}}
@@ -547,7 +560,7 @@ func boolPtr(v bool) *bool {
 // isReasoningModel 判断模型是否为 Responses API 下不支持 temperature/top_p 的推理模型。
 // 当前所有 gpt-5.x 模型都按推理模型处理。
 func isReasoningModel(model string) bool {
-	return strings.HasPrefix(model, "gpt-5")
+	return strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6")
 }
 
 // normalizeToolParameters ensures the tool parameter schema is valid for

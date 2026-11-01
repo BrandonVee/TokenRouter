@@ -116,6 +116,12 @@ Images API 的流式与非流式上游请求都脱离客户端请求取消信号
 
 OAuth Images 通过 Responses 主控模型调用独立的 `image_generation` 工具模型：当前内置 GPT Image 2.5 Flare/Sunburst，主控模型默认 `gpt-5.6-luna`，可通过 `SUB2API_IMAGES_MAIN_MODEL` 运维覆盖。模型列表、账号测试、请求转换和计费均保留工具模型与主控模型的区分；远程价表尚未包含 GPT Image 2.5 时使用内置价格兜底，不能回退到旧图片模型价格。主控模型被套餐门控拒绝属于配置错误，不应冷却图片模型或账号。
 
+### 新模型兼容
+
+默认目录包含 GPT-6 Sol/Luna、GPT-6.1 Sol/Terra；路由和价格归一化保留这些模型及已支持的推理后缀，不能落到旧 GPT-5 默认模型。GPT-6.1 Sol 禁止 `none`/`minimal`，转换层以最终账号映射模型执行校验，不能静默提高推理强度。Claude Opus/Sonnet/Haiku 5.5 通过兼容入口转发时按最终模型生成各自的思考参数，并保留签名历史。
+
+图片编辑 multipart 单分片最多 50 MiB；读取超过上限立即拒绝，不能把被截断的数据当作有效图片转发。下载上限与上传上限分开管理。
+
 ## 额度与调度
 
 OpenAI 是通用高级调度器的能力适配者之一，而不是该调度器的全局所有者。只有最终目标 Group 的 `scheduler_type=advanced` 时，OpenAI 路径才在共同 active/schedulable、分组、模型、限流和并发硬过滤后使用通用 Top-K 评分；`basic` 保留原有默认选择路径。高级分组可用稀疏 `advanced_scheduler_overrides` 覆盖全局 Top-K、评分权重和粘性开关，未设置字段继续继承网关设置。高级分组还会考虑所需 transport/capability、账号优先级、负载、排队、错误率、近期延迟、配额余量和粘性上下文。previous response、WebSocket 会话和显式 session 可约束账号复用；只有策略允许时才能迁移。

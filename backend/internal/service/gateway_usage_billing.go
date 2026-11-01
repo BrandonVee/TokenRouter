@@ -388,11 +388,12 @@ func notifyAccountQuota(p *usageBillingParams, deps *billingDeps, result *UsageB
 			slog.Error("panic in notifyAccountQuota", "recover", r)
 		}
 	}()
-	if p.Cost.TotalCost <= 0 || p.Account == nil || !p.Account.IsAPIKeyOrBedrock() || deps.balanceNotifyService == nil {
+	if p.Cost.TotalCost <= 0 || p.Account == nil || !p.Account.SupportsAccountQuota() || !p.Account.HasAnyQuotaLimit() || deps.balanceNotifyService == nil {
 		slog.Debug("notifyAccountQuota: skipped",
 			"total_cost", p.Cost.TotalCost,
 			"account_nil", p.Account == nil,
-			"is_apikey_or_bedrock", p.Account != nil && p.Account.IsAPIKeyOrBedrock(),
+			"supports_account_quota", p.Account != nil && p.Account.SupportsAccountQuota(),
+			"has_quota_limit", p.Account != nil && p.Account.HasAnyQuotaLimit(),
 			"service_nil", deps.balanceNotifyService == nil,
 		)
 		return
@@ -401,6 +402,10 @@ func notifyAccountQuota(p *usageBillingParams, deps *billingDeps, result *UsageB
 	var quotaState *AccountQuotaState
 	if result != nil {
 		quotaState = result.QuotaState
+		// 本应累加却无递增后状态（账号已删除，计数被跳过）：没有新用量，不做阈值判定。
+		if quotaState == nil && p.shouldUpdateAccountQuota(accountCost) {
+			return
+		}
 	}
 	slog.Debug("notifyAccountQuota: calling CheckAccountQuotaAfterIncrement",
 		"account_id", p.Account.ID,
@@ -767,6 +772,10 @@ func (s *GatewayService) calculateRecordUsageCost(
 ) *CostBreakdown {
 	// 图片生成：渠道定价为令牌计费时走令牌路径，否则走图片计费
 	if result.ImageCount > 0 {
+		// 先保留 fork 的计费模型来源解析，再决定是否强制按张。
+		if imageCountBillingApplies(apiKey, result.ImageEndpoint) {
+			return s.calculateImageCost(ctx, result, apiKey, account, billingModel, requestedModel, billingModelSource, channelMappedModel, billingModel, nil, imageMultiplier)
+		}
 		if resolved, pricingModel := s.resolveChannelPricingForUsage(ctx, billingModel, requestedModel, billingModelSource, channelMappedModel, result.UpstreamModel, apiKey, account); resolved != nil && resolved.Mode == BillingModeToken {
 			return s.calculateTokenCost(ctx, result, apiKey, account, billingModel, requestedModel, billingModelSource, channelMappedModel, multiplier, opts)
 		} else if resolved != nil {
@@ -847,7 +856,7 @@ func (s *GatewayService) calculateImageCost(
 	if resolved == nil {
 		resolved, resolvedModel = s.resolveChannelPricingForUsage(ctx, billingModel, requestedModel, billingModelSource, channelMappedModel, result.UpstreamModel, apiKey, account)
 	}
-	if resolved != nil && resolved.Source == PricingSourceGroup {
+	if resolved != nil && resolved.Source == PricingSourceGroup && (resolved.Mode == BillingModePerRequest || resolved.Mode == BillingModeImage || !imageCountBillingApplies(apiKey, result.ImageEndpoint)) {
 		gid := apiKey.Group.ID
 		cost, err := s.billingService.CalculateCostUnified(CostInput{
 			Ctx:            ctx,
@@ -855,6 +864,7 @@ func (s *GatewayService) calculateImageCost(
 			GroupID:        &gid,
 			Group:          apiKey.Group,
 			RequestCount:   result.ImageCount,
+			Tokens:         UsageTokens{InputTokens: result.Usage.InputTokens, OutputTokens: result.Usage.OutputTokens, ImageOutputTokens: result.Usage.ImageOutputTokens},
 			SizeTier:       sizeTier,
 			RateMultiplier: multiplier,
 			Resolver:       s.resolver,
@@ -870,7 +880,7 @@ func (s *GatewayService) calculateImageCost(
 	if apiKeyHasConfiguredImagePrice(apiKey, sizeTier) {
 		return s.billingService.CalculateImageCost(billingModel, sizeTier, result.ImageCount, groupConfig, multiplier)
 	}
-	if resolved != nil {
+	if resolved != nil && (resolved.Mode != BillingModeToken || !imageCountBillingApplies(apiKey, result.ImageEndpoint)) {
 		tokens := UsageTokens{
 			InputTokens:       result.Usage.InputTokens,
 			OutputTokens:      result.Usage.OutputTokens,

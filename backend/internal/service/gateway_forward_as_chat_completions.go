@@ -44,11 +44,17 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	includeUsage := ccReq.StreamOptions != nil && ccReq.StreamOptions.IncludeUsage
 
 	// 2. Convert CC → Responses → Anthropic (chained conversion)
-	responsesReq, err := apicompat.ChatCompletionsToResponses(&ccReq)
+	responsesReq, err := chatCompletionsToResponses(s.cfg, &ccReq)
 	if err != nil {
 		return nil, fmt.Errorf("convert chat completions to responses: %w", err)
 	}
 
+	// 4. 模型映射：渠道映射已由 handler 写入 body，此处继续执行账号映射和平台规范化。
+	mappedModel := resolveAccountUpstreamModel(ctx, account, originalModel)
+	if mappedModel == "" {
+		mappedModel = originalModel
+	}
+	responsesReq.Model = mappedModel
 	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(responsesReq)
 	if err != nil {
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
@@ -58,11 +64,6 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	anthropicReq.Stream = true
 	reqStream := true
 
-	// 4. 模型映射：渠道映射已由 handler 写入 body，此处继续执行账号映射和平台规范化。
-	mappedModel := resolveAccountUpstreamModel(ctx, account, originalModel)
-	if mappedModel == "" {
-		mappedModel = originalModel
-	}
 	anthropicReq.Model = mappedModel
 
 	logger.L().Debug("gateway forward_as_chat_completions: model mapping applied",

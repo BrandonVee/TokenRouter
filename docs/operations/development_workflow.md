@@ -16,7 +16,7 @@
 
 | 工具 | 当前来源 | 当前约束 |
 | --- | --- | --- |
-| Go | `backend/go.mod`、CI | `1.27.2` |
+| Go | `backend/go.mod`、CI | `1.27.3` |
 | Node.js | `.github/workflows/backend-ci.yml` | `20` |
 | pnpm | CI 与根 Makefile | `9`；根命令默认使用 `npx --yes pnpm@9` |
 | golangci-lint | CI | `v2.14.0`，配置在 `backend/.golangci.yml` |
@@ -30,7 +30,9 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 升级 Go 时必须同时修改 `backend/go.mod`，以及 `backend-ci.yml`（两处）、`release.yml`（两处）和 `security-scan.yml` 中的 `go version` 硬断言；workflow 都通过 `go-version-file: backend/go.mod` 安装工具链，任一断言遗漏都会在版本校验步骤失败。
 
-Ent schema 加载依赖的 `golang.org/x/tools` 至少为 `v0.50.0`，以读取 Go 1.27.2 的导出数据。当前 uTLS HTTP/2 与 h2c 兼容实现保留 x/net 接口；Lint 仅对 `http_upstream.go`、对应测试与 `server/http.go` 的这些接口弃用提示设置精确例外，迁移标准库实现前需验证指纹拨号、PING 与 h2c 行为。
+Ent schema 加载依赖的 `golang.org/x/tools` 当前为 `v0.51.0`，以读取 Go 1.27.3 的导出数据。当前 uTLS HTTP/2 与 h2c 兼容实现保留 x/net 接口；Lint 仅对 `http_upstream.go`、对应测试与 `server/http.go` 的这些接口弃用提示设置精确例外，迁移标准库实现前需验证指纹拨号、PING 与 h2c 行为。
+
+前端国际化使用 Vue I18n 11 的 Composition API，消息编译器与运行时保持同版本；旧版 9.x 已停止维护。HTML 净化使用 DOMPurify 3.4.17 及以上，HTTP 重定向依赖固定为 follow-redirects 1.16.2，相关版本与锁文件共同通过安全扫描。前端审计使用官方 npm registry，例外校验器会拒绝端点错误或未知格式的报告，避免把扫描失败误认为通过。
 
 不要把个人数据库路径、固定密码或某台机器的服务配置写入工程文档。开发配置使用未提交的环境文件或 `backend/config.yaml`；可提交样例在 `deploy/`。前端开发服务器默认通过 `VITE_DEV_PROXY_TARGET` 代理后端，端口由 `VITE_DEV_PORT` 控制。
 
@@ -126,6 +128,12 @@ npx --yes pnpm@9 --dir frontend run build
 2. 上游在 `README.md` 新增的工程文档不直接并入 README；把内容归入 `docs/` 的合适 Project Doc 或相关用户手册，没有合适位置时再创建规范命名的新文档。
 
 同步后检查 `git diff upstream/...` 不足以证明行为正确，还要核对本 fork 的迁移顺序、默认配置、i18n、生成文件、部署样例、文档链接和安全边界。已经存在的 fork 修改不能为减少冲突而静默回退。
+
+### 稳定版兼容移植边界
+
+当前代码选择性移植上游 `v0.2.19`（`dece26153`）的模型、图片按张计费、Vertex 额度、配置、后台交互与安全修复，fork 的版本号独立演进。它不表示已逐提交合并至该上游版本。上游新增原生平台、Gemini 显式缓存、细粒度管理员 API Key、充值优惠和余额在途预占需要结合本 fork 的平台目录、团队/订阅/多分组权限与资金事务另行适配；不能通过覆盖同名文件把这些边界替换回上游实现。
+
+管理员账号优先级支持合并连续操作后保存，密钥列表支持按首选分组名称排序；仪表盘近期用户用量可按 Token 或实扣金额取 Top 12，原始与预聚合查询共用该排序维度，缓存键必须包含维度。运维请求详情按账号 ID 补充名称，无法查询时回退到 `#ID`。
 
 ## 发布
 

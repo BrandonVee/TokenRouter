@@ -51,14 +51,6 @@ func (s *GatewayService) ForwardAsResponses(
 	clientStream := responsesReq.Stream
 
 	// 2. Convert Responses → Anthropic
-	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(&responsesReq)
-	if err != nil {
-		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
-	}
-
-	// 3. Force upstream streaming (Anthropic works best with streaming)
-	anthropicReq.Stream = true
-	reqStream := true
 
 	// 4. 模型映射：渠道映射已由 handler 写入 body，此处继续执行账号映射和平台规范化。
 	mappedModel := resolveAccountUpstreamModel(ctx, account, originalModel)
@@ -68,6 +60,16 @@ func (s *GatewayService) ForwardAsResponses(
 	reasoningEffort := ExtractResponsesReasoningEffortFromBody(body)
 	// 国产模型没有显式 effort 档位时，thinking 启用后补默认展示值。
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, mappedModel)
+	responsesReq.Model = mappedModel
+	anthropicReq, err := apicompat.ResponsesToAnthropicRequest(&responsesReq)
+	if err != nil {
+		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
+	}
+
+	// 3. Force upstream streaming (Anthropic works best with streaming)
+	anthropicReq.Stream = true
+	reqStream := true
+
 	anthropicReq.Model = mappedModel
 
 	logger.L().Debug("gateway forward_as_responses: model mapping applied",
@@ -418,7 +420,10 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 		}
 	}
 
-	// Convert to Responses format
+	// 使用实际上游模型识别签名历史，外部响应仍还原客户端别名。
+	if isClaude55SignedThinkingModel(mappedModel) {
+		finalResp.Model = mappedModel
+	}
 	responsesResp := apicompat.AnthropicToResponsesResponse(finalResp)
 	responsesResp.Model = originalModel // Use original model name
 
@@ -477,6 +482,7 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 
 	state := apicompat.NewAnthropicEventToResponsesState()
 	state.Model = originalModel
+	state.PreserveThinkingSignatures = isClaude55SignedThinkingModel(mappedModel)
 	clientToolRestorer := apicompat.NewResponsesClientToolStreamRestorer(clientToolMapping)
 	var usage ClaudeUsage
 	var firstTokenMs *int

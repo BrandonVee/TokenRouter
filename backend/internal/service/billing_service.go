@@ -283,6 +283,137 @@ func NewBillingService(cfg *config.Config, pricingService *PricingService) *Bill
 // initFallbackPricing 初始化硬编码回退价格（当动态价格不可用时使用）
 // 价格单位：USD per token（与LiteLLM格式一致）
 func (s *BillingService) initFallbackPricing() {
+	s.fallbackPrices["gemini-3.7-flash"] = &ModelPricing{
+		InputPricePerToken:     0.75e-6,
+		OutputPricePerToken:    3.75e-6,
+		CacheReadPricePerToken: 0.075e-6,
+		SupportsCacheBreakdown: false,
+	}
+	s.fallbackPrices["gemini-3.8-flash"] = &ModelPricing{
+		InputPricePerToken:     0.75e-6,
+		OutputPricePerToken:    3.75e-6,
+		CacheReadPricePerToken: 0.075e-6,
+		SupportsCacheBreakdown: false,
+	}
+	// 同步 v0.2.19 的新模型回退价，避免离线时回退到旧模型族。
+	s.fallbackPrices["gpt-6.1-terra"] = &ModelPricing{
+		InputPricePerToken:                 1e-6,
+		InputPricePerTokenPriority:         2e-6,
+		OutputPricePerToken:                5e-6,
+		OutputPricePerTokenPriority:        10e-6,
+		CacheCreationPricePerToken:         1.25e-6,
+		CacheCreationPricePerTokenPriority: 2.5e-6,
+		CacheReadPricePerToken:             0.05e-6,
+		CacheReadPricePerTokenPriority:     0.1e-6,
+		CacheCreationPriceExplicit:         true,
+		LongContextInputThreshold:          272_000,
+		LongContextInputMultiplier:         2,
+		LongContextOutputMultiplier:        1.5,
+	}
+	s.fallbackPrices["gpt-6.1-sol"] = &ModelPricing{
+		InputPricePerToken:                 2e-6,
+		InputPricePerTokenPriority:         4e-6,
+		OutputPricePerToken:                10e-6,
+		OutputPricePerTokenPriority:        20e-6,
+		CacheCreationPricePerToken:         2.5e-6,
+		CacheCreationPricePerTokenPriority: 5e-6,
+		CacheReadPricePerToken:             0.1e-6,
+		CacheReadPricePerTokenPriority:     0.2e-6,
+		CacheCreationPriceExplicit:         true,
+		LongContextInputThreshold:          272_000,
+		LongContextInputMultiplier:         2,
+		LongContextOutputMultiplier:        1.5,
+	}
+	s.fallbackPrices["gpt-6-sol"] = &ModelPricing{
+		InputPricePerToken:                 2e-6,
+		InputPricePerTokenPriority:         4e-6,
+		OutputPricePerToken:                10e-6,
+		OutputPricePerTokenPriority:        20e-6,
+		CacheCreationPricePerToken:         2.5e-6,
+		CacheCreationPricePerTokenPriority: 5e-6,
+		CacheReadPricePerToken:             0.2e-6,
+		CacheReadPricePerTokenPriority:     0.4e-6,
+		CacheCreationPriceExplicit:         true,
+		LongContextInputThreshold:          272_000,
+		LongContextInputMultiplier:         2,
+		LongContextOutputMultiplier:        1.5,
+	}
+	s.fallbackPrices["gpt-6-luna"] = &ModelPricing{
+		InputPricePerToken:                 0.1e-6,
+		InputPricePerTokenPriority:         0.2e-6,
+		OutputPricePerToken:                0.5e-6,
+		OutputPricePerTokenPriority:        1e-6,
+		CacheCreationPricePerToken:         0.125e-6,
+		CacheCreationPricePerTokenPriority: 0.25e-6,
+		CacheReadPricePerToken:             0.01e-6,
+		CacheReadPricePerTokenPriority:     0.02e-6,
+		CacheCreationPriceExplicit:         true,
+		LongContextInputThreshold:          272_000,
+		LongContextInputMultiplier:         2,
+		LongContextOutputMultiplier:        1.5,
+	}
+	s.fallbackPrices["claude-opus-5-5"] = &ModelPricing{
+		InputPricePerToken:         4e-6,
+		OutputPricePerToken:        20e-6,
+		CacheCreationPricePerToken: 5e-6,
+		CacheReadPricePerToken:     0.2e-6,
+		CacheCreation5mPrice:       5e-6,
+		CacheCreation1hPrice:       8e-6,
+		SupportsCacheBreakdown:     true,
+	}
+	s.fallbackPrices["claude-sonnet-5-5"] = &ModelPricing{
+		InputPricePerToken:         2e-6,
+		OutputPricePerToken:        10e-6,
+		CacheCreationPricePerToken: 2.5e-6,
+		CacheReadPricePerToken:     0.2e-6,
+		CacheCreation5mPrice:       2.5e-6,
+		CacheCreation1hPrice:       4e-6,
+		SupportsCacheBreakdown:     true,
+	}
+	s.fallbackPrices["claude-haiku-5-5"] = &ModelPricing{
+		InputPricePerToken:          0.1e-6,
+		OutputPricePerToken:         0.5e-6,
+		CacheCreationPricePerToken:  0.125e-6,
+		CacheReadPricePerToken:      0.01e-6,
+		CacheCreation5mPrice:        0.125e-6,
+		CacheCreation1hPrice:        0.2e-6,
+		SupportsCacheBreakdown:      true,
+		LongContextInputThreshold:   100000,
+		LongContextInputMultiplier:  5,
+		LongContextOutputMultiplier: 5,
+	}
+	s.fallbackPrices["gemini-4-argon"] = &ModelPricing{
+		InputPricePerToken:     2e-6,
+		OutputPricePerToken:    10e-6,
+		CacheReadPricePerToken: 0.1e-6,
+		SupportsCacheBreakdown: false,
+	}
+	s.fallbackPrices["gemini-4-argon-cyber-permissive"] = &ModelPricing{
+		InputPricePerToken:     4e-6,
+		OutputPricePerToken:    20e-6,
+		CacheReadPricePerToken: 0.2e-6,
+		SupportsCacheBreakdown: false,
+	}
+	s.fallbackPrices["grok-4.7"] = &ModelPricing{
+		InputPricePerToken:            2e-6,
+		OutputPricePerToken:           6e-6,
+		CacheReadPricePerToken:        0.5e-6,
+		SupportsCacheBreakdown:        false,
+		LongContextInputThreshold:     200000,
+		LongContextThresholdInclusive: true,
+		LongContextInputMultiplier:    2,
+		LongContextOutputMultiplier:   2,
+	}
+	s.fallbackPrices["grok-4.7-fast"] = &ModelPricing{
+		InputPricePerToken:            4e-6,
+		OutputPricePerToken:           12e-6,
+		CacheReadPricePerToken:        1e-6,
+		SupportsCacheBreakdown:        false,
+		LongContextInputThreshold:     200000,
+		LongContextThresholdInclusive: true,
+		LongContextInputMultiplier:    1.5,
+		LongContextOutputMultiplier:   1.5,
+	}
 	// Claude 4.5 Opus
 	s.fallbackPrices["claude-opus-4.5"] = &ModelPricing{
 		InputPricePerToken:         5e-6,    // $5 per MTok
@@ -783,6 +914,37 @@ func (s *BillingService) initFallbackPricing() {
 // getFallbackPricing 根据模型系列获取回退价格
 func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	modelLower := strings.ToLower(model)
+	if strings.Contains(modelLower, "gemini-3.8-flash") {
+		return s.fallbackPrices["gemini-3.8-flash"]
+	}
+	if strings.Contains(modelLower, "gemini-3.7-flash") {
+		return s.fallbackPrices["gemini-3.7-flash"]
+	}
+
+	// 新模型须在旧模型族模糊匹配前识别，避免 5.5 被当作 Opus 5 或旧 Haiku。
+	canonical := normalizeKnownOpenAICodexModel(model)
+	switch canonical {
+	case "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-luna":
+		return s.fallbackPrices[canonical]
+	}
+	for _, family := range []string{"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"} {
+		normalized := strings.ReplaceAll(modelLower, ".", "-")
+		if strings.Contains(normalized, family) {
+			return s.fallbackPrices[family]
+		}
+	}
+	if strings.Contains(modelLower, "gemini-4-argon-cyber") {
+		return s.fallbackPrices["gemini-4-argon-cyber-permissive"]
+	}
+	if strings.Contains(modelLower, "gemini-4-argon") {
+		return s.fallbackPrices["gemini-4-argon"]
+	}
+	switch strings.ToLower(xai.StripGrokProviderPrefix(model)) {
+	case "grok-4.7", "grok-4.7-latest":
+		return s.fallbackPrices["grok-4.7"]
+	case "grok-4.7-fast", "grok-4.7-build-fast":
+		return s.fallbackPrices["grok-4.7-fast"]
+	}
 
 	// 按模型系列匹配
 	if strings.Contains(modelLower, "opus") {

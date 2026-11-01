@@ -133,11 +133,20 @@ func isOpenAIPersonalAccessTokenAuthMode(value string) bool {
 	}
 }
 
+// TempUnschedulableRule.Scope 的取值：命中后隔离的粒度。
+const (
+	TempUnschedScopeAccount = "account"
+	TempUnschedScopeModel   = "model"
+)
+
 type TempUnschedulableRule struct {
 	ErrorCode       int      `json:"error_code"`
 	Keywords        []string `json:"keywords"`
 	DurationMinutes int      `json:"duration_minutes"`
 	Description     string   `json:"description"`
+	// Scope 决定命中后的隔离粒度：account 暂停整个账号，model 只冷却本次请求的模型。
+	// 为空时模型已知且非 401 走模型级，否则账号级。
+	Scope string `json:"scope,omitempty"`
 }
 
 func (a *Account) IsActive() bool {
@@ -188,7 +197,7 @@ func (a *Account) IsSchedulable() bool {
 	if a.TempUnschedulableUntil != nil && now.Before(*a.TempUnschedulableUntil) {
 		return false
 	}
-	if a.IsAPIKeyOrBedrock() && a.IsQuotaExceeded() {
+	if a.SupportsAccountQuota() && a.IsQuotaExceeded() {
 		return false
 	}
 	return true
@@ -446,6 +455,7 @@ func (a *Account) GetTempUnschedulableRules() []TempUnschedulableRule {
 			Keywords:        parseTempUnschedStrings(entry["keywords"]),
 			DurationMinutes: parseTempUnschedInt(entry["duration_minutes"]),
 			Description:     parseTempUnschedString(entry["description"]),
+			Scope:           normalizeTempUnschedScope(entry["scope"]),
 		}
 
 		if rule.ErrorCode <= 0 || rule.DurationMinutes <= 0 || len(rule.Keywords) == 0 {
@@ -456,6 +466,18 @@ func (a *Account) GetTempUnschedulableRules() []TempUnschedulableRule {
 	}
 
 	return rules
+}
+
+// normalizeTempUnschedScope 只认 account / model 两个值，其余一律视为未设置。
+func normalizeTempUnschedScope(raw any) string {
+	switch strings.ToLower(strings.TrimSpace(parseTempUnschedString(raw))) {
+	case TempUnschedScopeAccount:
+		return TempUnschedScopeAccount
+	case TempUnschedScopeModel:
+		return TempUnschedScopeModel
+	default:
+		return ""
+	}
 }
 
 func parseTempUnschedString(value any) string {
@@ -1434,9 +1456,24 @@ func (a *Account) IsBedrockAPIKey() bool {
 	return a.IsBedrock() && a.GetCredential("auth_mode") == "apikey"
 }
 
-// IsAPIKeyOrBedrock 返回账号类型是否支持配额和池模式等特性
+// IsAPIKeyOrBedrock 返回账号类型是否支持池模式等特性（账号配额判定见 SupportsAccountQuota）
 func (a *Account) IsAPIKeyOrBedrock() bool {
 	return a.Type == AccountTypeAPIKey || a.Type == AccountTypeBedrock
+}
+
+// AccountTypeSupportsQuota 返回账号类型是否支持账号配额（quota_limit 及日/周额度、quota_used 累加、超限停调度）。
+// 在 apikey/bedrock 之外额外放开 Vertex service_account；池模式等其它特性仍只看 IsAPIKeyOrBedrock。
+func AccountTypeSupportsQuota(accountType string) bool {
+	switch strings.ToLower(accountType) {
+	case AccountTypeAPIKey, AccountTypeBedrock, AccountTypeServiceAccount:
+		return true
+	}
+	return false
+}
+
+// SupportsAccountQuota 返回账号是否支持账号配额，类型集合见 AccountTypeSupportsQuota。
+func (a *Account) SupportsAccountQuota() bool {
+	return AccountTypeSupportsQuota(a.Type)
 }
 
 func (a *Account) IsOpenAI() bool {

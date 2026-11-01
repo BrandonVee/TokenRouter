@@ -252,6 +252,7 @@ type OpenAIForwardResult struct {
 	Duration              time.Duration
 	FirstTokenMs          *int
 	ClientDisconnect      bool
+	ImageEndpoint         bool // 专用图片端点标记，混合请求不能强制按张结算。
 	ImageCount            int
 	ImageSize             string
 	ImageInputSize        string
@@ -1536,6 +1537,9 @@ func validateOpenAIReasoningEffort(body []byte, requestedModel string) error {
 		gjson.GetBytes(body, "session.reasoning_effort").String(),
 	}
 	for _, effort := range efforts {
+		if err := openai.ValidateGPT61SolReasoningEffort(requestedModel, effort); err != nil {
+			return err
+		}
 		if strings.EqualFold(strings.TrimSpace(effort), "ultra") {
 			return errors.New(`reasoning effort "ultra" is not supported; use "max"`)
 		}
@@ -1547,6 +1551,12 @@ func validateOpenAIReasoningEffort(body []byte, requestedModel string) error {
 		gjson.GetBytes(body, "session.model").String(),
 	}
 	for _, model := range models {
+		if openai.IsGPT61SolModelSpelling(model) {
+			canonical := openai.CanonicalizeOpenAIModelAliasSpelling(model)
+			if strings.HasSuffix(canonical, "-none") || strings.HasSuffix(canonical, "-minimal") {
+				return errors.New("gpt-6.1-sol requires reasoning effort low or higher")
+			}
+		}
 		if hasOpenAIUltraReasoningSuffix(model) {
 			return errors.New(`model reasoning suffix "ultra" is not supported; use "max"`)
 		}

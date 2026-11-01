@@ -23,6 +23,7 @@ describe('useModelWhitelist', () => {
       // GPT-6 系列（gpt-6 是 Astra 的公开别名）
       'gpt-6',
       'gpt-6-astra',
+      'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna',
       'gpt-5.2',
       'gpt-5.3',
       'gpt-5.3-spark',
@@ -282,13 +283,14 @@ describe('useModelWhitelist', () => {
     expect(models).toContain('composer-2.5')
   })
 
-  it('gemini 模型列表包含原生生图模型', () => {
+  it('gemini 默认目录包含当前生图模型并移除已停用的旧型号', () => {
     const models = getModelsByPlatform('gemini')
-
-    expect(models).toContain('gemini-2.5-flash-image')
     expect(models).toContain('gemini-3.1-flash-image')
-    expect(models.indexOf('gemini-3.1-flash-image')).toBeLessThan(models.indexOf('gemini-2.0-flash'))
-    expect(models.indexOf('gemini-2.5-flash-image')).toBeLessThan(models.indexOf('gemini-2.5-flash'))
+    expect(models).toContain('gemini-3.8-flash')
+    expect(models).toContain('gemini-4-argon')
+    expect(models).not.toContain('gemini-2.5-flash-image')
+    expect(models).not.toContain('gemini-2.0-flash')
+    expect(models).not.toContain('gemini-3-pro-preview')
   })
 
   it('antigravity 模型列表会把新的 Gemini 图片模型排在前面', () => {

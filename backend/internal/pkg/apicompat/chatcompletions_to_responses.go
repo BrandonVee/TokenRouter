@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 )
 
 type chatMessageContent struct {
@@ -16,6 +18,17 @@ type chatMessageContent struct {
 // true. store is always false and reasoning.encrypted_content is always
 // included so that the response translator has full context.
 func ChatCompletionsToResponses(req *ChatCompletionsRequest) (*ResponsesRequest, error) {
+	return ChatCompletionsToResponsesWithMinOutputTokens(req, DefaultMinMaxOutputTokens)
+}
+
+// ChatCompletionsToResponsesWithMinOutputTokens 按配置下限转换请求，保留原协议的推理与工具语义。
+func ChatCompletionsToResponsesWithMinOutputTokens(req *ChatCompletionsRequest, minOutputTokens int) (*ResponsesRequest, error) {
+	if minOutputTokens < 16 {
+		minOutputTokens = DefaultMinMaxOutputTokens
+	}
+	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, req.ReasoningEffort); err != nil {
+		return nil, err
+	}
 	if isUltraReasoningEffort(req.ReasoningEffort) {
 		return nil, fmt.Errorf("reasoning effort %q is not supported", strings.TrimSpace(req.ReasoningEffort))
 	}
@@ -31,17 +44,18 @@ func ChatCompletionsToResponses(req *ChatCompletionsRequest) (*ResponsesRequest,
 	}
 
 	out := &ResponsesRequest{
-		Model:             req.Model,
-		Instructions:      req.Instructions,
-		Input:             inputJSON,
-		Stream:            true, // upstream always streams
-		Include:           []string{"reasoning.encrypted_content"},
-		ServiceTier:       req.ServiceTier,
-		ParallelToolCalls: req.ParallelToolCalls,
+		Model:              req.Model,
+		Instructions:       req.Instructions,
+		Input:              inputJSON,
+		Stream:             true, // upstream always streams
+		Include:            []string{"reasoning.encrypted_content"},
+		ServiceTier:        req.ServiceTier,
+		PromptCacheOptions: req.PromptCacheOptions,
+		ParallelToolCalls:  req.ParallelToolCalls,
 	}
 
-	// gpt-5.x 推理模型不接受采样参数，具体判定见 isReasoningModel。
-	if !isReasoningModel(req.Model) {
+	// 推理模型不接受采样参数，具体判定见 isReasoningModel。
+	if !isReasoningModel(req.Model) || ((openai.IsGPT6SolOrLunaModelSpelling(req.Model) || openai.IsGPT61TerraModelSpelling(req.Model)) && req.ReasoningEffort == "none") {
 		out.Temperature = req.Temperature
 		out.TopP = req.TopP
 	}
@@ -59,8 +73,8 @@ func ChatCompletionsToResponses(req *ChatCompletionsRequest) (*ResponsesRequest,
 	}
 	if maxTokens > 0 {
 		v := maxTokens
-		if v < minMaxOutputTokens {
-			v = minMaxOutputTokens
+		if v < minOutputTokens {
+			v = minOutputTokens
 		}
 		out.MaxOutputTokens = &v
 	}
@@ -367,17 +381,29 @@ func convertChatContentPartsToResponses(parts []ChatContentPart) []ResponsesCont
 	for _, p := range parts {
 		switch p.Type {
 		case "text":
-			if p.Text != "" {
+			if p.Text != "" || len(p.PromptCacheBreakpoint) > 0 {
 				responseParts = append(responseParts, ResponsesContentPart{
-					Type: "input_text",
-					Text: p.Text,
+					PromptCacheBreakpoint: p.PromptCacheBreakpoint,
+					Type:                  "input_text",
+					Text:                  p.Text,
 				})
 			}
 		case "image_url":
 			if p.ImageURL != nil && p.ImageURL.URL != "" && !isEmptyBase64DataURI(p.ImageURL.URL) {
 				responseParts = append(responseParts, ResponsesContentPart{
-					Type:     "input_image",
-					ImageURL: p.ImageURL.URL,
+					PromptCacheBreakpoint: p.PromptCacheBreakpoint,
+					Type:                  "input_image",
+					ImageURL:              p.ImageURL.URL,
+				})
+			}
+		case "file":
+			if p.File != nil && (p.File.FileData != "" || p.File.FileID != "") {
+				responseParts = append(responseParts, ResponsesContentPart{
+					PromptCacheBreakpoint: p.PromptCacheBreakpoint,
+					Type:                  "input_file",
+					Filename:              p.File.Filename,
+					FileData:              p.File.FileData,
+					FileID:                p.File.FileID,
 				})
 			}
 		}

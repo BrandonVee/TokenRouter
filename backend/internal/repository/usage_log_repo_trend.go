@@ -87,13 +87,19 @@ func (r *usageLogRepository) GetAPIKeyUsageTrend(ctx context.Context, startTime,
 }
 
 // GetUserUsageTrend returns usage trend data grouped by user and date
-func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) (results []UserUsageTrendPoint, err error) {
-	if aggregated, ok, aggregateErr := r.getUserUsageTrendFromAnalytics(ctx, startTime, endTime, granularity, limit); aggregateErr == nil && ok {
+func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int, metric string) (results []UserUsageTrendPoint, err error) {
+
+	if aggregated, ok, aggregateErr := r.getUserUsageTrendFromAnalytics(ctx, startTime, endTime, granularity, limit, metric); aggregateErr == nil && ok {
 		return aggregated, nil
 	} else if aggregateErr != nil {
 		r.logUsageAnalyticsFallback("user_usage_trend", aggregateErr)
 	}
+
 	dateFormat := safeDateFormat(granularity)
+	rankExpr := "SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens)"
+	if metric == "actual_cost" {
+		rankExpr = "SUM(actual_cost)"
+	}
 
 	query := fmt.Sprintf(`
 		WITH top_users AS (
@@ -101,7 +107,7 @@ func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, e
 			FROM usage_logs
 			WHERE created_at >= $1 AND created_at < $2
 			GROUP BY user_id
-			ORDER BY SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) DESC
+			ORDER BY %s DESC, user_id ASC
 			LIMIT $3
 		)
 		SELECT
@@ -119,7 +125,7 @@ func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, e
 		  AND u.created_at >= $4 AND u.created_at < $5
 		GROUP BY date, u.user_id, us.email, us.username
 		ORDER BY date ASC, tokens DESC
-	`, dateFormat)
+	`, rankExpr, dateFormat)
 
 	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, limit, startTime, endTime)
 	if err != nil {

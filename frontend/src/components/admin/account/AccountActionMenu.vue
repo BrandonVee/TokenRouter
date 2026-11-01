@@ -78,6 +78,7 @@ import { useResizeObserver, useWindowSize } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@/components/icons'
 import type { Account } from '@/types'
+import { supportsAccountQuota } from '@/utils/accountQuota'
 
 const props = defineProps<{ show: boolean; account: Account | null; anchorRect: DOMRect | null }>()
 const emit = defineEmits(['close', 'test', 'stats', 'advanced-scheduler-score', 'schedule', 'duplicate', 'reauth', 'refresh-token', 'recover-state', 'reset-quota', 'set-privacy', 'invite-reset', 'create-spark-shadow'])
@@ -159,7 +160,7 @@ const supportsTokenRefresh = computed(() =>
 const isOpenAIOAuthParent = computed(() => isOpenAIOAuth.value && !isShadow.value)
 const supportsPrivacy = computed(() => (isAntigravityOAuth.value || isOpenAIOAuth.value) && !isShadow.value)
 const hasQuotaLimit = computed(() => {
-  return (props.account?.type === 'apikey' || props.account?.type === 'bedrock') && (
+  return supportsAccountQuota(props.account?.type) && (
     (props.account?.quota_limit ?? 0) > 0 ||
     (props.account?.quota_daily_limit ?? 0) > 0 ||
     (props.account?.quota_weekly_limit ?? 0) > 0

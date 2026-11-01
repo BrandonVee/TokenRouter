@@ -358,8 +358,8 @@
               {{ (row.rate_multiplier ?? 1).toFixed(2) }}x
             </span>
           </template>
-          <template #cell-priority="{ value }">
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{ value }}</span>
+          <template #cell-priority="{ row }">
+            <AccountPriorityCell :account="row" @updated="handleAccountUpdated" @error="(message: string) => appStore.showError(message)" />
           </template>
           <template #header-scheduler_score="{ column }">
             <div class="flex items-center">
@@ -486,6 +486,7 @@
 </template>
 
 <script setup lang="ts">
+import AccountPriorityCell from '@/components/account/AccountPriorityCell.vue'
 import { ref, reactive, computed, onMounted, onUnmounted, toRaw, watch } from 'vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'

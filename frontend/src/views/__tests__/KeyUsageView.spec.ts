@@ -180,8 +180,8 @@ describe('KeyUsageView', () => {
     await flushPromises()
 
     expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('keyUsage.remainingQuota')
-    const unlimitedNode = wrapper.findAll('span').find((node) => node.text() === 'payment.planCard.unlimited')
+    expect(wrapper.text()).toContain('Remaining Quota')
+    const unlimitedNode = wrapper.findAll('span').find((node) => node.text() === 'Unlimited')
     expect(unlimitedNode).toBeTruthy()
     expect(unlimitedNode?.classes()).toContain('text-emerald-500')
 
@@ -254,10 +254,10 @@ describe('KeyUsageView', () => {
     expect(String(mockFetch.mock.calls[0][0])).toContain('days=30')
 
     const text = wrapper.text()
-    expect(text).toContain('keyUsage.dailyDetail')
-    expect(text).toContain('keyUsage.date')
-    expect(text).toContain('keyUsage.cacheReadTokens')
-    expect(text).toContain('keyUsage.cacheWriteTokens')
+    expect(text).toContain('Daily Detail')
+    expect(text).toContain('Date')
+    expect(text).toContain('Cache Read')
+    expect(text).toContain('Cache Write')
     expect(text).toContain('2026-05-19')
     expect(text).toContain('12')
     expect(text).toContain('100')

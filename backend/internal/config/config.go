@@ -85,6 +85,7 @@ type Config struct {
 	Pricing                 PricingConfig                 `mapstructure:"pricing"`
 	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
 	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
+	APIKeyCreate            APIKeyCreateConfig            `mapstructure:"api_key_create"`
 	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
 	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
 	Dashboard               DashboardCacheConfig          `mapstructure:"dashboard_cache"`
@@ -915,6 +916,10 @@ const (
 
 // GatewayConfig API网关相关配置
 type GatewayConfig struct {
+	// MinOutputTokens 是协议转换的输出 token 下限，默认 128，最小 16。
+	MinOutputTokens int `mapstructure:"min_output_tokens"`
+	// MaxSameAccountRetriesGemini 是 Gemini 换号前同账号的额外重试次数。
+	MaxSameAccountRetriesGemini int `mapstructure:"max_same_account_retries_gemini"`
 	// 等待上游响应头的超时时间（秒），0表示无超时
 	// 注意：这不影响流式数据传输，只控制等待响应头的时间
 	ResponseHeaderTimeout int `mapstructure:"response_header_timeout"`
@@ -928,7 +933,7 @@ type GatewayConfig struct {
 	OpenAIHighEffortFirstOutputTimeoutSeconds int `mapstructure:"openai_high_effort_first_output_timeout_seconds"`
 	// 请求体最大字节数，用于网关请求体大小限制
 	MaxBodySize int64 `mapstructure:"max_body_size"`
-	// TextMaxBodySize 限制不允许内联图片或视频载荷的端点请求体大小。
+	// 文本模型。
 	TextMaxBodySize int64 `mapstructure:"text_max_body_size"`
 	// 非流式上游响应体读取上限（字节），用于防止无界读取导致内存放大
 	UpstreamResponseReadMaxBytes int64 `mapstructure:"upstream_response_read_max_bytes"`
@@ -1638,6 +1643,14 @@ type APIKeyAuthCacheConfig struct {
 	InvalidAbuse       InvalidAuthAbuseConfig `mapstructure:"invalid_abuse"`
 }
 
+// APIKeyCreateConfig 用户创建 API Key 的防滥用限制（0 表示不限制）
+type APIKeyCreateConfig struct {
+	// MaxActivePerUser 单个用户同时存在（未删除）的 API Key 上限
+	MaxActivePerUser int `mapstructure:"max_active_per_user"`
+	// MaxPerUserPerHour 单个用户每小时可创建的 API Key 次数（删除不返还次数）
+	MaxPerUserPerHour int `mapstructure:"max_per_user_per_hour"`
+}
+
 type InvalidAuthAbuseConfig struct {
 	Enabled       bool `mapstructure:"enabled"`
 	Threshold     int  `mapstructure:"threshold"`
@@ -2290,6 +2303,8 @@ func setDefaults() {
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.window_seconds", 60)
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.block_seconds", 60)
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.capacity", 16384)
+	viper.SetDefault("api_key_create.max_active_per_user", 200)
+	viper.SetDefault("api_key_create.max_per_user_per_hour", 60)
 
 	// Subscription auth L1 cache
 	viper.SetDefault("subscription_cache.l1_size", 16384)
@@ -2343,6 +2358,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.failover_on_400", false)
 	viper.SetDefault("gateway.max_account_switches", 10)
 	viper.SetDefault("gateway.max_account_switches_gemini", 3)
+	viper.SetDefault("gateway.min_output_tokens", 128)
+	viper.SetDefault("gateway.max_same_account_retries_gemini", 4)
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.codex_image_generation_bridge_enabled", false)
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)
@@ -2604,6 +2621,12 @@ func setEnvReachableDefaults() {
 }
 
 func (c *Config) Validate() error {
+	if c.Gateway.MinOutputTokens != 0 && c.Gateway.MinOutputTokens < 16 {
+		return fmt.Errorf("gateway.min_output_tokens must be at least 16")
+	}
+	if c.Gateway.MaxSameAccountRetriesGemini < 0 || c.Gateway.MaxSameAccountRetriesGemini > 10 {
+		return fmt.Errorf("gateway.max_same_account_retries_gemini must be between 0-10")
+	}
 	forwardedClientIPHeaders, err := NormalizeForwardedClientIPHeaders(c.Security.ForwardedClientIPHeaders)
 	if err != nil {
 		return fmt.Errorf("security.forwarded_client_ip_headers: %w", err)
@@ -2643,6 +2666,12 @@ func (c *Config) Validate() error {
 		if c.Server.H2C.MaxUploadBufferPerStream <= 0 {
 			return fmt.Errorf("server.h2c.max_upload_buffer_per_stream must be positive")
 		}
+	}
+	if c.APIKeyCreate.MaxActivePerUser < 0 {
+		return fmt.Errorf("api_key_create.max_active_per_user must be non-negative")
+	}
+	if c.APIKeyCreate.MaxPerUserPerHour < 0 {
+		return fmt.Errorf("api_key_create.max_per_user_per_hour must be non-negative")
 	}
 	if c.APIKeyAuth.InvalidAbuse.Enabled {
 		if c.APIKeyAuth.InvalidAbuse.Threshold < 10 {

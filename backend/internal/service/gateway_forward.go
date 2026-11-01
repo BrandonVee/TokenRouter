@@ -95,6 +95,15 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		return nil, fmt.Errorf("parse request: empty request")
 	}
 
+	// 先用最终账号映射模型校验，避免 OAuth 拟态吞掉不受支持的请求参数。
+	if account != nil && account.Platform == PlatformAnthropic && !account.IsBedrock() && account.Type != AccountTypeServiceAccount {
+		model := resolveAccountUpstreamModel(ctx, account, parsed.Model)
+		if err := validateClaude55Request(parsed.Body.Bytes(), model); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": err.Error()}})
+			return nil, err
+		}
+	}
+
 	if account != nil && s.shouldEmulateWebSearch(ctx, account, parsed.GroupID, parsed.Body.Bytes()) {
 		return s.handleWebSearchEmulation(ctx, c, account, parsed)
 	}

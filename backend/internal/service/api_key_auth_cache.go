@@ -109,10 +109,11 @@ type APIKeyAuthUserSnapshot struct {
 
 // APIKeyAuthGroupSnapshot 分组快照
 type APIKeyAuthGroupSnapshot struct {
-	ID            int64              `json:"id"`
-	Name          string             `json:"name"`
-	Platform      string             `json:"platform"`
-	SchedulerType GroupSchedulerType `json:"scheduler_type"`
+	ImageCountBilling bool               `json:"image_count_billing"`
+	ID                int64              `json:"id"`
+	Name              string             `json:"name"`
+	Platform          string             `json:"platform"`
+	SchedulerType     GroupSchedulerType `json:"scheduler_type"`
 	// AdvancedSchedulerOverrides 随认证快照下发，避免请求期回读分组配置。
 	AdvancedSchedulerOverrides      GroupAdvancedSchedulerOverrides `json:"advanced_scheduler_overrides"`
 	IsExclusive                     bool                            `json:"is_exclusive"`

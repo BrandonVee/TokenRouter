@@ -365,7 +365,7 @@ func (r *usageLogRepository) getAPIKeyUsageTrendFromAnalytics(ctx context.Contex
 }
 
 // getUserUsageTrendFromAnalytics 从组合聚合源计算最活跃用户趋势。
-func (r *usageLogRepository) getUserUsageTrendFromAnalytics(ctx context.Context, start, end time.Time, granularity string, limit int) ([]UserUsageTrendPoint, bool, error) {
+func (r *usageLogRepository) getUserUsageTrendFromAnalytics(ctx context.Context, start, end time.Time, granularity string, limit int, metric string) ([]UserUsageTrendPoint, bool, error) {
 	query, ok, err := r.buildUsageAnalyticsQuery(ctx, UsageLogFilters{}, start, end, false)
 	if err != nil || !ok {
 		return nil, false, err
@@ -376,12 +376,16 @@ func (r *usageLogRepository) getUserUsageTrendFromAnalytics(ctx context.Context,
 	query.args = append(query.args, resolveUsageStatsTimezone(), limit)
 	timezonePosition := len(query.args) - 1
 	limitPosition := len(query.args)
+	rankExpr := "SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens)"
+	if metric == "actual_cost" {
+		rankExpr = "SUM(actual_cost)"
+	}
 	rows, err := r.sql.QueryContext(ctx, query.cte+fmt.Sprintf(`,
 		top_users AS (
 			SELECT user_id
 			FROM combined
 			GROUP BY user_id
-			ORDER BY SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) DESC
+			ORDER BY %s DESC, user_id ASC
 			LIMIT $%d
 		)
 		SELECT
@@ -397,7 +401,7 @@ func (r *usageLogRepository) getUserUsageTrendFromAnalytics(ctx context.Context,
 		LEFT JOIN users u ON u.id = c.user_id
 		WHERE c.user_id IN (SELECT user_id FROM top_users)
 		GROUP BY 1, c.user_id, u.email, u.username
-		ORDER BY 1 ASC, 6 DESC`, limitPosition, timezonePosition, safeDateFormat(granularity)), query.args...)
+		ORDER BY 1 ASC, 6 DESC`, rankExpr, limitPosition, timezonePosition, safeDateFormat(granularity)), query.args...)
 	if err != nil {
 		return nil, false, err
 	}

@@ -68,6 +68,7 @@ type AnthropicContentBlock struct {
 	// Signature 携带提供方的加密推理（例如 xAI encrypted_content），使 Claude 多轮
 	// 客户端可以在后续轮次中原样回传。
 	Signature string `json:"signature,omitempty"`
+	Data      string `json:"data,omitempty"` // redacted_thinking
 
 	// type=image
 	Source *AnthropicImageSource `json:"source,omitempty"`
@@ -219,6 +220,7 @@ type AnthropicDelta struct {
 
 // ResponsesRequest is the request body for POST /v1/responses.
 type ResponsesRequest struct {
+	PromptCacheOptions json.RawMessage     `json:"prompt_cache_options,omitempty"`
 	Model              string              `json:"model"`
 	Instructions       string              `json:"instructions,omitempty"`
 	Input              json.RawMessage     `json:"input"` // string or []ResponsesInputItem
@@ -303,9 +305,15 @@ func (i *ResponsesInputItem) UnmarshalJSON(data []byte) error {
 
 // ResponsesContentPart is a typed content part in a Responses message.
 type ResponsesContentPart struct {
-	Type     string `json:"type"` // "input_text" | "output_text" | "input_image"
-	Text     string `json:"text,omitempty"`
-	ImageURL string `json:"image_url,omitempty"` // data URI for input_image
+	PromptCacheBreakpoint json.RawMessage `json:"prompt_cache_breakpoint,omitempty"`
+	Type                  string          `json:"type"` // "input_text" | "output_text" | "input_image" | "input_file"
+	Text                  string          `json:"text,omitempty"`
+	ImageURL              string          `json:"image_url,omitempty"` // data URI for input_image
+
+	// input_file 使用的文件引用字段。
+	Filename string `json:"filename,omitempty"`
+	FileData string `json:"file_data,omitempty"` // data URI
+	FileID   string `json:"file_id,omitempty"`
 }
 
 // ResponsesTool describes a tool in the Responses API.
@@ -637,6 +645,7 @@ type ResponsesStreamEvent struct {
 
 // ChatCompletionsRequest is the request body for POST /v1/chat/completions.
 type ChatCompletionsRequest struct {
+	PromptCacheOptions  json.RawMessage    `json:"prompt_cache_options,omitempty"`
 	Model               string             `json:"model"`
 	Messages            []ChatMessage      `json:"messages"`
 	Instructions        string             `json:"instructions,omitempty"` // OpenAI Responses API compat
@@ -680,9 +689,11 @@ type ChatMessage struct {
 
 // ChatContentPart is a typed content part in a multi-modal message.
 type ChatContentPart struct {
-	Type     string        `json:"type"` // "text" | "image_url"
-	Text     string        `json:"text,omitempty"`
-	ImageURL *ChatImageURL `json:"image_url,omitempty"`
+	PromptCacheBreakpoint json.RawMessage `json:"prompt_cache_breakpoint,omitempty"`
+	Type                  string          `json:"type"` // "text" | "image_url" | "file"
+	Text                  string          `json:"text,omitempty"`
+	ImageURL              *ChatImageURL   `json:"image_url,omitempty"`
+	File                  *ChatFile       `json:"file,omitempty"`
 }
 
 // ChatImageURL contains the URL for an image content part.
@@ -845,6 +856,14 @@ func (d ChatDelta) ReasoningText() *string {
 // Shared constants
 // ---------------------------------------------------------------------------
 
-// minMaxOutputTokens is the floor for max_output_tokens in a Responses request.
-// Very small values may cause upstream API errors, so we enforce a minimum.
-const minMaxOutputTokens = 128
+// DefaultMinMaxOutputTokens 是 Responses 输出 token 默认下限，避免过小上限被上游拒绝。
+const DefaultMinMaxOutputTokens = 128
+
+const minMaxOutputTokens = DefaultMinMaxOutputTokens
+
+// ChatFile 保存 Chat 多模态文件的原始引用。
+type ChatFile struct {
+	Filename string `json:"filename,omitempty"`
+	FileData string `json:"file_data,omitempty"` // data URI
+	FileID   string `json:"file_id,omitempty"`
+}

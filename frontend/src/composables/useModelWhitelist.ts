@@ -7,6 +7,7 @@ const openaiModels = [
 	// GPT-6 系列（gpt-6 是 Astra 的公开别名）
 	'gpt-6',
 	'gpt-6-astra',
+  'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna',
 	'gpt-5.2',
 	'gpt-5.3',
 	'gpt-5.3-spark',
@@ -39,22 +40,32 @@ export const claudeModels = [
   'claude-opus-4-8',
   'claude-sonnet-4-6',
   'claude-sonnet-5',
+  'claude-opus-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5',
   'claude-fable-5',
   'claude-fable-5.1'
 ]
 
 // Google Gemini
 const geminiModels = [
-  // Keep in sync with backend curated Gemini lists.
-  // This list is intentionally conservative (models commonly available across OAuth/API key).
+  // 与后端原生默认模型目录保持一致。
+  // 旧型号仍可通过账号显式映射使用。
   'gemini-3.1-flash-image',
-  'gemini-2.5-flash-image',
-  'gemini-2.0-flash',
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
-  'gemini-3.5-flash',
+  'gemini-3.1-flash-image-preview',
+  'gemini-3.1-flash-lite-image',
+  'gemini-3-pro-image',
+  'gemini-3-pro-image-preview',
+  'gemini-3-flash',
   'gemini-3-flash-preview',
-  'gemini-3-pro-preview'
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-pro-preview-customtools',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
+  'gemini-3.7-flash',
+  'gemini-3.8-flash',
+  'gemini-4-argon'
 ]
 
 // Antigravity 官方支持的模型（精确匹配）
@@ -94,7 +105,29 @@ const antigravityModels = [
   'gemini-3-pro-image',
   // 其他
   'gpt-oss-120b-medium',
-  'tab_flash_lite_preview'
+  'tab_flash_lite_preview',
+  // 新模型变体保持与 Antigravity 目录一致。
+  'claude-fable-5-1',
+  'claude-opus-5-5-high',
+  'claude-opus-5-5-medium',
+  'claude-opus-5-5-low',
+  'claude-sonnet-5-5-high',
+  'claude-sonnet-5-5-medium',
+  'claude-sonnet-5-5-low',
+  'gemini-pro-agent',
+  'gemini-3.7-flash',
+  'gemini-3.7-flash-low',
+  'gemini-3.7-flash-medium',
+  'gemini-3.7-flash-high',
+  'gemini-3.7-flash-tiered',
+  'gemini-3.8-flash',
+  'gemini-3.8-flash-low',
+  'gemini-3.8-flash-medium',
+  'gemini-3.8-flash-high',
+  'gemini-3.8-flash-tiered',
+  'gemini-4-argon-low',
+  'gemini-4-argon-medium',
+  'gemini-4-argon-high'
 ]
 
 // Qoder 上游模型变化较快。账号级 model_mapping 的 key 才是 Qoder
@@ -182,7 +215,7 @@ const metaModels = [
 
 // xAI Grok
 const xaiModels = [
-  'grok-4.6',
+  'grok-4.6', 'grok-4.7', 'grok-4.7-fast', 'grok-4.7-build-fast',
   'grok-4.5',
   'grok-4.3',
   'grok-build-0.1',

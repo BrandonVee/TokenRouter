@@ -1,9 +1,12 @@
 package apicompat
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/BrandonVee/TokenRouter/internal/pkg/claude"
 )
 
 // ResponsesToAnthropicRequest converts a Responses API request into an
@@ -11,7 +14,13 @@ import (
 // enables Anthropic platform groups to accept OpenAI Responses API requests
 // by converting them to the native /v1/messages format before forwarding upstream.
 func ResponsesToAnthropicRequest(req *ResponsesRequest) (*AnthropicRequest, error) {
-	system, messages, err := convertResponsesInputToAnthropic(req.Instructions, req.Input)
+	if req.Reasoning != nil && isUltraReasoningEffort(req.Reasoning.Effort) {
+		return nil, fmt.Errorf("reasoning effort ultra is not supported")
+	}
+	isOpus55 := claude.IsOpus55(req.Model)
+	isSonnet55 := claude.IsSonnet55(req.Model)
+	isHaiku55 := claude.IsHaiku55(req.Model)
+	system, messages, err := convertResponsesInputToAnthropic(req.Instructions, req.Input, isOpus55 || isSonnet55 || isHaiku55)
 	if err != nil {
 		return nil, err
 	}
@@ -23,9 +32,9 @@ func ResponsesToAnthropicRequest(req *ResponsesRequest) (*AnthropicRequest, erro
 		TopP:        req.TopP,
 		Stream:      req.Stream,
 	}
-	// OpenAI Priority/Fast 转为 Claude Fast 候选，beta header 由网关统一补齐。
-	switch strings.ToLower(strings.TrimSpace(req.ServiceTier)) {
-	case "priority", "fast":
+
+	// 保留本 fork 的 Priority 到 Claude Fast 映射。
+	if strings.EqualFold(req.ServiceTier, "priority") || strings.EqualFold(req.ServiceTier, "fast") {
 		out.Speed = "fast"
 	}
 
@@ -56,11 +65,74 @@ func ResponsesToAnthropicRequest(req *ResponsesRequest) (*AnthropicRequest, erro
 		out.ToolChoice = tc
 	}
 
+	// 5.5 系列按最终模型处理思考参数；Opus/Sonnet 拒绝强制工具调用，Haiku 保留该能力。
+	// Sonnet 的最低思考模式使用 between_tools，Haiku 在 high 及以下允许 disabled。
+	if isOpus55 || isSonnet55 || isHaiku55 {
+		var choice struct {
+			Type string `json:"type"`
+		}
+		if len(out.ToolChoice) > 0 {
+			if err := json.Unmarshal(out.ToolChoice, &choice); err != nil {
+				return nil, fmt.Errorf("invalid tool_choice: %w", err)
+			}
+		}
+		if (choice.Type == "any" || choice.Type == "tool") && !isHaiku55 {
+			return nil, fmt.Errorf("%s does not support forced tool_choice; use auto or none", req.Model)
+		}
+		effort := "medium"
+		if isSonnet55 {
+			effort = "high"
+			if req.Temperature != nil && *req.Temperature != 1 {
+				return nil, fmt.Errorf("claude-sonnet-5-5 does not support non-default temperature")
+			}
+			if req.TopP != nil && (*req.TopP < 0.99 || *req.TopP > 1) {
+				return nil, fmt.Errorf("claude-sonnet-5-5 does not support non-default top_p")
+			}
+		}
+		if isHaiku55 {
+			if req.Temperature != nil && *req.Temperature != 1 {
+				return nil, fmt.Errorf("claude-haiku-5-5 does not support non-default temperature")
+			}
+			if req.TopP != nil && *req.TopP != 0.99 {
+				return nil, fmt.Errorf("claude-haiku-5-5 does not support non-default top_p")
+			}
+			if req.Temperature != nil && req.TopP != nil {
+				return nil, fmt.Errorf("claude-haiku-5-5 does not allow temperature and top_p together; omit both")
+			}
+		}
+		if req.Reasoning != nil && req.Reasoning.Effort != "" {
+			effort = req.Reasoning.Effort
+		}
+		if isSonnet55 && effort == "none" {
+			// 将无推理请求映射到 Sonnet 5.5 的最低思考模式，并保留工具调用期间的签名历史。
+			out.Thinking = &AnthropicThinking{Type: "between_tools"}
+			if out.OutputConfig == nil {
+				out.OutputConfig = &AnthropicOutputConfig{}
+			}
+			out.OutputConfig.Effort = "low"
+			return out, nil
+		}
+		if isHaiku55 && effort == "none" {
+			// Haiku 5.5 在 high 及以下允许关闭思考，这里使用 low 以降低 token 消耗。
+			out.Thinking = &AnthropicThinking{Type: "disabled"}
+			if out.OutputConfig == nil {
+				out.OutputConfig = &AnthropicOutputConfig{}
+			}
+			out.OutputConfig.Effort = "low"
+			return out, nil
+		}
+		switch effort {
+		case "low", "medium", "high", "xhigh", "max":
+		default:
+			return nil, fmt.Errorf("%s does not support reasoning effort %q; use low, medium, high, xhigh or max", req.Model, effort)
+		}
+		out.Thinking = &AnthropicThinking{Type: "adaptive"}
+		out.OutputConfig = &AnthropicOutputConfig{Effort: effort}
+		return out, nil
+	}
+
 	// reasoning.effort → output_config.effort + thinking
 	if req.Reasoning != nil && req.Reasoning.Effort != "" {
-		if isUltraReasoningEffort(req.Reasoning.Effort) {
-			return nil, fmt.Errorf("reasoning effort %q is not supported", strings.TrimSpace(req.Reasoning.Effort))
-		}
 		effort := mapResponsesEffortToAnthropic(req.Reasoning.Effort)
 		out.OutputConfig = &AnthropicOutputConfig{Effort: effort}
 		// Enable thinking for non-low efforts
@@ -107,9 +179,8 @@ func mapResponsesEffortToAnthropic(effort string) string {
 	}
 }
 
-// convertResponsesInputToAnthropic 从 Responses API 的 instructions 与 input 数组中
-// 提取系统提示和消息，并以原始 JSON 返回 Anthropic 多态 system 字段。
-func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMessage) (json.RawMessage, []AnthropicMessage, error) {
+// convertResponsesInputToAnthropic 提取 Responses 系统提示与消息，system 保留原始多态 JSON。
+func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMessage, preserveThinking bool) (json.RawMessage, []AnthropicMessage, error) {
 	var systemParts []string
 	if strings.TrimSpace(instructions) != "" {
 		systemParts = append(systemParts, strings.TrimSpace(instructions))
@@ -174,11 +245,25 @@ func convertResponsesInputToAnthropic(instructions string, inputRaw json.RawMess
 			})
 
 		case item.Type == "reasoning":
-			// Anthropic 无法摄入 OpenAI 的 reasoning：encrypted_content 是不透明的，
-			// 而 thinking 块的重放需要 Anthropic 自己签发的 signature，无法伪造。
-			// Codex 常见形态（只带 summary + encrypted_content）本来就会被丢弃，
-			// 这里让带 content 数组的形态保持同样行为——否则 reasoning_text 块会被
-			// 原样塞进 Anthropic 请求体，上游直接回 400。
+			// 只解码带 Anthropic 桥接标记的载体，任意 OpenAI 密文保持不透明，签名仍由上游验证。
+			if preserveThinking && strings.HasPrefix(item.EncryptedContent, anthropicThinkingEnvelopePrefix) {
+				raw, err := base64.RawStdEncoding.DecodeString(strings.TrimPrefix(item.EncryptedContent, anthropicThinkingEnvelopePrefix))
+				if err != nil {
+					return nil, nil, fmt.Errorf("invalid Anthropic thinking envelope: %w", err)
+				}
+				var block AnthropicContentBlock
+				if err := json.Unmarshal(raw, &block); err != nil {
+					return nil, nil, fmt.Errorf("invalid Anthropic thinking block: %w", err)
+				}
+				if (block.Type != "thinking" || block.Signature == "") && (block.Type != "redacted_thinking" || block.Data == "") {
+					return nil, nil, fmt.Errorf("invalid Anthropic signed thinking block")
+				}
+				content, err := json.Marshal([]AnthropicContentBlock{block})
+				if err != nil {
+					return nil, nil, err
+				}
+				messages = append(messages, AnthropicMessage{Role: "assistant", Content: content})
+			}
 
 		case item.Role == "user":
 			content, err := convertResponsesUserToAnthropicContent(item.Content)

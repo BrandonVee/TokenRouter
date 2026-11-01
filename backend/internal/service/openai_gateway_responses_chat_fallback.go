@@ -64,6 +64,10 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	reasoningEffort := extractOpenAIReasoningEffortFromBody(body, upstreamModel, billingModel, originalModel)
 	// 国产模型没有显式 effort 档位时，thinking 启用后补默认展示值。
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
+	if err := validateOpenAIChatToolCompatibility(upstreamModel, len(chatReq.Tools) > 0 || len(chatReq.Functions) > 0, chatReq.ReasoningEffort); err != nil {
+		writeOpenAIResponsesFallbackError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 	chatReq.Model = upstreamModel
 	if clientStream {
 		chatReq.StreamOptions = &apicompat.ChatStreamOptions{IncludeUsage: true}

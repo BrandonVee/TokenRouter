@@ -51,6 +51,12 @@
 
 环境变量优先于 YAML，因此排查“文件修改不生效”时先检查容器环境。不得在日志、错误或管理响应中输出数据库密码、JWT/TOTP secret、OAuth secret、对象存储 secret 或账号凭据。
 
+### 网关兼容与 API Key 创建限额
+
+`gateway.min_output_tokens` 默认 `128`，协议转换在客户端提交正数 token 上限时，将其提升到该配置下限；允许最低 `16`。直接构造配置的旧调用方使用 `0` 时按默认值回退，不把 `0` 发送给上游。`gateway.max_same_account_retries_gemini` 默认 `4`，允许 `0–10`，表示首次请求之外的同账号重试次数；`0` 表示直接结束本账号尝试。Messages、原生 Gemini 和 Chat/Responses 兼容入口共用该预算，历史签名降级保留独立的两阶段恢复预算。
+
+`api_key_create.max_active_per_user` 默认 `200`，按用户未删除 Key 总数限制创建；`max_per_user_per_hour` 默认 `60`，由 Redis 固定一小时窗口累计创建次数。两者设为 `0` 可分别关闭，不能为负数。次数在实际创建前占用，删除 Key 不返还次数；Redis 故障时频率限制沿用创建自定义 Key 的放行策略，数据库计数失败仍终止创建。个人和团队 Key 继续经过 fork 的归属、订阅和分组权限校验。
+
 ## 生图历史对象存储
 
 `image_history` 的 YAML/环境变量是部署默认配置，独立于备份、数据共享和已经下线的旧 `image_storage`。`enabled` 默认关闭；开启时 `bucket`、`access_key_id`、`secret_access_key` 和安全的非空 `prefix` 必填。`endpoint` 可为空以使用 AWS 默认端点，`region` 默认 `auto`，需要 path-style 的 MinIO 等实现通过 `force_path_style=true` 启用。桶应保持私有，列表预览只通过有效期受限的预签名 URL 暴露。

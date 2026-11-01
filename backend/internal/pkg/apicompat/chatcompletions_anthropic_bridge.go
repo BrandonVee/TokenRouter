@@ -31,6 +31,11 @@ import (
 // 其语义等价于依次调用 AnthropicToResponses 与 ResponsesToChatCompletionsRequest，
 // 但不会创建中间 ResponsesRequest，也省去额外的序列化往返。
 func AnthropicToChatCompletionsRequest(req *AnthropicRequest) (*ChatCompletionsRequest, error) {
+	return AnthropicToChatCompletionsRequestWithMinOutputTokens(req, DefaultMinMaxOutputTokens)
+}
+
+// AnthropicToChatCompletionsRequestWithMinOutputTokens 使用配置下限转换 Messages 输出 token。
+func AnthropicToChatCompletionsRequestWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int) (*ChatCompletionsRequest, error) {
 	if req == nil {
 		return nil, fmt.Errorf("anthropic request is nil")
 	}
@@ -54,8 +59,8 @@ func AnthropicToChatCompletionsRequest(req *AnthropicRequest) (*ChatCompletionsR
 
 	if req.MaxTokens > 0 {
 		v := req.MaxTokens
-		if v < minMaxOutputTokens {
-			v = minMaxOutputTokens
+		if v < minOutputTokens {
+			v = minOutputTokens
 		}
 		out.MaxCompletionTokens = &v
 	}

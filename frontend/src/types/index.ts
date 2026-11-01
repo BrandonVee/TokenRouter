@@ -740,6 +740,7 @@ export interface Group {
   // 图片生成计费配置
   allow_image_generation: boolean
   allow_batch_image_generation: boolean
+  image_count_billing: boolean
   image_rate_independent: boolean
   image_rate_multiplier: number
   batch_image_discount_multiplier: number
@@ -1035,6 +1036,7 @@ export interface CreateGroupRequest {
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
+  image_count_billing?: boolean
   image_rate_independent?: boolean
   image_rate_multiplier?: number
   batch_image_discount_multiplier?: number
@@ -1099,6 +1101,7 @@ export interface UpdateGroupRequest {
   model_pricing?: import('@/api/admin/channels').ChannelModelPricing[]
   allow_image_generation?: boolean
   allow_batch_image_generation?: boolean
+  image_count_billing?: boolean
   image_rate_independent?: boolean
   image_rate_multiplier?: number
   batch_image_discount_multiplier?: number
@@ -1254,11 +1257,15 @@ export interface GeminiCredentials {
   model_mapping?: Record<string, string>
 }
 
+export type TempUnschedulableScope = 'account' | 'model'
+
 export interface TempUnschedulableRule {
   error_code: number
   keywords: string[]
   duration_minutes: number
   description: string
+  // 作用范围：account 暂停整个账号，model 只冷却本次请求的模型；缺省时 401 按 account、其余按 model 处理。
+  scope?: TempUnschedulableScope
 }
 
 export interface TempUnschedulableState {
@@ -1266,6 +1273,8 @@ export interface TempUnschedulableState {
   triggered_at_unix: number
   status_code: number
   matched_keyword: string
+  scope?: TempUnschedulableScope
+  model?: string
   rule_index: number
   error_message: string
   trigger_count?: number

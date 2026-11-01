@@ -60,3 +60,14 @@ func groupAudioPriceConfigFromAPIKey(apiKey *APIKey) *audioPriceConfig {
 		STTPerHour:     g.AudioSTTPricePerHour,
 	}
 }
+
+// imageCountBillingEnabled 只读取已完成鉴权的分组计费配置。
+func imageCountBillingEnabled(apiKey *APIKey) bool {
+	return apiKey != nil && apiKey.Group != nil && apiKey.Group.ImageCountBilling
+}
+
+// @project-doc docs/domains/routing_and_billing.md#image_count_billing
+// imageCountBillingApplies 将开关限制在图片端点，混合请求继续按 token 计费。
+func imageCountBillingApplies(apiKey *APIKey, imageEndpoint bool) bool {
+	return imageEndpoint && imageCountBillingEnabled(apiKey)
+}

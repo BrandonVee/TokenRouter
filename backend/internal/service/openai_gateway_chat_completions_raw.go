@@ -75,6 +75,11 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	// 仅支持 Chat 的账号不能安全承接需要原生推理历史的新模型工具调用。
+	if err := validateOpenAIChatToolCompatibility(upstreamModel, len(gjson.GetBytes(body, "tools").Array()) > 0 || len(gjson.GetBytes(body, "functions").Array()) > 0, gjson.GetBytes(body, "reasoning_effort").String()); err != nil {
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 	grokCacheIdentity := ""
 	if account.Platform == PlatformGrok {
 		// 在图片桥接或其它请求体改写前解析，使回退身份始终基于客户端稳定的会话前缀。

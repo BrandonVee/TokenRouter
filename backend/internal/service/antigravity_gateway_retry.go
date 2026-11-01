@@ -1156,21 +1156,8 @@ func (s *AntigravityGatewayService) updateAccountModelRateLimitInCache(ctx conte
 		return
 	}
 
-	// 更新账号对象的 Extra 字段
-	if account.Extra == nil {
-		account.Extra = make(map[string]any)
-	}
-
-	limits, _ := account.Extra["model_rate_limits"].(map[string]any)
-	if limits == nil {
-		limits = make(map[string]any)
-		account.Extra["model_rate_limits"] = limits
-	}
-
-	limits[modelKey] = map[string]any{
-		"rate_limited_at":     time.Now().UTC().Format(time.RFC3339),
-		"rate_limit_reset_at": resetAt.UTC().Format(time.RFC3339),
-	}
+	// 复制共享快照后写入本次限流，不污染并发选号的母本。
+	setAccountModelRateLimitSnapshot(account, modelKey, resetAt, "", time.Now())
 
 	// 更新 Redis 快照
 	if err := s.schedulerSnapshot.UpdateAccountInCache(ctx, account); err != nil {

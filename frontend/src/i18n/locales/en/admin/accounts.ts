@@ -116,6 +116,12 @@ export default {
       schedulableEnabled: 'Scheduling enabled',
       schedulableDisabled: 'Scheduling disabled',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
+      priorityQuick: {
+        raise: 'Raise priority (value -1)',
+        lower: 'Lower priority (value +1)',
+        editHint: 'Click to type a value; lower is used first',
+        failed: 'Failed to update priority'
+      },
       groupCountTotal: '{count} groups total',
       platforms: {
         anthropic: 'Anthropic',
@@ -1409,7 +1415,7 @@ export default {
         modelPassthroughDesc:
           'All model requests are forwarded directly to the Gemini API without model restrictions or mappings.',
         baseUrlHint: 'Leave default for official Gemini API',
-        apiKeyHint: 'Your Gemini API Key (starts with AIza)',
+        apiKeyHint: 'AI Studio API key (AQ. or legacy AIza format)',
         providerType: {
           label: 'Provider Source',
           official: 'Official Gemini API',

@@ -43,7 +43,13 @@ Antigravity 专用 `/antigravity/v1beta/*` 强制选择 Antigravity 账号，其
 
 兼容层维护 thinking/推理字段、tool/schema、图片输入、usage、finish reason 和 Gemini thought signature。工具 schema 会递归移除 Gemini 不支持的字段；INTEGER 的整数 `exclusiveMinimum` 转换为加一后的包含式 `minimum`，且不覆盖更严格的既有下界，无法等价转换的独占下界只清理不伪造。需要跨轮次的 signature、session 和 cache 连续性时，粘性会话优先复用账号；切换账号必须重新评估可继续性，不能把另一个账号的内部状态当作通用上下文。
 
-原生与 Claude 兼容生图响应按上游实际返回的 `inlineData`/`inline_data` 图片 part 数量计费，自定义模型别名也适用。流式响应按单个 payload 中观测到的最大图片数记录，避免累积式 SSE 重复计费；未观测到内联图片时才回退到请求模型名或映射后模型名的生图启发式。
+原生与 Claude 兼容生图响应按上游实际返回的内联或文件 URI 图片 part 数量计费，自定义模型别名也适用。流式响应按单个 payload 中观测到的最大图片数记录，避免累积式 SSE 重复计费；未观测到内联图片时才回退到请求模型名或映射后模型名的生图启发式。
+
+### 当前模型与图片响应
+
+原生与连接测试默认模型目录已更新至 Gemini 3.x 与 Gemini 4 Argon，默认测试为 `gemini-3.5-flash`；Google One 仍使用其独立保守目录。旧 2.x 模型不再作为默认推荐，但管理员显式模型映射仍可配置。AI Studio `AQ.` 与旧 `AIza` Key 均可输入，并在日志脱敏层隐藏。
+
+图片输出计数同时识别 `inlineData`/`inline_data` 和 `fileData`/`file_data`，要求图片 MIME 和非空数据或 URI，同一 part 只算一张。累积式 SSE 继续使用单个 payload 的最大图片数，避免重复计费。被拦截 prompt 只返回缓存命中时，净输入 token 截断为非负数，不产生负费用。
 
 ## 配额与调度
 

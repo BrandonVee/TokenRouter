@@ -259,7 +259,8 @@ func parseGrokMediaMultipartRequest(contentType string, body []byte, info *GrokM
 			_ = part.Close()
 			continue
 		}
-		data, err := io.ReadAll(io.LimitReader(part, openAIImageMaxUploadPartSize))
+		// 请求体已受入口大小限制；分片不能静默截断后把损坏图片发给上游。
+		data, err := io.ReadAll(part)
 		_ = part.Close()
 		if err != nil {
 			return
@@ -871,6 +872,7 @@ func (s *OpenAIGatewayService) ForwardGrokMedia(
 		UpstreamModel:        upstreamModel,
 		ResponseHeaders:      resp.Header.Clone(),
 		Duration:             time.Since(startTime),
+		ImageEndpoint:        usage.ImageCount > 0,
 		ImageCount:           usage.ImageCount,
 		ImageSize:            usage.ImageSize,
 		ImageInputSize:       usage.ImageInputSize,

@@ -113,6 +113,12 @@ export default {
       schedulableEnabled: '调度已开启',
       schedulableDisabled: '调度已关闭',
       failedToToggleSchedulable: '切换调度状态失败',
+      priorityQuick: {
+        raise: '提高优先级（数值 -1）',
+        lower: '降低优先级（数值 +1）',
+        editHint: '点击直接输入；数值越小越优先',
+        failed: '更新优先级失败'
+      },
       groupCountTotal: '共 {count} 个分组',
       columns: {
         name: '名称',
@@ -1458,7 +1464,7 @@ export default {
         modelPassthrough: 'Gemini 直接转发模型',
         modelPassthroughDesc: '所有模型请求将直接转发至 Gemini API，不进行模型限制或映射。',
         baseUrlHint: '留空使用官方 Gemini API',
-        apiKeyHint: '您的 Gemini API Key（以 AIza 开头）',
+        apiKeyHint: 'AI Studio Key（支持 AQ. 和旧版 AIza 格式）',
         providerType: {
           label: '接入来源',
           official: '官方 Gemini API',
