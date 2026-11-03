@@ -2406,7 +2406,7 @@ func (r *stubUserSubscriptionRepo) BatchUpdateExpiredStatus(ctx context.Context)
 	return 0, errors.New("not implemented")
 }
 
-// TestAPIKeyAuthRoutingStrategy 覆盖两类鉴权及两种运行模式，防止已保存策略在入口丢失。
+// TestAPIKeyAuthRoutingStrategy 覆盖两类鉴权及两种运行模式，确认历史智能策略不再生效。
 func TestAPIKeyAuthRoutingStrategy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, mode := range []string{config.RunModeSimple, config.RunModeStandard} {
@@ -2425,7 +2425,7 @@ func TestAPIKeyAuthRoutingStrategy(t *testing.T) {
 						router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
 					}
 					router.POST("/t", func(c *gin.Context) {
-						require.Equal(t, strategy, service.APIKeyRoutingStrategyFromContext(c.Request.Context()))
+						require.Equal(t, service.APIKeyRoutingStrategyManual, service.APIKeyRoutingStrategyFromContext(c.Request.Context()))
 						c.Status(http.StatusOK)
 					})
 					req := httptest.NewRequest(http.MethodPost, "/t", nil)

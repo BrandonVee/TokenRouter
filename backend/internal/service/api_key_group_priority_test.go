@@ -6,32 +6,50 @@ import (
 	"context"
 	"testing"
 
+	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
-func TestApplyPriorityGroupSelectsFirstActiveAccessibleGroup(t *testing.T) {
-	service := &APIKeyService{groupRepo: &authGroupRepoStub{groupsByID: map[int64]Group{
-		10: {ID: 10, Status: "inactive"},
+// TestGetByKeyKeepsLegacyPrimaryGroup 防止历史候选列表继续在鉴权时切换分组。
+func TestGetByKeyKeepsLegacyPrimaryGroup(t *testing.T) {
+	primaryID := int64(10)
+	repo := &authRepoStub{getByKeyForAuth: func(context.Context, string) (*APIKey, error) {
+		return &APIKey{
+			ID: 1, UserID: 7, Status: StatusActive,
+			GroupID: &primaryID, GroupIDs: []int64{10, 20},
+			User:  &User{ID: 7, Status: StatusActive, GroupRestrictionsLoaded: true},
+			Group: &Group{ID: primaryID, Status: StatusDisabled, Platform: PlatformOpenAI, Hydrated: true},
+		}, nil
+	}}
+	groupRepo := &authGroupRepoStub{groupsByID: map[int64]Group{
 		20: {ID: 20, Status: StatusActive, Platform: PlatformOpenAI},
-		30: {ID: 30, Status: StatusActive, Platform: PlatformAnthropic},
-	}}}
-	key := &APIKey{
-		GroupIDs: []int64{10, 20, 30},
-		User:     &User{ID: 7, GroupRestrictionsLoaded: true},
-	}
+	}}
+	svc := NewAPIKeyService(repo, nil, groupRepo, nil, nil, nil, &config.Config{})
 
-	selected := service.applyPriorityGroup(context.Background(), key)
+	key, err := svc.GetByKey(context.Background(), "sk-legacy")
 
-	require.NotNil(t, selected.GroupID)
-	require.Equal(t, int64(20), *selected.GroupID)
-	require.Equal(t, int64(20), selected.Group.ID)
-	require.Equal(t, []int64{10, 20, 30}, selected.GroupIDs)
+	require.NoError(t, err)
+	require.Equal(t, primaryID, *key.GroupID)
+	require.Equal(t, StatusDisabled, key.Group.Status)
 }
 
-func TestPrepareAPIKeyPriorityGroupsRejectsDuplicateBeforeRepositoryRead(t *testing.T) {
+// TestRetiredAPIKeyRoutingRejected 确认创建与更新入口均拒绝已下线的配置。
+func TestRetiredAPIKeyRoutingRejected(t *testing.T) {
+	ids := []int64{10, 20}
+	require.ErrorIs(t, validateCreateAPIKeyRequest(CreateAPIKeyRequest{GroupIDs: ids}), ErrAPIKeyGroupPrioritiesInvalid)
+	require.ErrorIs(t, validateUpdateAPIKeyRequest(UpdateAPIKeyRequest{GroupIDs: &ids}), ErrAPIKeyGroupPrioritiesInvalid)
+	for _, strategy := range []string{"auto", "speed", "price", "success_rate"} {
+		require.ErrorIs(t, validateCreateAPIKeyRequest(CreateAPIKeyRequest{RoutingStrategy: strategy}), ErrInvalidAPIKeyRoutingStrategy)
+		require.ErrorIs(t, validateUpdateAPIKeyRequest(UpdateAPIKeyRequest{RoutingStrategy: &strategy}), ErrInvalidAPIKeyRoutingStrategy)
+	}
+	require.NoError(t, validateCreateAPIKeyRequest(CreateAPIKeyRequest{GroupIDs: []int64{10}}))
+	require.NoError(t, validateUpdateAPIKeyRequest(UpdateAPIKeyRequest{}))
+}
+
+func TestPrepareAPIKeySingleGroupRejectsMultipleBeforeRepositoryRead(t *testing.T) {
 	service := &APIKeyService{}
 
-	_, _, err := service.prepareAPIKeyPriorityGroups(context.Background(), &User{}, []int64{10, 10})
+	_, _, err := service.prepareAPIKeySingleGroup(context.Background(), &User{}, []int64{10, 10})
 
 	require.ErrorIs(t, err, ErrAPIKeyGroupPrioritiesInvalid)
 }

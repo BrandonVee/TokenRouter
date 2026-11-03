@@ -713,7 +713,7 @@ describe('user KeysView column settings', () => {
     expect(groupSelect?.props('options')[0]).not.toHaveProperty('capacity')
   })
 
-  it('快捷分组编辑器可同时保存候选分组优先级和智能策略', async () => {
+  it('快捷分组编辑器仅保存单个分组', async () => {
     listKeys.mockResolvedValueOnce({
       items: [{ ...createApiKey(), group_id: 42, group_ids: [42], routing_strategy: 'manual' }],
       total: 1,
@@ -732,13 +732,12 @@ describe('user KeysView column settings', () => {
     const claudeButton = wrapper.findAll('button').find((button) => button.text().includes('Claude'))
     expect(claudeButton).toBeDefined()
     await claudeButton!.trigger('click')
-    await wrapper.get('[data-test="quick-routing-price"]').trigger('click')
-    await wrapper.get('[data-test="quick-routing-save"]').trigger('click')
+    expect(wrapper.find('[data-test="quick-routing-strategies"]').exists()).toBe(false)
+    await wrapper.get('[data-test="group-selection-save"]').trigger('click')
     await flushPromises()
 
     expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({
-      group_ids: [42, 43],
-      routing_strategy: 'price',
+      group_ids: [43],
     }))
   })
 
@@ -758,7 +757,7 @@ describe('user KeysView column settings', () => {
     await wrapper.get('[title="keys.clickToChangeGroup"]').trigger('click')
     await nextTick()
     await wrapper.findAll('button').find((button) => button.text().includes('OpenAI'))!.trigger('click')
-    await wrapper.get('[data-test="quick-routing-save"]').trigger('click')
+    await wrapper.get('[data-test="group-selection-save"]').trigger('click')
     await flushPromises()
 
     expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ group_ids: [42] }))
@@ -787,6 +786,27 @@ describe('user KeysView column settings', () => {
       name: 'renamed-key',
       group_ids: [],
     }))
+  })
+
+  it('编辑历史多分组 Key 时仅保留原首选分组', async () => {
+    listKeys.mockResolvedValueOnce({
+      items: [{ ...createApiKey(), group_id: 42, group_ids: [42, 43], routing_strategy: 'speed' }],
+      total: 1, page: 1, page_size: 20, pages: 1,
+    })
+    getAvailableGroups.mockResolvedValueOnce([
+      { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
+      { id: 43, name: 'Claude', platform: 'anthropic', rate_multiplier: 1, data_sharing_enabled: false },
+    ])
+    const wrapper = await mountView()
+
+    await getButtonByText(wrapper, 'Edit').trigger('click')
+    await flushPromises()
+    await wrapper.get('form#key-form').trigger('submit')
+    await flushPromises()
+
+    expect(updateKey).toHaveBeenCalledWith(1, expect.objectContaining({ group_ids: [42] }))
+    expect(updateKey.mock.calls[0][1]).not.toHaveProperty('routing_strategy')
+    expect(wrapper.find('[data-test="smart-routing-toggle"]').exists()).toBe(false)
   })
 
   it('指定订阅后仅保留套餐允许的表单分组', async () => {
@@ -917,7 +937,7 @@ describe('user KeysView column settings', () => {
     }))
   })
 
-  it('submits smart routing while keeping candidate groups selectable', async () => {
+  it('creates a standard key without smart routing controls or strategy', async () => {
     getAvailableGroups.mockResolvedValueOnce([
       { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
     ])
@@ -929,23 +949,21 @@ describe('user KeysView column settings', () => {
       (select) => select.attributes('data-tour') === 'key-form-group'
     )
     await groupSelect!.vm.$emit('update:modelValue', 42)
-    await wrapper.get('[data-test="smart-routing-toggle"]').trigger('click')
-    await wrapper.get('[data-test="routing-strategy-speed"]').trigger('click')
+    expect(wrapper.find('[data-test="smart-routing-toggle"]').exists()).toBe(false)
     await nextTick()
 
-    expect(wrapper.find('[data-test="priority-group-editor"]').exists()).toBe(true)
-    expect(wrapper.findAll('[data-test="priority-group-row"]')).toHaveLength(1)
+    expect(wrapper.find('[data-test="single-group-editor"]').exists()).toBe(true)
     await wrapper.get('form#key-form').trigger('submit')
     await flushPromises()
 
     expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
       name: 'smart-key',
       group_ids: [42],
-      routing_strategy: 'speed',
     }))
+    expect(createKey.mock.calls[0][0]).not.toHaveProperty('routing_strategy')
   })
 
-  it('submits candidate groups in the displayed priority order', async () => {
+  it('replaces the selected group instead of accumulating candidates', async () => {
     getAvailableGroups.mockResolvedValueOnce([
       { id: 42, name: 'OpenAI', platform: 'openai', rate_multiplier: 1, data_sharing_enabled: false },
       { id: 43, name: 'Claude', platform: 'anthropic', rate_multiplier: 1, data_sharing_enabled: false },
@@ -961,13 +979,13 @@ describe('user KeysView column settings', () => {
     await groupSelect!.vm.$emit('update:modelValue', 43)
     await nextTick()
 
-    expect(wrapper.findAll('[data-test="priority-group-row"]')).toHaveLength(2)
+    expect(groupSelect!.props('modelValue')).toBe(43)
     await wrapper.get('form#key-form').trigger('submit')
     await flushPromises()
 
     expect(createKey).toHaveBeenCalledWith(expect.objectContaining({
       name: 'priority-key',
-      group_ids: [42, 43],
+      group_ids: [43],
     }))
   })
 

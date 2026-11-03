@@ -31,7 +31,7 @@ const (
 	APIKeyBillingModeBalance      = "balance"
 )
 
-// API Key 路由策略常量。manual 保持有序分组的历史行为。
+// 请求级路由策略常量。manual 沿用所选分组的调度规则。
 const (
 	APIKeyRoutingStrategyManual      = "manual"
 	APIKeyRoutingStrategyAuto        = "auto"
@@ -53,16 +53,10 @@ func NormalizeAPIKeyRoutingStrategy(value string) (string, bool) {
 	}
 }
 
-// APIKeyEffectiveRoutingStrategy 返回 Key 的有效路由策略。
-func APIKeyEffectiveRoutingStrategy(key *APIKey) string {
-	if key == nil {
-		return APIKeyRoutingStrategyManual
-	}
-	strategy, ok := NormalizeAPIKeyRoutingStrategy(key.RoutingStrategy)
-	if !ok {
-		return APIKeyRoutingStrategyManual
-	}
-	return strategy
+// APIKeyEffectiveRoutingStrategy 忽略历史 Key 保存的智能策略，默认沿用分组调度。
+// 请求显式指定的 provider.sort 等策略由请求解析层独立处理。
+func APIKeyEffectiveRoutingStrategy(_ *APIKey) string {
+	return APIKeyRoutingStrategyManual
 }
 
 // APIKeyRoutingStrategyFromContext 返回请求上下文中的有效策略。
@@ -158,7 +152,7 @@ type APIKey struct {
 	Key               string
 	Name              string
 	GroupID           *int64
-	// GroupIDs 按优先级保存普通 Key 的候选分组；空列表继续使用默认分组逻辑。
+	// GroupIDs 保留旧接口兼容字段；普通 Key 仅使用 GroupID，历史多项不再参与选组。
 	GroupIDs []int64
 	// IsComposite 表示该 Key 通过模型前缀选择多个分组。
 	IsComposite bool

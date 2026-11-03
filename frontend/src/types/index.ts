@@ -966,7 +966,7 @@ export interface CreateApiKeyRequest {
   is_composite?: boolean
   composite_groups?: Array<{ group_id: number; prefix: string }>
   fast_mode_policy?: ApiKeyFastModePolicy
-  routing_strategy?: ApiKeyRoutingStrategy
+  routing_strategy?: 'manual' // 仅为旧客户端兼容保留，Key 级智能路由已下线。
   billing_mode?: ApiKeyBillingMode
   preferred_subscription_id?: number | null
   model_mapping?: Record<string, string>
@@ -996,7 +996,7 @@ export interface UpdateApiKeyRequest {
   composite_groups?: Array<{ group_id: number; prefix: string }>
   status?: 'active' | 'inactive'
   fast_mode_policy?: ApiKeyFastModePolicy
-  routing_strategy?: ApiKeyRoutingStrategy
+  routing_strategy?: 'manual' // 仅为旧客户端兼容保留，Key 级智能路由已下线。
   billing_mode?: ApiKeyBillingMode
   preferred_subscription_id?: number | null
   model_mapping?: Record<string, string>

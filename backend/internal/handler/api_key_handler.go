@@ -47,7 +47,7 @@ type CreateAPIKeyRequest struct {
 	IPWhitelist             []string                            `json:"ip_whitelist"`     // IP 白名单
 	IPBlacklist             []string                            `json:"ip_blacklist"`     // IP 黑名单
 	FastModePolicy          string                              `json:"fast_mode_policy"` // Fast 模式策略，空值表示跟随请求
-	RoutingStrategy         string                              `json:"routing_strategy"` // 路由策略，空值表示手动有序分组
+	RoutingStrategy         string                              `json:"routing_strategy"` // 兼容字段，仅接受空值或 manual
 	BillingMode             string                              `json:"billing_mode"`     // 结算模式，空值表示自动选择
 	PreferredSubscriptionID *int64                              `json:"preferred_subscription_id"`
 	ModelMapping            map[string]string                   `json:"model_mapping"` // 当前 Key 的完整模型重定向规则
@@ -84,7 +84,7 @@ type UpdateAPIKeyRequest struct {
 	IPWhitelist             *[]string                            `json:"ip_whitelist"`     // IP 白名单（nil 不修改，空数组清空）
 	IPBlacklist             *[]string                            `json:"ip_blacklist"`     // IP 黑名单（nil 不修改，空数组清空）
 	FastModePolicy          *string                              `json:"fast_mode_policy"` // nil 表示保持原配置
-	RoutingStrategy         *string                              `json:"routing_strategy"` // nil 表示保持原配置
+	RoutingStrategy         *string                              `json:"routing_strategy"` // 兼容字段，仅接受空值或 manual
 	BillingMode             *string                              `json:"billing_mode"`     // nil 表示保持原配置
 	PreferredSubscriptionID *int64                               `json:"preferred_subscription_id"`
 	ModelMapping            *map[string]string                   `json:"model_mapping"` // nil 不修改，空对象清空

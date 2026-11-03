@@ -97,9 +97,9 @@ Grok OAuth 媒体资格使用 `GET|PUT /api/v1/admin/accounts/:id/grok-media-eli
 
 `POST /api/v1/keys` 和 `PUT /api/v1/keys/{id}` 接受 `billing_mode`（`auto`、`subscription`、`balance`）及可空 `preferred_subscription_id`。省略模式或使用 `auto` 保持旧的订阅优先、余额兜底行为；`balance` 会清除指定订阅；`subscription` 必须指定当前付款主体的一份有效订阅。个人 Key 的付款主体是本人，团队 Key 的付款主体是 Team Owner。
 
-普通 Key 可提交最多 20 个不重复正整数构成的 `group_ids`。数组顺序就是认证选组优先级，空数组表示使用入口默认分组；服务同时把首项同步到兼容字段 `group_id`。更新时 `group_ids` 是完整替换，省略则保持原值。旧客户端仍可只提交 `group_id`，服务会将其规范化为单元素候选列表；复合 Key 使用 `composite_groups`，不能同时提交非空普通候选列表。创建和更新都会校验每个候选的用户权限，指定订阅模式还要求每个候选都在套餐范围内。
+普通 Key 仅绑定单个分组。`group_ids` 兼容字段最多接受一个正整数，空数组表示使用入口默认分组；服务同时同步到 `group_id`。更新时 `group_ids` 是完整替换，省略则保留现有绑定；只提交 `group_id` 时同步成单元素列表。多于一个分组返回 `API_KEY_GROUP_PRIORITIES_INVALID`，跨分组调用应使用复合 Key 的 `composite_groups`，复合 Key 不能同时提交非空普通分组字段。创建和更新均校验用户权限，指定订阅还必须覆盖绑定分组或全部复合映射。
 
-普通 Key 还接受 `routing_strategy`：`manual`、`auto`、`speed`、`price` 或 `success_rate`，省略时默认 `manual`。`manual` 使用上述分组优先级及分组自身调度模式；其它值对最终分组内账号启用智能排序。候选模型分组与智能策略可同时提交，智能排序不会扩大到 `group_ids` 以外的分组。网关 JSON 请求可用 `provider.sort` 覆盖本次策略，也兼容模型后缀 `:nitro`（速度）和 `:floor`（价格）；扩展字段和后缀由网关消费，不转发给上游。
+Key 级智能路由已下线。`routing_strategy` 仅兼容空值或 `manual`，其它值在创建和更新时返回 `INVALID_API_KEY_ROUTING_STRATEGY`。历史多候选 Key 按原 `group_id` 路由，不再依次选组；历史持久策略不生效，保存旧 Key 时收敛这两类字段。网关 JSON 请求仍可通过 `provider.sort` 或模型后缀 `:nitro`（速度）、`:floor`（价格）指定本次请求的组内账号排序；扩展由网关消费，不转发上游，也不会触发跨分组选组。
 
 创建和更新 API Key 时，`quota`、`rate_limit_5h`、`rate_limit_1d`、`rate_limit_7d` 必须是有限、非负且小于 `1e12` 的 USD 数值，以匹配数据库 `DECIMAL(20,8)`；`0` 仍表示不限额。创建请求省略 `expires_in_days` 表示永不过期，显式提供时必须大于 0；更新请求用空 `expires_at` 清除到期时间，用合法 RFC3339 时间设置明确到期点。handler 的早期校验与 service 的最终校验必须使用同一规则，内部调用不能绕过。
 

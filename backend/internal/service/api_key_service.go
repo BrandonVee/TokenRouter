@@ -38,14 +38,14 @@ var (
 	ErrAPIKeyAuthOverloaded              = infraerrors.ServiceUnavailable("API_KEY_AUTH_OVERLOADED", "api key authentication is temporarily overloaded")
 	ErrInvalidIPPattern                  = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
 	ErrInvalidAPIKeyFastModePolicy       = infraerrors.BadRequest("INVALID_API_KEY_FAST_MODE_POLICY", "invalid API key fast mode policy")
-	ErrInvalidAPIKeyRoutingStrategy      = infraerrors.BadRequest("INVALID_API_KEY_ROUTING_STRATEGY", "invalid API key routing strategy")
+	ErrInvalidAPIKeyRoutingStrategy      = infraerrors.BadRequest("INVALID_API_KEY_ROUTING_STRATEGY", "API key routing strategies have been retired; only manual is supported")
 	ErrInvalidAPIKeyBillingMode          = infraerrors.BadRequest("INVALID_API_KEY_BILLING_MODE", "invalid API key billing mode")
 	ErrPreferredSubscriptionRequired     = infraerrors.BadRequest("PREFERRED_SUBSCRIPTION_REQUIRED", "subscription billing mode requires a subscription")
 	ErrPreferredSubscriptionInvalid      = infraerrors.Forbidden("PREFERRED_SUBSCRIPTION_INVALID", "preferred subscription is unavailable")
 	ErrPreferredSubscriptionGroup        = infraerrors.Forbidden("PREFERRED_SUBSCRIPTION_GROUP_NOT_ALLOWED", "preferred subscription does not allow this group")
 	ErrPreferredSubscriptionInsufficient = infraerrors.TooManyRequests("PREFERRED_SUBSCRIPTION_EXHAUSTED", "preferred subscription has insufficient remaining quota")
 	ErrDataSharingConsentRequired        = infraerrors.Forbidden("DATA_SHARING_CONSENT_REQUIRED", "switching to a data sharing group requires confirmation")
-	ErrAPIKeyGroupPrioritiesInvalid      = infraerrors.BadRequest("API_KEY_GROUP_PRIORITIES_INVALID", "api key group priorities must contain at most 20 unique positive group ids")
+	ErrAPIKeyGroupPrioritiesInvalid      = infraerrors.BadRequest("API_KEY_GROUP_PRIORITIES_INVALID", "a standard API key supports at most one positive group id; use a composite key for multiple groups")
 	ErrCompositeKeyGroupsRequired        = infraerrors.BadRequest("COMPOSITE_KEY_GROUPS_REQUIRED", "composite api key requires at least one group")
 	ErrCompositeKeyTooManyGroups         = infraerrors.BadRequest("COMPOSITE_KEY_TOO_MANY_GROUPS", "composite api key supports at most 20 groups")
 	ErrCompositeKeyPrefixInvalid         = infraerrors.BadRequest("COMPOSITE_KEY_PREFIX_INVALID", "composite api key prefix is invalid")
@@ -284,7 +284,7 @@ type CreateAPIKeyRequest struct {
 	IPBlacklist     []string                    `json:"ip_blacklist"` // IP 黑名单
 	// FastModePolicy 为空时默认跟随下游请求。
 	FastModePolicy string `json:"fast_mode_policy"`
-	// RoutingStrategy 为空时使用手动有序分组模式。
+	// RoutingStrategy 仅兼容空值或 manual；Key 级智能路由已下线。
 	RoutingStrategy string `json:"routing_strategy"`
 	// BillingMode 为空时兼容存量行为，按自动选择处理。
 	BillingMode string `json:"billing_mode"`
@@ -341,7 +341,7 @@ type UpdateAPIKeyRequest struct {
 	IPBlacklist     *[]string                    `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
 	// FastModePolicy 为 nil 时保持原值。
 	FastModePolicy *string `json:"fast_mode_policy"`
-	// RoutingStrategy 为 nil 时保持原值。
+	// RoutingStrategy 仅兼容空值或 manual；保存时会清理历史智能策略。
 	RoutingStrategy *string `json:"routing_strategy"`
 	// BillingMode 为 nil 时保持原值；指定订阅模式必须同时传入订阅 ID。
 	BillingMode             *string `json:"billing_mode"`
@@ -428,6 +428,13 @@ func normalizeUpdateAPIKeyLimits(req *UpdateAPIKeyRequest) {
 }
 
 func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
+	// 普通 Key 已恢复单分组配置，旧客户端也不能重新启用候选分组或持久智能策略。
+	if len(req.GroupIDs) > 1 {
+		return ErrAPIKeyGroupPrioritiesInvalid
+	}
+	if strategy, ok := NormalizeAPIKeyRoutingStrategy(req.RoutingStrategy); !ok || strategy != APIKeyRoutingStrategyManual {
+		return ErrInvalidAPIKeyRoutingStrategy
+	}
 	limits := []struct {
 		field string
 		value float64
@@ -450,6 +457,15 @@ func validateCreateAPIKeyRequest(req CreateAPIKeyRequest) error {
 }
 
 func validateUpdateAPIKeyRequest(req UpdateAPIKeyRequest) error {
+	// 与创建入口保持一致，部分更新省略兼容字段时不强制提交它们。
+	if req.GroupIDs != nil && len(*req.GroupIDs) > 1 {
+		return ErrAPIKeyGroupPrioritiesInvalid
+	}
+	if req.RoutingStrategy != nil {
+		if strategy, ok := NormalizeAPIKeyRoutingStrategy(*req.RoutingStrategy); !ok || strategy != APIKeyRoutingStrategyManual {
+			return ErrInvalidAPIKeyRoutingStrategy
+		}
+	}
 	limits := []struct {
 		field string
 		value *float64
@@ -737,9 +753,9 @@ func validatePreferredSubscriptionGroups(subscription *UserSubscription, group *
 	return nil
 }
 
-// prepareAPIKeyPriorityGroups 校验普通 Key 的有序候选分组，并保留调用方给出的优先级。
-func (s *APIKeyService) prepareAPIKeyPriorityGroups(ctx context.Context, user *User, groupIDs []int64) ([]int64, []*Group, error) {
-	if len(groupIDs) > MaxCompositeAPIKeyGroups {
+// prepareAPIKeySingleGroup 校验兼容字段 group_ids，普通 Key 最多绑定一个分组。
+func (s *APIKeyService) prepareAPIKeySingleGroup(ctx context.Context, user *User, groupIDs []int64) ([]int64, []*Group, error) {
+	if len(groupIDs) > 1 {
 		return nil, nil, ErrAPIKeyGroupPrioritiesInvalid
 	}
 	ids := make([]int64, 0, len(groupIDs))
@@ -768,7 +784,7 @@ func (s *APIKeyService) prepareAPIKeyPriorityGroups(ctx context.Context, user *U
 	return ids, groups, nil
 }
 
-// validatePreferredSubscriptionGroupIDs 确保智能路由的每个候选分组都在指定订阅范围内。
+// validatePreferredSubscriptionGroupIDs 确保普通 Key 的绑定分组位于指定订阅范围内。
 func validatePreferredSubscriptionGroupIDs(subscription *UserSubscription, groupIDs []int64) error {
 	for _, groupID := range groupIDs {
 		if groupID > 0 && !subscriptionPlanIncludesGroup(subscription.Plan, groupID) {
@@ -929,7 +945,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 验证普通分组、智能路由候选分组或复合分组权限。
+	// 验证普通单分组或复合分组权限。
 	var dataSharingNoticeVersion int
 	var dataSharingConfirmedGroupID *int64
 	var dataSharingConfirmedAt *time.Time
@@ -955,7 +971,7 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 			return nil, ErrAPIKeyGroupPrioritiesInvalid
 		}
 		var priorityGroups []*Group
-		req.GroupIDs, priorityGroups, err = s.prepareAPIKeyPriorityGroups(ctx, user, req.GroupIDs)
+		req.GroupIDs, priorityGroups, err = s.prepareAPIKeySingleGroup(ctx, user, req.GroupIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -1249,7 +1265,6 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
 			if !apiKey.IsComposite {
-				apiKey = s.applyPriorityGroup(ctx, apiKey)
 				apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 				if !s.canUserUseBoundGroup(ctx, apiKey) {
 					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1273,7 +1288,6 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
 			if !apiKey.IsComposite {
-				apiKey = s.applyPriorityGroup(ctx, apiKey)
 				apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 				if !s.canUserUseBoundGroup(ctx, apiKey) {
 					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1292,7 +1306,6 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 				return nil, fmt.Errorf("get api key: %w", err)
 			}
 			if !apiKey.IsComposite {
-				apiKey = s.applyPriorityGroup(ctx, apiKey)
 				apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 				if !s.canUserUseBoundGroup(ctx, apiKey) {
 					return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1309,7 +1322,6 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	}
 	apiKey.Key = key
 	if !apiKey.IsComposite {
-		apiKey = s.applyPriorityGroup(ctx, apiKey)
 		apiKey = s.applyDefaultGroupFallback(ctx, apiKey)
 		if !s.canUserUseBoundGroup(ctx, apiKey) {
 			return nil, fmt.Errorf("get api key: %w", ErrGroupDisabledForUser)
@@ -1317,36 +1329,6 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey, nil
-}
-
-// applyPriorityGroup 按 Key 配置顺序选择首个仍启用且用户可访问的分组。
-// 组内账号与渠道排序继续由最终分组的基础或高级调度器负责。
-func (s *APIKeyService) applyPriorityGroup(ctx context.Context, apiKey *APIKey) *APIKey {
-	if apiKey == nil || s.groupRepo == nil || len(apiKey.GroupIDs) == 0 {
-		return apiKey
-	}
-	for _, groupID := range apiKey.GroupIDs {
-		group := apiKey.Group
-		if group == nil || group.ID != groupID {
-			var err error
-			group, err = s.groupRepo.GetByIDLite(ctx, groupID)
-			if err != nil {
-				continue
-			}
-		}
-		if group == nil || !group.IsActive() {
-			continue
-		}
-		if apiKey.User != nil && !s.canUserBindGroup(ctx, apiKey.User, group) {
-			continue
-		}
-		selectedID := group.ID
-		apiKey.GroupID = &selectedID
-		apiKey.Group = group
-		s.refreshFallbackUserGroupRPMOverride(ctx, apiKey, selectedID)
-		return apiKey
-	}
-	return apiKey
 }
 
 // SelectCompositeGroupForRequest 为复合 Key 创建请求级分组视图，缓存对象不会被修改。
@@ -1563,6 +1545,19 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	originalStatus := apiKey.Status
 	originalIsComposite := apiKey.IsComposite
 
+	// 保存旧 Key 时收敛已下线的配置；鉴权已直接使用首选分组并忽略历史智能策略。
+	if apiKey.RoutingStrategy != "" && apiKey.RoutingStrategy != APIKeyRoutingStrategyManual {
+		apiKey.RoutingStrategy = APIKeyRoutingStrategyManual
+		fields.RoutingStrategy = true
+	}
+	if !apiKey.IsComposite && len(apiKey.GroupIDs) > 1 {
+		apiKey.GroupIDs = nil
+		if apiKey.GroupID != nil {
+			apiKey.GroupIDs = []int64{*apiKey.GroupID}
+		}
+		fields.GroupIDs = true
+	}
+
 	// 更新指定订阅时先确定最终配置，后续普通分组和复合分组都要按它校验。
 	targetBillingMode := APIKeyEffectiveBillingMode(apiKey)
 	targetPreferredSubscriptionID := apiKey.PreferredSubscriptionID
@@ -1638,7 +1633,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		targetComposite = *req.IsComposite
 	}
 
-	// 有序候选分组是普通 Key 的完整替换字段；首项同步到 group_id 兼容现有网关链路。
+	// group_ids 保留完整替换语义，仅接受单个分组并同步到 group_id。
 	if req.GroupIDs != nil {
 		if targetComposite && len(*req.GroupIDs) > 0 {
 			return nil, ErrCompositeKeyGroupConflict
@@ -1648,7 +1643,7 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			return nil, fmt.Errorf("get billing user: %w", err)
 		}
 		apiKey.User = billingUser
-		ids, groups, prepareErr := s.prepareAPIKeyPriorityGroups(ctx, billingUser, *req.GroupIDs)
+		ids, groups, prepareErr := s.prepareAPIKeySingleGroup(ctx, billingUser, *req.GroupIDs)
 		if prepareErr != nil {
 			return nil, prepareErr
 		}

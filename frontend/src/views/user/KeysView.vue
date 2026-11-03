@@ -172,12 +172,6 @@
                 <span v-else-if="row.group_id" class="text-sm text-amber-600 dark:text-amber-400">
                   {{ t('keys.groupUnavailable', { id: row.group_id }) }}
                 </span>
-                <span v-if="availableGroupCount(row) > 1" class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-500 dark:bg-dark-700 dark:text-dark-300">
-                  +{{ availableGroupCount(row) - 1 }}
-                </span>
-                <span v-if="row.routing_strategy && row.routing_strategy !== 'manual'" class="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-                  {{ t('keys.smartRouting.shortSmart') }}
-                </span>
                 <span v-if="!displayGroup(row) && !row.group_id" class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
                 }}</span>
@@ -552,112 +546,24 @@
           />
         </div>
 
-        <div v-if="!formData.is_composite" class="space-y-5 md:col-span-2" data-test="routing-strategy-editor">
-          <section class="space-y-3" data-test="priority-group-editor">
-            <div class="flex items-end justify-between gap-3">
-              <div>
-                <label class="input-label">{{ t('keys.smartRouting.candidateGroups') }}</label>
-                <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('keys.smartRouting.candidateGroupsHint') }}</p>
-              </div>
-              <span class="shrink-0 text-xs font-medium text-gray-500 dark:text-dark-400">
-                {{ t('keys.smartRouting.selectedCount', { count: formData.group_ids.length }) }}
-              </span>
-            </div>
-
-            <Select
-              :model-value="priorityGroupPicker"
-              :options="availablePriorityGroupOptions"
-              :placeholder="t('keys.smartRouting.addGroup')"
-              :searchable="true"
-              :search-placeholder="t('keys.searchGroup')"
-              :disabled="formGroupsLoading"
-              data-tour="key-form-group"
-              @update:model-value="addPriorityGroup"
-            >
-              <template #option="{ option, selected }">
-                <!-- 候选分组下拉与已选分组列表保持同一套信息密度。 -->
-                <GroupOptionItem
-                  v-bind="groupDisplayProps(option)"
-                  :selected="selected"
-                />
-              </template>
-            </Select>
-
-            <VueDraggable v-model="formData.group_ids" handle=".priority-group-handle" :animation="160" class="space-y-2">
-              <div
-                v-for="(groupId, index) in formData.group_ids"
-                :key="groupId"
-                class="flex min-h-12 items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-2 dark:border-dark-600 dark:bg-dark-800"
-                data-test="priority-group-row"
-              >
-                <button type="button" class="priority-group-handle cursor-grab rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-700" :title="t('keys.smartRouting.dragHint')">
-                  <Icon name="menu" size="sm" />
-                </button>
-                <span class="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded bg-gray-100 px-1.5 text-xs font-semibold tabular-nums text-gray-600 dark:bg-dark-700 dark:text-dark-300">
-                  {{ index + 1 }}
-                </span>
-                <GroupBadge
-                  v-if="priorityGroupOption(groupId)"
-                  class="min-w-0 flex-1"
-                  :name="priorityGroupOption(groupId)!.label"
-                  :platform="priorityGroupOption(groupId)!.platform"
-                  :display-brand="priorityGroupOption(groupId)!.displayBrand"
-                  :rate-multiplier="priorityGroupOption(groupId)!.rate"
-                  :user-rate-multiplier="priorityGroupOption(groupId)!.userRate"
-                  :peak-rate-enabled="priorityGroupOption(groupId)!.peakRateEnabled"
-                  :peak-start="priorityGroupOption(groupId)!.peakStart"
-                  :peak-end="priorityGroupOption(groupId)!.peakEnd"
-                  :peak-rate-multiplier="priorityGroupOption(groupId)!.peakRateMultiplier"
-                />
-                <span
-                  v-else
-                  class="min-w-0 flex-1 truncate text-sm text-gray-600 dark:text-dark-200"
-                >
-                  {{ t('keys.smartRouting.groupFallback', { id: groupId }) }}
-                </span>
-                <button type="button" class="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" :title="t('common.delete')" @click="removePriorityGroup(groupId)">
-                  <Icon name="trash" size="sm" />
-                </button>
-              </div>
-            </VueDraggable>
-
-            <p v-if="formData.group_ids.length === 0" class="rounded-md border border-dashed border-gray-200 px-3 py-4 text-center text-xs text-gray-500 dark:border-dark-600 dark:text-dark-400">
-              {{ t('keys.smartRouting.defaultHint') }}
-            </p>
-          </section>
-
-          <section class="space-y-3 border-t border-gray-100 pt-4 dark:border-dark-700">
-            <div class="flex items-center justify-between gap-4">
-              <div>
-                <label class="input-label">{{ t('keys.smartRouting.modeLabel') }}</label>
-                <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('keys.smartRouting.channelHint') }}</p>
-              </div>
-              <div class="flex shrink-0 items-center gap-2">
-                <span class="text-xs font-medium" :class="smartRoutingEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-dark-400'">
-                  {{ smartRoutingEnabled ? t('keys.smartRouting.enabled') : t('keys.smartRouting.disabled') }}
-                </span>
-                <Toggle :model-value="smartRoutingEnabled" size="sm" data-test="smart-routing-toggle" @update:model-value="setSmartRoutingEnabled" />
-              </div>
-            </div>
-
-            <div v-if="smartRoutingEnabled" class="grid grid-cols-1 gap-2 sm:grid-cols-2" data-test="smart-routing-strategies">
-              <button
-                v-for="strategy in smartRoutingStrategyOptions"
-                :key="strategy.value"
-                type="button"
-                class="min-h-16 rounded-md border px-3 py-2.5 text-left transition-colors"
-                :class="formData.routing_strategy === strategy.value
-                  ? 'border-primary-500 bg-primary-50 text-primary-800 dark:border-primary-500 dark:bg-primary-900/20 dark:text-primary-200'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-dark-200 dark:hover:bg-dark-700'"
-                :data-test="`routing-strategy-${strategy.value}`"
-                @click="formData.routing_strategy = strategy.value"
-              >
-                <span class="block text-sm font-semibold">{{ strategy.label }}</span>
-                <span class="mt-0.5 block text-xs leading-5 opacity-75">{{ strategy.description }}</span>
-              </button>
-            </div>
-            <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('keys.smartRouting.requestOverrideHint') }}</p>
-          </section>
+        <!-- 普通 Key 只绑定一个分组；跨分组调用统一使用复合 Key。 -->
+        <div v-if="!formData.is_composite" class="md:col-span-2" data-test="single-group-editor">
+          <label class="input-label">{{ t('keys.group') }}</label>
+          <Select
+            v-model="formData.group_id"
+            :options="formGroupOptions"
+            :placeholder="t('keys.selectGroup')"
+            :searchable="true"
+            :search-placeholder="t('keys.searchGroup')"
+            :disabled="formGroupsLoading"
+            clearable
+            data-tour="key-form-group"
+          >
+            <template #option="{ option, selected }">
+              <GroupOptionItem v-bind="groupDisplayProps(option)" :selected="selected" />
+            </template>
+          </Select>
+          <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">{{ t('keys.singleGroupHint') }}</p>
         </div>
 
         <div v-else class="space-y-3 md:col-span-2" data-test="composite-group-editor">
@@ -1463,35 +1369,12 @@
       >
         <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2 dark:border-dark-700">
           <div>
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('keys.smartRouting.quickTitle') }}</h3>
-            <p class="mt-0.5 text-[11px] text-gray-500 dark:text-dark-400">{{ t('keys.smartRouting.quickHint') }}</p>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('keys.group') }}</h3>
+            <p class="mt-0.5 text-[11px] text-gray-500 dark:text-dark-400">{{ t('keys.singleGroupHint') }}</p>
           </div>
           <button type="button" class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700" :title="t('common.close')" @click="groupSelectorKeyId = null; dropdownPosition = null">
             <Icon name="x" size="sm" />
           </button>
-        </div>
-
-        <div class="border-b border-gray-100 px-3 py-2 dark:border-dark-700">
-          <div class="mb-1.5 flex items-center justify-between">
-            <span class="text-xs font-semibold text-gray-700 dark:text-dark-200">{{ t('keys.smartRouting.modeLabel') }}</span>
-            <span class="text-[11px] text-gray-400 dark:text-dark-400">{{ t('keys.smartRouting.selectedCount', { count: quickGroupIDs.length }) }}</span>
-          </div>
-          <div class="grid grid-cols-5 gap-1 rounded-md bg-gray-100 p-1 dark:bg-dark-900" data-test="quick-routing-strategies">
-            <button
-              v-for="strategy in quickRoutingStrategyOptions"
-              :key="strategy.value"
-              type="button"
-              class="min-w-0 rounded px-1 py-1 text-[10px] font-medium transition-colors"
-              :class="quickRoutingStrategy === strategy.value
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
-                : 'text-gray-500 hover:text-gray-800 dark:text-dark-400 dark:hover:text-dark-200'"
-              :title="strategy.description"
-              :data-test="`quick-routing-${strategy.value}`"
-              @click="quickRoutingStrategy = strategy.value"
-            >
-              {{ strategy.label }}
-            </button>
-          </div>
         </div>
 
         <!-- Search box -->
@@ -1511,26 +1394,29 @@
         </div>
         <!-- Group list -->
         <div class="min-h-0 max-h-56 flex-1 overflow-y-auto p-2">
+          <!-- 默认分组是单选项，清除显式绑定后按请求入口选择。 -->
+          <button
+            v-if="!groupSearchQuery.trim()"
+            type="button"
+            class="mb-1 flex min-h-10 w-full items-center rounded-md px-2 py-1 text-left text-sm hover:bg-gray-50 dark:hover:bg-dark-700"
+            :class="quickGroupID === null ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/15 dark:text-primary-300' : 'text-gray-600 dark:text-dark-300'"
+            data-test="default-group-option"
+            @click="quickGroupID = null"
+          >
+            {{ t('keys.defaultGroup') }}
+          </button>
           <div
             v-for="option in filteredGroupOptions"
             :key="option.value ?? 'null'"
             :class="[
               'mb-1 flex min-h-10 items-center gap-1 rounded-md border px-2 py-1 last:mb-0',
-              quickGroupPriority(option.value) >= 0
+              quickGroupID === option.value
                 ? 'border-primary-200 bg-primary-50/70 dark:border-primary-800 dark:bg-primary-900/15'
                 : 'border-transparent hover:bg-gray-50 dark:hover:bg-dark-700'
             ]"
             :title="option.description || undefined"
           >
-            <button type="button" class="flex min-w-0 flex-1 items-center gap-2 text-left" @click="toggleQuickGroup(option.value)">
-              <span
-                class="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded text-[11px] font-semibold tabular-nums"
-                :class="quickGroupPriority(option.value) >= 0
-                  ? 'bg-primary-600 text-white'
-                  : 'border border-gray-200 text-gray-300 dark:border-dark-500 dark:text-dark-500'"
-              >
-                {{ quickGroupPriority(option.value) >= 0 ? quickGroupPriority(option.value) + 1 : '' }}
-              </span>
+            <button type="button" class="flex min-w-0 flex-1 items-center gap-2 text-left" @click="quickGroupID = option.value">
               <GroupOptionItem
                 class="min-w-0 flex-1"
                 :name="option.label"
@@ -1543,29 +1429,20 @@
                 :peak-end="option.peakEnd"
                 :peak-rate-multiplier="option.peakRateMultiplier"
                 :description="option.description"
-                :selected="quickGroupPriority(option.value) >= 0"
+                :selected="quickGroupID === option.value"
               />
             </button>
-            <div v-if="option.value !== null && quickGroupPriority(option.value) >= 0" class="flex shrink-0 items-center">
-              <button type="button" class="rounded p-1 text-gray-400 hover:bg-white hover:text-gray-700 disabled:opacity-25 dark:hover:bg-dark-600 dark:hover:text-white" :disabled="quickGroupPriority(option.value) === 0" :title="t('keys.composite.moveUp')" @click="moveQuickGroup(option.value, -1)">
-                <Icon name="arrowUp" size="xs" />
-              </button>
-              <button type="button" class="rounded p-1 text-gray-400 hover:bg-white hover:text-gray-700 disabled:opacity-25 dark:hover:bg-dark-600 dark:hover:text-white" :disabled="quickGroupPriority(option.value) === quickGroupIDs.length - 1" :title="t('keys.composite.moveDown')" @click="moveQuickGroup(option.value, 1)">
-                <Icon name="arrowDown" size="xs" />
-              </button>
-            </div>
           </div>
           <!-- Empty state when search has no results -->
           <div v-if="filteredGroupOptions.length === 0" class="py-4 text-center text-sm text-gray-400 dark:text-gray-500">
             {{ t('keys.noGroupFound') }}
           </div>
         </div>
-        <div class="flex items-center justify-between border-t border-gray-100 px-3 py-2 dark:border-dark-700">
-          <span class="text-[11px] text-gray-400 dark:text-dark-400">{{ t('keys.smartRouting.quickOrderHint') }}</span>
+        <div class="flex justify-end border-t border-gray-100 px-3 py-2 dark:border-dark-700">
           <div class="flex gap-2">
             <button type="button" class="btn btn-secondary btn-sm" @click="groupSelectorKeyId = null; dropdownPosition = null">{{ t('common.cancel') }}</button>
-            <button type="button" class="btn btn-primary btn-sm" :disabled="quickRoutingSaving" data-test="quick-routing-save" @click="saveQuickRouting">
-              {{ quickRoutingSaving ? t('keys.saving') : t('common.save') }}
+            <button type="button" class="btn btn-primary btn-sm" :disabled="groupSelectionSaving" data-test="group-selection-save" @click="saveGroupSelection">
+              {{ groupSelectionSaving ? t('keys.saving') : t('common.save') }}
             </button>
           </div>
         </div>
@@ -1577,7 +1454,6 @@
 	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useRoute } from 'vue-router'
-	import { VueDraggable } from 'vue-draggable-plus'
 	import { useAppStore } from '@/stores/app'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useClipboard } from '@/composables/useClipboard'
@@ -1607,8 +1483,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	  ApiKeyBillingMode,
 	  ApiKeyBillingSubscriptionOption,
 	  ApiKeyFastModePolicy,
-	  ApiKeyRoutingStrategy,
-	  CreateApiKeyRequest,
+		  CreateApiKeyRequest,
 	  Group,
 	  PublicSettings,
 	  GroupPlatform,
@@ -1828,13 +1703,11 @@ const actionMenuKey = ref<ApiKey | null>(null)
 const actionMenuPosition = ref<{ top: number; left: number } | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
-const quickGroupIDs = ref<number[]>([])
-const quickRoutingStrategy = ref<ApiKeyRoutingStrategy>('manual')
-const quickRoutingSaving = ref(false)
-const pendingQuickRoutingUpdate = ref<{
+const quickGroupID = ref<number | null>(null)
+const groupSelectionSaving = ref(false)
+const pendingGroupUpdate = ref<{
   key: ApiKey
-  group_ids: number[]
-  routing_strategy: ApiKeyRoutingStrategy
+  group_id: number | null
 } | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)
 const teamFeatureEnabled = computed(() => publicSettings.value?.team_enabled !== false)
@@ -1897,12 +1770,10 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 const formData = ref({
   name: '',
   group_id: null as number | null,
-  group_ids: [] as number[],
   is_composite: false,
   composite_groups: [] as Array<ReturnType<typeof newCompositeBinding>>,
   status: 'active' as 'active' | 'inactive',
   fast_mode_policy: 'follow_request' as ApiKeyFastModePolicy,
-  routing_strategy: 'manual' as ApiKeyRoutingStrategy,
   billing_mode: 'auto' as ApiKeyBillingMode,
   preferred_subscription_id: null as number | null,
   model_mapping_rows: [] as Array<ReturnType<typeof newModelMappingRow>>,
@@ -1925,7 +1796,6 @@ const formData = ref({
   expiration_date: '',
   fallback_to_default_group_when_unavailable: true
 })
-const priorityGroupPicker = ref<number | null>(null)
 
 type ModelMappingRowError = { source?: string; target?: string }
 
@@ -2030,39 +1900,6 @@ const billingModeOptions = computed(() => [
   { value: 'balance', label: t('keys.billing.modes.balance') }
 ])
 
-// 智能策略与候选分组独立：分组始终保留，开关只控制组内渠道排序。
-const smartRoutingStrategyOptions = computed<Array<{
-  value: Exclude<ApiKeyRoutingStrategy, 'manual'>
-  label: string
-  description: string
-}>>(() => [
-  { value: 'auto', label: t('keys.smartRouting.autoMode'), description: t('keys.smartRouting.autoHint') },
-  { value: 'speed', label: t('keys.smartRouting.speedMode'), description: t('keys.smartRouting.speedHint') },
-  { value: 'price', label: t('keys.smartRouting.priceMode'), description: t('keys.smartRouting.priceHint') },
-  { value: 'success_rate', label: t('keys.smartRouting.successMode'), description: t('keys.smartRouting.successHint') }
-])
-const quickRoutingStrategyOptions = computed<Array<{
-  value: ApiKeyRoutingStrategy
-  label: string
-  description: string
-}>>(() => [
-  { value: 'manual', label: t('keys.smartRouting.disabled'), description: t('keys.smartRouting.manualHint') },
-  ...smartRoutingStrategyOptions.value
-])
-const lastSmartRoutingStrategy = ref<Exclude<ApiKeyRoutingStrategy, 'manual'>>('auto')
-const smartRoutingEnabled = computed(() => formData.value.routing_strategy !== 'manual')
-
-const setSmartRoutingEnabled = (enabled: boolean) => {
-  if (enabled) {
-    formData.value.routing_strategy = lastSmartRoutingStrategy.value
-    return
-  }
-  if (formData.value.routing_strategy !== 'manual') {
-    lastSmartRoutingStrategy.value = formData.value.routing_strategy
-  }
-  formData.value.routing_strategy = 'manual'
-}
-
 const billingSubscriptionOptions = computed<Array<{
   value: number
   label: string
@@ -2107,13 +1944,6 @@ const groupFilterOptions = computed(() => [
   { value: 0, label: t('keys.noGroup') },
   ...groups.value.map((g) => ({ value: g.id, label: g.name }))
 ])
-
-// 已删除或禁用的分组不会出现在可用分组快照中，但旧 Key 仍可能保留其 ID。
-const availableGroupCount = (key: ApiKey) => {
-  const availableIDs = new Set(groups.value.map((group) => group.id))
-  return (key.group_ids?.length ? key.group_ids : (key.group_id ? [key.group_id] : []))
-    .filter((groupID) => availableIDs.has(groupID)).length
-}
 
 // 列表关系未展开时，从当前可用分组快照补齐展示信息。
 const displayGroup = (key: ApiKey) => key.group ?? groups.value.find((group) => group.id === key.group_id) ?? null
@@ -2162,34 +1992,11 @@ const buildGroupOptions = (source: Group[]): GroupOption[] =>
 // 指定订阅时仅使用服务端返回的权限与套餐分组交集。
 const formGroupOptions = computed(() => buildGroupOptions(formGroups.value))
 const allGroupOptions = computed(() => buildGroupOptions(groups.value))
-const availablePriorityGroupOptions = computed(() =>
-  formGroupOptions.value.filter((option) => !formData.value.group_ids.includes(option.value))
-)
-
-// 候选分组列表只保存 ID，展示信息始终从当前可用分组快照读取。
-const priorityGroupOption = (groupId: number) =>
-  formGroupOptions.value.find((option) => option.value === groupId) ??
-  allGroupOptions.value.find((option) => option.value === groupId)
-
-const addPriorityGroup = (value: string | number | boolean | null) => {
-  const groupId = Number(value)
-  if (Number.isInteger(groupId) && groupId > 0 && !formData.value.group_ids.includes(groupId)) {
-    formData.value.group_ids.push(groupId)
-    formData.value.group_id = formData.value.group_ids[0] ?? null
-  }
-  priorityGroupPicker.value = null
-}
-
-const removePriorityGroup = (groupId: number) => {
-  formData.value.group_ids = formData.value.group_ids.filter((id) => id !== groupId)
-  formData.value.group_id = formData.value.group_ids[0] ?? null
-}
-
 // 切换复合模式时保留普通 Key 的原分组，前缀仍要求用户明确填写。
 const onCompositeModeChange = (enabled: boolean) => {
   if (enabled) {
     if (formData.value.composite_groups.length === 0) {
-      formData.value.composite_groups = [newCompositeBinding(formData.value.group_ids[0] ?? formData.value.group_id)]
+      formData.value.composite_groups = [newCompositeBinding(formData.value.group_id)]
     }
     formData.value.is_composite = true
     return
@@ -2199,7 +2006,6 @@ const onCompositeModeChange = (enabled: boolean) => {
     formData.value.group_id = null
   } else if (formData.value.group_id === null) {
     formData.value.group_id = formData.value.composite_groups[0]?.group_id ?? null
-    formData.value.group_ids = formData.value.group_id ? [formData.value.group_id] : []
   }
 }
 
@@ -2263,11 +2069,9 @@ const filteredGroupOptions = computed(() => {
 
 // 指定订阅切换后，普通 Key 与复合 Key 都不能继续保留套餐未覆盖的分组。
 const pruneFormGroupBindings = (allowedGroupIDs: Set<number>, pruneComposite = true) => {
-  formData.value.group_ids = formData.value.group_ids.filter((groupId) => allowedGroupIDs.has(groupId))
-  if (formData.value.group_id !== null && allowedGroupIDs.has(formData.value.group_id) && formData.value.group_ids.length === 0) {
-    formData.value.group_ids = [formData.value.group_id]
+  if (formData.value.group_id !== null && !allowedGroupIDs.has(formData.value.group_id)) {
+    formData.value.group_id = null
   }
-  formData.value.group_id = formData.value.group_ids[0] ?? null
   if (pruneComposite) {
     formData.value.composite_groups = formData.value.composite_groups.filter((binding) =>
       binding.group_id !== null && allowedGroupIDs.has(binding.group_id)
@@ -2509,7 +2313,6 @@ const editKey = (key: ApiKey) => {
   formData.value = {
     name: key.name,
     group_id: key.group_id,
-    group_ids: key.group_ids?.length ? [...key.group_ids] : (key.group_id ? [key.group_id] : []),
     is_composite: key.is_composite ?? false,
     composite_groups: (key.composite_groups || []).map((binding) =>
       newCompositeBinding(binding.group_id, binding.prefix)
@@ -2517,7 +2320,6 @@ const editKey = (key: ApiKey) => {
     // 后端的终态统一映射为不可用，编辑表单只提交 active/inactive。
     status: key.status === 'active' ? 'active' : 'inactive',
     fast_mode_policy: key.fast_mode_policy ?? 'follow_request',
-    routing_strategy: key.routing_strategy ?? 'manual',
     billing_mode: key.billing_mode ?? 'auto',
     preferred_subscription_id: key.preferred_subscription_id ?? null,
     model_mapping_rows: Object.entries(key.model_mapping ?? {})
@@ -2539,9 +2341,6 @@ const editKey = (key: ApiKey) => {
     expiration_preset: 'custom',
     expiration_date: key.expires_at ? formatDateTimeLocal(key.expires_at) : '',
     fallback_to_default_group_when_unavailable: key.fallback_to_default_group_when_unavailable ?? false
-  }
-  if (formData.value.routing_strategy !== 'manual') {
-    lastSmartRoutingStrategy.value = formData.value.routing_strategy
   }
   formGroups.value = []
   showEditModal.value = true
@@ -2630,41 +2429,10 @@ const openGroupSelector = (key: ApiKey) => {
       }
     }
     groupSelectorKeyId.value = key.id
-    const existingGroupIDs = key.group_ids?.length ? [...key.group_ids] : (key.group_id ? [key.group_id] : [])
-    // 分组快照尚未加载时保留旧值，避免用户过早打开下拉框导致候选被误清空。
-    quickGroupIDs.value = groups.value.length > 0
-      ? existingGroupIDs.filter((groupID) => allGroupOptions.value.some((option) => option.value === groupID))
-      : existingGroupIDs
-    quickRoutingStrategy.value = key.routing_strategy ?? 'manual'
+    // 历史多分组 Key 仅展示原首选分组，不再自动切换候选。
+    quickGroupID.value = key.group_id ?? null
     groupSearchQuery.value = ''
   }
-}
-
-const quickGroupPriority = (groupId: number | null) => {
-  if (groupId === null) return quickGroupIDs.value.length === 0 ? 0 : -1
-  return quickGroupIDs.value.indexOf(groupId)
-}
-
-// 快捷编辑器按点击顺序追加候选；默认分组选项会清空显式候选。
-const toggleQuickGroup = (groupId: number | null) => {
-  if (groupId === null) {
-    quickGroupIDs.value = []
-    return
-  }
-  const index = quickGroupIDs.value.indexOf(groupId)
-  if (index >= 0) {
-    quickGroupIDs.value.splice(index, 1)
-    return
-  }
-  quickGroupIDs.value.push(groupId)
-}
-
-const moveQuickGroup = (groupId: number, offset: -1 | 1) => {
-  const index = quickGroupIDs.value.indexOf(groupId)
-  const target = index + offset
-  if (index < 0 || target < 0 || target >= quickGroupIDs.value.length) return
-  const [value] = quickGroupIDs.value.splice(index, 1)
-  quickGroupIDs.value.splice(target, 0, value)
 }
 
 const getGroupById = (groupId: number | null) => {
@@ -2696,7 +2464,7 @@ const startDataSharingCountdown = () => {
 
 const closeDataSharingNotice = () => {
   clearDataSharingCountdown()
-  pendingQuickRoutingUpdate.value = null
+  pendingGroupUpdate.value = null
   dataSharingNoticeDialog.value = {
     show: false,
     loading: false,
@@ -2742,13 +2510,13 @@ const confirmDataSharingNotice = async () => {
   try {
     await dataSharingAPI.confirmNotice(state.targetGroupId, state.notice.version)
     if (state.mode === 'row' && state.key) {
-      const pending = pendingQuickRoutingUpdate.value
+      const pending = pendingGroupUpdate.value
       if (pending) {
-        await submitQuickRoutingUpdate(pending.key, pending.group_ids, pending.routing_strategy, {
+        await submitGroupUpdate(pending.key, pending.group_id, {
           data_sharing_confirmed: true,
           data_sharing_notice_version: state.notice.version
         })
-        pendingQuickRoutingUpdate.value = null
+        pendingGroupUpdate.value = null
       }
     } else if (state.mode === 'form') {
       await submitKeyForm({
@@ -2765,46 +2533,43 @@ const confirmDataSharingNotice = async () => {
   }
 }
 
-const submitQuickRoutingUpdate = async (
+const submitGroupUpdate = async (
   key: ApiKey,
-  groupIds: number[],
-  routingStrategy: ApiKeyRoutingStrategy,
+  groupId: number | null,
   consent?: { data_sharing_confirmed: boolean; data_sharing_notice_version: number }
 ) => {
   await keysAPI.update(key.id, {
-    group_ids: [...groupIds],
-    routing_strategy: routingStrategy,
+    // 使用空数组明确恢复默认分组，兼容更新接口的完整替换语义。
+    group_ids: groupId === null ? [] : [groupId],
     ...consent
   })
   appStore.showSuccess(t('keys.groupChangedSuccess'))
   await loadApiKeys()
 }
 
-const saveQuickRouting = async () => {
+const saveGroupSelection = async () => {
   const key = selectedKeyForGroup.value
-  if (!key || quickRoutingSaving.value) return
-  const groupIds = [...quickGroupIDs.value]
-  const routingStrategy = quickRoutingStrategy.value
-  const previousGroupIDs = new Set(key.group_ids?.length ? key.group_ids : (key.group_id ? [key.group_id] : []))
-  const newDataSharingGroup = groupIds.find(
-    (groupId) => !previousGroupIDs.has(groupId) && groupRequiresDataSharingNotice(groupId)
-  )
+  if (!key || groupSelectionSaving.value) return
+  const groupId = quickGroupID.value
+  const newDataSharingGroup = groupId !== key.group_id && groupRequiresDataSharingNotice(groupId)
+    ? groupId
+    : null
 
   groupSelectorKeyId.value = null
   dropdownPosition.value = null
   if (newDataSharingGroup) {
-    pendingQuickRoutingUpdate.value = { key, group_ids: groupIds, routing_strategy: routingStrategy }
+    pendingGroupUpdate.value = { key, group_id: groupId }
     await openDataSharingNotice(newDataSharingGroup, 'row', key)
     return
   }
 
-  quickRoutingSaving.value = true
+  groupSelectionSaving.value = true
   try {
-    await submitQuickRoutingUpdate(key, groupIds, routingStrategy)
+    await submitGroupUpdate(key, groupId)
   } catch (error) {
     appStore.showError(t('keys.failedToChangeGroup'))
   } finally {
-    quickRoutingSaving.value = false
+    groupSelectionSaving.value = false
   }
 }
 
@@ -2882,7 +2647,7 @@ const submitKeyForm = async (
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        group_ids: formData.value.is_composite ? undefined : [...formData.value.group_ids],
+        group_ids: formData.value.is_composite ? undefined : (formData.value.group_id === null ? [] : [formData.value.group_id]),
         is_composite: formData.value.is_composite,
         composite_groups: formData.value.is_composite
           ? formData.value.composite_groups.map((binding) => ({
@@ -2891,7 +2656,6 @@ const submitKeyForm = async (
             }))
           : undefined,
         fast_mode_policy: formData.value.fast_mode_policy,
-        routing_strategy: formData.value.routing_strategy,
         model_mapping: modelMapping,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
@@ -2925,7 +2689,7 @@ const submitKeyForm = async (
       const payload: CreateApiKeyRequest = {
         name: formData.value.name,
         scope: scope.value,
-        group_ids: formData.value.is_composite ? undefined : [...formData.value.group_ids],
+        group_ids: formData.value.is_composite ? undefined : (formData.value.group_id === null ? [] : [formData.value.group_id]),
         is_composite: formData.value.is_composite,
         composite_groups: formData.value.is_composite
           ? formData.value.composite_groups.map((binding) => ({
@@ -2934,7 +2698,6 @@ const submitKeyForm = async (
             }))
           : undefined,
         fast_mode_policy: formData.value.fast_mode_policy,
-        routing_strategy: formData.value.routing_strategy,
         billing_mode: formData.value.billing_mode,
         preferred_subscription_id: formData.value.billing_mode === 'subscription'
           ? formData.value.preferred_subscription_id
@@ -3024,11 +2787,9 @@ const handleSubmit = async () => {
 		await openDataSharingNotice(newCompositeDataSharingGroup.group_id, 'form', selectedKey.value)
 		return
 	}
-	const newPriorityDataSharingGroup = formData.value.group_ids.find(
-		(groupId) => !(selectedKey.value?.group_ids ?? []).includes(groupId) && groupRequiresDataSharingNotice(groupId)
-	)
-	if (!formData.value.is_composite && newPriorityDataSharingGroup) {
-		await openDataSharingNotice(newPriorityDataSharingGroup, 'form', selectedKey.value)
+  const groupId = formData.value.group_id
+  if (!formData.value.is_composite && groupId !== null && groupId !== selectedKey.value?.group_id && groupRequiresDataSharingNotice(groupId)) {
+    await openDataSharingNotice(groupId, 'form', selectedKey.value)
     return
   }
 
@@ -3064,12 +2825,10 @@ const closeModals = () => {
   formData.value = {
     name: '',
     group_id: null,
-    group_ids: [],
     is_composite: false,
     composite_groups: [],
     status: 'active',
     fast_mode_policy: 'follow_request',
-    routing_strategy: 'manual',
     billing_mode: 'auto',
     preferred_subscription_id: null,
     model_mapping_rows: [],
