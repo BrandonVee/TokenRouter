@@ -13,6 +13,9 @@
             <p class="mt-0.5 text-xs" :class="settingsStatusClass">
               {{ settingsStatus }}
             </p>
+            <p v-if="settings.available" class="mt-1 text-xs text-gray-500 dark:text-gray-400" data-testid="image-history-retention-hint">
+              {{ t('imageHistory.retentionHint', { days: settings.retention_days ?? 7 }) }}
+            </p>
           </div>
         </div>
 
@@ -270,7 +273,7 @@ import { useAppStore } from '@/stores/app'
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 
-const settings = ref<ImageHistorySettings>({ available: false, enabled: false })
+const settings = ref<ImageHistorySettings>({ available: false, enabled: false, retention_days: 7 })
 const records = ref<ImageHistoryRecord[]>([])
 const loadingSettings = ref(true)
 const loadingHistory = ref(false)
@@ -306,7 +309,7 @@ async function refreshAll() {
     settings.value = await imageHistoryAPI.getSettings()
   } catch (error) {
     appStore.showError(errorMessage(error, t('imageHistory.loadError')))
-    settings.value = { available: false, enabled: false }
+    settings.value = { available: false, enabled: false, retention_days: 7 }
   } finally {
     loadingSettings.value = false
   }

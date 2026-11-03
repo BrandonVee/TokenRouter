@@ -71,8 +71,9 @@ type ImageHistoryRecord struct {
 
 // ImageHistorySettings 返回全局可用性和当前用户选择。
 type ImageHistorySettings struct {
-	Available bool `json:"available"`
-	Enabled   bool `json:"enabled"`
+	RetentionDays int  `json:"retention_days"`
+	Available     bool `json:"available"`
+	Enabled       bool `json:"enabled"`
 }
 
 // ImageHistoryList 是用户历史分页响应。
@@ -88,6 +89,8 @@ type ImageHistoryList struct {
 type ImageHistoryListParams struct {
 	pagination.PaginationParams
 	Search string
+	// CreatedAfter 限制用户列表只显示保存期限内的记录。
+	CreatedAfter time.Time
 }
 
 // SaveImageHistoryInput 描述一次成功生图请求及其最终图片。
@@ -109,6 +112,7 @@ type ImageHistoryRepository interface {
 	SetSavingEnabled(ctx context.Context, userID int64, enabled bool) error
 	Create(ctx context.Context, record ImageHistoryRecord) error
 	List(ctx context.Context, userID int64, params ImageHistoryListParams) ([]ImageHistoryRecord, int64, error)
+	ListExpired(ctx context.Context, cutoff time.Time, afterID string, limit int) ([]ImageHistoryRecord, error)
 	Get(ctx context.Context, userID int64, id string) (*ImageHistoryRecord, error)
 	Delete(ctx context.Context, userID int64, id string) error
 }
@@ -132,6 +136,10 @@ type ImageHistoryService struct {
 	repo ImageHistoryRepository
 	// cfg 保留部署配置指针，兼容现有测试和依赖注入调用方；运行时读写使用 storageCfg 快照。
 	cfg *config.Config
+
+	// 清理游标跨周期保留，避免云端持续超时的早期记录耗尽每轮预算。
+	retentionMu      sync.Mutex
+	retentionAfterID string
 
 	storageMu            sync.RWMutex
 	store                ImageHistoryObjectStore
@@ -178,7 +186,8 @@ func (s *ImageHistoryService) Available() bool {
 
 // GetSettings 获取当前用户的保存选择；全局未配置时始终显示未启用。
 func (s *ImageHistoryService) GetSettings(ctx context.Context, userID int64) (ImageHistorySettings, error) {
-	settings := ImageHistorySettings{Available: s.Available()}
+	_, cfg := s.storageSnapshot()
+	settings := ImageHistorySettings{Available: s.Available(), RetentionDays: cfg.EffectiveRetentionDays()}
 	if s == nil || s.repo == nil {
 		return settings, nil
 	}
@@ -201,7 +210,8 @@ func (s *ImageHistoryService) UpdateSettings(ctx context.Context, userID int64, 
 	if err := s.repo.SetSavingEnabled(ctx, userID, enabled); err != nil {
 		return ImageHistorySettings{Available: s.Available()}, err
 	}
-	return ImageHistorySettings{Available: s.Available(), Enabled: enabled && s.Available()}, nil
+	_, cfg := s.storageSnapshot()
+	return ImageHistorySettings{Available: s.Available(), Enabled: enabled && s.Available(), RetentionDays: cfg.EffectiveRetentionDays()}, nil
 }
 
 // ShouldCapture 只在全局存储可用且用户已主动开启时启用响应捕获。
@@ -259,13 +269,20 @@ func (s *ImageHistoryService) List(ctx context.Context, userID int64, params Ima
 	}
 	// 限制搜索词长度，避免异常长查询拖慢历史列表。
 	params.Search = truncateImageHistoryText(strings.TrimSpace(params.Search), imageHistorySearchMaxRunes)
+	now := time.Now()
+	params.CreatedAfter = imageHistoryRetentionCutoff(now, cfg)
 	items, total, err := s.repo.List(ctx, userID, params)
 	if err != nil {
 		return nil, err
 	}
 	expiry := time.Duration(cfg.PreviewURLExpiryMinutes) * time.Minute
 	for i := range items {
-		previewURL, signErr := store.PresignGet(ctx, items[i].ObjectKey, expiry)
+		// 预览签名不能越过记录的保存期限。
+		remaining := items[i].CreatedAt.Add(time.Duration(cfg.EffectiveRetentionDays()) * 24 * time.Hour).Sub(now)
+		if remaining <= 0 {
+			continue
+		}
+		previewURL, signErr := store.PresignGet(ctx, items[i].ObjectKey, min(expiry, remaining))
 		if signErr == nil {
 			items[i].PreviewURL = previewURL
 		}
@@ -289,6 +306,9 @@ func (s *ImageHistoryService) OpenContent(ctx context.Context, userID int64, id 
 	record, err := s.repo.Get(ctx, userID, id)
 	if err != nil {
 		return nil, err
+	}
+	if !record.CreatedAt.After(imageHistoryRetentionCutoff(time.Now(), cfg)) {
+		return nil, ErrImageHistoryNotFound
 	}
 	body, err := store.Open(ctx, record.ObjectKey)
 	if err != nil {

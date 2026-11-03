@@ -3,6 +3,7 @@ import { apiClient } from '../client'
 export type ImageHistoryStorageSource = 'deployment' | 'database'
 
 export interface ImageHistoryStorageConfig {
+  retention_days: number
   enabled: boolean
   endpoint: string
   region: string

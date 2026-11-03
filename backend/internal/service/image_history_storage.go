@@ -36,6 +36,7 @@ type imageHistoryObjectStoreConnectionTester interface {
 
 // ImageHistoryStorageConfig 是管理员页面使用的生图历史存储配置。
 type ImageHistoryStorageConfig struct {
+	RetentionDays      int    `json:"retention_days"`
 	Enabled            bool   `json:"enabled"`
 	Endpoint           string `json:"endpoint"`
 	Region             string `json:"region"`
@@ -51,6 +52,7 @@ type ImageHistoryStorageConfig struct {
 }
 
 type imageHistoryStoredStorageConfig struct {
+	RetentionDays   int    `json:"retention_days"`
 	Enabled         bool   `json:"enabled"`
 	Endpoint        string `json:"endpoint"`
 	Region          string `json:"region"`
@@ -100,6 +102,7 @@ func (s *ImageHistoryService) storageSnapshot() (ImageHistoryObjectStore, config
 	if s.storageSource == ImageHistoryStorageSourceDeployment && s.cfg != nil {
 		cfg = s.cfg.ImageHistory
 	}
+	cfg.RetentionDays = cfg.EffectiveRetentionDays()
 	return s.store, cfg
 }
 
@@ -237,6 +240,7 @@ func (s *ImageHistoryService) loadPersistedStorageConfig(ctx context.Context) er
 func (s *ImageHistoryService) runtimeStorageConfigFromInput(input ImageHistoryStorageConfig) (config.ImageHistoryConfig, error) {
 	base := s.deploymentStorageCfg
 	stored := imageHistoryStoredStorageConfig{
+		RetentionDays:   input.RetentionDays,
 		Enabled:         input.Enabled,
 		Endpoint:        input.Endpoint,
 		Region:          input.Region,
@@ -246,11 +250,20 @@ func (s *ImageHistoryService) runtimeStorageConfigFromInput(input ImageHistorySt
 		Prefix:          input.Prefix,
 		ForcePathStyle:  input.ForcePathStyle,
 	}
+	// 旧客户端省略新字段时保留当前期限，避免无意重置管理员已保存的值。
+	if input.RetentionDays == 0 {
+		_, current := s.storageSnapshot()
+		stored.RetentionDays = current.EffectiveRetentionDays()
+	}
 	runtimeCfg := imageHistoryRuntimeStorageConfig(base, stored)
 	return runtimeCfg, nil
 }
 
 func imageHistoryRuntimeStorageConfig(base config.ImageHistoryConfig, stored imageHistoryStoredStorageConfig) config.ImageHistoryConfig {
+	if stored.RetentionDays != 0 {
+		base.RetentionDays = stored.RetentionDays
+	}
+	base.RetentionDays = base.EffectiveRetentionDays()
 	base.Enabled = stored.Enabled
 	base.Endpoint = strings.TrimSpace(stored.Endpoint)
 	base.Region = strings.TrimSpace(stored.Region)
@@ -267,6 +280,7 @@ func imageHistoryRuntimeStorageConfig(base config.ImageHistoryConfig, stored ima
 
 func imageHistoryStoredStorageConfigFromRuntime(cfg config.ImageHistoryConfig) imageHistoryStoredStorageConfig {
 	return imageHistoryStoredStorageConfig{
+		RetentionDays:   cfg.EffectiveRetentionDays(),
 		Enabled:         cfg.Enabled,
 		Endpoint:        cfg.Endpoint,
 		Region:          cfg.Region,
@@ -280,6 +294,7 @@ func imageHistoryStoredStorageConfigFromRuntime(cfg config.ImageHistoryConfig) i
 
 func imageHistoryStorageConfigResponse(cfg config.ImageHistoryConfig, source string, available, encryptionKeyReady bool) ImageHistoryStorageConfig {
 	return ImageHistoryStorageConfig{
+		RetentionDays:      cfg.EffectiveRetentionDays(),
 		Enabled:            cfg.Enabled,
 		Endpoint:           cfg.Endpoint,
 		Region:             cfg.Region,
@@ -295,6 +310,9 @@ func imageHistoryStorageConfigResponse(cfg config.ImageHistoryConfig, source str
 }
 
 func validateImageHistoryRuntimeStorageConfig(cfg config.ImageHistoryConfig) error {
+	if days := cfg.EffectiveRetentionDays(); days < 1 || days > config.MaxImageHistoryRetentionDays {
+		return infraerrors.BadRequest("IMAGE_HISTORY_RETENTION_INVALID", "image history retention_days must be between 1 and 3650")
+	}
 	if cfg.Prefix == "" || cfg.Prefix == "." || strings.Contains(cfg.Prefix, "..") {
 		return infraerrors.BadRequest("IMAGE_HISTORY_PREFIX_INVALID", "image history prefix must be a safe non-empty object prefix")
 	}

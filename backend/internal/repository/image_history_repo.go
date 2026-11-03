@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"strings"
+	"time"
 
 	dbent "github.com/BrandonVee/TokenRouter/ent"
 	"github.com/BrandonVee/TokenRouter/ent/imagehistory"
@@ -61,6 +62,9 @@ func (r *imageHistoryRepository) Create(ctx context.Context, record service.Imag
 func (r *imageHistoryRepository) List(ctx context.Context, userID int64, params service.ImageHistoryListParams) ([]service.ImageHistoryRecord, int64, error) {
 	client := clientFromContext(ctx, r.client)
 	filter := imagehistory.UserIDEQ(userID)
+	if !params.CreatedAfter.IsZero() {
+		filter = imagehistory.And(filter, imagehistory.CreatedAtGT(params.CreatedAfter))
+	}
 	if search := strings.TrimSpace(params.Search); search != "" {
 		// 搜索只作用于当前用户，并覆盖列表中可见的主要元数据字段。
 		filter = imagehistory.And(filter, imagehistory.Or(
@@ -91,6 +95,21 @@ func (r *imageHistoryRepository) List(ctx context.Context, userID int64, params 
 		records = append(records, imageHistoryEntityToService(item))
 	}
 	return records, int64(total), nil
+}
+
+// ListExpired 使用主键游标遍历过期记录，删除失败的对象不会阻塞后续记录清理。
+func (r *imageHistoryRepository) ListExpired(ctx context.Context, cutoff time.Time, afterID string, limit int) ([]service.ImageHistoryRecord, error) {
+	items, err := clientFromContext(ctx, r.client).ImageHistory.Query().
+		Where(imagehistory.CreatedAtLTE(cutoff), imagehistory.IDGT(afterID)).
+		Order(dbent.Asc(imagehistory.FieldID)).Limit(limit).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]service.ImageHistoryRecord, 0, len(items))
+	for _, item := range items {
+		records = append(records, imageHistoryEntityToService(item))
+	}
+	return records, nil
 }
 
 func (r *imageHistoryRepository) Get(ctx context.Context, userID int64, id string) (*service.ImageHistoryRecord, error) {

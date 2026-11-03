@@ -240,8 +240,15 @@ type BatchImageConfig struct {
 	VertexGCSBaseURL             string `mapstructure:"vertex_gcs_base_url"`
 }
 
+// 生图历史的记录与云端对象统一使用有限保存期限。
+const (
+	DefaultImageHistoryRetentionDays = 7
+	MaxImageHistoryRetentionDays     = 3650
+)
+
 // ImageHistoryConfig 控制用户主动开启的同步生图历史存储。
 type ImageHistoryConfig struct {
+	RetentionDays           int    `mapstructure:"retention_days"`
 	Enabled                 bool   `mapstructure:"enabled"`
 	Endpoint                string `mapstructure:"endpoint"`
 	Region                  string `mapstructure:"region"`
@@ -256,6 +263,14 @@ type ImageHistoryConfig struct {
 	WorkerCount             int    `mapstructure:"worker_count"`
 	QueueSize               int    `mapstructure:"queue_size"`
 	SaveTimeoutSeconds      int    `mapstructure:"save_timeout_seconds"`
+}
+
+// EffectiveRetentionDays 为未配置的新字段提供七天默认值，兼容旧配置和内部构造调用。
+func (c ImageHistoryConfig) EffectiveRetentionDays() int {
+	if c.RetentionDays == 0 {
+		return DefaultImageHistoryRetentionDays
+	}
+	return c.RetentionDays
 }
 
 type LinuxDoConnectConfig struct {
@@ -2221,6 +2236,7 @@ func setDefaults() {
 
 	// 用户生图历史使用独立的私有 S3 前缀，默认不保存任何图片。
 	viper.SetDefault("image_history.enabled", false)
+	viper.SetDefault("image_history.retention_days", DefaultImageHistoryRetentionDays)
 	viper.SetDefault("image_history.endpoint", "")
 	viper.SetDefault("image_history.region", "auto")
 	viper.SetDefault("image_history.bucket", "")
@@ -3112,6 +3128,9 @@ func (c *Config) Validate() error {
 		if c.BatchImage.VertexOutputRetentionHours <= 0 {
 			return fmt.Errorf("batch_image.vertex_output_retention_hours must be positive")
 		}
+	}
+	if days := c.ImageHistory.EffectiveRetentionDays(); days < 1 || days > MaxImageHistoryRetentionDays {
+		return fmt.Errorf("image_history.retention_days must be between 1 and %d", MaxImageHistoryRetentionDays)
 	}
 	if c.ImageHistory.Enabled {
 		if strings.TrimSpace(c.ImageHistory.Bucket) == "" {

@@ -56,6 +56,7 @@ vi.mock('vue-i18n', () => ({
 
 // 页面只接收脱敏后的 Secret 状态，空密码框表示沿用已保存值。
 const databaseConfig: ImageHistoryStorageConfig = {
+  retention_days: 7,
   enabled: true,
   endpoint: 'https://s3.example.test',
   region: 'auto',
@@ -109,6 +110,8 @@ describe('FileStorageSettings', () => {
     await flushPromises()
 
     expect(getConfig).toHaveBeenCalledOnce()
+    expect(wrapper.get<HTMLInputElement>('[data-testid="image-history-retention-days"]').element.value).toBe('7')
+    await wrapper.get('[data-testid="image-history-retention-days"]').setValue('14')
     expect(wrapper.get('input[type="password"]').attributes('placeholder')).toContain('secretConfigured')
 
     const testButton = wrapper
@@ -137,9 +140,26 @@ describe('FileStorageSettings', () => {
       expect.objectContaining({
         secret_access_key: '',
         bucket: 'images',
+        retention_days: 14,
       }),
     )
     expect(showSuccess).toHaveBeenCalledWith('admin.settings.fileStorage.images.saved')
+  })
+
+  it('blocks empty, fractional and out-of-range retention days', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+    const days = wrapper.get('[data-testid="image-history-retention-days"]')
+    const save = wrapper.findAll('button').find((button) => button.text().includes('common.save'))!
+    for (const value of ['', '0', '1.5', '3651']) {
+      await days.setValue(value)
+      expect(days.attributes('aria-invalid')).toBe('true')
+      expect(save.attributes('disabled')).toBeDefined()
+      await save.trigger('click')
+    }
+    expect(updateConfig).not.toHaveBeenCalled()
+    await days.setValue('30')
+    expect(save.attributes('disabled')).toBeUndefined()
   })
 
   it('requires an encryption key to save without blocking a connection test', async () => {

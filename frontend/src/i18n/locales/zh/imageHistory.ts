@@ -2,6 +2,7 @@ export default {
   imageHistory: {
     title: '生图记录',
     description: '查看已保存的生图结果',
+    retentionHint: '记录及云端图片最多保存 {days} 天，到期自动清理。',
     settingsTitle: '保存生成图片',
     enabled: '正在保存',
     disabled: '未开启保存',

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -64,8 +65,29 @@ func (r *fakeImageHistoryRepository) List(_ context.Context, userID int64, param
 	defer r.mu.Unlock()
 	r.lastListUser = userID
 	r.lastListSearch = params.Search
-	items := append([]ImageHistoryRecord(nil), r.records...)
+	items := make([]ImageHistoryRecord, 0)
+	for _, record := range r.records {
+		if record.UserID == userID && (params.CreatedAfter.IsZero() || record.CreatedAt.After(params.CreatedAfter)) {
+			items = append(items, record)
+		}
+	}
 	return items, int64(len(items)), nil
+}
+
+func (r *fakeImageHistoryRepository) ListExpired(_ context.Context, cutoff time.Time, afterID string, limit int) ([]ImageHistoryRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	items := make([]ImageHistoryRecord, 0)
+	for _, record := range r.records {
+		if !record.CreatedAt.After(cutoff) && record.ID > afterID {
+			items = append(items, record)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ID < items[j].ID })
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	return items, nil
 }
 
 func (r *fakeImageHistoryRepository) Get(_ context.Context, userID int64, id string) (*ImageHistoryRecord, error) {
@@ -259,7 +281,7 @@ func TestImageHistoryServiceCleansObjectWhenMetadataWriteFailsAfterCancellation(
 
 func TestImageHistoryServiceListOpenAndDeleteKeepUserScope(t *testing.T) {
 	store := newFakeImageHistoryObjectStore()
-	record := ImageHistoryRecord{ID: "record-1", UserID: 7, ObjectKey: "image-history/7/record-1.png", MimeType: "image/png", SizeBytes: 3}
+	record := ImageHistoryRecord{CreatedAt: time.Now(), ID: "record-1", UserID: 7, ObjectKey: "image-history/7/record-1.png", MimeType: "image/png", SizeBytes: 3}
 	repo := &fakeImageHistoryRepository{records: []ImageHistoryRecord{record}}
 	store.objects[record.ObjectKey] = []byte("png")
 	svc := newTestImageHistoryService(repo, store)

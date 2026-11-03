@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 
 export interface ImageHistorySettings {
+  retention_days: number
   available: boolean
   enabled: boolean
 }

@@ -104,6 +104,7 @@ func TestImageHistoryStorageConfigFallsBackToDeployment(t *testing.T) {
 	require.NoError(t, err)
 
 	legacy := svc.GetStorageConfig()
+	require.Equal(t, 7, legacy.RetentionDays)
 	require.Equal(t, ImageHistoryStorageSourceDeployment, legacy.Source)
 	require.True(t, legacy.Available)
 	require.True(t, legacy.SecretConfigured)
@@ -111,6 +112,7 @@ func TestImageHistoryStorageConfigFallsBackToDeployment(t *testing.T) {
 	require.Equal(t, "legacy-images", legacy.Prefix)
 
 	updated, err := svc.UpdateStorageConfig(context.Background(), ImageHistoryStorageConfig{
+		RetentionDays:   14,
 		Enabled:         true,
 		Endpoint:        "https://s3.example.com",
 		Region:          "us-east-1",
@@ -121,6 +123,7 @@ func TestImageHistoryStorageConfigFallsBackToDeployment(t *testing.T) {
 		ForcePathStyle:  true,
 	})
 	require.NoError(t, err)
+	require.Equal(t, 14, updated.RetentionDays)
 	require.Equal(t, ImageHistoryStorageSourceDatabase, updated.Source)
 	require.Equal(t, "generated/images", updated.Prefix)
 	require.True(t, updated.Available)
@@ -128,6 +131,7 @@ func TestImageHistoryStorageConfigFallsBackToDeployment(t *testing.T) {
 
 	var stored imageHistoryStoredStorageConfig
 	require.NoError(t, json.Unmarshal([]byte(repo.values[settingKeyImageHistoryStorageConfig]), &stored))
+	require.Equal(t, 14, stored.RetentionDays)
 	require.Equal(t, "ciphertext", stored.SecretAccessKey)
 	require.Equal(t, "page-secret", created[len(created)-1].SecretAccessKey)
 
@@ -213,4 +217,12 @@ func TestImageHistoryStorageConnectionUsesSavedSecret(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "deployment-secret", created[len(created)-1].SecretAccessKey)
+}
+
+// TestImageHistoryRetentionConfigValidatesDays 防止越界保存天数导致失效或无限保留。
+func TestImageHistoryRetentionConfigValidatesDays(t *testing.T) {
+	for _, days := range []int{-1, config.MaxImageHistoryRetentionDays + 1} {
+		err := validateImageHistoryRuntimeStorageConfig(config.ImageHistoryConfig{RetentionDays: days, Prefix: "image-history"})
+		require.Error(t, err)
+	}
 }

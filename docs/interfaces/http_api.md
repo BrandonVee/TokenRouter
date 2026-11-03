@@ -76,15 +76,15 @@ Grok OAuth 媒体资格使用 `GET|PUT /api/v1/admin/accounts/:id/grok-media-eli
 
 | 方法与路径 | 语义 |
 | --- | --- |
-| `GET /settings` | 返回 `{ available, enabled }`；`available` 表示部署者已启用完整存储，`enabled` 是可用性与用户选择共同生效后的值 |
+| `GET /settings` | 返回 `{ available, enabled, retention_days }`；`available` 表示部署者已启用完整存储，`enabled` 是可用性与用户选择共同生效后的值 |
 | `PUT /settings` | 接受 `{ "enabled": boolean }`；全局不可用时拒绝开启，允许关闭 |
 | `GET /` | 使用通用 `page`、`page_size` 分页，单页最多 100；可选 `search` 对模型、提示词、来源、接口或请求 ID 做不区分大小写的模糊筛选；返回元数据和短期 `preview_url`，不返回对象键 |
 | `GET /:id/content` | 校验当前用户归属后代理私有对象并以附件形式下载 |
 | `DELETE /:id` | 校验当前用户归属后删除私有对象和元数据 |
 
-历史列表和对象操作在全局存储关闭时返回 `IMAGE_HISTORY_UNAVAILABLE`；不存在或不属于当前用户的记录统一返回 `IMAGE_HISTORY_NOT_FOUND`，避免跨用户枚举。设置默认关闭，现有历史不会因关闭用户开关而自动删除。具体捕获与失败语义见[生图历史](../domains/image_history.md)。
+历史列表和对象操作在全局存储关闭时返回 `IMAGE_HISTORY_UNAVAILABLE`；不存在或不属于当前用户的记录统一返回 `IMAGE_HISTORY_NOT_FOUND`，避免跨用户枚举。设置默认关闭，关闭用户开关不会立即删除已有历史，旧记录仍按 `retention_days` 到期清理。具体捕获与失败语义见[生图历史](../domains/image_history.md)。
 
-管理员存储配置位于 `/api/v1/admin/settings/image-history-storage`：`GET` 返回脱敏后的当前有效配置，`PUT` 保存数据库覆盖并热生效，`POST /test` 只测试连接、不持久化。`PUT` 需要 step-up 2FA；Secret 不会在响应中回显，入库前使用启动时在 `security_secrets` 中自动确保稳定的 TOTP 加密密钥加密。该管理配置不改变备份、发票附件或数据共享的既有存储边界。
+管理员存储配置位于 `/api/v1/admin/settings/image-history-storage`：`GET` 返回脱敏后的当前有效配置，`PUT` 保存数据库覆盖并热生效，`POST /test` 只测试连接、不持久化。`PUT` 需要 step-up 2FA；Secret 不会在响应中回显，入库前使用启动时在 `security_secrets` 中自动确保稳定的 TOTP 加密密钥加密。`retention_days` 默认 7、允许 1–3650，统一控制记录和云端对象的保存期限；用户不能通过个人设置修改这个上限。该管理配置不改变备份、发票附件或数据共享的既有存储边界。
 
 <a id="invoice_api"></a>
 ## 人工发票接口

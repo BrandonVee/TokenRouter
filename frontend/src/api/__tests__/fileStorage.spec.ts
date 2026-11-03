@@ -18,6 +18,7 @@ import fileStorageAPI, { type ImageHistoryStorageConfig } from '@/api/admin/file
 
 // 管理端四个操作共享同一份脱敏配置响应。
 const config: ImageHistoryStorageConfig = {
+  retention_days: 7,
   enabled: true,
   endpoint: 'https://s3.example.test',
   region: 'auto',

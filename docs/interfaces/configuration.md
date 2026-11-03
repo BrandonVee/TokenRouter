@@ -61,9 +61,11 @@
 
 `image_history` 的 YAML/环境变量是部署默认配置，独立于备份、数据共享和已经下线的旧 `image_storage`。`enabled` 默认关闭；开启时 `bucket`、`access_key_id`、`secret_access_key` 和安全的非空 `prefix` 必填。`endpoint` 可为空以使用 AWS 默认端点，`region` 默认 `auto`，需要 path-style 的 MinIO 等实现通过 `force_path_style=true` 启用。桶应保持私有，列表预览只通过有效期受限的预签名 URL 暴露。
 
+`retention_days` 控制记录与云端图片的统一保存天数，默认 7，范围 1–3650。管理员页面可热更新该值；过期后列表与下载立即失效，后台周期清理元数据和对象，详见[保存期限与自动清理](../domains/image_history.md#retention)。旧数据库覆盖省略该字段时继承部署默认值；旧客户端省略或传入 0 时沿用当前有效天数。
+
 默认限制为单对象 32 MiB、URL 下载 30 秒、预览 URL 15 分钟、4 个 worker、256 个排队任务和每任务 45 秒。`preview_url_expiry_minutes` 允许 1-1440，worker 允许 1-64，队列允许 1-10000，任务总超时允许 1-600 秒；其它大小和超时必须为正数。队列满时丢弃历史转存而不阻断生图，因此容量应按实例并发、平均图片大小、S3 延迟和内存预算共同设置。
 
-所有键都通过 Viper 的点分键映射到同名大写下划线环境变量，例如 `IMAGE_HISTORY_ENABLED`、`IMAGE_HISTORY_BUCKET`、`IMAGE_HISTORY_ACCESS_KEY_ID`、`IMAGE_HISTORY_SECRET_ACCESS_KEY` 和 `IMAGE_HISTORY_PREFIX`。仓库提供的三套 Compose（`docker-compose.yml`、`docker-compose.local.yml`、`docker-compose.dev.yml`）和 `deploy/.env.example` 均已透传这些变量；本地环境只需在 `.env` 填写后重建/重启应用容器。部署配置只在启动时加载，修改后需要重启；部署配置凭据不会复制到数据库设置或前端响应。
+所有键都通过 Viper 的点分键映射到同名大写下划线环境变量，例如 `IMAGE_HISTORY_ENABLED`、`IMAGE_HISTORY_BUCKET`、`IMAGE_HISTORY_ACCESS_KEY_ID`、`IMAGE_HISTORY_SECRET_ACCESS_KEY` 、`IMAGE_HISTORY_PREFIX` 和 `IMAGE_HISTORY_RETENTION_DAYS`。仓库提供的四套 Compose（`docker-compose.yml`、`docker-compose.local.yml`、`docker-compose.standalone.yml`、`docker-compose.dev.yml`）和 `deploy/.env.example` 均已透传这些变量；本地环境只需在 `.env` 填写后重建/重启应用容器。部署配置只在启动时加载，修改后需要重启；部署配置凭据不会复制到数据库设置或前端响应。
 
 管理员“设置 - 文件存储 - 生图历史”可通过 `/api/v1/admin/settings/image-history-storage` 保存一份数据库覆盖。页面不会回显 Secret，数据库中的 Secret 使用启动时自动确保稳定的 TOTP 加密密钥加密；覆盖保存后立即替换运行中的 S3 客户端，不需要重启。保存配置要求 step-up 2FA，连接测试不依赖凭据持久化，只验证桶访问能力且不写入数据库。如果覆盖记录损坏或无法解密，也会回退到部署配置并保留管理员修复入口。覆盖配置只改变生图历史，备份、发票附件和数据共享继续使用各自的配置与生命周期。
 

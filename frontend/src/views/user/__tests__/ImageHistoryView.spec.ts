@@ -43,7 +43,7 @@ vi.mock('vue-i18n', async (importOriginal) => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key,
+      t: (key: string, params?: { days: number }) => params ? `${key}:${params.days}` : key,
       locale: { value: 'en' },
     }),
   }
@@ -104,8 +104,8 @@ describe('ImageHistoryView', () => {
     showSuccess.mockReset()
     saveAs.mockReset()
 
-    getSettings.mockResolvedValue({ available: true, enabled: true })
-    updateSettings.mockResolvedValue({ available: true, enabled: false })
+    getSettings.mockResolvedValue({ available: true, enabled: true, retention_days: 7 })
+    updateSettings.mockResolvedValue({ available: true, enabled: false, retention_days: 7 })
     list.mockResolvedValue({ items: [record], total: 1, page: 1, page_size: 12, pages: 1 })
   })
 
@@ -115,6 +115,7 @@ describe('ImageHistoryView', () => {
 
     expect(getSettings).toHaveBeenCalledTimes(1)
     expect(list).toHaveBeenCalledWith(1, 12)
+    expect(wrapper.get('[data-testid="image-history-retention-hint"]').text()).toBe('imageHistory.retentionHint:7')
     expect(wrapper.text()).toContain('gpt-image-1')
     expect(wrapper.text()).toContain('draw a lighthouse')
     expect(wrapper.get('img').attributes('src')).toBe(record.preview_url)

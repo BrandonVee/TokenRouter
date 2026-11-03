@@ -2,6 +2,7 @@ export default {
   imageHistory: {
     title: 'Image History',
     description: 'Saved outputs from image generation requests',
+    retentionHint: 'Records and cloud images are kept for up to {days} days, then automatically deleted.',
     settingsTitle: 'Save generated images',
     enabled: 'Saving is on',
     disabled: 'Saving is off',

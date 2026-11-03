@@ -63,6 +63,9 @@ func NewImageHistorySaveWorkerPool(imageHistoryService *ImageHistoryService, cfg
 	// worker 始终启动，使管理员从页面启用存储后无需重启进程。
 	pool.accepting = true
 	pool.wg.Add(workerCount)
+	// 清理与转存一起启动、取消和等待退出；页面热启用存储后也会生效。
+	pool.wg.Add(1)
+	go pool.runRetentionCleanup()
 	for workerID := 0; workerID < workerCount; workerID++ {
 		go pool.runWorker(workerID)
 	}

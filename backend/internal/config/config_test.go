@@ -50,6 +50,7 @@ func TestLoadImageHistoryConfig(t *testing.T) {
 		require.Equal(t, 4, cfg.ImageHistory.WorkerCount)
 		require.Equal(t, 256, cfg.ImageHistory.QueueSize)
 		require.Equal(t, 45, cfg.ImageHistory.SaveTimeoutSeconds)
+		require.Equal(t, 7, cfg.ImageHistory.RetentionDays)
 	})
 
 	t.Run("从环境变量启用独立私有存储", func(t *testing.T) {
@@ -61,6 +62,7 @@ func TestLoadImageHistoryConfig(t *testing.T) {
 		t.Setenv("IMAGE_HISTORY_PREFIX", "private-history")
 		t.Setenv("IMAGE_HISTORY_WORKER_COUNT", "2")
 		t.Setenv("IMAGE_HISTORY_QUEUE_SIZE", "64")
+		t.Setenv("IMAGE_HISTORY_RETENTION_DAYS", "14")
 
 		cfg, err := Load()
 		require.NoError(t, err)
@@ -69,6 +71,7 @@ func TestLoadImageHistoryConfig(t *testing.T) {
 		require.Equal(t, "private-history", cfg.ImageHistory.Prefix)
 		require.Equal(t, 2, cfg.ImageHistory.WorkerCount)
 		require.Equal(t, 64, cfg.ImageHistory.QueueSize)
+		require.Equal(t, 14, cfg.ImageHistory.RetentionDays)
 	})
 }
 

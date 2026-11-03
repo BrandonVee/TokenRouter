@@ -129,6 +129,7 @@ services:
       # =======================================================================
       # 用户在面板开启保存后，同步生图结果写入私有 S3 兼容存储。
       - IMAGE_HISTORY_ENABLED=${IMAGE_HISTORY_ENABLED:-false}
+      - IMAGE_HISTORY_RETENTION_DAYS=${IMAGE_HISTORY_RETENTION_DAYS:-7}
       - IMAGE_HISTORY_ENDPOINT=${IMAGE_HISTORY_ENDPOINT:-}
       - IMAGE_HISTORY_REGION=${IMAGE_HISTORY_REGION:-auto}
       - IMAGE_HISTORY_BUCKET=${IMAGE_HISTORY_BUCKET:-}

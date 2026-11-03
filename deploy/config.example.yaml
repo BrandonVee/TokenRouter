@@ -1183,6 +1183,8 @@ update:
 # 存储桶应保持私有；列表预览使用短期签名 URL，下载和删除仍校验当前用户身份。
 image_history:
   enabled: false
+  # 记录和云端图片的统一保存天数（1-3650，默认七天）
+  retention_days: 7
   # S3 兼容端点。AWS 官方可留空；R2 形如 https://<account_id>.r2.cloudflarestorage.com
   endpoint: ""
   # 区域。Cloudflare R2 用 "auto"

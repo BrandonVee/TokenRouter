@@ -68,6 +68,26 @@
               <Toggle v-model="form.enabled" data-testid="image-history-storage-enabled" />
             </div>
 
+            <!-- 记录与云端图片共用保存期限，避免清理记录后留下存储对象。 -->
+            <div class="border-t border-gray-100 pt-5 dark:border-dark-700">
+              <label for="image-history-retention-days" class="input-label">{{ t('admin.settings.fileStorage.images.retentionDays') }}</label>
+              <input
+                id="image-history-retention-days"
+                v-model.number="form.retention_days"
+                type="number"
+                min="1"
+                max="3650"
+                step="1"
+                class="input w-full sm:max-w-40"
+                :aria-invalid="!retentionValid"
+                aria-describedby="image-history-retention-hint"
+                data-testid="image-history-retention-days"
+              />
+              <p id="image-history-retention-hint" class="mt-1 text-sm" :class="retentionValid ? 'text-gray-500 dark:text-gray-400' : 'text-red-600 dark:text-red-400'">
+                {{ t(retentionValid ? 'admin.settings.fileStorage.images.retentionHint' : 'admin.settings.fileStorage.images.retentionInvalid') }}
+              </p>
+            </div>
+
             <div
               v-if="!form.encryption_key_ready"
               class="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
@@ -240,6 +260,7 @@ const invoiceSaving = ref(false)
 const invoiceTesting = ref(false)
 
 const emptyConfig = (): ImageHistoryStorageConfig => ({
+  retention_days: 7,
   enabled: false,
   endpoint: '',
   region: 'auto',
@@ -263,8 +284,10 @@ const invoiceForm = reactive<FileStorageDirectoryConfig>({
 const hasConnectionFields = computed(() =>
   Boolean(form.bucket.trim() && form.access_key_id.trim() && (form.secret_access_key?.trim() || form.secret_configured)),
 )
+// 天数必须是有限正整数，空值和小数不能绕过表单直接保存。
+const retentionValid = computed(() => Number.isInteger(form.retention_days) && form.retention_days >= 1 && form.retention_days <= 3650)
 const canSave = computed(() =>
-  form.encryption_key_ready && (!form.enabled || (hasConnectionFields.value && Boolean(form.prefix.trim()))),
+  retentionValid.value && form.encryption_key_ready && (!form.enabled || (hasConnectionFields.value && Boolean(form.prefix.trim()))),
 )
 
 function assignConfig(config: ImageHistoryStorageConfig): void {
@@ -354,6 +377,7 @@ async function testInvoiceStorage(): Promise<void> {
 }
 
 async function saveConfig(): Promise<void> {
+  if (!canSave.value) return
   saving.value = true
   try {
     const updated = await storageStepUp.run(() =>
