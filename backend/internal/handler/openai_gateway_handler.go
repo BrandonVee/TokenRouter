@@ -86,7 +86,7 @@ func resolveOpenAIMessagesDispatchMappedModel(c *gin.Context, apiKey *service.AP
 	// 默认值是 openai 专属,发给这些上游必错）,模型改写交给账号级 model_mapping。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			(platform == service.PlatformGrok || service.IsMultiProtocolAPIKeyProvider(platform)) {
 			return ""
 		}
 	}
@@ -226,7 +226,7 @@ func (h *OpenAIGatewayHandler) handleOpenAISelectionBusinessError(c *gin.Context
 func openAICompatibleRequestPlatform(ctx context.Context, apiKey *service.APIKey) string {
 	if platform, ok := service.ResolvedTargetPlatformFromContext(ctx); ok {
 		switch platform {
-		case service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek:
+		case service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo, service.PlatformCommandCode, service.PlatformCline:
 			return platform
 		default:
 			return service.PlatformOpenAI
@@ -234,7 +234,7 @@ func openAICompatibleRequestPlatform(ctx context.Context, apiKey *service.APIKey
 	}
 	if apiKey != nil && apiKey.Group != nil {
 		switch apiKey.Group.Platform {
-		case service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek:
+		case service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo, service.PlatformCommandCode, service.PlatformCline:
 			return apiKey.Group.Platform
 		}
 	}
@@ -261,7 +261,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	// 协议账号原生直通 Claude Code),无需 allow_messages_dispatch 开关授权——
 	// 该开关对非 openai 平台恒被 sanitizeGroupMessagesDispatchFields 置 false,
 	// 若不豁免,CN 分组将永远 403。
-	if service.IsCNProvider(apiKey.Group.Platform) {
+	if service.IsMultiProtocolAPIKeyProvider(apiKey.Group.Platform) {
 		return true
 	}
 	// composite 分组解析到 grok/CN 目标时与对应独立分组同语义豁免：sanitize
@@ -269,7 +269,7 @@ func allowOpenAICompatibleMessagesDispatch(c *gin.Context, apiKey *service.APIKe
 	// 解析到 openai 目标仍受开关控制,维持现状。
 	if apiKey.Group.Platform == service.PlatformComposite && c != nil && c.Request != nil {
 		if platform, ok := service.ResolvedTargetPlatformFromContext(c.Request.Context()); ok &&
-			(platform == service.PlatformGrok || service.IsCNProvider(platform)) {
+			(platform == service.PlatformGrok || service.IsMultiProtocolAPIKeyProvider(platform)) {
 			return true
 		}
 	}
@@ -406,6 +406,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 	reqModel := modelResult.String()
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	if !openAICompatibleTextTargetAllowed(c, apiKey, reqModel) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
@@ -1080,6 +1083,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 	}
 	reqModel := modelResult.String()
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	if !compositeTargetPlatformAllowed(c, apiKey, reqModel, service.PlatformOpenAI) {
 		h.anthropicErrorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
@@ -1767,6 +1773,9 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	ctx, reqModel = apiKeyModelRedirectContext(ctx, apiKey, clientReqModel)
 	c.Request = c.Request.WithContext(ctx)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	ctx = c.Request.Context()
 	if apiKey.Group != nil && apiKey.Group.Platform == service.PlatformComposite {
 		platform, ok := service.ResolvedTargetPlatformFromContext(ctx)

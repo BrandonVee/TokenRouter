@@ -81,6 +81,10 @@ func (a *Account) modelRateLimitKeysForRequest(ctx context.Context, requestedMod
 
 	keys := []string{modelKey}
 	switch a.Platform {
+	case PlatformCline:
+		if wallet := clineWalletRateLimitKey(modelKey); wallet != "" {
+			keys = append(keys, wallet)
+		}
 	case PlatformAntigravity:
 		if isAntigravityGeminiModel(modelKey) && modelKey != antigravityGeminiModelRateLimitKey {
 			keys = append(keys, antigravityGeminiModelRateLimitKey)
@@ -218,4 +222,15 @@ func setAccountModelRateLimitSnapshot(account *Account, scope string, resetAt ti
 	maps.Copy(extra, account.Extra)
 	extra[modelRateLimitsKey] = limits
 	account.Extra = extra
+}
+
+// modelRateLimitReason 返回指定 scope 冷却记录中的原因；没有记录时为空。
+func (a *Account) modelRateLimitReason(scope string) string {
+	if a == nil || a.Extra == nil {
+		return ""
+	}
+	rawLimits, _ := a.Extra[modelRateLimitsKey].(map[string]any)
+	rawLimit, _ := rawLimits[scope].(map[string]any)
+	reason, _ := rawLimit["reason"].(string)
+	return reason
 }

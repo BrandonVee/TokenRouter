@@ -22,7 +22,7 @@ const props = defineProps<{ account: Account }>()
 const loading = ref(false)
 const error = ref('')
 const balance = ref<string | null>(null)
-const visible = computed(() => cnBalanceCellVisible(props.account.platform, String(props.account.credentials?.account_mode || '')))
+const visible = computed(() => cnBalanceCellVisible(props.account))
 const label = computed(() => balance.value || '余额')
 
 // 只在用户主动点击时查询，避免账号列表刷新时集中触发供应商接口。

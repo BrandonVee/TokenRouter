@@ -1,6 +1,6 @@
 # 上游账号能力矩阵
 
-本文统一记录 TokenRouter 九个平台、七类账号和公开网关协议的当前支持边界。它是账号能力的路由入口，不替代各平台专题中的认证、转换、限流和诊断细节，也不把数据导入器能够保存的历史组合视为正式支持。
+本文统一记录 TokenRouter 十四个平台、七类账号和公开网关协议的当前支持边界。它是账号能力的路由入口，不替代各平台专题中的认证、转换、限流和诊断细节，也不把数据导入器能够保存的历史组合视为正式支持。
 
 ## 章节导航
 
@@ -12,7 +12,7 @@
 
 ## 判定口径
 
-后端常量定义九个平台 `anthropic`、`openai`、`gemini`、`antigravity`、`grok`、`qoder`、`kimi`、`zhipu`、`deepseek`，以及七类账号 `oauth`、`setup-token`、`apikey`、`upstream`、`bedrock`、`service_account`、`cosy`。矩阵使用以下等级：
+后端常量定义十四个平台 `anthropic`、`openai`、`gemini`、`antigravity`、`grok`、`qoder`、`kimi`、`zhipu`、`deepseek`、`minimax`、`opencode_go`、`typesafe`、`command_code`、`cline`，以及七类账号 `oauth`、`setup-token`、`apikey`、`upstream`、`bedrock`、`service_account`、`cosy`。矩阵使用以下等级：
 
 - **正式支持**：管理端有创建或授权流程，平台运行时也有对应凭据、转发和维护契约。
 - **兼容保留**：通用创建/导入层可以保存，或旧运行路径仍会识别，但管理端不推荐该组合；不能据此推导完整平台能力。
@@ -26,7 +26,7 @@
 <a id="cn_adaptive_usage"></a>
 ### 国产供应商自适应协议
 
-Kimi、智谱 GLM、DeepSeek API Key 账号支持 `adaptive` 协议：同一账号可承接 Chat Completions、Anthropic Messages 与 OpenAI Responses，并可分别设置三类 Base URL。账号级 Header 覆写继续受平台白名单约束。Composite 分组可把这些平台与 OpenAI、Grok、Codex 目标共同纳入路由；Responses WebSocket 仍只允许 OpenAI/Grok 目标。
+Kimi、智谱 GLM、DeepSeek、MiniMax API Key 账号支持 `adaptive` 协议：同一账号可承接 Chat Completions、Anthropic Messages 与 OpenAI Responses，并可分别设置三类 Base URL。账号级 Header 覆写继续受平台白名单约束。Composite 分组可把这些平台与 OpenAI、Grok、Codex 目标共同纳入路由；Responses WebSocket 仍只允许 OpenAI/Grok 目标。
 
 自适应账号的原生 Messages 响应必须解析实际用量：非流式读取 `usage`，SSE 合并 `message_start.message.usage` 与 `message_delta.usage`，其中输出是累计值，不能累加重复事件或用末尾输出覆盖输入。Anthropic 普通输入与缓存桶互斥，进入 OpenAI 兼容结算前先把缓存读取和创建合入总输入，由统一结算再次拆桶，避免漏收普通输入费用。上游请求脱离客户端取消信号继续读取最终用量；上游请求 ID 一并保留用于对账。
 
@@ -38,7 +38,10 @@ Kimi、智谱 GLM、DeepSeek API Key 账号支持 `adaptive` 协议：同一账�
 | Antigravity | 正式支持 | 兼容导入，无正式转发契约 | 契约冲突，见下文 | 兼容保留（旧 Claude 直连） | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 不支持 |
 | Grok | 正式支持 | 兼容导入，无正式转发契约 | 正式支持 | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 不支持 |
 | Qoder | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 不支持 | 正式支持 |
-| Kimi / 智谱 / DeepSeek | 不支持 | 不支持 | API Key（payg/coding；Chat、Anthropic，DeepSeek 另支持 Responses） | 兼容保留 | 不支持 | 不支持 | 不支持 |
+| Kimi / 智谱 / DeepSeek / MiniMax | 不支持 | 不支持 | API Key（payg/coding；Chat、Anthropic，除智谱外均支持 Responses） | 兼容保留 | 不支持 | 不支持 | 不支持 |
+
+| OpenCode / Command Code / Cline | 不支持 | 不支持 | 正式支持（按模型选择协议） | 兼容保留 | 不支持 | 不支持 | 不支持 |
+| TypeSafe / Jev | 不支持 | 不支持 | 正式支持（仅 System One） | 不支持 | 不支持 | 不支持 | 不支持 |
 
 平台专题：
 
@@ -48,6 +51,7 @@ Kimi、智谱 GLM、DeepSeek API Key 账号支持 `adaptive` 协议：同一账�
 - [Antigravity 上游](antigravity_upstream.md)
 - [Grok / xAI 上游](grok_upstream.md)
 - [Qoder 原生上游](qoder_upstream.md)
+- [多协议与 System One 上游](multi_protocol_upstream.md)
 
 <a id="public_gateway_protocols"></a>
 ## 公开网关协议
@@ -62,15 +66,18 @@ Kimi、智谱 GLM、DeepSeek API Key 账号支持 `adaptive` 协议：同一账�
 | Antigravity | Messages、Responses、Chat、Gemini GenerateContent | Messages、Gemini GenerateContent | 四项全部启用 |
 | Qoder | Messages、Responses、Chat | 空集合 | 三项全部启用 |
 | Grok | Messages、Responses、Chat | Responses、Chat | 三项全部启用 |
+| 国产多协议 / OpenCode / Command Code / Cline | Messages、Responses、Chat | Responses、Chat | 保留已有策略 |
+| TypeSafe | 独立 System One | 空集合 | 不补通用文本协议 |
 
 集合顺序固定为 Messages、Responses、Chat、Gemini，空集合对所有平台都合法。准入只控制文本生成协议；Live、WebSocket、Embedding、图片和视频继续使用独立能力规则。
 
 | 协议族或入口 | 当前平台边界 | 专题路由 |
 | --- | --- | --- |
-| Anthropic Messages：`/v1/messages` | 九个平台均有平台分派；国产供应商按 OpenAI 兼容链路转发 | 各平台专题；共同链路见[网关请求生命周期](../architecture/gateway_request_lifecycle.md) |
+| Anthropic Messages：`/v1/messages` | 除 TypeSafe 外的平台有生成协议分派；多协议供应商按 profile 转发 | 各平台专题；共同链路见[网关请求生命周期](../architecture/gateway_request_lifecycle.md) |
 | Anthropic token count：`/v1/messages/count_tokens`、`/messages/count_tokens` | Anthropic、OpenAI、Gemini 进入各自统计路径，Grok 使用本地估算；Antigravity、Qoder 明确返回 `404`，国产供应商沿 OpenAI 兼容链路处理，Anthropic Bedrock 账号也不支持 | 各平台专题；客户端应保留本地估算回退 |
-| OpenAI Responses：`/v1/responses`、`/responses` 及允许的子路径 | OpenAI、Grok、Kimi、智谱、DeepSeek 在最终分组允许 Responses 时进入兼容适配；Qoder 不支持 Responses 子路径和 WebSocket | OpenAI 兼容上游专题；WebSocket/Realtime 重点见 [OpenAI 上游](openai_upstream.md) |
-| OpenAI Chat Completions：`/v1/chat/completions`、`/chat/completions` | 最终分组允许 Chat 时，九个平台均按平台转换或原生转发 | 各平台专题 |
+| OpenAI Responses：`/v1/responses`、`/responses` 及允许的子路径 | OpenAI、Grok 及多协议供应商在最终分组允许 Responses 时进入兼容适配；Qoder 不支持 Responses 子路径和 WebSocket | OpenAI 兼容上游专题；WebSocket/Realtime 重点见 [OpenAI 上游](openai_upstream.md) |
+| OpenAI Chat Completions：`/v1/chat/completions`、`/chat/completions` | 最终分组允许 Chat 时，除 TypeSafe 外按平台转换或原生转发 | 各平台专题 |
+| TypeSafe System One：`POST /v1/systemone` | TypeSafe 或明确路由到 TypeSafe 的 Composite 分组，独立非流式协议 | [多协议与 System One 上游](multi_protocol_upstream.md) |
 | 模型与用量：`/v1/models`、`/models`、`/v1/usage` | 按 Key、分组、账号和渠道解析可请求模型与本地额度；不是上游模型列表或账单的原样代理 | [模型目录与市场](model_catalog_and_marketplace.md)及各平台专题 |
 | Embeddings：`/v1/embeddings`、`/embeddings` | 仅 OpenAI 分组 | [OpenAI 上游](openai_upstream.md) |
 | Realtime、Live 与 Alpha Search | Live/sideband、Codex realtime 和 alpha search 仅 OpenAI 平台；是否可用还受分组和账号能力限制 | [OpenAI 上游](openai_upstream.md) |

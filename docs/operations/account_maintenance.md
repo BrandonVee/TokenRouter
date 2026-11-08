@@ -55,6 +55,8 @@ OpenAI 重置次数查询把带到期时间的完整结果保存为账号展示�
 
 OpenAI API Key 可探测 Responses、Chat、Embeddings 等 endpoint capability。Responses 探测只有在响应足以下结论时才写入能力标记：2xx 响应若仍因 `max_output_tokens` 未完成，或响应状态为 `failed`，应保持 unknown，不能持久化为“不支持 Responses”；完成但没有 `function_call` 的响应仍判定为不支持。Ollama Cloud 等兼容 API Key 上游可以保存其管理会话和用量快照，但只有明确匹配的账号才进入探测，不能把探测协议推广到所有 `apikey`。Grok 计费与媒体资格、各平台额度探测也继续使用各自独立协议。
 
+多协议供应商的周期余额/套餐检测、Cline 钱包隔离和 OpenCode Go 请求驱动刷新见[多协议上游](../interfaces/multi_protocol_upstream.md#provider_usage)。这些 worker 与现有 Ollama、Qoder 探测独立启停，不恢复已下线的声明倍率探测。
+
 通用的上游声明倍率探测已移除，不再有定时任务、手动操作、快照或公开账单自省接口。账号创建、编辑、批量更新、复制、CRS 同步和仓储写入都会丢弃历史 `upstream_billing_probe` 与 `upstream_billing_probe_enabled` 键；这项清理不得影响 Ollama Cloud 会话/用量、endpoint capability 或其它额度状态。
 
 实时探测失败时保留最近成功快照并同时暴露当前错误，不把旧数据标为实时。任何配额耗尽或 capability 变化都要触发相关调度投影失效。

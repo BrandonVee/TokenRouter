@@ -17,14 +17,14 @@ import { computed } from 'vue'
 import { CN_BASE_URL_PRESETS, type CnBaseUrlPreset } from './credentialsBuilder'
 
 const props = defineProps<{
-  platform: 'kimi' | 'zhipu' | 'deepseek'
+  platform: string
   protocol?: 'adaptive' | 'chat_completions' | 'anthropic' | 'responses'
 }>()
 
 const emit = defineEmits<{ (event: 'select', preset: CnBaseUrlPreset): void }>()
 
 const presets = computed(() => {
-  const all = CN_BASE_URL_PRESETS[props.platform]
+  const all = CN_BASE_URL_PRESETS[props.platform] ?? []
   return props.protocol ? all.filter(item => item.protocol === props.protocol) : all
 })
 </script>

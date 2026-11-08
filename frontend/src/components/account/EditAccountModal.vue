@@ -157,6 +157,7 @@
             </div>
           </div>
         </div>
+        <OpenCodeGoProtocolRulesEditor v-if="isCNApiKeyAccount && providerRoutesByModel(account.platform) && editApiProtocol === 'adaptive'" v-model:rows="providerProtocolRules" :platform="account.platform" :plan="editAccountMode" />
         <div v-if="account.platform === 'gemini'">
           <label class="input-label">{{ t('admin.accounts.gemini.providerType.label') }}</label>
           <Select
@@ -1900,6 +1901,8 @@
         @updated="handleOllamaCloudUsageUpdated"
       />
 
+      <OpenCodeGoUsageSettings v-if="account?.opencode_go_usage?.eligible" :account="account" @updated="handleOpenCodeGoUsageUpdated" />
+
       <!-- Anthropic API Key 自动透传开关 -->
       <div
         v-if="account?.platform === 'anthropic' && account?.type === 'apikey'"
@@ -2886,6 +2889,7 @@ import type {
   OpenAIResponsesMode,
   OpenAIEndpointCapability,
   OllamaCloudUsageState,
+  OpenCodeGoUsageState,
   GrokMediaEligibilityMode,
   GrokMediaEligibilityState,
   TempUnschedulableScope
@@ -2902,9 +2906,11 @@ import CodexImageToolModeSelector from '@/components/account/CodexImageToolModeS
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
+import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import OllamaCloudUsageSettings from '@/components/account/OllamaCloudUsageSettings.vue'
+import OpenCodeGoUsageSettings from '@/components/account/OpenCodeGoUsageSettings.vue'
 import {
   ANTIGRAVITY_PROJECT_ID_CREDENTIAL_KEY,
   applyAntigravityProjectID,
@@ -2912,6 +2918,14 @@ import {
   applyInterceptWarmup,
   CN_BASE_URL_PRESETS,
   defaultCNBaseUrl,
+  providerRoutesByModel,
+  defaultProviderProtocolRules,
+  cloneOpenCodeGoProtocolRules,
+  applyOpenCodeGoProtocolRules,
+  resolveProviderAccountMode,
+  type OpenCodeGoProtocolRule,
+  providerAccountModes,
+  providerNativeProtocols,
   defaultCNAdaptiveBaseUrls,
   applyPlanType,
   buildPlanTypeOptions,
@@ -2923,7 +2937,6 @@ import {
   HEADER_OVERRIDE_ENABLED_CREDENTIAL_KEY,
   HEADER_OVERRIDES_CREDENTIAL_KEY,
   type HeaderOverrideRow,
-  type CnAccountMode,
   type CnApiProtocol,
   type CnNativeApiProtocol,
   type CnBaseUrlPreset
@@ -2997,6 +3010,11 @@ const selectableGroups = computed(() => {
 // 故隐藏代理选择器。
 const isSparkShadow = computed(() => props.account?.parent_account_id != null)
 
+// 独立保存的受管开关立即同步列表投影，避免重新打开时显示旧值。
+const handleOpenCodeGoUsageUpdated = (state: OpenCodeGoUsageState) => {
+  if (props.account) emit('updated', { ...props.account, opencode_go_usage: state })
+}
+
 const handleOllamaCloudUsageUpdated = (state: OllamaCloudUsageState) => {
   if (props.account) emit('updated', { ...props.account, ollama_cloud_usage: state })
 }
@@ -3033,36 +3051,19 @@ interface TempUnschedRuleForm {
 // State
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
-const editAccountMode = ref<CnAccountMode>('payg')
+const editAccountMode = ref<string>('payg')
+const providerProtocolRules = ref<OpenCodeGoProtocolRule[]>([])
 const editApiProtocol = ref<CnApiProtocol>('adaptive')
 const editAdaptiveBaseUrls = ref<Record<CnNativeApiProtocol, string>>({ chat_completions: '', anthropic: '', responses: '' })
 const isCNApiKeyAccount = computed(() =>
-  props.account?.type === 'apikey' && ['kimi', 'zhipu', 'deepseek'].includes(props.account.platform)
+  props.account?.type === 'apikey' && ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(props.account.platform)
 )
-const cnPresetPlatform = computed<'kimi' | 'zhipu' | 'deepseek'>(() =>
-  isCNApiKeyAccount.value ? (props.account!.platform as 'kimi' | 'zhipu' | 'deepseek') : 'kimi'
+const cnPresetPlatform = computed<string>(() =>
+  isCNApiKeyAccount.value ? (props.account!.platform as string) : 'kimi'
 )
-const cnAccountModeOptions = computed(() =>
-  props.account?.platform === 'deepseek'
-    ? [{ value: 'payg' as const }]
-    : [{ value: 'payg' as const }, { value: 'coding' as const }]
-)
-const cnProtocolOptions = computed(() => {
-  const options: Array<{ value: CnApiProtocol; labelKey: 'adaptive' | 'chatCompletions' | 'anthropic' | 'responses' }> = [
-    { value: 'adaptive', labelKey: 'adaptive' },
-    { value: 'chat_completions' as const, labelKey: 'chatCompletions' },
-    { value: 'anthropic' as const, labelKey: 'anthropic' }
-  ]
-  if (props.account?.platform === 'deepseek') options.push({ value: 'responses' as const, labelKey: 'responses' })
-  return options
-})
-const editAdaptiveProtocolOptions = computed<Array<{ value: CnNativeApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }>>(() => {
-  const options: Array<{ value: CnNativeApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }> = [
-    { value: 'chat_completions', labelKey: 'chatCompletions' }, { value: 'anthropic', labelKey: 'anthropic' }
-  ]
-  if (props.account?.platform === 'deepseek') options.push({ value: 'responses', labelKey: 'responses' })
-  return options
-})
+const cnAccountModeOptions = computed(() => providerAccountModes(props.account?.platform ?? '').map(value => ({ value })))
+const editAdaptiveProtocolOptions = computed<Array<{value:CnNativeApiProtocol;labelKey:'chatCompletions'|'anthropic'|'responses'}>>(() => providerNativeProtocols(props.account?.platform ?? '', editAccountMode.value).map(value=>({value,labelKey:value==='chat_completions'?'chatCompletions':value})))
+const cnProtocolOptions = computed(() => [{value:'adaptive' as CnApiProtocol,labelKey:'adaptive'}, ...editAdaptiveProtocolOptions.value])
 const onCnPresetSelect = (preset: CnBaseUrlPreset) => {
   editAccountMode.value = preset.mode
   editApiProtocol.value = preset.protocol
@@ -3825,11 +3826,13 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 
   // Load intercept warmup requests setting (applies to all account types)
   const credentials = newAccount.credentials as Record<string, unknown> | undefined
-  editAccountMode.value =
-    newAccount.platform !== 'deepseek' && credentials?.account_mode === 'coding' ? 'coding' : 'payg'
+  editAccountMode.value = resolveProviderAccountMode(newAccount.platform, credentials?.account_mode)
+  providerProtocolRules.value = cloneOpenCodeGoProtocolRules(Array.isArray(credentials?.protocol_rules)
+    ? credentials.protocol_rules as OpenCodeGoProtocolRule[]
+    : defaultProviderProtocolRules(newAccount.platform, editAccountMode.value))
   editApiProtocol.value =
     credentials?.api_protocol === 'adaptive' || credentials?.api_protocol === 'anthropic' ||
-    (newAccount.platform === 'deepseek' && credentials?.api_protocol === 'responses')
+    (editAdaptiveProtocolOptions.value.some(option => option.value === 'responses') && credentials?.api_protocol === 'responses')
       ? credentials.api_protocol
       : 'adaptive'
   geminiProviderType.value = 'official'
@@ -4061,15 +4064,15 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           ? 'https://generativelanguage.googleapis.com'
           : newAccount.platform === 'grok'
             ? 'https://api.x.ai/v1'
-            : ['kimi', 'zhipu', 'deepseek'].includes(newAccount.platform)
+            : ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(newAccount.platform)
               ? defaultCNBaseUrl(
-                  newAccount.platform as 'kimi' | 'zhipu' | 'deepseek',
+                  newAccount.platform as string,
                   editAccountMode.value,
                   editApiProtocol.value
                 )
             : 'https://api.anthropic.com'
-    const adaptiveDefaults = ['kimi', 'zhipu', 'deepseek'].includes(newAccount.platform)
-      ? defaultCNAdaptiveBaseUrls(newAccount.platform as 'kimi' | 'zhipu' | 'deepseek', editAccountMode.value)
+    const adaptiveDefaults = ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(newAccount.platform)
+      ? defaultCNAdaptiveBaseUrls(newAccount.platform as string, editAccountMode.value)
       : null
     const storedAdaptive = (credentials.api_base_urls as Record<string, unknown> | undefined) || {}
     if (editApiProtocol.value === 'adaptive' && adaptiveDefaults) {
@@ -4170,9 +4173,9 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           ? 'https://generativelanguage.googleapis.com'
           : newAccount.platform === 'grok'
             ? 'https://api.x.ai/v1'
-            : ['kimi', 'zhipu', 'deepseek'].includes(newAccount.platform)
+            : ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(newAccount.platform)
               ? defaultCNBaseUrl(
-                  newAccount.platform as 'kimi' | 'zhipu' | 'deepseek',
+                  newAccount.platform as string,
                   editAccountMode.value,
                   editApiProtocol.value
                 )
@@ -4907,6 +4910,7 @@ const handleSubmit = async () => {
         newCredentials.account_mode =
           props.account.platform === 'deepseek' ? 'payg' : editAccountMode.value
         newCredentials.api_protocol = editApiProtocol.value
+        if (providerRoutesByModel(props.account.platform)) applyOpenCodeGoProtocolRules(newCredentials, providerProtocolRules.value, 'edit')
         if (editApiProtocol.value === 'adaptive') {
           const defaults = defaultCNAdaptiveBaseUrls(cnPresetPlatform.value, editAccountMode.value)
           newCredentials.api_base_urls = Object.fromEntries(editAdaptiveProtocolOptions.value.map(item => [item.value, (editAdaptiveBaseUrls.value[item.value] || defaults[item.value]).trim()]))

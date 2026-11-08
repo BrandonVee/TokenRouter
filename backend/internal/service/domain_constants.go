@@ -16,10 +16,15 @@ const (
 	StatusExpired  = domain.StatusExpired
 )
 
+// 请求驱动的 OpenCode Go 额度刷新为独立可选运行设置，默认关闭。
+const SettingKeyOpenCodeGoUsageSettings = "opencode_go_usage_settings"
+
 // 国产供应商的账号模式与上游协议直接复用领域常量。
 const (
 	AccountModePayG   = domain.AccountModePayG
 	AccountModeCoding = domain.AccountModeCoding
+	AccountModeZen    = domain.AccountModeZen
+	AccountModeGo     = domain.AccountModeGo
 
 	APIProtocolChatCompletions = domain.APIProtocolChatCompletions
 	APIProtocolAnthropic       = domain.APIProtocolAnthropic
@@ -29,26 +34,37 @@ const (
 
 // 国产供应商默认端点与管理端预设保持一致。
 const (
-	DefaultKimiPayGBaseURL            = "https://api.moonshot.cn/v1"
-	DefaultKimiCodingBaseURL          = "https://api.kimi.com/coding/v1"
-	DefaultZhipuPayGBaseURL           = "https://open.bigmodel.cn/api/paas/v4"
-	DefaultZhipuCodingBaseURL         = "https://open.bigmodel.cn/api/coding/paas/v4"
-	DefaultDeepseekBaseURL            = "https://api.deepseek.com"
-	DefaultKimiPayGAnthropicBaseURL   = "https://api.moonshot.cn/anthropic"
-	DefaultKimiCodingAnthropicBaseURL = "https://api.kimi.com/coding"
-	DefaultZhipuAnthropicBaseURL      = "https://open.bigmodel.cn/api/anthropic"
-	DefaultDeepseekAnthropicBaseURL   = "https://api.deepseek.com/anthropic"
+	DefaultKimiPayGBaseURL             = "https://api.moonshot.cn/v1"
+	DefaultKimiCodingBaseURL           = "https://api.kimi.com/coding/v1"
+	DefaultZhipuPayGBaseURL            = "https://open.bigmodel.cn/api/paas/v4"
+	DefaultZhipuCodingBaseURL          = "https://open.bigmodel.cn/api/coding/paas/v4"
+	DefaultDeepseekBaseURL             = "https://api.deepseek.com"
+	DefaultKimiPayGAnthropicBaseURL    = "https://api.moonshot.cn/anthropic"
+	DefaultKimiCodingAnthropicBaseURL  = "https://api.kimi.com/coding"
+	DefaultZhipuAnthropicBaseURL       = "https://open.bigmodel.cn/api/anthropic"
+	DefaultDeepseekAnthropicBaseURL    = "https://api.deepseek.com/anthropic"
+	DefaultMiniMaxBaseURL              = "https://api.minimaxi.com/v1"
+	DefaultMiniMaxAnthropicBaseURL     = "https://api.minimaxi.com/anthropic"
+	DefaultOpenCodeGoBaseURL           = "https://opencode.ai/zen/go/v1"
+	DefaultOpenCodeZenBaseURL          = "https://opencode.ai/zen/v1"
+	DefaultOpenCodeGoAnthropicBaseURL  = "https://opencode.ai/zen/go"
+	DefaultOpenCodeZenAnthropicBaseURL = "https://opencode.ai/zen"
+	DefaultCommandCodeBaseURL          = "https://api.commandcode.ai/provider/v1"
+	DefaultCommandCodeAnthropicBaseURL = "https://api.commandcode.ai/provider"
+	DefaultClineBaseURL                = "https://api.cline.bot/api/v1"
 )
 
 // IsCNProvider 判断平台是否属于国产 OpenAI 兼容供应商。
 func IsCNProvider(platform string) bool {
-	switch platform {
-	case PlatformKimi, PlatformZhipu, PlatformDeepseek:
-		return true
-	default:
-		return false
-	}
+	return domain.IsCNProviderPlatform(platform)
 }
+
+// IsMultiProtocolAPIKeyProvider 以供应商目录统一决定多协议 API Key 接入归属。
+func IsMultiProtocolAPIKeyProvider(platform string) bool {
+	return LookupProviderProfile(platform) != nil
+}
+
+func IsOpenCodeGo(platform string) bool { return platform == PlatformOpenCodeGo }
 
 // Role constants
 const (
@@ -88,23 +104,18 @@ const (
 	PlatformKimi        = domain.PlatformKimi
 	PlatformZhipu       = domain.PlatformZhipu
 	PlatformDeepseek    = domain.PlatformDeepseek
+	PlatformMiniMax     = domain.PlatformMiniMax
+	PlatformOpenCodeGo  = domain.PlatformOpenCodeGo
+	PlatformTypeSafe    = domain.PlatformTypeSafe
+	PlatformCommandCode = domain.PlatformCommandCode
+	PlatformCline       = domain.PlatformCline
 	PlatformComposite   = domain.PlatformComposite
 )
 
 // AllowedQuotaPlatforms 是允许设置 user × platform quota 的平台列表（单一权威来源）。
 // ent/schema/user_platform_quota.go 的 Validate 函数独立维护（构建期约束），
 // 若新增平台需同步修改该 schema。
-var AllowedQuotaPlatforms = []string{
-	PlatformAnthropic,
-	PlatformOpenAI,
-	PlatformGemini,
-	PlatformAntigravity,
-	PlatformQoder,
-	PlatformGrok,
-	PlatformKimi,
-	PlatformZhipu,
-	PlatformDeepseek,
-}
+var AllowedQuotaPlatforms = domain.ConcretePlatformIDs()
 
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。
 // 仅 openai / anthropic / grok 有原生用量窗口可供评估；其他平台写入阈值无效果。
@@ -112,6 +123,7 @@ var AllowedSchedulingThresholdPlatforms = []string{
 	PlatformOpenAI,
 	PlatformAnthropic,
 	PlatformGrok,
+	PlatformKimi, PlatformZhipu, PlatformMiniMax, PlatformOpenCodeGo, PlatformCommandCode,
 }
 
 // IsAllowedQuotaPlatform 报告 s 是否为合法的 quota platform 标识。

@@ -869,6 +869,8 @@ var ProviderSet = wire.NewSet(
 	ProvideGrokQuotaService,
 	NewCNProviderQuotaService,
 	NewCNProviderBalanceService,
+	ProvideCNProviderBalanceCheckService,
+	ProvideOpenCodeGoUsageService,
 	ProvideClaudeTokenProvider,
 	NewAntigravityGatewayService,
 	ProvideRateLimitService,
@@ -991,6 +993,25 @@ func ProvidePaymentService(entClient *dbent.Client, registry *payment.Registry, 
 func ProvidePaymentOrderExpiryService(paymentSvc *PaymentService, lockCache LeaderLockCache, db *sql.DB) *PaymentOrderExpiryService {
 	svc := NewPaymentOrderExpiryService(paymentSvc, 60*time.Second)
 	svc.SetLeaderLock(lockCache, db)
+	svc.Start()
+	return svc
+}
+
+// ProvideCNProviderBalanceCheckService 构造并启动周期余额/额度检测任务。
+// payg 账号探余额（低余额停调）；coding plan 账号探 5h/weekly 滚动窗口
+// （落 extra 快照供调度阈值评估自动停调）。
+// 间隔取自 gateway.cn_providers.balance_check_interval_minutes；<=0 或关闭时不启动。
+func ProvideCNProviderBalanceCheckService(
+	accountRepo AccountRepository,
+	balanceService *CNProviderBalanceService,
+	quotaService *CNProviderQuotaService,
+	cfg *config.Config,
+) *CNProviderBalanceCheckService {
+	minutes := 10
+	if cfg != nil {
+		minutes = cfg.Gateway.CNProviders.BalanceCheckIntervalMinutes
+	}
+	svc := NewCNProviderBalanceCheckService(accountRepo, balanceService, quotaService, cfg, time.Duration(minutes)*time.Minute)
 	svc.Start()
 	return svc
 }

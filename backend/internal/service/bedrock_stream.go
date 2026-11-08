@@ -58,13 +58,18 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 		payload []byte
 		err     error
 	}
+	queueBudget := newSSEQueueBudget(s.cfg)
 	events := make(chan decodeEvent, 16)
 	done := make(chan struct{})
 	sendEvent := func(ev decodeEvent) bool {
+		if !queueBudget.acquire(len(ev.payload), done) {
+			return false
+		}
 		select {
 		case events <- ev:
 			return true
 		case <-done:
+			queueBudget.release(len(ev.payload))
 			return false
 		}
 	}
@@ -107,6 +112,9 @@ func (s *GatewayService) handleBedrockStreamingResponse(
 	for {
 		select {
 		case ev, ok := <-events:
+			if ok {
+				queueBudget.release(len(ev.payload))
+			}
 			if !ok {
 				if !clientDisconnected {
 					flusher.Flush()

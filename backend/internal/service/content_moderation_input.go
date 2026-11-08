@@ -106,6 +106,13 @@ func ExtractContentModerationInput(protocol string, body []byte) ContentModerati
 	}
 	builder := newContentModerationInputBuilder()
 	switch protocol {
+	case ContentModerationProtocolTypeSafeSystemOne:
+		// System One 的 state 和各问题指令都属于本次提交，不能因不同协议形状漏审。
+		builder.addText(ContentModerationSourceUser, gjson.GetBytes(body, "state").String())
+		gjson.GetBytes(body, "questions").ForEach(func(_, question gjson.Result) bool {
+			builder.addText(ContentModerationSourceUser, question.Get("instructions").String())
+			return true
+		})
 	case ContentModerationProtocolAnthropicMessages:
 		collectAnthropicCurrentTurn(gjson.GetBytes(body, "messages"), builder)
 	case ContentModerationProtocolOpenAIChat:

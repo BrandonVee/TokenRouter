@@ -39,6 +39,7 @@ func (s *OpenAIGatewayService) newUpstreamSSEScanner(r io.Reader) *bufio.Scanner
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
 	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 	return scanner
 }
 
@@ -182,6 +183,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	grokCacheIdentity string,
 	tlsRouterMatch ...TLSFingerprintRouterMatchResult,
 ) (*http.Response, error) {
+	body = clampOllamaCloudUpstreamMaxTokens(account, body)
 	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
 	upstreamReq, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, targetURL, bytes.NewReader(body))
 	releaseUpstreamCtx()
@@ -223,13 +225,15 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 	}
 	// 账号级请求头覆写：放在所有内置默认头（含 Grok CLI 身份头）之后应用，
 	// 使配置值获得除共享传输层强制头之外的最高优先级。
+	applyOpenCodeUpstreamUserAgent(account, targetURL, upstreamReq.Header)
 	account.ApplyHeaderOverrides(upstreamReq.Header)
-	applyOpenCodeSessionHeader(c, account, targetURL, upstreamReq.Header)
+	applyOpenCodeSessionHeader(c, account, targetURL, upstreamReq.Header, body)
 
 	proxyURL := ""
 	if account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
+	scheduleOpenCodeGoUsageActivity(s.deferredService, account)
 	resp, err := s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.resolveOpenAITLSProfile(account, tlsRouterMatch...))
 	if err != nil {
 		return nil, s.handleOpenAIUpstreamTransportError(ctx, c, account, err, false)

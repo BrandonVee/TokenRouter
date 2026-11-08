@@ -367,26 +367,20 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		}
 		return s.testOpenAIAccountConnection(c, account, modelID, prompt, normalizeAccountTestMode(mode))
 	}
-	// 国产供应商使用 OpenAI 兼容测试链，避免落入 Claude 测试逻辑。
-	if account.IsCNProvider() {
-		if account.GetAPIProtocol() == APIProtocolAnthropic {
-			return s.testClaudeAccountConnection(c, account, modelID, prompt)
+	if account.routesByModel() {
+		return s.testModelRoutedAccountConnection(c, account, modelID, prompt)
+	}
+	if account.IsMultiProtocolAPIKey() {
+		if account.IsAdaptiveAPIProtocol() {
+			return s.testCNProviderAdaptiveConnection(c, account, modelID, prompt)
 		}
-		testModelID := strings.TrimSpace(modelID)
-		if testModelID == "" {
-			testModelID = openai.DefaultTestModel
+		if account.IsAnthropicProtocol() {
+			return s.testCNProviderAnthropicConnection(c, account, modelID)
 		}
-		testModelID = account.GetMappedModel(testModelID)
-		authToken := account.GetOpenAIProtocolAPIKey()
-		if authToken == "" {
-			return s.sendErrorAndEnd(c, "No API key available")
-		}
-		baseURL := account.GetCNProtocolBaseURL(APIProtocolChatCompletions)
-		normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
-		if err != nil {
-			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
-		}
-		return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
+		return s.testCNProviderChatCompletionsConnection(c, account, modelID, prompt)
+	}
+	if account.IsTypeSafe() {
+		return s.testTypeSafeAccountConnection(c, account, prompt)
 	}
 
 	if account.IsGemini() {
@@ -2588,6 +2582,11 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 }
 
 func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
+	if event.Type == "test_complete" {
+		if value, ok := c.Get(accountTestSuppressCompletionContextKey); ok && value == true {
+			return
+		}
+	}
 	eventJSON, _ := json.Marshal(event)
 	if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON); err != nil {
 		log.Printf("failed to write SSE event: %v", err)
@@ -2721,4 +2720,69 @@ func parseTestSSEOutput(body string) (responseText, errMsg string) {
 	}
 	responseText = strings.Join(texts, "")
 	return
+}
+
+func (s *AccountTestService) testModelRoutedAccountConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = account.providerDefaultTestModel()
+	}
+	if testModelID == "" {
+		testModelID = openai.DefaultTestModel
+	}
+	testModelID = account.GetMappedModel(testModelID)
+	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(testModelID) {
+		return fmt.Errorf("model %q is not supported on OpenCode standard gateway (gemini models require Google SDK endpoint, jev models require System One endpoint)", testModelID)
+	}
+	// 与网关同一判定（含上游模型目录）；测试没有入站协议，取模型的首选协议。
+	protocol := account.resolveModelRoutedProtocol(testModelID)
+	if s.openAIGatewayService != nil {
+		protocol = s.openAIGatewayService.resolveUpstreamProtocolFor(c.Request.Context(), account, "", testModelID)
+	}
+	switch protocol {
+	case APIProtocolAnthropic:
+		return s.testCNProviderAnthropicConnection(c, account, testModelID)
+	case APIProtocolResponses:
+		return s.testModelRoutedResponsesConnection(c, account, testModelID)
+	default:
+		return s.testCNProviderChatCompletionsConnection(c, account, testModelID, prompt)
+	}
+}
+
+func (s *AccountTestService) testModelRoutedResponsesConnection(c *gin.Context, account *Account, testModelID string) error {
+	authToken := strings.TrimSpace(account.GetOpenAIProtocolAPIKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No API key available")
+	}
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+	s.sendEvent(c, TestEvent{Type: "test_start", Model: testModelID})
+	return s.testCNProviderAdaptiveResponsesConnection(c, account, testModelID, authToken)
+}
+
+func (s *AccountTestService) testCNProviderChatCompletionsConnection(c *gin.Context, account *Account, modelID string, prompt string) error {
+	testModelID := strings.TrimSpace(modelID)
+	if testModelID == "" {
+		testModelID = account.providerDefaultTestModel()
+	}
+	if testModelID == "" {
+		testModelID = openai.DefaultTestModel
+	}
+	testModelID = account.GetMappedModel(testModelID)
+
+	authToken := strings.TrimSpace(account.GetOpenAIProtocolAPIKey())
+	if authToken == "" {
+		return s.sendErrorAndEnd(c, "No API key available")
+	}
+
+	baseURL := account.GetOpenAIBaseURL()
+	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
+	if err != nil {
+		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
+	}
+
+	return s.testOpenAIChatCompletionsConnection(c, account, testModelID, prompt, normalizedBaseURL, authToken)
 }

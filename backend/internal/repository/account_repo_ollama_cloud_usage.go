@@ -16,7 +16,7 @@ const (
 	ollamaCloudBaseURLMatchSQLPrefix = "btrim("
 	ollamaCloudBaseURLMatchSQLSuffix = ") ~ '" + ollamaCloudBaseURLRegexSQL + "'"
 	ollamaCloudUsageEligibleSQL      = `
-	platform IN ('openai', 'anthropic')
+	platform IN ('openai', 'anthropic', 'kimi', 'zhipu', 'deepseek', 'minimax')
 	AND type = 'apikey'
 	AND ` + ollamaCloudBaseURLMatchSQLPrefix + `credentials ->> 'base_url'` + ollamaCloudBaseURLMatchSQLSuffix + `
 	AND jsonb_typeof(credentials -> 'api_key') = 'string'
@@ -557,3 +557,6 @@ func (r *accountRepository) ListDueOllamaCloudUsageAccounts(
 	}
 	return result, nil
 }
+
+// Ollama 管理会话继续遵循 fork 当前支持的挂载平台，不与 OpenCode 资格混淆。
+const ollamaCloudUsagePlatformsSQL = "'openai', 'anthropic', 'kimi', 'zhipu', 'deepseek', 'minimax'"

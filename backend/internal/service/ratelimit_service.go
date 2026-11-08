@@ -438,6 +438,24 @@ func (s *RateLimitService) handleDefaultUpstreamError(ctx context.Context, accou
 		upstreamMsg = truncateForLog([]byte(upstreamMsg), 512)
 	}
 
+	// 钱包/订阅额度是可恢复业务状态，不能落到通用凭据封禁或扩大到另一钱包。
+	if statusCode == http.StatusPaymentRequired || statusCode == http.StatusForbidden || statusCode == http.StatusTooManyRequests {
+		if account.IsCommandCode() {
+			if handled, disable := s.handleCommandCodeUsageError(ctx, account, statusCode, responseBody, upstreamMsg); handled {
+				return disable
+			}
+		}
+		if account.IsCline() {
+			if s.handleClineError(ctx, account, statusCode, responseBody, upstreamMsg) || statusCode == http.StatusPaymentRequired {
+				return false
+			}
+		}
+		if statusCode == http.StatusPaymentRequired && account.IsCNProvider() {
+			s.handleCNProviderInsufficientBalance(ctx, account, upstreamMsg)
+			return false
+		}
+	}
+
 	switch statusCode {
 	case 400:
 		// "organization has been disabled" → 永久禁用
@@ -1007,6 +1025,14 @@ func buildForbiddenErrorMessage(prefix string, upstreamMsg string, responseBody 
 // OpenAI OAuth（ChatGPT）账号的 403 视为临时错误，转为临时不可调度；
 // 其他平台保持原有 SetError 行为。
 func (s *RateLimitService) handle403(ctx context.Context, account *Account, upstreamMsg string, responseBody []byte) (shouldDisable bool) {
+	if isCNProviderConcurrencyLimit403(account, upstreamMsg) {
+		s.handleCNProviderConcurrencyLimit403(ctx, account)
+		return false
+	}
+	if isCNProviderQuotaExhausted403(account, responseBody, upstreamMsg) {
+		s.handleCNProviderQuotaExhausted403(ctx, account, upstreamMsg)
+		return false
+	}
 	if isCloudflareBotBlockResponse(responseBody) {
 		slog.Warn(
 			"403_cloudflare_bot_block_skips_account_penalty",
@@ -1264,6 +1290,11 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	if account.IsCNProvider() || account.IsOpenCodeGo() {
+		if s.applyCNProviderReactive429(ctx, account, headers, responseBody) {
+			return
+		}
+	}
 	// Spark 影子：限流/熔断状态 100% 由 QueryUsage(/wham/usage body 的 codex_bengalfox)驱动。
 	// /responses 的 429 携带的 x-codex-*/usage_limit_reached 是 global codex 道(plan/spec §8),
 	// 套到影子会把 spark 误耦合到 global 窗口——即便 spark 仍有配额也会被冷却到 global reset,
@@ -2794,4 +2825,65 @@ func (s *RateLimitService) triggerStreamTimeoutError(ctx context.Context, accoun
 
 	slog.Warn("stream_timeout_account_error", "account_id", account.ID, "model", model)
 	return true
+}
+
+// OpenCode 的窗口提示只提取明确的重置时长，不把整段错误消息作为动态状态键。
+var openCodeGoUsageLimitResetPattern = regexp.MustCompile(`(?i)\bresets\s+in\s+`)
+var openCodeGoUsageLimitDurationPartPattern = regexp.MustCompile(`(?i)^([0-9]+(?:\.[0-9]+)?)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|week|weeks)\b`)
+
+func parseOpenCodeGoUsageLimitResetDuration(message string) time.Duration {
+	resetPrefix := openCodeGoUsageLimitResetPattern.FindStringIndex(message)
+	if resetPrefix == nil {
+		return 0
+	}
+
+	remainder := message[resetPrefix[1]:]
+	var total time.Duration
+	for {
+		remainder = strings.TrimSpace(remainder)
+		matches := openCodeGoUsageLimitDurationPartPattern.FindStringSubmatchIndex(remainder)
+		if matches == nil {
+			break
+		}
+
+		value, err := strconv.ParseFloat(remainder[matches[2]:matches[3]], 64)
+		if err != nil || value <= 0 {
+			return 0
+		}
+
+		unit := openCodeGoUsageLimitDurationUnit(remainder[matches[4]:matches[5]])
+		if unit <= 0 {
+			return 0
+		}
+
+		const maxDuration = time.Duration(1<<63 - 1)
+		if value >= float64(maxDuration)/float64(unit) {
+			return 0
+		}
+		part := time.Duration(value * float64(unit))
+		if part <= 0 || total > maxDuration-part {
+			return 0
+		}
+		total += part
+		remainder = remainder[matches[1]:]
+	}
+
+	return total
+}
+
+func openCodeGoUsageLimitDurationUnit(raw string) time.Duration {
+	switch strings.ToLower(raw) {
+	case "s", "sec", "secs", "second", "seconds":
+		return time.Second
+	case "m", "min", "mins", "minute", "minutes":
+		return time.Minute
+	case "h", "hr", "hrs", "hour", "hours":
+		return time.Hour
+	case "d", "day", "days":
+		return 24 * time.Hour
+	case "w", "week", "weeks":
+		return 7 * 24 * time.Hour
+	default:
+		return 0
+	}
 }

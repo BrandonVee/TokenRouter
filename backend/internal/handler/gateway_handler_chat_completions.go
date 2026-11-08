@@ -79,6 +79,9 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	}
 	reqModel := modelResult.String()
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.chatCompletionsErrorResponse) {
+		return
+	}
 	reqStream, ok := parseOpenAICompatibleStream(body)
 	if !ok {
 		h.chatCompletionsErrorResponse(c, http.StatusBadRequest, "invalid_request_error", invalidStreamFieldTypeMessage)

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -1554,9 +1553,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 	streamInterval := s.openAIImageStreamDataInterval()
 	keepaliveInterval := s.openAIImageStreamKeepaliveInterval()
 	if streamInterval <= 0 && keepaliveInterval <= 0 {
-		reader := bufio.NewReader(resp.Body)
+		reader := newBoundedSSELineReader(resp.Body, s.cfg)
 		for {
-			line, err := reader.ReadBytes('\n')
+			line, err := reader.ReadLine()
 			done, processErr := processLine(line)
 			if processErr != nil {
 				return usage, imageCount, imageOutputSizes, firstTokenMs, processErr
@@ -1568,6 +1567,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 				break
 			}
 			if err != nil {
+				if errors.Is(err, errSSETransportLimit) {
+					return usage, imageCount, imageOutputSizes, firstTokenMs, err
+				}
 				if done, processErr := flushData(); processErr != nil {
 					return usage, imageCount, imageOutputSizes, firstTokenMs, processErr
 				} else if done {
@@ -1594,13 +1596,18 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 		line []byte
 		err  error
 	}
+	queueBudget := newSSEQueueBudget(s.cfg)
 	events := make(chan readEvent, 16)
 	done := make(chan struct{})
 	sendEvent := func(ev readEvent) bool {
+		if !queueBudget.acquire(len(ev.line), done) {
+			return false
+		}
 		select {
 		case events <- ev:
 			return true
 		case <-done:
+			queueBudget.release(len(ev.line))
 			return false
 		}
 	}
@@ -1608,9 +1615,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func() {
 		defer close(events)
-		reader := bufio.NewReader(resp.Body)
+		reader := newBoundedSSELineReader(resp.Body, s.cfg)
 		for {
-			line, err := reader.ReadBytes('\n')
+			line, err := reader.ReadLine()
 			if len(line) > 0 {
 				atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 			}
@@ -1651,6 +1658,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 	for {
 		select {
 		case ev, ok := <-events:
+			if ok {
+				queueBudget.release(len(ev.line))
+			}
 			if !ok {
 				if done, processErr := flushData(); processErr != nil {
 					return usage, imageCount, imageOutputSizes, firstTokenMs, processErr
@@ -1663,6 +1673,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthStreamingResponse(
 				return usage, imageCount, imageOutputSizes, firstTokenMs, nil
 			}
 			if ev.err != nil {
+				if errors.Is(ev.err, errSSETransportLimit) {
+					return usage, imageCount, imageOutputSizes, firstTokenMs, ev.err
+				}
 				if done, processErr := flushData(); processErr != nil {
 					return usage, imageCount, imageOutputSizes, firstTokenMs, processErr
 				} else if done {

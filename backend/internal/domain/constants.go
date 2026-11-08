@@ -33,15 +33,22 @@ const (
 	PlatformQoder       = "qoder"
 	PlatformComposite   = "composite"
 	// 国产 OpenAI 兼容供应商统一经 OpenAI 网关转发。
-	PlatformKimi     = "kimi"
-	PlatformZhipu    = "zhipu"
-	PlatformDeepseek = "deepseek"
+	PlatformKimi        = "kimi"
+	PlatformZhipu       = "zhipu"
+	PlatformDeepseek    = "deepseek"
+	PlatformMiniMax     = "minimax"
+	PlatformOpenCodeGo  = "opencode_go"
+	PlatformTypeSafe    = "typesafe"
+	PlatformCommandCode = "command_code"
+	PlatformCline       = "cline"
 )
 
 // Account mode constants 区分国产供应商按量付费与 Coding Plan 账号。
 const (
 	AccountModePayG   = "payg"
 	AccountModeCoding = "coding"
+	AccountModeZen    = "zen"
+	AccountModeGo     = "go"
 )
 
 // API protocol constants 描述国产供应商的上游协议形态。

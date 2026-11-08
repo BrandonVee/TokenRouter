@@ -335,6 +335,10 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 	}
 	redactedCreds, credsStatus := RedactCredentials(a.Credentials)
 	extra := redactAccountManagedExtra(a.Extra)
+	var openCodeGoUsage *service.OpenCodeGoUsageState
+	if state := service.OpenCodeGoUsageStateFromAccount(a); state.Eligible {
+		openCodeGoUsage = state
+	}
 	var ollamaCloudUsage *service.OllamaCloudUsageState
 	if state := service.OllamaCloudUsageStateFromAccount(a); state.Eligible {
 		ollamaCloudUsage = state
@@ -349,6 +353,7 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		CredentialsStatus:       credsStatus,
 		Extra:                   extra,
 		OllamaCloudUsage:        ollamaCloudUsage,
+		OpenCodeGoUsage:         openCodeGoUsage,
 		ProxyID:                 a.ProxyID,
 		ProxyFallbackOriginID:   a.ProxyFallbackOriginID,
 		ProxyFallbackOriginName: a.ProxyFallbackOriginName,
@@ -526,7 +531,7 @@ func redactAccountManagedExtra(extra map[string]any) map[string]any {
 		switch key {
 		case service.OllamaCloudUsageSessionExtraKey,
 			service.OllamaCloudUsageAutoRefreshExtraKey,
-			service.OllamaCloudUsageSnapshotExtraKey:
+			service.OllamaCloudUsageSnapshotExtraKey, service.OpenCodeGoUsageAutoRefreshExtraKey, service.OpenCodeGoUsageSnapshotExtraKey:
 			continue
 		default:
 			redacted[key] = value
@@ -568,6 +573,7 @@ func AccountListItemFromAccount(a *Account) *AccountListItem {
 		ID: a.ID, Name: a.Name, Notes: a.Notes, Platform: a.Platform, Type: a.Type,
 		Credentials: a.Credentials, CredentialsStatus: a.CredentialsStatus, Extra: a.Extra,
 		OllamaCloudUsage: a.OllamaCloudUsage,
+		OpenCodeGoUsage:  a.OpenCodeGoUsage,
 		ProxyID:          a.ProxyID, ProxyFallbackOriginID: a.ProxyFallbackOriginID, ProxyFallbackOriginName: a.ProxyFallbackOriginName,
 		Concurrency: a.Concurrency, LoadFactor: a.LoadFactor, Priority: a.Priority, RateMultiplier: a.RateMultiplier,
 		Status: a.Status, ErrorMessage: a.ErrorMessage, LastUsedAt: a.LastUsedAt, ExpiresAt: a.ExpiresAt,

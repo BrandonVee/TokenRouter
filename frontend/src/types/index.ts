@@ -561,7 +561,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'qoder' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'composite'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'qoder' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'opencode_go' | 'typesafe' | 'command_code' | 'cline' | 'composite'
 export type GroupSchedulerType = 'basic' | 'advanced'
 export type VideoModelPrices = Record<string, Record<string, number>>
 
@@ -1149,7 +1149,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'qoder' | 'grok' | 'kimi' | 'zhipu' | 'deepseek'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'qoder' | 'grok' | 'kimi' | 'zhipu' | 'deepseek' | 'minimax' | 'opencode_go' | 'typesafe' | 'command_code' | 'cline'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account' | 'cosy'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
@@ -1349,6 +1349,7 @@ export interface Account {
   // 改为通过 credentials_status.has_<key> 暴露存在性。
   credentials?: Record<string, unknown>
   credentials_status?: Record<string, boolean>
+  opencode_go_usage?: OpenCodeGoUsageState
   ollama_cloud_usage?: OllamaCloudUsageState
   // Extra 包含 Codex 用量、OpenAI 旧版 Compact 端点能力和模型级限流状态等扩展字段。
   extra?: (CodexUsageSnapshot & OpenAICompactState & {
@@ -2698,3 +2699,43 @@ export type {
   PlatformQuotaWindow,
   PlatformQuotasResponse,
 } from '@/api/admin/users'
+
+export type OpenCodeGoUsageStatus = 'ok' | 'unauthorized' | 'failed'
+
+export interface OpenCodeGoUsageWindow {
+  status?: string
+  percent: number
+  resets_at?: string
+}
+
+export interface OpenCodeGoUsageData {
+  rolling?: OpenCodeGoUsageWindow
+  weekly?: OpenCodeGoUsageWindow
+  monthly?: OpenCodeGoUsageWindow
+}
+
+export interface OpenCodeGoUsageSnapshot {
+  status: OpenCodeGoUsageStatus
+  data?: OpenCodeGoUsageData
+  fetched_at?: string
+  last_attempt_at?: string
+  next_refresh_at?: string
+  failure_count?: number
+  http_status?: number
+  last_error?: string
+}
+
+export interface OpenCodeGoUsageState {
+  account_id: number
+  eligible: boolean
+  auto_refresh_enabled: boolean
+  snapshot?: OpenCodeGoUsageSnapshot
+}
+
+export interface OpenCodeGoUsageSettings {
+  enabled: boolean
+  /** Max wait while model requests keep arriving (minutes). */
+  interval_minutes: number
+  /** Trailing quiet period after the latest model request (minutes). */
+  debounce_minutes: number
+}

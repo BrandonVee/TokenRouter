@@ -38,7 +38,7 @@ func compositeTargetPlatformAllowed(c *gin.Context, apiKey *service.APIKey, mode
 func openAICompatibleTextTargetAllowed(c *gin.Context, apiKey *service.APIKey, model string) bool {
 	return compositeTargetPlatformAllowed(c, apiKey, model,
 		service.PlatformOpenAI, service.PlatformGrok,
-		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek)
+		service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo, service.PlatformCommandCode, service.PlatformCline)
 }
 
 func effectiveAPIKeyPlatform(c *gin.Context, apiKey *service.APIKey) string {

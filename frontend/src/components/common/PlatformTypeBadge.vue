@@ -71,6 +71,7 @@ import type { AccountPlatform, AccountType } from '@/types'
 import PlatformIcon from './PlatformIcon.vue'
 import GrokFreeIcon from './GrokFreeIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { platformDisplayName } from '@/constants/platformCatalog'
 
 const { t } = useI18n()
 
@@ -95,8 +96,7 @@ const platformLabel = computed(() => {
   if (props.platform === 'kimi') return 'Kimi'
   if (props.platform === 'zhipu') return '智谱 GLM'
   if (props.platform === 'deepseek') return 'DeepSeek'
-  if (props.platform === 'composite') return 'Composite'
-  return props.platform
+  return platformDisplayName(props.platform)
 })
 
 const normalizedAuthMode = computed(() =>

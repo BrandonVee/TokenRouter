@@ -612,3 +612,42 @@ func dedupeAndSortModelIDs(models []string) []string {
 	sort.Strings(result)
 	return result
 }
+
+func extractUpstreamModelRawEntries(body []byte) ([]json.RawMessage, error) {
+	var response struct {
+		Data   []json.RawMessage `json:"data"`
+		Models json.RawMessage   `json:"models"`
+	}
+	if err := json.Unmarshal(body, &response); err == nil && (response.Data != nil || response.Models != nil) {
+		entries := append([]json.RawMessage{}, response.Data...)
+		if len(response.Models) > 0 && string(response.Models) != "null" {
+			var list []json.RawMessage
+			if err := json.Unmarshal(response.Models, &list); err == nil {
+				entries = append(entries, list...)
+			} else {
+
+				var models map[string]map[string]json.RawMessage
+				if err := json.Unmarshal(response.Models, &models); err != nil {
+					return nil, fmt.Errorf("parse upstream model catalog: %w", err)
+				}
+				for modelID, fields := range models {
+					if fields == nil {
+						fields = make(map[string]json.RawMessage)
+					}
+					fields["id"], _ = json.Marshal(modelID)
+					raw, err := json.Marshal(fields)
+					if err != nil {
+						return nil, fmt.Errorf("parse upstream model metadata: %w", err)
+					}
+					entries = append(entries, raw)
+				}
+			}
+		}
+		return entries, nil
+	}
+	var entries []json.RawMessage
+	if err := json.Unmarshal(body, &entries); err != nil {
+		return nil, fmt.Errorf("parse upstream model catalog: %w", err)
+	}
+	return entries, nil
+}

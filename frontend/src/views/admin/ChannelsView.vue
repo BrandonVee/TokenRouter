@@ -629,6 +629,7 @@
 </template>
 
 <script setup lang="ts">
+import { listPlatformIds } from '@/constants/platformCatalog'
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -775,7 +776,7 @@ const billingModelSourceHint = computed(() => {
 let abortController: AbortController | null = null
 
 // ── Platform config ──
-const platformOrder: GroupPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'qoder', 'grok', 'kimi', 'zhipu', 'deepseek']
+const platformOrder = listPlatformIds() as GroupPlatform[]
 
 // ── Helpers ──
 function formatDate(value: string): string {

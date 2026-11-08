@@ -54,6 +54,7 @@ const (
 	ContentModerationModelFilterExclude = "exclude"
 
 	ContentModerationProtocolAnthropicMessages = "anthropic_messages"
+	ContentModerationProtocolTypeSafeSystemOne = "typesafe_systemone"
 	ContentModerationProtocolOpenAIResponses   = "openai_responses"
 	ContentModerationProtocolOpenAIChat        = "openai_chat_completions"
 	ContentModerationProtocolGemini            = "gemini"

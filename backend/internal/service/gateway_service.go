@@ -579,18 +579,20 @@ type AudioUsage struct {
 }
 
 type ForwardResult struct {
-	RequestID string
-	Usage     ClaudeUsage
-	Model     string
+	UpstreamHeaders http.Header // 兼容桥接路径复用上游响应诊断头。
+	RequestID       string
+	Usage           ClaudeUsage
+	Model           string
 	// UpstreamModel is the actual upstream model after mapping.
 	// Prefer empty when it is identical to Model; persistence normalizes equal values away as no-op mappings.
-	UpstreamModel    string
-	Stream           bool
-	Duration         time.Duration
-	FirstTokenMs     *int // 首字时间（流式请求）
-	ClientDisconnect bool // 客户端是否在流式传输过程中断开
-	ReasoningEffort  *string
-	ResponseBody     []byte // 成功响应体，用于数据共享提取 assistant 输出
+	UpstreamModel         string
+	UpstreamResponseModel string // 上游响应自报模型，用于对账，不能替代客户端路由模型。
+	Stream                bool
+	Duration              time.Duration
+	FirstTokenMs          *int // 首字时间（流式请求）
+	ClientDisconnect      bool // 客户端是否在流式传输过程中断开
+	ReasoningEffort       *string
+	ResponseBody          []byte // 成功响应体，用于数据共享提取 assistant 输出
 
 	// 图片生成计费字段（图片生成模型使用）
 	ImageCount int // 生成的图片数量

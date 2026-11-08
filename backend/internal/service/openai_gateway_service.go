@@ -1595,3 +1595,15 @@ type openAIUpstreamWarningError struct {
 	warning *OpenAIUpstreamWarning
 	err     error
 }
+
+func stampOpenAIResponsesUpstreamEndpoint(c *gin.Context, result *OpenAIForwardResult) {
+	SetActualOpenAIUpstreamEndpoint(c, openAIResponsesUpstreamEndpoint)
+	if result == nil {
+		return
+	}
+	if strings.TrimSpace(result.UpstreamEndpoint) == "" {
+		result.UpstreamEndpoint = openAIResponsesUpstreamEndpoint
+	}
+}
+
+const openAIResponsesUpstreamEndpoint = "/v1/responses"

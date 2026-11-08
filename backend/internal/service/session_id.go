@@ -65,3 +65,10 @@ func sanitizeSessionID(raw string) string {
 	}
 	return trimmed
 }
+
+func ClaudeCodeSessionIDFromHeader(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	return sanitizeSessionID(c.GetHeader(claudeCodeSessionHeader))
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/BrandonVee/TokenRouter/internal/domain"
 	"net/http"
 	"strings"
 
@@ -216,6 +217,14 @@ func compositeRouteFromInput(groupID int64, input CompositeRouteInput) (*Composi
 
 func defaultModelsListCandidateIDs(platform string) []string {
 	switch platform {
+	case PlatformTypeSafe:
+		return []string{"jev-latest"}
+	case PlatformOpenCodeGo:
+		return DefaultOpenCodeGoModelIDs()
+	case PlatformMiniMax:
+		return []string{"minimax-m3", "minimax-m2.7", "minimax-m2.5"}
+	case PlatformCline, PlatformCommandCode:
+		return nil // 聚合目录由账号模型同步或显式模型映射提供，不猜测其它账号权限。
 	case PlatformOpenAI:
 		return openai.DefaultModelIDs()
 	case PlatformGemini:
@@ -1382,4 +1391,23 @@ func (s *adminServiceImpl) ReplaceUserGroup(ctx context.Context, userID, oldGrou
 	}
 
 	return &ReplaceUserGroupResult{MigratedKeys: migrated}, nil
+}
+
+func compositeDefaultModelsListCandidateIDs() []string {
+	seen := make(map[string]struct{})
+	ids := make([]string, 0)
+	for _, platform := range domain.CompositePrecedencePlatformIDs() {
+
+		if platform == PlatformTypeSafe {
+			continue
+		}
+		for _, id := range defaultModelsListCandidateIDs(platform) {
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }

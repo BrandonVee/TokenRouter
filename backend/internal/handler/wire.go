@@ -49,8 +49,10 @@ func ProvideAdminHandlers(
 	auditLogHandler *admin.AuditLogHandler,
 	teamHandler *admin.TeamHandler,
 	ollamaCloudUsage *service.OllamaCloudUsageService,
+	openCodeGoUsage *service.OpenCodeGoUsageService,
 ) *AdminHandlers {
 	accountHandler.SetOllamaCloudUsageService(ollamaCloudUsage)
+	accountHandler.SetOpenCodeGoUsageService(openCodeGoUsage)
 	return &AdminHandlers{
 		Dashboard:             dashboardHandler,
 		User:                  userHandler,

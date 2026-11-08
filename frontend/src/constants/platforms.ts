@@ -1,28 +1,19 @@
+import { listPlatforms } from './platformCatalog'
 import type { AccountPlatform, GroupPlatform } from '@/types'
 
 export interface PlatformOption<T extends string = string> {
+  [key: string]: unknown
   value: T
   label: string
 }
 
-/**
- * Concrete upstream platforms supported by accounts and request routing.
- * Keep platform selectors derived from this catalog so newly added providers
- * do not silently disappear from list filters.
- */
-export const CONCRETE_PLATFORM_OPTIONS = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'antigravity', label: 'Antigravity' },
-  { value: 'qoder', label: 'Qoder' },
-  { value: 'grok', label: 'Grok' },
-  { value: 'kimi', label: 'Kimi' },
-  { value: 'zhipu', label: 'Zhipu GLM' },
-  { value: 'deepseek', label: 'DeepSeek' }
-] as const satisfies readonly PlatformOption<AccountPlatform>[]
+/** 账号与路由的平台选项同源，新增平台自动进入筛选器。 */
+export const CONCRETE_PLATFORM_OPTIONS: readonly PlatformOption<AccountPlatform>[] = listPlatforms().map(spec => ({
+  value: spec.id as AccountPlatform,
+  label: spec.display_name
+}))
 
-/** Platforms that can own a group. */
+/** 分组可选择具体平台或复合路由。 */
 export const GROUP_PLATFORM_OPTIONS = [
   ...CONCRETE_PLATFORM_OPTIONS,
   { value: 'composite', label: 'Composite' }

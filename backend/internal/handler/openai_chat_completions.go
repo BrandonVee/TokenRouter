@@ -78,6 +78,9 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 	}
 	reqModel := modelResult.String()
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	if !compositeTargetPlatformAllowed(c, apiKey, reqModel, service.PlatformOpenAI) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return

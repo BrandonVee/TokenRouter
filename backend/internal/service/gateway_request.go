@@ -1542,3 +1542,45 @@ func NormalizeChineseLLMThinking(body []byte, mappedModel string) ([]byte, bool)
 	}
 	return modified, true
 }
+
+func NormalizeGLM53AnthropicThinking(body []byte, mappedModel string) ([]byte, bool) {
+	if !isGLM53Model(mappedModel) {
+		return body, false
+	}
+
+	raw := gjson.GetBytes(body, "output_config.effort").String()
+	if strings.TrimSpace(raw) == "" {
+		raw = gjson.GetBytes(body, "thinking.type").String()
+	}
+
+	var effort string
+	switch normalizeEffortToken(raw) {
+	case "disabled", "off", "none", "minimal", "low":
+		effort = "low"
+	case "enabled", "adaptive", "medium", "high":
+		effort = "high"
+	case "xhigh", "max", "ultra":
+		effort = "max"
+	default:
+		return body, false
+	}
+
+	modified, err := sjson.SetBytes(body, "thinking.type", "enabled")
+	if err != nil {
+		return body, false
+	}
+	modified, err = sjson.SetBytes(modified, "output_config.effort", effort)
+	if err != nil {
+		return body, false
+	}
+	return modified, true
+}
+
+func isGLM53Model(model string) bool {
+	return strings.EqualFold(strings.TrimSpace(model), "glm-5.3")
+}
+
+func normalizeEffortToken(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	return strings.NewReplacer("-", "", "_", "", " ", "").Replace(value)
+}

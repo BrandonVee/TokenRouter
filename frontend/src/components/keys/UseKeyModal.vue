@@ -383,7 +383,12 @@ const openCodeProtocolPriority: Record<GroupPlatform, readonly GroupClientProtoc
   kimi: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
   zhipu: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
   deepseek: ['openai_responses', 'openai_chat_completions', 'anthropic_messages'],
-  composite: ['openai_responses', 'openai_chat_completions', 'anthropic_messages', 'gemini_generate_content']
+  composite: ['openai_responses', 'openai_chat_completions', 'anthropic_messages', 'gemini_generate_content'],
+  minimax: ['openai_responses','openai_chat_completions','anthropic_messages'],
+  opencode_go: ['openai_responses','openai_chat_completions','anthropic_messages'],
+  command_code: ['openai_responses','openai_chat_completions','anthropic_messages'],
+  cline: ['openai_chat_completions','openai_responses','anthropic_messages'],
+  typesafe: [],
 }
 
 function preferredOpenCodeProtocol(
@@ -1060,6 +1065,11 @@ function generateCompatibleCodexFiles(
     model: string
     contextWindow: number
   }> = {
+    minimax: { provider:'tokenrouter_minimax',name:'TokenRouter minimax',model:'minimax-m3',contextWindow:200000 },
+    opencode_go: { provider:'tokenrouter_opencode_go',name:'TokenRouter opencode_go',model:'glm-5.3',contextWindow:200000 },
+    command_code: { provider:'tokenrouter_command_code',name:'TokenRouter command_code',model:'deepseek/deepseek-v4-flash',contextWindow:200000 },
+    cline: { provider:'tokenrouter_cline',name:'TokenRouter cline',model:'deepseek/deepseek-v4-flash',contextWindow:200000 },
+    typesafe: { provider:'tokenrouter_typesafe',name:'TokenRouter typesafe',model:'jev-latest',contextWindow:200000 },
     anthropic: {
       provider: 'tokenrouter_anthropic',
       name: 'TokenRouter Anthropic',

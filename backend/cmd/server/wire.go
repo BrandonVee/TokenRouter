@@ -98,6 +98,8 @@ func provideCleanup(
 	pricing *service.PricingService,
 	emailQueue *service.EmailQueueService,
 	billingCache *service.BillingCacheService,
+	cnBalanceCheck *service.CNProviderBalanceCheckService,
+	openCodeGoUsage *service.OpenCodeGoUsageService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	dataSharingService *service.DataSharingService,
 	dataSharingCaptureWorkerPool *service.DataSharingCaptureWorkerPool,
@@ -262,6 +264,18 @@ func provideCleanup(
 			}},
 			{"BillingCacheService", func() error {
 				billingCache.Stop()
+				return nil
+			}},
+			{"CNProviderBalanceCheckService", func() error {
+				if cnBalanceCheck != nil {
+					cnBalanceCheck.Stop()
+				}
+				return nil
+			}},
+			{"OpenCodeGoUsageService", func() error {
+				if openCodeGoUsage != nil {
+					openCodeGoUsage.Stop()
+				}
 				return nil
 			}},
 			{"UsageRecordWorkerPool", func() error {

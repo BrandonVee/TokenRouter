@@ -125,6 +125,8 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		body = sanitized
 	}
 
+	// Ollama 的输出上限按实际端点判定，避免影响其它 Anthropic 上游。
+	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, account.GetBaseURL(), body)
 	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, nil, err
@@ -925,4 +927,35 @@ func (s *GatewayService) validateUpstreamBaseURL(raw string) (string, error) {
 		return "", fmt.Errorf("invalid base_url: %w", err)
 	}
 	return normalized, nil
+}
+
+func filterSonnet55ToolsetBetaHeader(headers http.Header, body []byte, modelID string) {
+	header := getHeaderRaw(headers, "anthropic-beta")
+	filtered := filterSonnet55ToolsetBeta(header, body, modelID)
+	if filtered == header {
+		return
+	}
+	deleteHeaderAllForms(headers, "anthropic-beta")
+	if filtered != "" {
+		setHeaderRaw(headers, "anthropic-beta", filtered)
+	}
+}
+
+func filterSonnet55ToolsetBeta(header string, body []byte, modelID string) string {
+	if at := strings.IndexByte(modelID, '@'); at >= 0 {
+		modelID = modelID[:at]
+	}
+	if !claude.IsSonnet55(modelID) && !claude.IsHaiku55(modelID) {
+		return header
+	}
+	for _, tool := range gjson.GetBytes(body, "tools").Array() {
+		switch tool.Get("type").String() {
+		case "computer_toolset_20260801", "browser_toolset_20260801":
+			if !containsBetaToken(header, claude.BetaFineGrainedToolStreaming) {
+				return header
+			}
+			return stripBetaTokensWithSet(header, map[string]struct{}{claude.BetaFineGrainedToolStreaming: {}})
+		}
+	}
+	return header
 }

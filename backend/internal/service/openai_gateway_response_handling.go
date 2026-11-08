@@ -152,8 +152,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	scanner := bufio.NewScanner(resp.Body)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 	if guardFirstOutput {
-		scanner.Split(openAIFirstOutputDynamicScanLines(&firstOutputScanGuard))
+		scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, openAIFirstOutputDynamicScanLines(&firstOutputScanGuard)))
 	}
 	documentScanner := newOpenAISSEJSONDocumentScanner(scanner)
 
@@ -703,13 +704,18 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	// scanner/channel 保留量约束在 16 MiB 附近。禁用超时时保留原有深度 16。
 	events := make(chan scanEvent, openAIFirstOutputEventQueueSize(guardFirstOutput))
 	done := make(chan struct{})
+	queueBudget := newSSEQueueBudget(s.cfg)
 	sendEvent := func(ev scanEvent) bool {
+		if !queueBudget.acquire(len(ev.line), done) {
+			return false
+		}
 		if guardFirstOutput {
 			ev.processed = make(chan struct{})
 		}
 		select {
 		case events <- ev:
 		case <-done:
+			queueBudget.release(len(ev.line))
 			return false
 		}
 		if ev.processed == nil {
@@ -747,6 +753,9 @@ func (s *OpenAIGatewayService) handleStreamingResponseWithReasoning(ctx context.
 	for {
 		select {
 		case ev, ok := <-events:
+			if ok {
+				queueBudget.release(len(ev.line))
+			}
 			if !ok {
 				if guardFirstOutput && eventInProgress {
 					// 即使没有结尾空行，EOF 也会派发最后一个 SSE 事件；

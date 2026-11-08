@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 
 const {
   updateAccountMock,
@@ -136,6 +136,7 @@ describe('EditAccountModal Grok media eligibility', () => {
   it('shows only for Grok OAuth and fills the current decision', async () => {
     const wrapper = mountModal()
     await vi.waitFor(() => expect(getEligibilityMock).toHaveBeenCalledWith(12))
+    await flushPromises()
     expect(wrapper.find('[data-testid="grok-media-eligibility-card"]').exists()).toBe(true)
     expect(wrapper.get('[data-testid="grok-media-eligibility-mode"]').attributes('data-current')).toBe('auto')
     expect(wrapper.get('[data-testid="grok-media-eligibility-status"]').text()).toContain(

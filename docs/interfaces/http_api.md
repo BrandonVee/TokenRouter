@@ -70,6 +70,8 @@ Grok OAuth 媒体资格使用 `GET|PUT /api/v1/admin/accounts/:id/grok-media-eli
 
 路由前缀不独自决定协议处理器。例如 `/v1/messages` 会根据分组平台分派到 Anthropic、OpenAI/Grok 或 Qoder handler；路由层拥有分派，handler/service 不能通过字符串猜测调用方已经具备某个平台能力。
 
+TypeSafe 使用独立 `POST /v1/systemone` 非流式网关，限制为 TypeSafe 及兼容 Composite 分组；通用文本入口不接受 TypeSafe。协议、用量与后台刷新接口见[多协议与 System One 上游](multi_protocol_upstream.md)。
+
 ## 生图历史接口
 
 生图历史位于用户 JWT 路由族 `/api/v1/user/image-history`，所有对象操作都使用当前认证用户 ID 约束查询，不能用 API Key、记录 UUID 或预览 URL 替代对象归属校验：

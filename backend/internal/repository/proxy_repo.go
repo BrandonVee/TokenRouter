@@ -224,13 +224,12 @@ func lockProxyConnectionIdentity(ctx context.Context, client *dbent.Client, prox
 func invalidateProxyOllamaSnapshots(ctx context.Context, exec sqlExecutor, proxyID int64) ([]int64, error) {
 	rows, err := exec.QueryContext(ctx, `
 		UPDATE accounts
-		SET extra = COALESCE(extra, '{}'::jsonb) - 'ollama_cloud_usage_snapshot',
+		SET extra = COALESCE(extra, '{}'::jsonb) - 'ollama_cloud_usage_snapshot' - 'opencode_go_usage_snapshot',
 			updated_at = NOW()
 		WHERE proxy_id = $1
 			AND type = 'apikey'
-			AND platform IN ('openai', 'anthropic')
-			AND extra ? 'ollama_cloud_usage_snapshot'
-			AND extra -> 'ollama_cloud_usage_snapshot' <> 'null'::jsonb
+			AND ((platform IN ('openai', 'anthropic') AND extra ? 'ollama_cloud_usage_snapshot' AND extra -> 'ollama_cloud_usage_snapshot' <> 'null'::jsonb)
+OR ((platform='opencode_go' OR platform IN (`+opencodeGoUsageMountPlatformsSQL+`)) AND extra ? 'opencode_go_usage_snapshot' AND extra -> 'opencode_go_usage_snapshot' <> 'null'::jsonb))
 			AND deleted_at IS NULL
 		RETURNING id
 	`, proxyID)

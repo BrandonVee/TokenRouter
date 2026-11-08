@@ -162,6 +162,8 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 		zap.Bool("stream", clientStream),
 	)
 
+	upstreamBody = applyOllamaCloudRawChatCompletionsRequest(account, upstreamBody)
+
 	// 5. 通过共享 CC 管线构造并发送上游请求。
 	targetURL, err := s.rawChatCompletionsURL(account)
 	if err != nil {
@@ -309,7 +311,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	}
 
 	for scanner.Scan() {
-		line := scanner.Text()
+		line := applyOllamaCloudRawChatCompletionsSSELine(account, scanner.Text())
 		refusalDetector.ObserveSSELine(line)
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
@@ -654,6 +656,7 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		return nil, fmt.Errorf("read upstream body: %w", err)
 	}
 
+	respBody = applyOllamaCloudRawChatCompletionsResponse(account, respBody)
 	var usage OpenAIUsage
 	if parsedUsage, ok := extractOpenAIUsageFromJSONBytes(respBody); ok {
 		usage = parsedUsage

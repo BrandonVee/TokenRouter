@@ -997,7 +997,7 @@ func OllamaCloudUsageStateFromAccount(account *Account) *OllamaCloudUsageState {
 }
 
 func IsOllamaCloudUsageAccount(account *Account) bool {
-	if account == nil || account.Type != AccountTypeAPIKey || (account.Platform != PlatformOpenAI && account.Platform != PlatformAnthropic) {
+	if account == nil || account.Type != AccountTypeAPIKey || !isOllamaCloudUsagePlatform(account.Platform) {
 		return false
 	}
 	baseURL, _ := account.Credentials["base_url"].(string)
@@ -1224,4 +1224,14 @@ func (s *OllamaCloudUsageService) currentTime() time.Time {
 		return s.now()
 	}
 	return time.Now()
+}
+
+// isOllamaCloudUsagePlatform 与仓储的受管身份 SQL 白名单同步维护。
+func isOllamaCloudUsagePlatform(platform string) bool {
+	switch platform {
+	case PlatformOpenAI, PlatformAnthropic, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax:
+		return true
+	default:
+		return false
+	}
 }

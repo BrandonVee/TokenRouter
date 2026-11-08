@@ -63,6 +63,10 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	defaultMappedModel string,
 	tlsRouterMatch ...TLSFingerprintRouterMatchResult,
 ) (*OpenAIForwardResult, error) {
+	if err := validateOpenAIReasoningEffort(body, gjson.GetBytes(body, "model").String()); err != nil {
+		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return nil, err
+	}
 	if account.Platform == PlatformGrok {
 		if account.IsGrokOAuth() {
 			if eligible, reason := grokChatResponsesBridgeEligibility(body); eligible {
@@ -76,18 +80,34 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 		}
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel, tlsRouterMatch...)
 	}
-	// 自适应账号的 Chat Completions 入站始终使用原生 CC 端点。
-	if account.IsAdaptiveAPIProtocol() {
-		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel, tlsRouterMatch...)
+	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(account.GetMappedModel(gjson.GetBytes(body, "model").String())) {
+		return nil, writeOpenCodeUnsupportedModelError(c, false, gjson.GetBytes(body, "model").String())
 	}
-	if err := validateOpenAIReasoningEffort(body, gjson.GetBytes(body, "model").String()); err != nil {
-		writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
-		return nil, err
+	rememberOpenCodeInboundBody(c, body)
+	if promptCacheKey != "" && !gjson.GetBytes(body, "prompt_cache_key").Exists() {
+		rememberOpenCodeInboundBody(c, openCodeSessionHintBody(promptCacheKey))
 	}
-
-	// 入口分流：APIKey 账号 + 强制或已探测确认上游不支持 Responses，走 CC 直转。
-	// 自动模式下标记缺失（未探测）按"现状即证据"原则继续走下方原 Responses 转换路径。
-	if account.Type == AccountTypeAPIKey && !openai_compat.ShouldUseResponsesAPI(account.Extra) {
+	// Cursor 等客户端会把 Responses 请求发送到 Chat 路径，先按实际形状选择上游。
+	isResponsesShape := !gjson.GetBytes(body, "messages").Exists() && gjson.GetBytes(body, "input").Exists()
+	inbound := APIProtocolChatCompletions
+	if isResponsesShape {
+		inbound = APIProtocolResponses
+	}
+	convertResponsesShape := isResponsesShape && (account.routesByModel() || account.IsAdaptiveAPIProtocol())
+	switch s.resolveUpstreamProtocolFor(ctx, account, inbound, upstreamRoutingModel(account, body, defaultMappedModel)) {
+	case APIProtocolAnthropic:
+		if convertResponsesShape {
+			return s.forwardResponsesViaNativeAnthropic(ctx, c, account, body, defaultMappedModel)
+		}
+		return s.forwardChatCompletionsViaNativeAnthropic(ctx, c, account, body, defaultMappedModel)
+	case APIProtocolChatCompletions:
+		if convertResponsesShape {
+			converted, err := s.convertResponsesShapedChatBody(body)
+			if err != nil {
+				return nil, err
+			}
+			body = converted
+		}
 		return s.forwardAsRawChatCompletions(ctx, c, account, body, defaultMappedModel, tlsRouterMatch...)
 	}
 
@@ -125,7 +145,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	// Detect that shape and forward the raw body as-is, only rewriting `model`
 	// to the resolved upstream model. The downstream codex OAuth transform will
 	// still normalize store/stream/instructions/etc.
-	isResponsesShape := !gjson.GetBytes(body, "messages").Exists() && gjson.GetBytes(body, "input").Exists()
+	isResponsesShape = !gjson.GetBytes(body, "messages").Exists() && gjson.GetBytes(body, "input").Exists()
 
 	var (
 		responsesReq  *apicompat.ResponsesRequest

@@ -14,7 +14,11 @@ const (
 
 // GetAnthropicAPIKeyAuthScheme 返回 Anthropic API Key 账号转发上游时使用的认证头方案。
 func (a *Account) GetAnthropicAPIKeyAuthScheme() string {
-	if a == nil || a.Platform != PlatformAnthropic || a.Type != AccountTypeAPIKey {
+	if a == nil || a.Type != AccountTypeAPIKey {
+		return AnthropicAPIKeyAuthSchemeXAPIKey
+	}
+
+	if a.Platform != PlatformAnthropic && !a.RoutesProtocolByInbound() {
 		return AnthropicAPIKeyAuthSchemeXAPIKey
 	}
 
@@ -27,10 +31,14 @@ func (a *Account) GetAnthropicAPIKeyAuthScheme() string {
 }
 
 // setAnthropicAPIKeyAuthHeader 按账号配置写入 Anthropic API Key 上游认证头。
-func setAnthropicAPIKeyAuthHeader(header http.Header, account *Account, token string) {
-	if account.GetAnthropicAPIKeyAuthScheme() == AnthropicAPIKeyAuthSchemeAuthorizationBearer {
-		setHeaderRaw(header, "authorization", "Bearer "+token)
+func setAnthropicAPIKeyAuthHeader(header http.Header, account *Account, token string, baseURLs ...string) {
+	if len(baseURLs) > 0 && isOllamaCloudBaseURL(strings.TrimRight(strings.TrimSpace(baseURLs[0]), "/")) {
+		header.Set("Authorization", "Bearer "+token)
 		return
 	}
-	setHeaderRaw(header, "x-api-key", token)
+	if account.GetAnthropicAPIKeyAuthScheme() == AnthropicAPIKeyAuthSchemeAuthorizationBearer {
+		header.Set("Authorization", "Bearer "+token)
+		return
+	}
+	header.Set("x-api-key", token)
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/BrandonVee/TokenRouter/internal/domain"
 	"log/slog"
 	"strings"
 	"sync/atomic"
@@ -362,7 +363,7 @@ func isPlatformPricingMatch(groupPlatform, pricingPlatform string) bool {
 // 各平台严格独立，只返回自身。
 func matchingPlatforms(groupPlatform string) []string {
 	if groupPlatform == PlatformComposite {
-		return []string{PlatformAnthropic, PlatformGemini, PlatformOpenAI, PlatformAntigravity, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek}
+		return domain.CompositePrecedencePlatformIDs()
 	}
 	return []string{groupPlatform}
 }

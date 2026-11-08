@@ -3,6 +3,8 @@
  * 负责后台系统设置的读取与保存。
  */
 
+import { listPlatformIds } from "@/constants/platformCatalog";
+import type { AccountPlatform } from "@/types";
 import { apiClient } from "../client";
 import type {
   CustomEndpoint,
@@ -28,7 +30,7 @@ type DefaultSubscriptionInput = Partial<DefaultSubscriptionSetting> & {
 };
 
 // ── 平台限额类型 ──────────────────────────────────────────────────
-export type PlatformType = "anthropic" | "openai" | "gemini" | "antigravity" | "qoder" | "grok" | "kimi" | "zhipu" | "deepseek"
+export type PlatformType = AccountPlatform
 export type QuotaWindowType = "daily" | "weekly" | "monthly"
 
 /** 单平台三档限额；null = 不限制，undefined = 未填（等价 null） */
@@ -41,7 +43,7 @@ export interface PlatformQuotaLimits {
 /** 全平台默认限额 map（key = PlatformType） */
 export type DefaultPlatformQuotasMap = Partial<Record<PlatformType, PlatformQuotaLimits>>
 
-const PLATFORMS: PlatformType[] = ["anthropic", "openai", "gemini", "antigravity", "qoder", "grok", "kimi", "zhipu", "deepseek"]
+const PLATFORMS = listPlatformIds() as PlatformType[]
 
 export type SchedulingThresholdPlatformType = "openai" | "anthropic" | "grok"
 

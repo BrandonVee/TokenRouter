@@ -1,7 +1,6 @@
 package service
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -1035,6 +1034,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	resp *http.Response,
 	c *gin.Context,
 	startTime time.Time,
+	_ ...*OpenAIImagesRequest,
 ) (OpenAIUsage, int, []string, *int, error) {
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
@@ -1070,8 +1070,25 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		CaptureGeneratedImagesFromSSE(c.Request.Context(), dataBytes)
 	}
 
+	var pendingWire bytes.Buffer
+	writePendingWire := func() {
+		if pendingWire.Len() == 0 {
+			return
+		}
+		if !clientDisconnected {
+			if _, writeErr := c.Writer.Write(pendingWire.Bytes()); writeErr != nil {
+				clientDisconnected = true
+				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Images stream client disconnected, continue draining upstream for billing")
+			} else {
+				flusher.Flush()
+				lastDownstreamWriteAt = time.Now()
+			}
+		}
+		pendingWire.Reset()
+	}
 	flushSSEEvent := func() {
 		sseData.Flush(processSSEData)
+		writePendingWire()
 	}
 
 	processLine := func(line []byte) {
@@ -1082,14 +1099,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 			ms := int(time.Since(startTime).Milliseconds())
 			firstTokenMs = &ms
 		}
-		if !clientDisconnected {
-			if _, writeErr := c.Writer.Write(line); writeErr != nil {
-				clientDisconnected = true
-				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Images stream client disconnected, continue draining upstream for billing")
-			} else {
-				flusher.Flush()
-				lastDownstreamWriteAt = time.Now()
-			}
+		_, _ = pendingWire.Write(line)
+		if len(bytes.TrimSpace(line)) == 0 {
+			writePendingWire()
 		}
 
 		trimmedLine := strings.TrimRight(string(line), "\r\n")
@@ -1124,15 +1136,14 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	streamInterval := s.openAIImageStreamDataInterval()
 	keepaliveInterval := s.openAIImageStreamKeepaliveInterval()
 	if streamInterval <= 0 && keepaliveInterval <= 0 {
-		reader := bufio.NewReader(resp.Body)
+		reader := newBoundedSSELineReader(resp.Body, s.cfg)
 		for {
-			line, err := reader.ReadBytes('\n')
+			line, err := reader.ReadLine()
 			processLine(line)
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
-				flushSSEEvent()
 				return usage, imageCounter.Count(), imageCounter.Sizes(), firstTokenMs, err
 			}
 		}
@@ -1145,13 +1156,18 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 		line []byte
 		err  error
 	}
+	queueBudget := newSSEQueueBudget(s.cfg)
 	events := make(chan readEvent, 16)
 	done := make(chan struct{})
 	sendEvent := func(ev readEvent) bool {
+		if !queueBudget.acquire(len(ev.line), done) {
+			return false
+		}
 		select {
 		case events <- ev:
 			return true
 		case <-done:
+			queueBudget.release(len(ev.line))
 			return false
 		}
 	}
@@ -1159,9 +1175,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 	go func() {
 		defer close(events)
-		reader := bufio.NewReader(resp.Body)
+		reader := newBoundedSSELineReader(resp.Body, s.cfg)
 		for {
-			line, err := reader.ReadBytes('\n')
+			line, err := reader.ReadLine()
 			if len(line) > 0 {
 				atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
 			}
@@ -1202,13 +1218,15 @@ func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
 	for {
 		select {
 		case ev, ok := <-events:
+			if ok {
+				queueBudget.release(len(ev.line))
+			}
 			if !ok {
 				flushSSEEvent()
 				finalizeFallbackBody()
 				return usage, imageCounter.Count(), imageCounter.Sizes(), firstTokenMs, nil
 			}
 			if ev.err != nil {
-				flushSSEEvent()
 				return usage, imageCounter.Count(), imageCounter.Sizes(), firstTokenMs, ev.err
 			}
 			processLine(ev.line)

@@ -224,6 +224,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		applyCodexFingerprintHeaders(upstreamReq.Header, fingerprintIDs)
 
 		upstreamStart := time.Now()
+		scheduleOpenCodeGoUsageActivity(s.deferredService, account)
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.resolveOpenAITLSProfile(account, tlsRouterMatch...))
 		SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 		if err != nil {
@@ -369,13 +370,13 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 	case AccountTypeOAuth:
 		targetURL = chatgptCodexURL
 	case AccountTypeAPIKey:
-		baseURL := account.GetOpenAIBaseURL()
+		baseURL := openAIResponsesUpstreamBaseURL(account)
 		if baseURL != "" {
 			validatedURL, err := s.validateUpstreamBaseURL(baseURL)
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURL(validatedURL)
+			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
 		}
 	}
 	targetURL = appendOpenAIResponsesRequestPathSuffix(targetURL, openAIResponsesRequestPathSuffix(c))
@@ -478,8 +479,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequestOpenAIPassthrough(
 		req.Header.Set("content-type", "application/json")
 	}
 
+	applyOpenCodeUpstreamUserAgent(account, req.URL.String(), req.Header)
 	account.ApplyHeaderOverrides(req.Header)
-	applyOpenCodeSessionHeader(c, account, targetURL, req.Header)
+	applyOpenCodeSessionHeader(c, account, targetURL, req.Header, body)
 	// 透传与非透传路径保持相同的 Codex 会话级 beta 头语义。
 	applyOpenAICodexBetaFeatures(c, account, req.Header)
 	setOpenAICodexRoutingHintFromBody(req.Header, account, body)
@@ -1358,6 +1360,7 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 	}
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 	defer putSSEScannerBuf64K(scanBuf)
 	documentScanner := newOpenAISSEJSONDocumentScanner(scanner)
 

@@ -80,6 +80,8 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		pricingSvc,
 		emailQueueSvc,
 		billingCacheSvc,
+		nil, // 国产供应商周期检测未在该关闭测试中启动。
+		nil, // OpenCode 用量刷新未在该关闭测试中启动。
 		&service.UsageRecordWorkerPool{},
 		nil, // dataSharingService
 		&service.DataSharingCaptureWorkerPool{},

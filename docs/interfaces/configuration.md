@@ -59,6 +59,8 @@
 
 `api_key_create.max_active_per_user` 默认 `200`，按用户未删除 Key 总数限制创建；`max_per_user_per_hour` 默认 `60`，由 Redis 固定一小时窗口累计创建次数。两者设为 `0` 可分别关闭，不能为负数。次数在实际创建前占用，删除 Key 不返还次数；Redis 故障时频率限制沿用创建自定义 Key 的放行策略，数据库计数失败仍终止创建。个人和团队 Key 继续经过 fork 的归属、订阅和分组权限校验。
 
+`gateway.cn_providers.balance_check_enabled` 默认 true，`balance_threshold` 默认 0.5（按各上游返回币种），`balance_check_interval_minutes` 默认 10。关闭开关或周期不大于零时不启动余额/套餐周期探测。OpenCode Go 的用量刷新另外使用数据库设置 `opencode_go_usage_settings`，默认关闭，最长等待默认 15 分钟（5–1440）、静默期默认 1 分钟（1–60）；账号自动刷新也须独立启用。
+
 ## 生图历史对象存储
 
 `image_history` 的 YAML/环境变量是部署默认配置，独立于备份、数据共享和已经下线的旧 `image_storage`。`enabled` 默认关闭；开启时 `bucket`、`access_key_id`、`secret_access_key` 和安全的非空 `prefix` 必填。`endpoint` 可为空以使用 AWS 默认端点，`region` 默认 `auto`，需要 path-style 的 MinIO 等实现通过 `force_path_style=true` 启用。桶应保持私有，列表预览只通过有效期受限的预签名 URL 暴露。

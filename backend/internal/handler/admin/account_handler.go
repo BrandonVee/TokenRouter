@@ -65,12 +65,18 @@ type AccountHandler struct {
 	tokenCacheInvalidator   service.TokenCacheInvalidator
 	grokImportProber        grokImportProber
 	ollamaCloudUsage        *service.OllamaCloudUsageService
+	opencodeGoUsage         *service.OpenCodeGoUsageService
 	advancedSchedulerScores *service.AdvancedSchedulerScoreDiagnosticService
 }
 
 // SetOllamaCloudUsageService 注入 Ollama Cloud 用量服务。
 func (h *AccountHandler) SetOllamaCloudUsageService(usage *service.OllamaCloudUsageService) {
 	h.ollamaCloudUsage = usage
+}
+
+// SetOpenCodeGoUsageService 注入只访问官方 Go 用量端点的刷新服务。
+func (h *AccountHandler) SetOpenCodeGoUsageService(usage *service.OpenCodeGoUsageService) {
+	h.opencodeGoUsage = usage
 }
 
 // SetAdvancedSchedulerScoreDiagnosticService 注入账号高级调度评分诊断服务。
@@ -587,6 +593,16 @@ func (h *AccountHandler) List(c *gin.Context) {
 			accountPointers[index] = &accounts[index]
 		}
 		if err := h.ollamaCloudUsage.ResolveAccounts(c.Request.Context(), accountPointers); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
+	if h.opencodeGoUsage != nil && len(accounts) > 0 {
+		pointers := make([]*service.Account, len(accounts))
+		for i := range accounts {
+			pointers[i] = &accounts[i]
+		}
+		if err := h.opencodeGoUsage.ResolveOpenCodeGoUsageAccounts(c.Request.Context(), pointers); err != nil {
 			response.ErrorFrom(c, err)
 			return
 		}

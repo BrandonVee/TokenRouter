@@ -328,7 +328,7 @@ func (s *AntigravityGatewayService) handleAntigravityCompatStream(
 		c.Status(http.StatusOK)
 	}
 	session := newAntigravityCompatStreamSession(originalModel, startTime, adapter, writer)
-	events, stopScanner, maxLineSize := s.startAntigravityCompatScanner(resp.Body)
+	events, stopScanner, maxLineSize, queueBudget := s.startAntigravityCompatScanner(resp.Body)
 	defer stopScanner()
 
 	timeout := s.antigravityCompatStreamTimeout()
@@ -344,6 +344,9 @@ func (s *AntigravityGatewayService) handleAntigravityCompatStream(
 	for {
 		select {
 		case event, open := <-events:
+			if open {
+				queueBudget.release(len(event.line))
+			}
 			if !open {
 				if !session.hasMeaningfulData() && !writer.Disconnected() {
 					return nil, antigravityCompatEmptyStreamError()
@@ -377,7 +380,7 @@ func (s *AntigravityGatewayService) handleAntigravityCompatStream(
 
 func (s *AntigravityGatewayService) startAntigravityCompatScanner(
 	body io.Reader,
-) (<-chan antigravityCompatScanEvent, func(), int) {
+) (<-chan antigravityCompatScanEvent, func(), int, *sseQueueBudget) {
 	maxLineSize := defaultMaxLineSize
 	if s.settingService != nil && s.settingService.cfg != nil && s.settingService.cfg.Gateway.MaxLineSize > 0 {
 		maxLineSize = s.settingService.cfg.Gateway.MaxLineSize
@@ -385,6 +388,8 @@ func (s *AntigravityGatewayService) startAntigravityCompatScanner(
 	scanner := bufio.NewScanner(body)
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.antigravitySSEConfig(), maxLineSize, nil))
+	queueBudget := newSSEQueueBudget(s.antigravitySSEConfig())
 
 	events := make(chan antigravityCompatScanEvent, 16)
 	done := make(chan struct{})
@@ -392,10 +397,14 @@ func (s *AntigravityGatewayService) startAntigravityCompatScanner(
 		defer putSSEScannerBuf64K(scanBuf)
 		defer close(events)
 		send := func(event antigravityCompatScanEvent) bool {
+			if !queueBudget.acquire(len(event.line), done) {
+				return false
+			}
 			select {
 			case events <- event:
 				return true
 			case <-done:
+				queueBudget.release(len(event.line))
 				return false
 			}
 		}
@@ -408,7 +417,7 @@ func (s *AntigravityGatewayService) startAntigravityCompatScanner(
 			send(antigravityCompatScanEvent{err: err})
 		}
 	}()
-	return events, func() { close(done) }, maxLineSize
+	return events, func() { close(done) }, maxLineSize, queueBudget
 }
 
 func (s *AntigravityGatewayService) antigravityCompatStreamTimeout() time.Duration {

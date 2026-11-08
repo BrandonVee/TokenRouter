@@ -15,6 +15,8 @@ import (
 )
 
 type rateLimitAccountRepoStub struct {
+	rateLimitedCalls  int
+	lastRateLimitedAt time.Time
 	mockAccountRepoForGemini
 	setErrorCalls          int
 	tempCalls              int
@@ -27,6 +29,13 @@ type rateLimitAccountRepoStub struct {
 	lastTempReason         string
 	lastErrorID            int64
 	lastTempID             int64
+}
+
+// 记录账号级限流，验证钱包级或并发错误不会扩大处罚范围。
+func (r *rateLimitAccountRepoStub) SetRateLimited(_ context.Context, _ int64, until time.Time) error {
+	r.rateLimitedCalls++
+	r.lastRateLimitedAt = until
+	return nil
 }
 
 func (r *rateLimitAccountRepoStub) SetError(ctx context.Context, id int64, errorMsg string) error {

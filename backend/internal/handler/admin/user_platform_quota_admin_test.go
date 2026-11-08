@@ -105,7 +105,12 @@ func TestUpdateUserPlatformQuotas_Success(t *testing.T) {
 		{"platform":"kimi","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
 		{"platform":"qoder","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
 		{"platform":"grok","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
-		{"platform":"zhipu","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null}
+		{"platform":"zhipu","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
+		{"platform":"minimax","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
+		{"platform":"opencode_go","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
+		{"platform":"typesafe","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
+		{"platform":"command_code","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null},
+		{"platform":"cline","daily_limit_usd":null,"weekly_limit_usd":null,"monthly_limit_usd":null}
 	]}`
 	c, w := putReq(t, body)
 	h.UpdateUserPlatformQuotas(c)

@@ -495,6 +495,8 @@
         </div>
       </div>
 
+      <OpenCodeGoProtocolRulesEditor v-if="isCNPlatform && providerRoutesByModel(form.platform) && apiProtocol === 'adaptive'" v-model:rows="providerProtocolRules" :platform="form.platform" :plan="accountMode" />
+
       <!-- Account Type Selection (Gemini) -->
       <div v-if="form.platform === 'gemini'">
         <div class="flex items-center justify-between">
@@ -4140,6 +4142,7 @@ import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
 import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
+import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import {
@@ -4148,6 +4151,14 @@ import {
   applyInterceptWarmup,
   defaultCNAdaptiveBaseUrls,
   defaultCNBaseUrl,
+  providerAccountModes,
+  providerNativeProtocols,
+  providerRoutesByModel,
+  defaultProviderProtocolRules,
+  cloneOpenCodeGoProtocolRules,
+  type OpenCodeGoProtocolRule,
+  applyOpenCodeGoProtocolRules,
+  resolveProviderAccountMode,
   CN_BASE_URL_PRESETS,
   isHeaderOverrideCapable,
   validateHeaderOverrideRows,
@@ -4375,41 +4386,23 @@ const submitting = ref(false)
 const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_account'>('apikey')
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
-const accountMode = ref<CnAccountMode>('payg')
+const accountMode = ref<string>('payg')
 const apiProtocol = ref<CnApiProtocol>('adaptive')
+const providerProtocolRules = ref<OpenCodeGoProtocolRule[]>([])
 const adaptiveBaseUrls = ref<Record<CnNativeApiProtocol, string>>({ chat_completions: '', anthropic: '', responses: '' })
 
 // 国产 OpenAI 兼容供应商默认使用 API Key，端点仍允许管理员覆盖。
-const cnProviderPlatformOptions = [
-  { value: 'kimi' as const, label: 'Kimi' },
-  { value: 'zhipu' as const, label: '智谱 GLM' },
-  { value: 'deepseek' as const, label: 'DeepSeek' },
+const cnProviderPlatformOptions: Array<{value:AccountPlatform;label:string}> = [
+ {value:'kimi',label:'Kimi'},{value:'zhipu',label:'智谱 GLM'},{value:'deepseek',label:'DeepSeek'},
+ {value:'minimax',label:'MiniMax'},{value:'opencode_go',label:'OpenCode'},{value:'command_code',label:'Command Code'},{value:'cline',label:'Cline'},{value:'typesafe',label:'TypeSafe / Jev'}
 ]
-const isCNPlatform = computed(() => ['kimi', 'zhipu', 'deepseek'].includes(form.platform))
-const cnPresetPlatform = computed<'kimi' | 'zhipu' | 'deepseek'>(() =>
-  isCNPlatform.value ? (form.platform as 'kimi' | 'zhipu' | 'deepseek') : 'kimi'
+const isCNPlatform = computed(() => ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(form.platform))
+const cnPresetPlatform = computed<string>(() =>
+  isCNPlatform.value ? (form.platform as string) : 'kimi'
 )
-const cnAccountModeOptions = computed(() =>
-  form.platform === 'deepseek'
-    ? [{ value: 'payg' as const }]
-    : [{ value: 'payg' as const }, { value: 'coding' as const }]
-)
-const cnProtocolOptions = computed(() => {
-  const options: Array<{ value: CnApiProtocol; labelKey: 'adaptive' | 'chatCompletions' | 'anthropic' | 'responses' }> = [
-    { value: 'adaptive', labelKey: 'adaptive' },
-    { value: 'chat_completions' as const, labelKey: 'chatCompletions' },
-    { value: 'anthropic' as const, labelKey: 'anthropic' }
-  ]
-  if (form.platform === 'deepseek') options.push({ value: 'responses' as const, labelKey: 'responses' })
-  return options
-})
-const cnAdaptiveProtocolOptions = computed<Array<{ value: CnNativeApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }>>(() => {
-  const options: Array<{ value: CnNativeApiProtocol; labelKey: 'chatCompletions' | 'anthropic' | 'responses' }> = [
-    { value: 'chat_completions', labelKey: 'chatCompletions' }, { value: 'anthropic', labelKey: 'anthropic' }
-  ]
-  if (form.platform === 'deepseek') options.push({ value: 'responses', labelKey: 'responses' })
-  return options
-})
+const cnAccountModeOptions = computed(() => providerAccountModes(form.platform).map(value => ({ value })))
+const cnAdaptiveProtocolOptions = computed<Array<{value:CnNativeApiProtocol;labelKey:'chatCompletions'|'anthropic'|'responses'}>>(() => providerNativeProtocols(form.platform, accountMode.value).map(value=>({value,labelKey:value==='chat_completions'?'chatCompletions':value})))
+const cnProtocolOptions = computed(() => [{value:'adaptive' as CnApiProtocol,labelKey:'adaptive'}, ...cnAdaptiveProtocolOptions.value])
 const onCnPresetSelect = (preset: CnBaseUrlPreset) => {
   accountMode.value = preset.mode
   apiProtocol.value = preset.protocol
@@ -5226,15 +5219,17 @@ watch(
   }
 )
 
+watch([() => form.platform, accountMode], ([platform, mode]) => { providerProtocolRules.value = cloneOpenCodeGoProtocolRules(defaultProviderProtocolRules(platform, mode)) })
+
 // Reset platform-specific settings when platform changes
 watch(
   () => form.platform,
   (newPlatform) => {
     accountCategory.value = 'apikey'
-    accountMode.value = 'payg'
-    apiProtocol.value = ['kimi', 'zhipu', 'deepseek'].includes(newPlatform) ? 'adaptive' : 'chat_completions'
-    if (['kimi', 'zhipu', 'deepseek'].includes(newPlatform)) {
-      adaptiveBaseUrls.value = defaultCNAdaptiveBaseUrls(newPlatform as 'kimi' | 'zhipu' | 'deepseek', accountMode.value)
+    accountMode.value = resolveProviderAccountMode(newPlatform, '')
+    apiProtocol.value = ['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(newPlatform) ? 'adaptive' : 'chat_completions'
+    if (['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(newPlatform)) {
+      adaptiveBaseUrls.value = defaultCNAdaptiveBaseUrls(newPlatform as string, accountMode.value)
     }
     // Reset base URL based on platform
     apiKeyBaseUrl.value =
@@ -5253,6 +5248,8 @@ watch(
                 : newPlatform === 'deepseek'
                   ? defaultCNBaseUrl('deepseek', accountMode.value, apiProtocol.value)
             : 'https://api.anthropic.com'
+    if (isCNPlatform.value) apiKeyBaseUrl.value = defaultCNBaseUrl(newPlatform, accountMode.value, apiProtocol.value)
+    if (newPlatform === 'typesafe') apiKeyBaseUrl.value = 'https://api.typesafe.ai'
     // 切换平台时旧平台模型不再适用。Qoder 由账号 model_mapping
     // 配置展示/请求模型，默认不填充会过期的前端硬编码白名单。
     allowedModels.value = newPlatform === 'qoder' ? [] : [...getModelsByPlatform(newPlatform)]
@@ -6366,18 +6363,19 @@ const handleSubmit = async () => {
 
   // Build credentials with optional model mapping
   const credentials: Record<string, unknown> = {
-    base_url: enteredBaseUrl || defaultBaseUrl,
+    base_url: enteredBaseUrl || (form.platform==='typesafe'?'https://api.typesafe.ai':defaultBaseUrl),
     api_key: apiKeyValue.value.trim()
   }
   if (isCNPlatform.value) {
-    credentials.account_mode = form.platform === 'deepseek' ? 'payg' : accountMode.value
+    credentials.account_mode = resolveProviderAccountMode(form.platform, accountMode.value)
     credentials.api_protocol = apiProtocol.value
+    if (providerRoutesByModel(form.platform)) applyOpenCodeGoProtocolRules(credentials, providerProtocolRules.value, 'create')
 	if (apiProtocol.value === 'adaptive') {
-		const defaults = defaultCNAdaptiveBaseUrls(form.platform as 'kimi' | 'zhipu' | 'deepseek', credentials.account_mode as CnAccountMode)
+		const defaults = defaultCNAdaptiveBaseUrls(form.platform as string, credentials.account_mode as CnAccountMode)
 		credentials.api_base_urls = Object.fromEntries(cnAdaptiveProtocolOptions.value.map(item => [item.value, (adaptiveBaseUrls.value[item.value] || defaults[item.value]).trim()]))
 		credentials.base_url = (credentials.api_base_urls as Record<string, string>).chat_completions
 	} else if (!enteredBaseUrl) {
-		credentials.base_url = defaultCNBaseUrl(form.platform as 'kimi' | 'zhipu' | 'deepseek', credentials.account_mode as CnAccountMode, apiProtocol.value)
+		credentials.base_url = defaultCNBaseUrl(form.platform as string, credentials.account_mode as CnAccountMode, apiProtocol.value)
 	}
   }
   if (form.platform === 'gemini') {

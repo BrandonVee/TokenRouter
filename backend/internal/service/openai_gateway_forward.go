@@ -118,13 +118,6 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	reqModel, reqStream, promptCacheKey := requestView.Model, requestView.Stream, requestView.PromptCacheKey
 	originalModel := reqModel
 
-	if account.Platform == PlatformGrok {
-		return s.forwardGrokResponses(ctx, c, account, body, originalModel, reqStream, startTime)
-	}
-	// Kimi/智谱没有原生 Responses，按自适应策略回退到 CC；DeepSeek 保留原生 Responses。
-	if account.IsAdaptiveAPIProtocol() && account.Platform != PlatformDeepseek {
-		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body, tlsRouterMatch)
-	}
 	if err := validateOpenAIReasoningEffort(body, originalModel); err != nil {
 		if c != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -138,9 +131,25 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, err
 	}
 
-	if account.Type == AccountTypeAPIKey && !openai_compat.ShouldUseResponsesAPI(account.Extra) {
+	if account.Platform == PlatformGrok {
+		return s.forwardGrokResponses(ctx, c, account, body, originalModel, reqStream, startTime)
+	}
+	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(account.GetMappedModel(gjson.GetBytes(body, "model").String())) {
+		return nil, writeOpenCodeUnsupportedModelError(c, false, gjson.GetBytes(body, "model").String())
+	}
+	rememberOpenCodeInboundBody(c, body)
+	switch s.resolveUpstreamProtocolFor(ctx, account, APIProtocolResponses, upstreamRoutingModel(account, body, "")) {
+	case APIProtocolAnthropic:
+		return s.forwardResponsesViaNativeAnthropic(ctx, c, account, body, "")
+	case APIProtocolChatCompletions:
 		return s.forwardResponsesViaRawChatCompletions(ctx, c, account, body, tlsRouterMatch)
 	}
+	body = normalizeDeepSeekResponsesRequestBody(account, body)
+	// 规范化后的正文必须成为后续惰性解析和局部 patch 的共同基线，避免恢复旧 store/续接字段。
+	originalBody = body
+	requestView = newOpenAIRequestView(body)
+	reqModel, reqStream, promptCacheKey = requestView.Model, requestView.Stream, requestView.PromptCacheKey
+
 	if account.Platform == PlatformOpenAI && account.Type == AccountTypeAPIKey {
 		sanitizedBody, changed, sanitizeErr := sanitizeOpenAIResponsesInputItemIDs(body)
 		if sanitizeErr != nil {
@@ -322,6 +331,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		markPatchSet("model", billingModel)
 	}
 	upstreamModel := billingModel
+	if cap, clamped := ollamaCloudResponsesMaxOutputTokensClamp(account, upstreamModel, body); clamped {
+		markPatchSet("max_output_tokens", cap)
+	}
 	isCompactRequest := compactPath
 	compactMapped := false
 	if isCompactRequest {
@@ -478,7 +490,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		maxOutputTokens := gjson.GetBytes(body, "max_output_tokens")
 		if maxOutputTokens.Exists() {
 			switch account.Platform {
-			case PlatformOpenAI:
+			case PlatformOpenAI, PlatformDeepseek, PlatformKimi, PlatformMiniMax, PlatformOpenCodeGo, PlatformCommandCode:
 				// 先保留 Responses 原生输出上限；仅当选中上游明确拒绝时，才在下方有界 HTTP 重试中移除。
 			case PlatformAnthropic:
 				decoded, decodeErr := ensureReqBody()
@@ -855,6 +867,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 
 		upstreamStart := time.Now()
+		scheduleOpenCodeGoUsageActivity(s.deferredService, account)
 		resp, err := s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.resolveOpenAITLSProfile(account, tlsRouterMatch))
 		SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 		if headerGuard != nil && headerGuard.stopHeaderWait() {
@@ -1048,10 +1061,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 		targetURL = chatgptCodexURL
 	case AccountTypeAPIKey:
 		// API Key accounts use Platform API or custom base URL
-		baseURL := account.GetOpenAIBaseURL()
-		if account.Platform == PlatformDeepseek && account.IsAdaptiveAPIProtocol() {
-			baseURL = account.GetCNProtocolBaseURL(APIProtocolResponses)
-		}
+		baseURL := openAIResponsesUpstreamBaseURL(account)
 		if baseURL == "" {
 			targetURL = openaiPlatformAPIURL
 		} else {
@@ -1059,7 +1069,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			if err != nil {
 				return nil, err
 			}
-			targetURL = buildOpenAIResponsesURL(validatedURL)
+			targetURL = buildOpenAIResponsesURLForPlatform(account.Platform, validatedURL)
 		}
 	default:
 		targetURL = openaiPlatformAPIURL
@@ -1154,8 +1164,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	}
 
 	// 账号级请求头覆写（仅 openai api_key 账号启用时生效；OAuth 路径 no-op）
+	applyOpenCodeUpstreamUserAgent(account, req.URL.String(), req.Header)
 	account.ApplyHeaderOverrides(req.Header)
-	applyOpenCodeSessionHeader(c, account, targetURL, req.Header)
+	applyOpenCodeSessionHeader(c, account, targetURL, req.Header, body)
 	// Codex beta 功能头是会话级属性，需在账号覆写后统一补齐。
 	applyOpenAICodexBetaFeatures(c, account, req.Header)
 	setOpenAICodexRoutingHintFromBody(req.Header, account, body)
@@ -1186,4 +1197,28 @@ func (s *OpenAIGatewayService) overrideBrowserUserAgent(ctx context.Context, acc
 		}
 	}
 	req.Header.Set("user-agent", codexUA)
+}
+
+func shouldForwardOpenAIResponsesViaRawChatCompletions(account *Account) bool {
+	if account == nil || account.Type != AccountTypeAPIKey {
+		return false
+	}
+	if account.routesByModel() {
+
+		return false
+	}
+	if account.RoutesProtocolByInbound() {
+		// 按入站协议分流的供应商（国产厂商等）：显式协议配置优先于异步探针
+		// Extra；adaptive 仅在供应商有原生 Responses 端点时直转，否则回退
+		// Chat Completions（如 GLM）。
+		switch account.GetAPIProtocol() {
+		case APIProtocolChatCompletions:
+			return true
+		case APIProtocolAdaptive:
+			return !account.SupportsNativeCNResponses()
+		default:
+			return false
+		}
+	}
+	return !openai_compat.ShouldUseResponsesAPI(account.Extra)
 }

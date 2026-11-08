@@ -137,6 +137,10 @@ Apple Container 的 `APPLE_CONTAINER_NETWORK_SUBNET` 只在创建受管网络时
 
 该层有两条专属告警，出现即说明预期与实际计费脱节：`override entry %q skipped: not a JSON object`（补丁不是对象），以及 `override had no effect for N model(s)`（模型名拼错，或纯补丁条目落在不存在的模型上，被有效性过滤丢弃）。本变更同样只改代码，不涉及迁移；需要回滚时直接移除该配置键即可回到两层数据。
 
+### 平台目录约束迁移
+
+迁移 `265_platform_catalog_constraints.sql` 移除用户平台额度和 Composite 路由目标的旧固定 CHECK；合法平台由后端目录、服务校验及 Ent 验证共同限定。现有记录不改写，新增五个平台从同一清单进入额度、路由和管理表单。渠道监控的 provider CHECK 表达实际探测能力，继续保留。升级完成后确认新平台可保存、未知平台仍被应用拒绝；旧二进制不认识新平台，不应承接已配置新平台的流量。
+
 ### 通用高级调度器迁移
 
 迁移 `238_generalize_advanced_scheduler.sql` 为 `groups` 增加受约束的 `scheduler_type`，默认 `basic`，并把旧 OpenAI 实验调度器转换为按分组选择的通用高级调度器。旧 `openai_advanced_scheduler_enabled=true` 时，仅既有 OpenAI 与 Grok 分组回填为 `advanced`；开关为 false 或不存在时，所有存量分组保持基础。其它平台不会被自动升级，新建分组始终为基础。

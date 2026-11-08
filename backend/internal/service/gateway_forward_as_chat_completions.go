@@ -231,13 +231,16 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 		maxLineSize = s.cfg.Gateway.MaxLineSize
 	}
 	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 
 	var finalResp *apicompat.AnthropicResponse
 	var usage ClaudeUsage
+	streamStatus := &anthropicCompatStream{body: resp.Body}
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		// SSE 规范允许冒号后不带空格，必须兼容紧凑格式的 Anthropic 上游。
+		// SSE 规范允许 `event:xxx`（冒号后无空格）：Kimi 等 Anthropic 兼容上游
+		// 返回紧凑格式，严格匹配 "event: " 会丢弃全部事件（#4653 同根因）。
 		if _, ok := extractOpenAISSEEventLine(line); !ok {
 			continue
 		}
@@ -253,6 +256,11 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 		var event apicompat.AnthropicStreamEvent
 		if err := json.Unmarshal([]byte(payload), &event); err != nil {
 			continue
+		}
+
+		streamStatus.observe(&event, payload)
+		if streamStatus.upstreamErrType != "" {
+			break
 		}
 
 		// message_start carries the initial response structure and cache usage
@@ -275,7 +283,7 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 		}
 		if event.Type == "content_block_delta" && event.Delta != nil && finalResp != nil && event.Index != nil {
 			idx := *event.Index
-			if idx < len(finalResp.Content) {
+			if idx >= 0 && idx < len(finalResp.Content) {
 				switch event.Delta.Type {
 				case "text_delta":
 					finalResp.Content[idx].Text += event.Delta.Text
@@ -295,6 +303,17 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 				zap.String("request_id", requestID),
 			)
 		}
+	}
+
+	streamStatus.readErr = scanner.Err()
+	if failure := streamStatus.failure(); failure != nil {
+		_ = resp.Body.Close()
+		writeGatewayCCError(c, http.StatusBadGateway, "server_error", failure.message)
+		return &ForwardResult{
+			RequestID: requestID, UpstreamHeaders: resp.Header, Usage: usage,
+			Model: originalModel, UpstreamModel: mappedModel, ReasoningEffort: reasoningEffort,
+			Duration: time.Since(startTime),
+		}, failure.err
 	}
 
 	if finalResp == nil {
@@ -327,22 +346,21 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 	c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	// Marshal then bytes-replace so tool name mapping is reversed at byte level
 	// (parity with Parrot non-stream flow that marshals → restore → emit).
-	var responseBody []byte
-	if respBytes, err := json.Marshal(ccResp); err == nil {
-		respBytes = reverseToolNamesIfPresent(c, respBytes)
-		responseBody = cloneDataSharingRequestBody(respBytes)
-		c.Data(http.StatusOK, "application/json; charset=utf-8", respBytes)
-	} else {
-		c.JSON(http.StatusOK, ccResp)
+	responseBody, err := json.Marshal(ccResp)
+	if err != nil {
+		return nil, err
 	}
+	responseBody = reverseToolNamesIfPresent(c, responseBody)
+	c.Data(http.StatusOK, "application/json; charset=utf-8", responseBody)
 
 	return &ForwardResult{
 		RequestID:       requestID,
+		UpstreamHeaders: resp.Header,
+		ResponseBody:    cloneDataSharingRequestBody(responseBody),
 		Usage:           usage,
 		Model:           originalModel,
 		UpstreamModel:   mappedModel,
 		ReasoningEffort: reasoningEffort,
-		ResponseBody:    responseBody,
 		Stream:          false,
 		Duration:        time.Since(startTime),
 	}, nil
@@ -374,32 +392,31 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 	anthState := apicompat.NewAnthropicEventToResponsesState()
 	anthState.Model = originalModel
 	ccState := apicompat.NewResponsesEventToChatState()
-	ccState.Model = originalModel
 	ccState.IncludeUsage = includeUsage
+	ccState.Model = originalModel
+	streamAccumulator := newOpenAIChatCompletionsStreamAccumulator(originalModel)
 
 	var usage ClaudeUsage
 	var firstTokenMs *int
 	firstChunk := true
-	streamAccumulator := newOpenAIChatCompletionsStreamAccumulator(originalModel)
+	writerSizeBeforeStream := c.Writer.Size()
 
-	scanner := bufio.NewScanner(resp.Body)
-	maxLineSize := defaultMaxLineSize
-	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
-		maxLineSize = s.cfg.Gateway.MaxLineSize
-	}
-	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
+	stream := newAnthropicCompatStream(s.cfg, c, resp, "forward_as_cc", requestID)
+	defer stream.stop()
 
 	resultWithUsage := func() *ForwardResult {
 		return &ForwardResult{
-			RequestID:       requestID,
-			Usage:           usage,
-			Model:           originalModel,
-			UpstreamModel:   mappedModel,
-			ReasoningEffort: reasoningEffort,
-			ResponseBody:    streamAccumulator.ResponseBody(openAIUsageFromClaudeUsage(usage)),
-			Stream:          true,
-			Duration:        time.Since(startTime),
-			FirstTokenMs:    firstTokenMs,
+			RequestID:        requestID,
+			UpstreamHeaders:  resp.Header,
+			ResponseBody:     streamAccumulator.ResponseBody(openAIUsageFromClaudeUsage(usage)),
+			Usage:            usage,
+			Model:            originalModel,
+			UpstreamModel:    mappedModel,
+			ReasoningEffort:  reasoningEffort,
+			Stream:           true,
+			Duration:         time.Since(startTime),
+			FirstTokenMs:     firstTokenMs,
+			ClientDisconnect: stream.clientDisconnected,
 		}
 	}
 
@@ -410,15 +427,30 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 		}
 		payload = reverseToolNamesIfPresent(c, payload)
 		observeOpenAIChatStreamPayload(streamAccumulator, payload, openAIUsageFromClaudeUsage(usage))
-		// Reverse tool name mapping: fake → real, per-chunk bytes.Replace.
-		// c 可能持有请求侧注入的 ToolNameRewrite；无则仅做静态前缀还原。
+		if stream.clientDisconnected {
+			return false
+		}
 		if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", payload); err != nil {
-			return true // client disconnected
+			return true
 		}
 		return false
 	}
 
-	processAnthropicEvent := func(event *apicompat.AnthropicStreamEvent) bool {
+	processAnthropicEvent := func(event *apicompat.AnthropicStreamEvent) {
+		if event == nil {
+			return
+		}
+		if event.Type == "ping" {
+			if stream.clientDisconnected {
+				return
+			}
+			if _, err := fmt.Fprint(c.Writer, ": ping\n\n"); err != nil {
+				stream.markClientDisconnected()
+				return
+			}
+			c.Writer.Flush()
+			return
+		}
 		if firstChunk {
 			firstChunk = false
 			ms := int(time.Since(startTime).Milliseconds())
@@ -433,6 +465,8 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 		if event.Type == "message_start" && event.Message != nil {
 			mergeAnthropicUsage(&usage, event.Message.Usage)
 		}
+		syncAnthropicResponsesUsage(anthState, usage)
+		normalizeAnthropicEventUsageForResponses(event, usage)
 
 		// Chain: Anthropic event → Responses events → CC chunks
 		responsesEvents := apicompat.AnthropicEventToResponsesEvents(event, anthState)
@@ -440,25 +474,29 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 			ccChunks := apicompat.ResponsesEventToChatChunks(&resEvt, ccState)
 			for _, chunk := range ccChunks {
 				if disconnected := writeChunk(chunk); disconnected {
-					return true
+					stream.markClientDisconnected()
+					return
 				}
 			}
 		}
 		c.Writer.Flush()
-		return false
 	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		// 与缓冲路径一致，接受冒号后无空格的紧凑 SSE 格式。
+	for {
+		line, ok := stream.nextLine()
+		if !ok {
+			break
+		}
+		// 与缓冲路径一致：接受 SSE 紧凑格式（冒号后无空格，#4653 同根因）。
 		if _, ok := extractOpenAISSEEventLine(line); !ok {
 			continue
 		}
 
-		if !scanner.Scan() {
+		dataLine, ok := stream.nextLine()
+		if !ok {
 			break
 		}
-		payload, ok := extractOpenAISSEDataLine(scanner.Text())
+		payload, ok := extractOpenAISSEDataLine(dataLine)
 		if !ok {
 			continue
 		}
@@ -468,18 +506,22 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 			continue
 		}
 
-		if processAnthropicEvent(&event) {
-			return resultWithUsage(), nil
+		ccState.IncludeUsage = ccState.IncludeUsage || anthropicChatStreamHasUsage(&event, payload)
+
+		stream.observe(&event, payload)
+		if stream.upstreamErrType != "" {
+			break
 		}
+		processAnthropicEvent(&event)
 	}
 
-	if err := scanner.Err(); err != nil {
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			logger.L().Warn("forward_as_cc stream: read error",
-				zap.Error(err),
-				zap.String("request_id", requestID),
-			)
-		}
+	if failure := stream.failure(); failure != nil {
+		return finishAnthropicCompatStreamFailure(c, writerSizeBeforeStream, failure, resultWithUsage(), func() {
+			writeAnthropicCompatCCStreamFailure(c, failure)
+		})
+	}
+	if stream.clientDisconnected {
+		return resultWithUsage(), nil
 	}
 
 	// Finalize both state machines
@@ -520,5 +562,16 @@ func openAIUsageFromClaudeUsage(usage ClaudeUsage) *OpenAIUsage {
 		InputTokens:          usage.InputTokens,
 		OutputTokens:         usage.OutputTokens,
 		CacheReadInputTokens: usage.CacheReadInputTokens,
+	}
+}
+
+func anthropicChatStreamHasUsage(event *apicompat.AnthropicStreamEvent, payload string) bool {
+	switch event.Type {
+	case "message_start":
+		return event.Message != nil && gjson.Get(payload, "message.usage").IsObject()
+	case "message_delta":
+		return event.Usage != nil
+	default:
+		return false
 	}
 }

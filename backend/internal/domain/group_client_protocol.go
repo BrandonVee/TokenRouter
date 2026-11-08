@@ -22,7 +22,7 @@ var canonicalGroupClientProtocols = []GroupClientProtocol{
 // SupportedGroupClientProtocols 返回平台实际实现的客户端协议集合。
 func SupportedGroupClientProtocols(platform string) []GroupClientProtocol {
 	switch platform {
-	case PlatformAnthropic, PlatformOpenAI, PlatformQoder, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek:
+	case PlatformAnthropic, PlatformOpenAI, PlatformQoder, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformCommandCode, PlatformCline:
 		return []GroupClientProtocol{
 			GroupClientProtocolAnthropicMessages,
 			GroupClientProtocolOpenAIResponses,
@@ -41,7 +41,7 @@ func DefaultGroupClientProtocols(platform string) []GroupClientProtocol {
 	switch platform {
 	case PlatformAnthropic:
 		return []GroupClientProtocol{GroupClientProtocolAnthropicMessages}
-	case PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek:
+	case PlatformOpenAI, PlatformGrok, PlatformKimi, PlatformZhipu, PlatformDeepseek, PlatformMiniMax, PlatformOpenCodeGo, PlatformCommandCode, PlatformCline:
 		return []GroupClientProtocol{
 			GroupClientProtocolOpenAIResponses,
 			GroupClientProtocolOpenAIChatCompletions,

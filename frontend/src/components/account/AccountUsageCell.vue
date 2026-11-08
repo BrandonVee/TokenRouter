@@ -419,9 +419,13 @@
     </template>
 
     <!-- 国产供应商：按账号模式展示余额或 Coding Plan 窗口。 -->
-    <template v-else-if="['kimi', 'zhipu', 'deepseek'].includes(account.platform)">
-      <CNProviderBalanceCell :account="account" />
-      <CNProviderQuotaCell :account="account" />
+    <template v-else-if="['kimi', 'zhipu', 'deepseek', 'minimax', 'opencode_go', 'command_code', 'cline'].includes(account.platform)">
+      <OpenCodeGoUsageCell v-if="account.opencode_go_usage?.eligible" :account="account" />
+      <OllamaCloudUsageCell v-else-if="account.ollama_cloud_usage?.eligible" :account="account" />
+      <template v-else>
+        <CNProviderBalanceCell :account="account" />
+        <CNProviderQuotaCell :account="account" />
+      </template>
     </template>
 
     <!-- Qoder COSY 账号：上游月度 credits -->
@@ -651,6 +655,7 @@
     <AccountQuotaInfo v-else-if="account.platform === 'gemini'" :account="account" />
     <!-- Key/Bedrock accounts: show today stats + optional quota bars -->
     <div v-else class="space-y-1">
+      <OpenCodeGoUsageCell v-if="account.opencode_go_usage?.eligible" :account="account" />
       <OllamaCloudUsageCell
         v-if="account.ollama_cloud_usage?.eligible"
         :account="account"
@@ -736,6 +741,7 @@ import UsageProgressBar from './UsageProgressBar.vue'
 import AccountQuotaInfo from './AccountQuotaInfo.vue'
 import OpenAIQuotaResetCell from './OpenAIQuotaResetCell.vue'
 import GrokQuotaProbeCell from './GrokQuotaProbeCell.vue'
+import OpenCodeGoUsageCell from './OpenCodeGoUsageCell.vue'
 import OllamaCloudUsageCell from './OllamaCloudUsageCell.vue'
 import CNProviderBalanceCell from './CNProviderBalanceCell.vue'
 import CNProviderQuotaCell from './CNProviderQuotaCell.vue'
@@ -801,6 +807,7 @@ const isGeminiThirdPartyProvider = computed(() => {
 
 // Show usage windows for OAuth and Setup Token accounts
 const showUsageWindows = computed(() => {
+  if (['kimi','zhipu','deepseek','minimax','opencode_go','command_code','cline'].includes(props.account.platform)) return true
   // 第三方 Gemini 账号没有官方等级，不能展示或请求本地模拟配额。
   if (props.account.platform === 'gemini') return !isGeminiThirdPartyProvider.value
   if (props.account.platform === 'qoder') return true

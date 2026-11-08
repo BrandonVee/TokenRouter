@@ -298,7 +298,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	teamService := service.NewTeamService(teamRepository, userRepository, emailService, apiKeyCache, teamInvitationLimiter, settingService, configConfig)
 	teamHandler := admin.NewTeamHandler(teamService)
 	ollamaCloudUsageService := service.ProvideOllamaCloudUsageService(accountRepository, httpUpstream, settingService, secretEncryptor, configConfig, leaderLockCache, db)
-	adminHandlers := handler.ProvideAdminHandlers(dashboardHandler, adminUserHandler, groupHandler, accountHandler, adminAnnouncementHandler, dataManagementHandler, backupHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, grokOAuthHandler, cnProviderHandler, qoderOAuthHandler, proxyHandler, adminRedeemHandler, promoHandler, settingHandler, opsHandler, systemHandler, adminSubscriptionHandler, adminUsageHandler, userAttributeHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, tlsFingerprintRouterHandler, adminAPIKeyHandler, scheduledTestHandler, channelHandler, contentModerationHandler, paymentHandler, affiliateHandler, dataSharingHandler, imageHistoryHandler, fileStorageHandler, codexInviteResetHandler, auditLogHandler, teamHandler, ollamaCloudUsageService)
+	openCodeGoUsageService := service.ProvideOpenCodeGoUsageService(accountRepository, httpUpstream, settingService, leaderLockCache, db)
+	adminHandlers := handler.ProvideAdminHandlers(dashboardHandler, adminUserHandler, groupHandler, accountHandler, adminAnnouncementHandler, dataManagementHandler, backupHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, grokOAuthHandler, cnProviderHandler, qoderOAuthHandler, proxyHandler, adminRedeemHandler, promoHandler, settingHandler, opsHandler, systemHandler, adminSubscriptionHandler, adminUsageHandler, userAttributeHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, tlsFingerprintRouterHandler, adminAPIKeyHandler, scheduledTestHandler, channelHandler, contentModerationHandler, paymentHandler, affiliateHandler, dataSharingHandler, imageHistoryHandler, fileStorageHandler, codexInviteResetHandler, auditLogHandler, teamHandler, ollamaCloudUsageService, openCodeGoUsageService)
 	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)
 	userMsgQueueCache := repository.NewUserMsgQueueCache(redisClient)
 	userMessageQueueService := service.ProvideUserMessageQueueService(userMsgQueueCache, rpmCache, configConfig)
@@ -349,11 +350,12 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	subscriptionExpiryService := service.ProvideSubscriptionExpiryService(userSubscriptionRepository, settingRepository, notificationEmailService, leaderLockCache, db)
 	announcementExpiryService := service.ProvideAnnouncementExpiryService(announcementRepository)
 	batchImageWorkerRuntime := service.ProvideBatchImageWorkerRuntime(batchImageRepository, accountRepository, batchImageQueue, usageBillingRepository, usageLogRepository, batchImageModelPricingResolver, apiKeyAuthCacheInvalidator, configConfig)
+	cnProviderBalanceCheckService := service.ProvideCNProviderBalanceCheckService(accountRepository, cnProviderBalanceService, cnProviderQuotaService, configConfig)
 	scheduledTestRunnerService := service.ProvideScheduledTestRunnerService(scheduledTestPlanRepository, scheduledTestService, accountTestService, rateLimitService, configConfig)
 	groupAvailabilityProbeRunnerService := service.ProvideGroupAvailabilityProbeRunnerService(groupAvailabilityProbeRepository, settingRepository, accountTestService, gatewayService, openAIGatewayService, geminiMessagesCompatService, configConfig)
 	paymentOrderExpiryService := service.ProvidePaymentOrderExpiryService(paymentService, leaderLockCache, db)
 	userPlatformQuotaUsageFlusher := service.ProvideUserPlatformQuotaUsageFlusher(configConfig, billingCache, serviceUserPlatformQuotaRepository, timingWheelService)
-	v4 := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, opsSystemLogSink, opsService, opsIngressRejectAggregator, apiKeyService, authCacheInvalidationWorker, schedulerSnapshotService, tokenRefreshService, accountExpiryService, proxyExpiryService, subscriptionExpiryService, announcementExpiryService, usageCleanupService, idempotencyCleanupService, batchImageCleanupService, batchImageWorkerRuntime, pricingService, emailQueueService, billingCacheService, usageRecordWorkerPool, dataSharingService, dataSharingCaptureWorkerPool, imageHistorySaveWorkerPool, subscriptionService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, qoderOAuthService, grokOAuthService, openAIGatewayService, scheduledTestRunnerService, groupAvailabilityProbeRunnerService, backupService, paymentOrderExpiryService, userPlatformQuotaUsageFlusher, tlsFingerprintCollectorService, ollamaCloudUsageService, auditLogService)
+	v4 := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, opsSystemLogSink, opsService, opsIngressRejectAggregator, apiKeyService, authCacheInvalidationWorker, schedulerSnapshotService, tokenRefreshService, accountExpiryService, proxyExpiryService, subscriptionExpiryService, announcementExpiryService, usageCleanupService, idempotencyCleanupService, batchImageCleanupService, batchImageWorkerRuntime, pricingService, emailQueueService, billingCacheService, cnProviderBalanceCheckService, openCodeGoUsageService, usageRecordWorkerPool, dataSharingService, dataSharingCaptureWorkerPool, imageHistorySaveWorkerPool, subscriptionService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, qoderOAuthService, grokOAuthService, openAIGatewayService, scheduledTestRunnerService, groupAvailabilityProbeRunnerService, backupService, paymentOrderExpiryService, userPlatformQuotaUsageFlusher, tlsFingerprintCollectorService, ollamaCloudUsageService, auditLogService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v4,
@@ -405,6 +407,8 @@ func provideCleanup(
 	pricing *service.PricingService,
 	emailQueue *service.EmailQueueService,
 	billingCache *service.BillingCacheService,
+	cnBalanceCheck *service.CNProviderBalanceCheckService,
+	openCodeGoUsage *service.OpenCodeGoUsageService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	dataSharingService *service.DataSharingService,
 	dataSharingCaptureWorkerPool *service.DataSharingCaptureWorkerPool,
@@ -568,6 +572,18 @@ func provideCleanup(
 			}},
 			{"BillingCacheService", func() error {
 				billingCache.Stop()
+				return nil
+			}},
+			{"CNProviderBalanceCheckService", func() error {
+				if cnBalanceCheck != nil {
+					cnBalanceCheck.Stop()
+				}
+				return nil
+			}},
+			{"OpenCodeGoUsageService", func() error {
+				if openCodeGoUsage != nil {
+					openCodeGoUsage.Stop()
+				}
 				return nil
 			}},
 			{"UsageRecordWorkerPool", func() error {

@@ -1053,6 +1053,11 @@ affiliates: {
         kimi: 'Kimi',
         zhipu: 'Zhipu GLM',
         deepseek: 'DeepSeek',
+        minimax: 'MiniMax',
+        opencode_go: 'OpenCode',
+        typesafe: 'TypeSafe / Jev',
+        command_code: 'Command Code',
+        cline: 'Cline',
         composite: 'Composite',
       },
       deleteConfirm:

@@ -363,6 +363,8 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 		body = sanitized
 	}
 
+	// Ollama 的输出上限按实际端点判定，避免影响其它 Anthropic 上游。
+	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, baseURL, body)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, nil, err
@@ -454,18 +456,24 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 	}
 	scanBuf := getSSEScannerBuf64K()
 	scanner.Buffer(scanBuf[:0], maxLineSize)
+	scanner.Split(newBoundedSSESplit(s.cfg, maxLineSize, nil))
 
 	type scanEvent struct {
 		line string
 		err  error
 	}
+	queueBudget := newSSEQueueBudget(s.cfg)
 	events := make(chan scanEvent, 16)
 	done := make(chan struct{})
 	sendEvent := func(ev scanEvent) bool {
+		if !queueBudget.acquire(len(ev.line), done) {
+			return false
+		}
 		select {
 		case events <- ev:
 			return true
 		case <-done:
+			queueBudget.release(len(ev.line))
 			return false
 		}
 	}
@@ -544,6 +552,9 @@ func (s *GatewayService) handleStreamingResponseAnthropicAPIKeyPassthrough(
 	for {
 		select {
 		case ev, ok := <-events:
+			if ok {
+				queueBudget.release(len(ev.line))
+			}
 			if !ok {
 				if !clientDisconnected {
 
@@ -788,8 +799,12 @@ func parseClaudeUsageFromResponseBody(body []byte) *ClaudeUsage {
 	return usage
 }
 
-func (s *GatewayService) invalidNonStreamingJSONFailoverError(
+// invalidNonStreamingJSONFailoverError 把"上游 2xx 返回非 JSON body"归一为
+// failover 错误（包级函数：Anthropic 平台 passthrough 与国产供应商原生
+// Anthropic 直通共用）。
+func invalidNonStreamingJSONFailoverError(
 	ctx context.Context,
+	rateLimitService *RateLimitService,
 	resp *http.Response,
 	account *Account,
 	body []byte,
@@ -800,9 +815,11 @@ func (s *GatewayService) invalidNonStreamingJSONFailoverError(
 
 	accountID := int64(0)
 	accountName := ""
+	retryableOnSameAccount := false
 	if account != nil {
 		accountID = account.ID
 		accountName = account.Name
+		retryableOnSameAccount = account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
 	}
 
 	logger.LegacyPrintf(
@@ -815,23 +832,19 @@ func (s *GatewayService) invalidNonStreamingJSONFailoverError(
 		parseErr,
 	)
 
-	decision := upstreamErrorDecisionWithoutPersistence(account, statusCode)
-	if s.rateLimitService != nil && account != nil {
+	if rateLimitService != nil && account != nil {
 		if len(requestedModel) > 0 {
-			decision = s.rateLimitService.ApplyUpstreamError(ctx, account, statusCode, resp.Header, body, requestedModel[0])
+			rateLimitService.HandleUpstreamError(ctx, account, statusCode, resp.Header, body, requestedModel[0])
 		} else {
-			decision = s.rateLimitService.ApplyUpstreamError(ctx, account, statusCode, resp.Header, body)
+			rateLimitService.HandleUpstreamError(ctx, account, statusCode, resp.Header, body)
 		}
-	}
-	if decision.ShouldReturnGenericError() {
-		return fmt.Errorf("upstream returned invalid JSON (not in custom error codes): %w", parseErr)
 	}
 
 	return &UpstreamFailoverError{
 		StatusCode:             statusCode,
 		ResponseBody:           body,
 		ResponseHeaders:        resp.Header,
-		RetryableOnSameAccount: decision.RetryableOnSameAccount(account, statusCode),
+		RetryableOnSameAccount: retryableOnSameAccount,
 	}
 }
 
@@ -902,4 +915,9 @@ func writeAnthropicPassthroughResponseHeaders(dst http.Header, src http.Header, 
 	if v := strings.TrimSpace(src.Get("x-request-id")); v != "" {
 		dst.Set("x-request-id", v)
 	}
+}
+
+// 旧 Anthropic 转发入口继续复用统一的非 JSON 失败分类。
+func (s *GatewayService) invalidNonStreamingJSONFailoverError(ctx context.Context, resp *http.Response, account *Account, body []byte, parseErr error, requestedModel ...string) error {
+	return invalidNonStreamingJSONFailoverError(ctx, s.rateLimitService, resp, account, body, parseErr, requestedModel...)
 }

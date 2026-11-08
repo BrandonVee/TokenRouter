@@ -153,6 +153,7 @@ import type { SyncUpstreamPreviewParams } from '@/api/admin/accounts'
 import { useClipboard } from '@/composables/useClipboard'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { supportsUpstreamModelSync } from '@/constants/platformCatalog'
 import { allModels, getModelsByPlatform } from '@/composables/useModelWhitelist'
 
 const { t } = useI18n()
@@ -207,24 +208,13 @@ watch(normalizedPlatforms, () => {
   syncedModels.value = []
 })
 
-// 国产供应商同样提供 OpenAI 兼容模型列表端点，创建和编辑流程都允许实时获取。
-const upstreamSyncPlatforms = new Set([
-  'anthropic',
-  'openai',
-  'gemini',
-  'antigravity',
-  'grok',
-  'kimi',
-  'zhipu',
-  'deepseek'
-])
 const canSyncUpstream = computed(() => {
   if (props.accountId) {
     if (normalizedPlatforms.value.length === 0) return true
-    return normalizedPlatforms.value.some(platform => upstreamSyncPlatforms.has(platform.toLowerCase()))
+    return normalizedPlatforms.value.some(platform => supportsUpstreamModelSync(platform))
   }
   if (props.syncCredentials) {
-    return upstreamSyncPlatforms.has(props.syncCredentials.platform.toLowerCase())
+    return supportsUpstreamModelSync(props.syncCredentials.platform)
   }
   return false
 })
@@ -236,7 +226,7 @@ const availableOptions = computed(() => {
     const allowedModels = new Set([...props.models, ...syncedModels.value])
     return [
       ...allModels.filter(model => allowedModels.has(model.value)),
-      ...syncedModels.value
+      ...[...allowedModels]
         .filter(model => !allModels.some(option => option.value === model))
         .map(model => ({ value: model, label: model }))
     ]
@@ -259,7 +249,7 @@ const availableOptions = computed(() => {
 
   return [
     ...allModels.filter(model => allowedModels.has(model.value)),
-    ...syncedModels.value
+    ...[...new Set([...allowedModels, ...syncedModels.value])]
       .filter(model => !allModels.some(option => option.value === model))
       .map(model => ({ value: model, label: model }))
   ]

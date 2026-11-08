@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"github.com/BrandonVee/TokenRouter/internal/domain"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -38,14 +39,11 @@ func (UserPlatformQuota) Fields() []ent.Field {
 			MaxLen(32).
 			NotEmpty().
 			Validate(func(s string) error {
-				// 注意：平台列表的单一权威源为 service.AllowedQuotaPlatforms；
-				// 此处为 ent 构建期约束，需与 service.AllowedQuotaPlatforms 保持同步。
-				switch s {
-				case "anthropic", "openai", "gemini", "antigravity", "qoder", "grok", "kimi", "zhipu", "deepseek":
+				// 与服务层平台清单同源，新增供应商不能被 Ent 的旧字面量列表拦截。
+				if domain.IsConcretePlatform(s) {
 					return nil
-				default:
-					return fmt.Errorf("platform %q is not allowed", s)
 				}
+				return fmt.Errorf("platform %q is not allowed", s)
 			}),
 
 		// 日 / 周 / 月 USD 上限：

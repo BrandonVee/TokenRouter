@@ -7,6 +7,9 @@ import (
 	"github.com/BrandonVee/TokenRouter/internal/pkg/openai"
 )
 
+// CodexCanonicalUserAgent 供无账号句柄的协议探测复用当前内置 Codex 身份。
+func CodexCanonicalUserAgent() string { return codexCLIUserAgent }
+
 // codexUpstreamMinVersion 上游 /backend-api/codex 接受的最低 version 头：
 // 若请求携带 version 且低于该值，上游直接 404（issue #3901，2026-07 实测）。
 const codexUpstreamMinVersion = "0.144.0"

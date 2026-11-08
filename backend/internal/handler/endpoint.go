@@ -220,7 +220,7 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 		}
 		return EndpointResponses
 
-	case service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek:
+	case service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek, service.PlatformMiniMax, service.PlatformOpenCodeGo, service.PlatformCommandCode, service.PlatformCline:
 		if inbound == EndpointChatCompletions || inbound == EndpointMessages {
 			return EndpointResponses
 		}

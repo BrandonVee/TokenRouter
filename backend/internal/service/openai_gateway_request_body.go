@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
+	"github.com/BrandonVee/TokenRouter/internal/pkg/apicompat"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/ctxkey"
 	"github.com/BrandonVee/TokenRouter/internal/util/urlvalidator"
 	"github.com/gin-gonic/gin"
@@ -1517,6 +1519,256 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 		return value
 	default:
 		// 只记录已知档位，避免未知客户端字段污染使用记录。
+		return ""
+	}
+}
+
+// buildOpenAIResponsesURLForPlatform 组装 Responses 端点（平台感知）。
+// 供应商 profile 声明了 ResponsesPath 时按其拼接（如 DeepSeek 为无 /v1 前缀的
+// /responses）；其余平台维持 /v1/responses。
+func buildOpenAIResponsesURLForPlatform(platform string, base string) string {
+	if profile := LookupProviderProfile(platform); profile != nil && profile.ResponsesPath != "" {
+		return buildOpenAIEndpointURL(base, profile.ResponsesPath)
+	}
+	return buildOpenAIResponsesURL(base)
+}
+
+// normalizeDeepSeekResponsesRequestBody 适配无状态 CN Responses 端点：
+// 强制 store=false 并清除 previous_response_id（DeepSeek / Kimi 官方
+// Responses 均不支持服务端状态存储，携带这些字段会被拒绝）。
+//
+// DeepSeek 另需把兼容格式的图片输入归一化为官方 image_url 字段；openai
+// 平台但 base_url 指向 api.deepseek.com 的映射账号同样走这条出站改写。
+// 非 CN / 非 DeepSeek 上游原样返回。
+func normalizeDeepSeekResponsesRequestBody(account *Account, body []byte) []byte {
+	if account == nil {
+		return body
+	}
+	applyStateless := account.UsesNativeCNResponses()
+	applyImages := shouldAliasDeepSeekResponsesInputImages(account)
+	if !applyStateless && !applyImages {
+		return body
+	}
+
+	normalized := body
+	if applyStateless {
+		patched, err := sjson.SetBytes(normalized, "store", false)
+		if err != nil {
+			return body
+		}
+		normalized = patched
+		if stripped, err := sjson.DeleteBytes(normalized, "previous_response_id"); err == nil {
+			normalized = stripped
+		}
+	}
+
+	var requestBody map[string]any
+	if err := decodeOpenAIJSONUseNumber(normalized, &requestBody); err != nil {
+		return normalized
+	}
+	input, exists := requestBody["input"]
+	if !exists {
+		return normalized
+	}
+
+	changed := false
+	if liftedInput, lifted := apicompat.LiftResponsesToolOutputMedia(input); lifted {
+		requestBody["input"] = liftedInput
+		input = liftedInput
+		changed = true
+	}
+	if applyImages {
+		if aliased, aliasedChanged := aliasDeepSeekResponsesInputImages(input); aliasedChanged {
+			requestBody["input"] = aliased
+			changed = true
+		}
+	}
+	if !changed {
+		return normalized
+	}
+	rebuilt, err := marshalOpenAIUpstreamJSON(requestBody)
+	if err != nil {
+		return normalized
+	}
+	return rebuilt
+}
+
+func shouldAliasDeepSeekResponsesInputImages(account *Account) bool {
+	return targetsDeepSeekAPIHost(account)
+}
+
+// aliasDeepSeekResponsesInputImages 把图片 part 改写成 DeepSeek 官方形状：
+// type=input_image，同时只保留字符串字段 image_url。仅有 file_id、没有可用
+// URL 的 part 原样保留。
+func aliasDeepSeekResponsesInputImages(input any) (any, bool) {
+	items, ok := asDeepSeekResponsesSlice(input)
+	if !ok {
+		return input, false
+	}
+	changed := false
+	for i, raw := range items {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if aliasDeepSeekResponsesInputItem(item) {
+			items[i] = item
+			changed = true
+		}
+	}
+	if !changed {
+		return input, false
+	}
+	return items, true
+}
+
+// targetsDeepSeekAPIHost 报告该账号实际上游是否是 DeepSeek 官方 API。
+// platform=deepseek 直接命中；platform=openai 但 base_url 指向
+// api.deepseek.com 的映射账号同样命中（Codex 把 GPT 模型名映射到 DeepSeek
+// 时的典型接入方式）。
+func targetsDeepSeekAPIHost(account *Account) bool {
+	if account == nil {
+		return false
+	}
+	if account.Platform == PlatformDeepseek {
+		return true
+	}
+	u, err := url.Parse(strings.TrimSpace(account.GetOpenAIBaseURL()))
+	if err != nil {
+		return false
+	}
+	ds, err := url.Parse(DefaultDeepseekBaseURL)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Hostname(), ds.Hostname())
+}
+
+func asDeepSeekResponsesSlice(value any) ([]any, bool) {
+	switch items := value.(type) {
+	case []any:
+		return items, true
+	case []map[string]any:
+		out := make([]any, len(items))
+		for i := range items {
+			out[i] = items[i]
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
+
+func aliasDeepSeekResponsesInputItem(item map[string]any) bool {
+	changed := aliasDeepSeekResponsesImagePart(item)
+	if content, exists := item["content"]; exists {
+		if rewritten, did := aliasDeepSeekResponsesContent(content); did {
+			item["content"] = rewritten
+			changed = true
+		}
+	}
+	if output, exists := item["output"]; exists {
+		if rewritten, did := aliasDeepSeekResponsesContent(output); did {
+			item["output"] = rewritten
+			changed = true
+		}
+	}
+	return changed
+}
+
+func aliasDeepSeekResponsesContent(content any) (any, bool) {
+	parts, ok := asDeepSeekResponsesSlice(content)
+	if !ok {
+		return content, false
+	}
+	changed := false
+	for i, raw := range parts {
+		part, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		if aliasDeepSeekResponsesImagePart(part) {
+			parts[i] = part
+			changed = true
+		}
+	}
+	if !changed {
+		return content, false
+	}
+	return parts, true
+}
+
+func aliasDeepSeekResponsesImagePart(part map[string]any) bool {
+	partType := strings.TrimSpace(deepSeekResponsesStringValue(part["type"]))
+	switch partType {
+	case "input_image", "image_url", "image":
+	default:
+		return false
+	}
+	imageURL := extractDeepSeekResponsesImageURL(part)
+	if imageURL == "" {
+		return false
+	}
+	changed := false
+	if partType != "input_image" {
+		part["type"] = "input_image"
+		changed = true
+	}
+	if current, ok := part["image_url"].(string); !ok || strings.TrimSpace(current) != imageURL {
+		part["image_url"] = imageURL
+		changed = true
+	}
+	if _, exists := part["url"]; exists {
+		delete(part, "url")
+		changed = true
+	}
+	return changed
+}
+
+func extractDeepSeekResponsesImageURL(part map[string]any) string {
+	if imageURL := deepSeekResponsesURLValue(part["image_url"]); imageURL != "" {
+		return imageURL
+	}
+	if imageURL := deepSeekResponsesURLValue(part["url"]); imageURL != "" {
+		return imageURL
+	}
+	if imageURL := deepSeekResponsesURLValue(part["image"]); imageURL != "" {
+		return imageURL
+	}
+	source, ok := part["source"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if imageURL := deepSeekResponsesURLValue(source["url"]); imageURL != "" {
+		return imageURL
+	}
+	data := strings.TrimSpace(deepSeekResponsesStringValue(source["data"]))
+	if data == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(data), "data:") {
+		return data
+	}
+	mediaType := strings.TrimSpace(deepSeekResponsesStringValue(source["media_type"]))
+	if mediaType == "" {
+		mediaType = "image/png"
+	}
+	return "data:" + mediaType + ";base64," + data
+}
+
+// 只接受协议中声明为字符串的图片引用，不把未知对象隐式格式化。
+func deepSeekResponsesStringValue(value any) string { text, _ := value.(string); return text }
+
+func deepSeekResponsesURLValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case map[string]any:
+		if imageURL := strings.TrimSpace(deepSeekResponsesStringValue(typed["url"])); imageURL != "" {
+			return imageURL
+		}
+		return strings.TrimSpace(deepSeekResponsesStringValue(typed["image_url"]))
+	default:
 		return ""
 	}
 }

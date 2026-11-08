@@ -206,6 +206,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
+	if rejectSystemOneOnlyPlatform(c, apiKey, h.errorResponse) {
+		return
+	}
 	reqLog = reqLog.With(zap.String("model", reqModel), zap.Bool("stream", reqStream))
 
 	// 解析渠道级模型映射

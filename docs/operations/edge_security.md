@@ -29,6 +29,8 @@ TokenRouter 支持长时间运行的 SSE 和 WebSocket 请求。入口保护不�
 
 复合 Key、单 Key 模型重定向与平台分流预读后以 `PrereadBody` 回填，后续处理器复用已经解码的切片，避免重复读取、重复计数和二次解压。最终正文预算保持到处理器退出，等待并发槽时也不提前释放；需要在请求结束后继续持有正文的异步任务必须显式接管独立预算，并在任务结束时释放。
 
+Anthropic/OpenAI 主链、原生协议桥接、图片和 Antigravity 的 SSE 读取增加事件与队列边界：`gateway.sse_event_max_bytes` 默认 0（沿用单行大小上限），`sse_event_max_lines` 默认 4096；无空行的异常事件不能无限堆积。`sse_queue_max_bytes` 默认 8 MiB；单个合法大帧可独占队列，仍受帧上限保护。图片成功终态只在完整事件边界或正常 EOF 派发，超限不会刷新尚未闭合的成功事件。
+
 ## 可信客户端 IP
 
 为兼容升级，`security.trust_forwarded_ip_for_api_key_acl` 默认开启。开启后，原始转发请求头接管日志与安全敏感路径的客户端 IP 解析。`security.forwarded_client_ip_headers` 中的自定义请求头按配置顺序检查，优先于内置的 `CF-Connecting-IP`、`X-Real-IP` 和 `X-Forwarded-For` 回退。请求头名称不区分大小写，加载时会规范化并去重，最多允许 16 个唯一且有效的 HTTP 字段名。请求头值必须包含 IP 字面量；支持逗号分隔，跳过无效项，并优先选择公网地址而不是私网回退地址。

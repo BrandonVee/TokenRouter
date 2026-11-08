@@ -369,6 +369,9 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
+	if err := NormalizeProtocolRulesCredentials(input.Credentials); err != nil {
+		return nil, err
+	}
 	duplicate, err := buildAccountForCreate(input, input.Extra)
 	if err != nil {
 		return nil, err
@@ -456,11 +459,16 @@ func normalizeGrokMediaEligibilityUpdateExtra(account *Account, input *UpdateAcc
 }
 
 func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]any) (*Account, error) {
+	if input.Platform == PlatformTypeSafe && input.Type != AccountTypeAPIKey {
+		return nil, infraerrors.BadRequest("TYPESAFE_ACCOUNT_TYPE_INVALID", "TypeSafe requires an API key account")
+	}
 	// 受管会话状态由系统维护，废弃字段不得通过通用账号接口写入。
 	DiscardDeprecatedAccountExtra(accountExtra)
 	delete(accountExtra, OllamaCloudUsageSessionExtraKey)
 	delete(accountExtra, OllamaCloudUsageAutoRefreshExtraKey)
 	delete(accountExtra, OllamaCloudUsageSnapshotExtraKey)
+	delete(accountExtra, OpenCodeGoUsageAutoRefreshExtraKey)
+	delete(accountExtra, OpenCodeGoUsageSnapshotExtraKey)
 	account := &Account{
 		Name:        input.Name,
 		Notes:       normalizeAccountNotes(input.Notes),
@@ -547,6 +555,9 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 
 	// 校验并规范化请求头覆写配置（header 名小写化、格式检查）
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
+		return nil, err
+	}
+	if err := NormalizeProtocolRulesCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
 	// OAuth 兑换后不得持久化临时 SSO 或密码。
@@ -664,6 +675,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		account.Credentials = MergePreservingSensitiveCreds(account.Credentials, input.Credentials)
 		// 校验并规范化请求头覆写配置（header 名小写化、格式检查）
 		if err := NormalizeHeaderOverrideCredentials(account.Credentials); err != nil {
+			return nil, err
+		}
+		if err := NormalizeProtocolRulesCredentials(account.Credentials); err != nil {
 			return nil, err
 		}
 		// 移除不得与 OAuth token 一同保存的 SSO 和密码残留。
@@ -935,6 +949,9 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// 校验并规范化请求头覆写配置（批量路径为 JSONB 顶层 key 合并，直接校验增量即可）
 	if err := NormalizeHeaderOverrideCredentials(input.Credentials); err != nil {
+		return nil, err
+	}
+	if err := NormalizeProtocolRulesCredentials(input.Credentials); err != nil {
 		return nil, err
 	}
 	// 批量更新可能混合平台，因此始终移除临时 SSO、密码和 cookie 字段。

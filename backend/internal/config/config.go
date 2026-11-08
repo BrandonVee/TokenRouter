@@ -931,6 +931,8 @@ const (
 
 // GatewayConfig API网关相关配置
 type GatewayConfig struct {
+	// 余额/订阅窗口探测与响应式冷却共享配置，默认按十分钟周期恢复。
+	CNProviders GatewayCNProvidersConfig `mapstructure:"cn_providers"`
 	// MinOutputTokens 是协议转换的输出 token 下限，默认 128，最小 16。
 	MinOutputTokens int `mapstructure:"min_output_tokens"`
 	// MaxSameAccountRetriesGemini 是 Gemini 换号前同账号的额外重试次数。
@@ -1029,6 +1031,10 @@ type GatewayConfig struct {
 	ImageNonstreamKeepaliveInterval int `mapstructure:"image_nonstream_keepalive_interval"`
 	// MaxLineSize: 上游 SSE 单行最大字节数（0使用默认值）
 	MaxLineSize int `mapstructure:"max_line_size"`
+	// SSE 排队和单事件边界，避免合法小行累积成无限大事件。
+	SSEQueueMaxBytes int64 `mapstructure:"sse_queue_max_bytes"`
+	SSEEventMaxBytes int64 `mapstructure:"sse_event_max_bytes"`
+	SSEEventMaxLines int   `mapstructure:"sse_event_max_lines"`
 
 	// 是否记录上游错误响应体摘要（避免输出请求内容）
 	LogUpstreamErrorBody bool `mapstructure:"log_upstream_error_body"`
@@ -1073,6 +1079,13 @@ type GatewayConfig struct {
 
 	// Grok 保存 Grok/xAI 网关调度与免费层软门禁配置。
 	Grok GatewayGrokConfig `mapstructure:"grok"`
+}
+
+// GatewayCNProvidersConfig 配置多协议供应商的周期余额检测与低余额阈值。
+type GatewayCNProvidersConfig struct {
+	BalanceCheckEnabled         bool    `mapstructure:"balance_check_enabled"`
+	BalanceThreshold            float64 `mapstructure:"balance_threshold"`
+	BalanceCheckIntervalMinutes int     `mapstructure:"balance_check_interval_minutes"`
 }
 
 // GatewayGrokConfig 保存 Grok 专用的网关调度参数。
@@ -2468,6 +2481,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.antigravity_fallback_cooldown_minutes", 1)
 	viper.SetDefault("gateway.antigravity_extra_retries", 10)
 	viper.SetDefault("gateway.max_body_size", int64(256*1024*1024))
+	viper.SetDefault("gateway.cn_providers.balance_check_enabled", true)
+	viper.SetDefault("gateway.cn_providers.balance_threshold", 0.5)
+	viper.SetDefault("gateway.cn_providers.balance_check_interval_minutes", 10)
 	viper.SetDefault("gateway.request_body_memory_budget_bytes", int64(1024*1024*1024))
 	viper.SetDefault("gateway.request_body_read_timeout_seconds", 120)
 	viper.SetDefault("gateway.downstream_write_timeout_seconds", 120)
@@ -2490,6 +2506,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.image_stream_keepalive_interval", 10)
 	viper.SetDefault("gateway.image_nonstream_keepalive_interval", 0)
 	viper.SetDefault("gateway.max_line_size", 500*1024*1024)
+	viper.SetDefault("gateway.sse_queue_max_bytes", int64(8*1024*1024))
+	viper.SetDefault("gateway.sse_event_max_bytes", int64(0))
+	viper.SetDefault("gateway.sse_event_max_lines", 4096)
 	viper.SetDefault("gateway.scheduling.sticky_session_max_waiting", 3)
 	viper.SetDefault("gateway.scheduling.sticky_session_wait_timeout", 120*time.Second)
 	viper.SetDefault("gateway.scheduling.fallback_wait_timeout", 30*time.Second)

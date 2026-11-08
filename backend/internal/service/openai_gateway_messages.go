@@ -15,7 +15,6 @@ import (
 	"github.com/BrandonVee/TokenRouter/internal/pkg/apicompat"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/claude"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/logger"
-	"github.com/BrandonVee/TokenRouter/internal/pkg/openai_compat"
 	"github.com/BrandonVee/TokenRouter/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -35,15 +34,19 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	defaultMappedModel string,
 	tlsRouterMatch ...TLSFingerprintRouterMatchResult,
 ) (*OpenAIForwardResult, error) {
-	// 自适应账号的 Messages 入站优先直通原生 Anthropic 端点。
-	if account.IsAdaptiveAPIProtocol() {
-		return s.forwardCNAdaptiveAnthropic(ctx, c, account, body, defaultMappedModel)
+	// 统一按入站协议、最终映射模型和供应商能力决定上游，保留 Grok 专属链路。
+	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(account.GetMappedModel(gjson.GetBytes(body, "model").String())) {
+		return nil, writeOpenCodeUnsupportedModelError(c, true, gjson.GetBytes(body, "model").String())
 	}
-	// 入口分流：APIKey 账号 + 上游不支持 Responses API → 走 CC 直转（与
-	// ForwardAsChatCompletions 对称）。缺少此分流时，/v1/messages 入站请求
-	// 会被无条件转为 Responses 格式发往上游 /v1/responses，导致只支持
-	// /v1/chat/completions 的第三方 OpenAI 兼容上游全部 400。
-	if account.Type == AccountTypeAPIKey && !openai_compat.ShouldUseResponsesAPI(account.Extra) {
+	rememberOpenCodeInboundBody(c, body)
+	switch s.resolveUpstreamProtocolFor(ctx, account, APIProtocolAnthropic, upstreamRoutingModel(account, body, defaultMappedModel)) {
+	case APIProtocolAnthropic:
+		if account.Platform == PlatformDeepseek {
+			// fork 的 DeepSeek 兼容链按真实响应形状处理，并在客户端取消后继续保留已发生的用量。
+			return s.forwardCNAdaptiveAnthropic(ctx, c, account, body, defaultMappedModel)
+		}
+		return s.forwardAnthropicViaNativeAnthropicEndpoint(ctx, c, account, body, defaultMappedModel)
+	case APIProtocolChatCompletions:
 		return s.forwardAnthropicViaRawChatCompletions(ctx, c, account, body, defaultMappedModel, tlsRouterMatch...)
 	}
 

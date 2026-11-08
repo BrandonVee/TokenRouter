@@ -13,6 +13,12 @@ interface GroupClientProtocolPolicy {
 }
 
 const GROUP_CLIENT_PROTOCOL_POLICIES: Record<GroupPlatform, GroupClientProtocolPolicy> = {
+	minimax: { supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'], defaults: ['openai_responses', 'openai_chat_completions'] },
+	opencode_go: { supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'], defaults: ['openai_responses', 'openai_chat_completions'] },
+	command_code: { supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'], defaults: ['openai_responses', 'openai_chat_completions'] },
+	cline: { supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'], defaults: ['openai_responses', 'openai_chat_completions'] },
+	// TypeSafe 只使用独立的 System One 入口，不允许通用文本协议。
+	typesafe: { supported: [], defaults: [] },
   anthropic: {
     supported: ['anthropic_messages', 'openai_responses', 'openai_chat_completions'],
     defaults: ['anthropic_messages']
