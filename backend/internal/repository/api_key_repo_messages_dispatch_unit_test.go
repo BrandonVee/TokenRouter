@@ -162,7 +162,7 @@ func TestAPIKeyRepository_GetByKeyForAuth_PreservesSessionIsolation_SQLite(t *te
 
 	key := &service.APIKey{
 		UserID:  user.ID,
-		Key:     "sk-getbykey-auth-session-isolation-unit",
+		Key:     "sk-getbykey-auth-session-isolation-unit", // secret-scan: allow 固定假 Key，只用于仓储投影回归。
 		Name:    "Session Isolation Key Unit",
 		GroupID: &group.ID,
 		Status:  service.StatusActive,

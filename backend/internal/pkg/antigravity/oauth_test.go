@@ -684,7 +684,7 @@ func TestConstants_值正确(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getClientSecret 应返回默认值，但报错: %v", err)
 	}
-	if secret != "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" {
+	if secret != "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" { // secret-scan: allow 断言公开 OAuth 客户端默认标识。
 		t.Errorf("默认 client_secret 不匹配: got %s", secret)
 	}
 	if RedirectURI != "http://localhost:8085/callback" {

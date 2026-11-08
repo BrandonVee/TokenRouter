@@ -112,6 +112,8 @@ npx --yes pnpm@9 --dir frontend run build
 
 部署文件变更要运行 `.github/workflows/backend-ci.yml` 中对应的 shell/Compose 检查；依赖或安全边界变更还应运行 `make secret-scan`、`govulncheck` 或相应审计。最终至少执行 `git diff --check`，并确认没有意外生成物、环境文件或秘密。
 
+`make secret-scan` 使用 Python 标准库检查 Git 跟踪文件工作副本中的常见提供商 Key 和完整 PEM 私钥，仅输出路径、行号和类别，不回显凭据；不读取未跟踪环境文件或符号链接目标。明确的公开 OAuth 客户端标识和固定假凭据可在对应行使用 `secret-scan: allow`，不整体豁免测试目录。发现疑似凭据返回 1，文件读取或 Git 错误返回 2，不能把未完成的扫描当作通过。扫描器回归入口为 `python3 -m unittest discover -s tools -p 'test_secret_scan.py'`。
+
 ## 提交与文档
 
 提交信息遵循 Conventional Commits，例如 `feat(gateway): ...`、`fix(billing): ...`、`docs(project): ...`。一次提交应围绕一个可验证目的，生成文件、迁移和契约测试与其源变更一起提交。
