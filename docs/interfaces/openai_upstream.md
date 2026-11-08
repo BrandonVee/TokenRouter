@@ -49,6 +49,8 @@ OpenAI 兼容非流式响应的 usage 按 `usage`、`response.usage`、`data.usa
 
 Responses 完整响应和 SSE 的 message item 共用序列化：`content` 保持数组，`output_text` 显式保留空文本及 `annotations` / `logprobs` 数组，拒绝分片使用 `refusal` 字段。Responses 非流式响应转换到 Chat Completions 或 Anthropic 时，优先读取 reasoning 的可见 `summary_text`；摘要为空才回退到 `content[].reasoning_text`，同时保留 Anthropic thinking 签名，不重复拼接两种载体。
 
+终态 output 存在但正文为空或纯空白时，缓冲转换器会用已收到的文本 delta 补齐，正常终态正文仍优先；拒绝 delta 和完整工具参数也在重建时保留。普通函数调用的 `encrypted_function_args` 按原始 JSON 作为不透明元数据通过消息项、流事件和历史回放，不能丢弃或当作可见工具参数解释。工具参数与思考签名累积使用可增长缓冲，避免小分片反复复制整个前缀；fork 的交错工具调用仍按完整内容块顺序收尾。Anthropic 显式 `thinking.type=disabled` 在转换到 OpenAI 时优先于强度字段，模型专属推理限制继续校验。
+
 Chat Completions SSE 也按上述路径提取用量，各 token 桶保留最新的非零累计快照：重复事件不相加，末尾空、全零或只含输出的局部快照不能清除此前的输入和缓存用量。直通 Chat 的响应体继续透传；桥接到 Responses/Messages 时，终态用量和结算使用同一份合并结果。
 
 DeepSeek 的原生 Messages 与 Chat 直通/桥接响应至少要有一个实际计费的聚合 token 桶。该校验按实际平台和最终计费/上游模型识别，也覆盖第三方 OpenAI 兼容账号承载的 DeepSeek；不依赖未映射的客户端别名。全程缺失用量时返回 `deepseek_missing_usage` 并记录账号及上游请求 ID，不输出正常完成标记、不以估算 token 扣费。尚未写出响应时可按原有策略切号；已经写出的流由 handler 禁止重放请求，按上游异常结束。

@@ -1734,6 +1734,12 @@ export default {
         noData: 'No usage data available for this account'
       },
       usageWindow: {
+        antigravityGemini5h: 'G·5h',
+        antigravityGeminiWeekly: 'G·wk',
+        antigravityArgon5h: 'A·5h',
+        antigravityArgonWeekly: 'A·wk',
+        antigravityOther5h: 'C·5h',
+        antigravityOtherWeekly: 'C·wk',
         statsTitle: '5-Hour Window Usage Statistics',
         statsTitleDaily: 'Daily Usage Statistics',
         geminiProDaily: 'Pro',

@@ -46,6 +46,8 @@ Anthropic Messages 经过 Antigravity request transformer 生成上游 Gemini/�
 
 Gemini 结构化输出将 `generationConfig` 或 `generation_config` 下的 `responseJsonSchema` / `response_json_schema` 清理后转换为上游可识别的 `responseSchema`；已有 `responseSchema` / `response_schema` 优先。SSE 转换按 `response` 字段是否存在区分 v1internal 包装和直接 Gemini 响应，不能仅依赖 JSON 解码报错来选择形状，否则直接响应中的候选内容和用量会被丢弃。
 
+Gemini 3 及以上模型将工具结果内图片保留在各自的 `functionResponse.parts`，按调用 ID 保持媒体归属；旧模型继续使用相邻图片 part。Claude/Gemini 转换保留合法文档输入和原有思考签名。Antigravity v1internal 当前拒绝内置搜索/代码执行与客户端函数混用，混合声明时保留客户端函数，不注入 `includeServerSideToolInvocations`；纯内置搜索仍走既有搜索请求与模型回退。工具配置在无工具的推理请求中也保持存在，避免上游拒绝缺失字段。
+
 通用 OpenAI Chat Completions 和 Responses 在选到原生 Antigravity OAuth 账号时走兼容适配器：
 
 ```text
@@ -78,6 +80,8 @@ Antigravity 同时提供 Claude 与 Gemini 模型族。Gemini 3.6 Flash 的基�
 
 额度查询按账号和模型 scope 保存上游 reset/remaining 状态，并可包含 AI Credits。429/503 分类区分模型限流、credits 耗尽和共享容量不足；请求结算的 `QuotaPlatform` 必须保留 Antigravity，即使客户端从 Anthropic/OpenAI 兼容入口进入。账号成本和用户扣费仍遵守渠道计价与分组倍率边界。
 
+账号用量额外查询 `retrieveUserQuotaSummary` 的共享模型池窗口。prod/daily 的同一 bucket 采用最小剩余额度合并，避免生成在 daily 记账、展示却只读 prod；单个端点失败仍返回其它端点的有效结果。前端优先显示各池的 5h 与周窗口，缺少摘要时回退到原单模型进度条，不由单模型最紧窗口推算周用量。摘要查询失败不影响原模型额度和 AI Credits 返回。模型目录支持指定与生成一致的单端点读取；响应有明确体积上限。
+
 ## 失败与恢复
 
 - 短 `RetryInfo` 可以在同账号做一次受限等待；长模型限流标记模型/账号并请求调度层切换。
@@ -86,6 +90,7 @@ Antigravity 同时提供 Claude 与 Gemini 模型族。Gemini 3.6 Flash 的基�
 - 粘性会话切换账号时可把普通输入按 cache-read 计费，反映缓存失效；该标志必须进入结算输入。
 - OAuth credential 被刷新后仍遭拒绝时返回要求重新授权并检查 project ID 的脱敏提示，同时把账号标记为可恢复错误。
 - 只有白名单中的安全上游提示可以透传；响应体日志受开关、字节上限和脱敏约束。
+- Gemini 图片模型连续 INTERNAL 500 只冷却该模型，默认 120 秒，不累计账号级惩罚；文本模型保留渐进账号惩罚。可用 `GATEWAY_ANTIGRAVITY_INTERNAL500_IMAGE_COOLDOWN_SECONDS`、`GATEWAY_ANTIGRAVITY_INTERNAL500_TIER1_SECONDS`、`GATEWAY_ANTIGRAVITY_INTERNAL500_TIER2_SECONDS` 和 `GATEWAY_ANTIGRAVITY_INTERNAL500_DISABLE_ACCOUNT` 调整，非法时回退默认值。
 
 修改适配器时应覆盖非流/流、Claude/Gemini/OpenAI 三种客户端形状、工具/thinking、单/多账号限流、混合调度关闭后的快照失效和用量归属测试。
 

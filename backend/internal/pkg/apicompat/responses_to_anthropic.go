@@ -164,25 +164,35 @@ func sanitizeAnthropicToolUseInput(name string, raw string) json.RawMessage {
 // Streaming: ResponsesStreamEvent → []AnthropicStreamEvent (stateful converter)
 // ---------------------------------------------------------------------------
 
+type responsesTextPart struct {
+	OutputIndex  int
+	ContentIndex int
+}
+
 // ResponsesEventToAnthropicState tracks state for converting a sequence of
 // Responses SSE events directly into Anthropic SSE events.
 type ResponsesEventToAnthropicState struct {
 	MessageStartSent bool
 	MessageStopSent  bool
 
-	ContentBlockIndex   int
-	ContentBlockOpen    bool
-	CurrentBlockType    string // "text" | "thinking" | "tool_use"
-	CurrentToolName     string
-	CurrentToolArgs     string
-	CurrentToolHadDelta bool
-	// PendingThinkingSignature 保存 reasoning.encrypted_content，并在 thinking 块
-	// 关闭前通过 signature_delta 发出。
+	ContentBlockIndex         int
+	ContentBlockOpen          bool
+	CurrentBlockType          string // "text" | "thinking" | "tool_use"
+	CurrentToolName           string
+	CurrentToolArgs           string
+	CurrentToolHadDelta       bool
+	currentToolArgsBuffer     *strings.Builder
+	currentToolArgsValidation *streamStringBytes
+
 	PendingThinkingSignature string
 	HasToolCall              bool
 
 	// OutputIndexToBlockIdx maps Responses output_index → Anthropic content block index.
 	OutputIndexToBlockIdx map[int]int
+
+	textByPart map[responsesTextPart]*strings.Builder
+
+	textDelivered bool
 
 	InputTokens              int
 	OutputTokens             int
@@ -198,6 +208,7 @@ type ResponsesEventToAnthropicState struct {
 func NewResponsesEventToAnthropicState() *ResponsesEventToAnthropicState {
 	return &ResponsesEventToAnthropicState{
 		OutputIndexToBlockIdx: make(map[int]int),
+		textByPart:            make(map[responsesTextPart]*strings.Builder),
 		Created:               time.Now().Unix(),
 	}
 }
@@ -216,7 +227,7 @@ func ResponsesEventToAnthropicEvents(
 	case "response.output_text.delta":
 		return resToAnthHandleTextDelta(evt, state)
 	case "response.output_text.done":
-		return resToAnthHandleBlockDone(state)
+		return resToAnthHandleTextDone(evt, state)
 	case "response.function_call_arguments.delta",
 		// custom/freeform 工具的输入增量与 function_call 参数增量同形。
 		"response.custom_tool_call_input.delta":
@@ -340,6 +351,8 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 		state.CurrentBlockType = "tool_use"
 		state.CurrentToolName = evt.Item.Name
 		state.CurrentToolArgs = ""
+		state.currentToolArgsBuffer = nil
+		state.currentToolArgsValidation = nil
 		state.CurrentToolHadDelta = false
 		state.HasToolCall = true
 
@@ -383,7 +396,15 @@ func resToAnthHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesE
 }
 
 func resToAnthHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
-	if evt.Delta == "" {
+	return resToAnthEmitText(evt.Delta, resToAnthTextPartOf(evt), state)
+}
+
+func resToAnthTextPartOf(evt *ResponsesStreamEvent) responsesTextPart {
+	return responsesTextPart{OutputIndex: evt.OutputIndex, ContentIndex: evt.ContentIndex}
+}
+
+func resToAnthEmitText(text string, part responsesTextPart, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if text == "" {
 		return nil
 	}
 
@@ -406,16 +427,51 @@ func resToAnthHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventTo
 		})
 	}
 
+	delivered, ok := state.textByPart[part]
+	if !ok {
+		delivered = &strings.Builder{}
+		state.textByPart[part] = delivered
+	}
+	_, _ = delivered.WriteString(text)
+	state.textDelivered = true
+
 	idx := state.ContentBlockIndex
 	events = append(events, AnthropicStreamEvent{
 		Type:  "content_block_delta",
 		Index: &idx,
 		Delta: &AnthropicDelta{
 			Type: "text_delta",
-			Text: evt.Delta,
+			Text: text,
 		},
 	})
 	return events
+}
+
+func resToAnthRecoverText(text string, part responsesTextPart, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	builder, known := state.textByPart[part]
+	if !known && state.textDelivered {
+
+		return nil
+	}
+
+	var delivered string
+	if known {
+		delivered = builder.String()
+	}
+	if text == delivered || !strings.HasPrefix(text, delivered) {
+		return nil
+	}
+	return resToAnthEmitText(text[len(delivered):], part, state)
+}
+
+func resToAnthHandleTextDone(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if state.MessageStopSent {
+
+		return resToAnthHandleBlockDone(state)
+	}
+
+	events := resToAnthRecoverText(evt.Text, resToAnthTextPartOf(evt), state)
+	return append(events, resToAnthHandleBlockDone(state)...)
 }
 
 func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
@@ -426,8 +482,9 @@ func resToAnthHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 	// Read 的空 pages 只有在参数成为完整 JSON 后才能安全清洗；一旦完整便在 delta 阶段发出，
 	// 不再依赖可能缺失的 arguments.done 事件。
 	if state.CurrentBlockType == "tool_use" && state.CurrentToolName == "Read" {
-		state.CurrentToolArgs += evt.Delta
-		if state.CurrentToolHadDelta || !json.Valid([]byte(state.CurrentToolArgs)) {
+		previousArgs := state.CurrentToolArgs
+		state.CurrentToolArgs = appendStreamString(&state.currentToolArgsBuffer, state.CurrentToolArgs, evt.Delta)
+		if state.CurrentToolHadDelta || !json.Valid(appendStreamStringBytes(&state.currentToolArgsValidation, previousArgs, state.CurrentToolArgs, evt.Delta)) {
 			return nil
 		}
 
@@ -618,6 +675,30 @@ func resToAnthHandleWebSearchDone(evt *ResponsesStreamEvent, state *ResponsesEve
 	return events
 }
 
+func resToAnthRecoverTerminalText(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
+	if state.textDelivered || evt.Response == nil {
+		return nil
+	}
+
+	var events []AnthropicStreamEvent
+	for outputIndex, item := range evt.Response.Output {
+		if item.Type != "message" {
+			continue
+		}
+		for contentIndex, content := range item.Content {
+			if content.Type != "output_text" {
+				continue
+			}
+			part := responsesTextPart{OutputIndex: outputIndex, ContentIndex: contentIndex}
+			events = append(events, resToAnthEmitText(content.Text, part, state)...)
+		}
+	}
+	if len(events) > 0 {
+		events = append(events, closeCurrentBlock(state)...)
+	}
+	return events
+}
+
 func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventToAnthropicState) []AnthropicStreamEvent {
 	if state.MessageStopSent {
 		return nil
@@ -625,6 +706,7 @@ func resToAnthHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 
 	var events []AnthropicStreamEvent
 	events = append(events, closeCurrentBlock(state)...)
+	events = append(events, resToAnthRecoverTerminalText(evt, state)...)
 
 	stopReason := "end_turn"
 	if evt.Usage != nil {
@@ -698,6 +780,8 @@ func closeCurrentBlock(state *ResponsesEventToAnthropicState) []AnthropicStreamE
 	state.ContentBlockIndex++
 	state.CurrentToolName = ""
 	state.CurrentToolArgs = ""
+	state.currentToolArgsBuffer = nil
+	state.currentToolArgsValidation = nil
 	state.CurrentToolHadDelta = false
 	events = append(events, AnthropicStreamEvent{
 		Type:  "content_block_stop",

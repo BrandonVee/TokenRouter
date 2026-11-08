@@ -68,11 +68,9 @@ func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTok
 		out.Tools = convertAnthropicToolsToResponses(req.Tools)
 	}
 
-	// 只使用 output_config.effort 控制推理等级，thinking.type 不参与判断。
-	// 默认值跟随 Codex CLI / airgate 的 Anthropic bridge 形态：未设置时使用 medium。
-	effort := "medium"
-	if req.OutputConfig != nil && req.OutputConfig.Effort != "" {
-		effort = req.OutputConfig.Effort
+	effort := anthropicReasoningEffort(req)
+	if (openai.IsGPT61SolModelSpelling(req.Model) || openai.IsGPT61TerraModelSpelling(req.Model)) && req.OutputConfig != nil && req.OutputConfig.Effort == "max" && effort != "none" {
+		effort = "max"
 	}
 	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, effort); err != nil {
 		return nil, err
@@ -81,8 +79,10 @@ func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTok
 		return nil, fmt.Errorf("reasoning effort %q is not supported", strings.TrimSpace(effort))
 	}
 	out.Reasoning = &ResponsesReasoning{
-		Effort:  mapAnthropicEffortToResponsesForModel(req.Model, effort),
-		Summary: "auto",
+		Effort: mapAnthropicEffortToResponsesForModel(req.Model, effort),
+	}
+	if effort != "none" {
+		out.Reasoning.Summary = "auto"
 	}
 
 	// Convert tool_choice
@@ -436,6 +436,18 @@ func extractAnthropicTextFromBlocks(blocks []AnthropicContentBlock) string {
 	return strings.Join(parts, "\n\n")
 }
 
+// anthropicReasoningEffort 让显式关闭思考优先于强度字段，同时保留 fork 的模型专属 max 映射。
+func anthropicReasoningEffort(req *AnthropicRequest) string {
+	if req.Thinking != nil && req.Thinking.Type == "disabled" {
+		return "none"
+	}
+	effort := "medium"
+	if req.OutputConfig != nil && req.OutputConfig.Effort != "" {
+		effort = req.OutputConfig.Effort
+	}
+	return mapAnthropicEffortToResponsesForModel(req.Model, effort)
+}
+
 func mapAnthropicEffortToResponsesForModel(model, effort string) string {
 	normalized := strings.ToLower(strings.TrimSpace(effort))
 	switch normalized {
@@ -560,7 +572,27 @@ func boolPtr(v bool) *bool {
 // isReasoningModel 判断模型是否为 Responses API 下不支持 temperature/top_p 的推理模型。
 // 当前所有 gpt-5.x 模型都按推理模型处理。
 func isReasoningModel(model string) bool {
-	return strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6")
+	major, ok := openAIModelGeneration(model)
+	return (ok && major >= 5) || openai.IsGPT6SolOrLunaModelSpelling(model)
+}
+
+func openAIModelGeneration(model string) (int, bool) {
+	rest, ok := strings.CutPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-")
+	if !ok {
+		return 0, false
+	}
+	major, digits := 0, 0
+	for _, r := range rest {
+		if r < '0' || r > '9' {
+			break
+		}
+		major = major*10 + int(r-'0')
+		digits++
+	}
+	if digits == 0 {
+		return 0, false
+	}
+	return major, true
 }
 
 // normalizeToolParameters ensures the tool parameter schema is valid for

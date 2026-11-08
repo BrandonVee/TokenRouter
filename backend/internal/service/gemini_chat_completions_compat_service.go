@@ -155,7 +155,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsOpenAICompat(
 	// 两种 OpenAI 兼容入口都遵循 C -> U，OAuth 账号不能绕过账号映射。
 	mappedModel := resolveAccountMappedModelForForward(account, req.Model)
 
-	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody)
+	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody, mappedModel)
 	if err != nil {
 		return nil, s.writeGeminiOpenAICompatError(c, protocol, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}

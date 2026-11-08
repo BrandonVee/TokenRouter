@@ -44,7 +44,7 @@ type AnthropicOutputConfig struct {
 
 // AnthropicThinking configures extended thinking in the Anthropic API.
 type AnthropicThinking struct {
-	Type         string `json:"type"`                    // "enabled" | "adaptive" | "disabled"
+	Type         string `json:"type"`
 	BudgetTokens int    `json:"budget_tokens,omitempty"` // max thinking tokens
 }
 
@@ -98,13 +98,12 @@ func (b AnthropicContentBlock) MarshalJSON() ([]byte, error) {
 			anthropicContentBlock: anthropicContentBlock(b),
 		})
 	case "thinking":
+
 		return json.Marshal(struct {
-			Thinking string `json:"thinking"`
+			Thinking  string `json:"thinking"`
+			Signature string `json:"signature"`
 			anthropicContentBlock
-		}{
-			Thinking:              b.Thinking,
-			anthropicContentBlock: anthropicContentBlock(b),
-		})
+		}{Thinking: b.Thinking, Signature: b.Signature, anthropicContentBlock: anthropicContentBlock(b)})
 	default:
 		return json.Marshal(anthropicContentBlock(b))
 	}
@@ -256,7 +255,7 @@ type ResponsesText struct {
 // The Type field determines which other fields are populated.
 type ResponsesInputItem struct {
 	// Common
-	Type string `json:"type,omitempty"` // "" for role-based messages
+	Type string `json:"type,omitempty"`
 
 	// Role-based messages (developer/system/user/assistant)
 	Role    string          `json:"role,omitempty"`
@@ -269,7 +268,9 @@ type ResponsesInputItem struct {
 	CallID    string `json:"call_id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Arguments string `json:"arguments,omitempty"`
-	ID        string `json:"id,omitempty"`
+	// 密封参数属于不透明协议元数据；保留原始 JSON，不能在重建或历史回放时丢弃/猜测类型。
+	EncryptedFunctionArgs json.RawMessage `json:"encrypted_function_args,omitempty"`
+	ID                    string          `json:"id,omitempty"`
 
 	// type=function_call_output
 	Output    string `json:"output,omitempty"`
@@ -401,6 +402,8 @@ type ResponsesOutput struct {
 	CallID    string `json:"call_id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Arguments string `json:"arguments,omitempty"`
+	// 回程重建必须保留密封参数标记，与原生输入回放使用相同的原始 JSON 语义。
+	EncryptedFunctionArgs json.RawMessage `json:"encrypted_function_args,omitempty"`
 	// 来源为 namespace 子工具时的归属命名空间（codex 按 namespace+name 路由该调用）。
 	Namespace string `json:"namespace,omitempty"`
 
@@ -624,8 +627,7 @@ type ResponsesStreamEvent struct {
 	Code  string `json:"code,omitempty"`
 	Param string `json:"param,omitempty"`
 
-	// Sequence number for ordering events
-	SequenceNumber int `json:"sequence_number,omitempty"`
+	SequenceNumber int `json:"sequence_number"`
 }
 
 // ---------------------------------------------------------------------------
@@ -666,6 +668,7 @@ type ChatStreamOptions struct {
 type ChatMessage struct {
 	Role             string          `json:"role"` // "system" | "user" | "assistant" | "tool" | "function"
 	Content          json.RawMessage `json:"content,omitempty"`
+	Refusal          string          `json:"refusal,omitempty"`
 	ReasoningContent string          `json:"reasoning_content,omitempty"`
 	Reasoning        string          `json:"reasoning,omitempty"`
 	Name             string          `json:"name,omitempty"`
@@ -820,6 +823,7 @@ type ChatChunkChoice struct {
 type ChatDelta struct {
 	Role             string         `json:"role,omitempty"`
 	Content          *string        `json:"content,omitempty"` // pointer: omit when not present, null vs "" matters
+	Refusal          *string        `json:"refusal,omitempty"`
 	ReasoningContent *string        `json:"reasoning_content,omitempty"`
 	Reasoning        *string        `json:"reasoning,omitempty"`
 	ToolCalls        []ChatToolCall `json:"tool_calls,omitempty"`

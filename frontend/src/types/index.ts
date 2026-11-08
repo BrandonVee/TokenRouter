@@ -1504,6 +1504,14 @@ export interface AntigravityModelQuota {
   reset_time: string  // 重置时间 ISO8601
 }
 
+// 同一模型池共享的 5h 与周额度，不能由单模型剩余量推算另一窗口。
+export interface AntigravityQuotaGroup {
+  key: string
+  name: string
+  description?: string
+  windows: Array<{ window: string; utilization: number; resets_at?: string | null }>
+}
+
 export interface GrokQuotaWindow {
   limit?: number | null
   remaining?: number | null
@@ -1563,6 +1571,7 @@ export interface AccountUsageInfo {
   gemini_flash_minute?: UsageProgress | null
   quota_auto_paused?: boolean
   antigravity_quota?: Record<string, AntigravityModelQuota> | null
+  antigravity_quota_groups?: AntigravityQuotaGroup[] | null
   grok_request_quota?: GrokQuotaWindow | null
   grok_token_quota?: GrokQuotaWindow | null
   grok_retry_after_seconds?: number | null

@@ -517,6 +517,12 @@ export default {
         }
       },
       usageWindow: {
+        antigravityGemini5h: 'G·5h',
+        antigravityGeminiWeekly: 'G·周',
+        antigravityArgon5h: 'A·5h',
+        antigravityArgonWeekly: 'A·周',
+        antigravityOther5h: 'C·5h',
+        antigravityOtherWeekly: 'C·周',
         statsTitle: '5小时窗口用量统计',
         statsTitleDaily: '每日用量统计',
         geminiProDaily: 'Pro',

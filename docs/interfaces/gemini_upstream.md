@@ -43,6 +43,8 @@ Antigravity 专用 `/antigravity/v1beta/*` 强制选择 Antigravity 账号，其
 
 兼容层维护 thinking/推理字段、tool/schema、图片输入、usage、finish reason 和 Gemini thought signature。工具 schema 会递归移除 Gemini 不支持的字段；INTEGER 的整数 `exclusiveMinimum` 转换为加一后的包含式 `minimum`，且不覆盖更严格的既有下界，无法等价转换的独占下界只清理不伪造。需要跨轮次的 signature、session 和 cache 连续性时，粘性会话优先复用账号；切换账号必须重新评估可继续性，不能把另一个账号的内部状态当作通用上下文。
 
+Messages 和 OpenAI 兼容入口按最终映射模型选择工具媒体形状：Gemini 3 及以上将图片放进对应调用的 `functionResponse.parts`，保留并行调用归属；旧模型继续在相邻用户 part 中提供图片，纯工具图片附带明确的文字占位。Antigravity 复用该转换规则，但其内置工具混用限制仍由平台专题单独控制。
+
 原生与 Claude 兼容生图响应按上游实际返回的内联或文件 URI 图片 part 数量计费，自定义模型别名也适用。流式响应按单个 payload 中观测到的最大图片数记录，避免累积式 SSE 重复计费；未观测到内联图片时才回退到请求模型名或映射后模型名的生图启发式。
 
 ### 当前模型与图片响应

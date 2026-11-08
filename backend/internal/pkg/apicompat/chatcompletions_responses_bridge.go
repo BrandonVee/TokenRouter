@@ -222,7 +222,47 @@ func responsesInputToChatMessages(instructions string, inputRaw json.RawMessage)
 	if err != nil {
 		return nil, err
 	}
-	return normalizeChatMessagesWithToolOutputMedia(built, mediaByCallID), nil
+	normalized := normalizeChatMessagesWithToolOutputMedia(built, mediaByCallID)
+	return normalizeResponsesDerivedChatMessageRoles(normalized), nil
+}
+
+func normalizeResponsesDerivedChatMessageRoles(messages []ChatMessage) []ChatMessage {
+	isInstructionRole := func(role string) bool {
+		return role == "system" || role == "developer"
+	}
+
+	leading := 0
+	for leading < len(messages) && isInstructionRole(messages[leading].Role) {
+		leading++
+	}
+
+	out := make([]ChatMessage, 0, len(messages))
+	switch leading {
+	case 0:
+
+	case 1:
+
+		out = append(out, messages[0])
+	default:
+		merged := make([]string, 0, leading)
+		for _, m := range messages[:leading] {
+			if text := strings.TrimSpace(chatMessageContentText(m.Content)); text != "" {
+				merged = append(merged, text)
+			}
+		}
+		if len(merged) > 0 {
+			content, _ := json.Marshal(strings.Join(merged, "\n\n"))
+			out = append(out, ChatMessage{Role: "system", Content: content})
+		}
+	}
+
+	for _, m := range messages[leading:] {
+		if isInstructionRole(m.Role) {
+			m.Role = "user"
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // buildChatMessagesFromItems 遍历 Responses input items，并追加对应的 Chat message。
@@ -344,6 +384,20 @@ func buildChatMessagesFromItems(messages []ChatMessage, rawItems []json.RawMessa
 			})
 			pendingReasoning = ""
 			continue
+		case "agent_message":
+			// Codex multi_agent_v2 用 agent_message 在父线程与子智能体之间传递任务和回复：
+			// input_text 是信封（消息类型、任务名、发送者），正文放在 encrypted_content 片段里
+			// （自定义 provider 下为明文）。chat 上游没有对应条目，按原顺序拼成一条 user 消息，
+			// 否则子智能体收不到任务却仍返回 200。
+			text := AgentMessageText(item["content"])
+			if text == "" {
+				pendingReasoning = ""
+				continue
+			}
+			content, _ := json.Marshal(text)
+			messages = append(messages, ChatMessage{Role: "user", Content: content})
+			pendingReasoning = ""
+			continue
 		case "input_text", "text":
 			content, _ := json.Marshal(rawString(item["text"]))
 			messages = append(messages, ChatMessage{Role: "user", Content: content})
@@ -388,8 +442,31 @@ func buildChatMessagesFromItems(messages []ChatMessage, rawItems []json.RawMessa
 	return messages, mediaByCallID, nil
 }
 
-// extractToolOutputMedia 只改写可识别的图片节点。无媒体输出返回 rewritten=false，
-// 让调用方保留原始字节与提示缓存前缀。
+func AgentMessageText(raw json.RawMessage) string {
+	raw = bytesTrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return text
+	}
+	var parts []map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &parts); err != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, part := range parts {
+		switch rawString(part["type"]) {
+		case "input_text", "text":
+			_, _ = b.WriteString(rawString(part["text"]))
+		case "encrypted_content":
+			_, _ = b.WriteString(rawString(part["encrypted_content"]))
+		}
+	}
+	return b.String()
+}
+
 func extractToolOutputMedia(outputRaw json.RawMessage) (string, []ChatContentPart, bool) {
 	outputRaw = bytesTrimSpace(outputRaw)
 	if len(outputRaw) == 0 || string(outputRaw) == "null" {
@@ -1234,10 +1311,10 @@ type ChatCompletionsToResponsesStreamState struct {
 	Text      strings.Builder
 	Reasoning strings.Builder
 
-	// 工具调用生命周期，按上游 tool_call index 归档。
-	ToolCalls       map[int]*ChatToolCall
-	ToolItemIDs     map[int]string
-	ToolOutputIndex map[int]int
+	ToolCalls           map[int]*ChatToolCall
+	ToolItemIDs         map[int]string
+	ToolOutputIndex     map[int]int
+	toolArgumentBuffers map[int]*strings.Builder
 
 	// CustomTools 是客户端请求中 custom/freeform 工具的名字集合（见
 	// CustomToolNames）。命中的调用按 custom_tool_call 生命周期下发，codex 才能
@@ -1286,6 +1363,24 @@ func NewChatCompletionsToResponsesStreamState(model string) *ChatCompletionsToRe
 		toolNamespace:    make(map[int]NamespacedToolName),
 		toolAnnounced:    make(map[int]bool),
 	}
+}
+
+// ValidateToolCallArguments 在流收尾前拒绝截断的普通函数参数，避免客户端持久化后回放坏历史。
+// 自由文本工具和工具搜索保留各自的参数协议，不强制按普通函数 JSON 校验。
+func (state *ChatCompletionsToResponsesStreamState) ValidateToolCallArguments() error {
+	if state == nil {
+		return nil
+	}
+	for idx, toolCall := range state.ToolCalls {
+		if toolCall == nil || state.toolIsCustom[idx] || state.toolIsToolSearch[idx] {
+			continue
+		}
+		arguments := strings.TrimSpace(toolCall.Function.Arguments)
+		if arguments != "" && !json.Valid([]byte(arguments)) {
+			return fmt.Errorf("tool call %q (%s) arguments are invalid JSON", toolCall.ID, toolCall.Function.Name)
+		}
+	}
+	return nil
 }
 
 func (state *ChatCompletionsToResponsesStreamState) allocOutputIndex() int {
@@ -1375,7 +1470,7 @@ func ChatCompletionsChunkToResponsesEvents(
 			}
 			events = append(events, announceChatToolItem(state, idx, stored, false)...)
 			if toolCall.Function.Arguments != "" {
-				stored.Function.Arguments += toolCall.Function.Arguments
+				stored.Function.Arguments = appendIndexedStreamString(&state.toolArgumentBuffers, idx, stored.Function.Arguments, toolCall.Function.Arguments)
 				// 未宣告（名字未到）时仅累积，宣告时统一补发；custom 调用的
 				// arguments 是包裹 input 的 JSON 片段，无法增量还原为自由文本
 				// 输入，缓冲整份 arguments 收尾时一次性下发（见 closeChatToolItems）；

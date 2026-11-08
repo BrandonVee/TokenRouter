@@ -270,6 +270,19 @@
         {{ error }}
       </div>
 
+      <!-- 优先展示上游共享模型池的真实独立窗口，缺失摘要时保留原模型视图。 -->
+      <div v-else-if="antigravityQuotaGroupBars.length" class="space-y-1">
+        <UsageProgressBar
+          v-for="bar in antigravityQuotaGroupBars"
+          :key="bar.key"
+          :label="bar.label"
+          :title="bar.title"
+          :utilization="bar.utilization"
+          :resets-at="bar.resetsAt"
+          :color="bar.color"
+        />
+      </div>
+
       <!-- Usage data from API -->
       <div v-else-if="hasAntigravityQuotaFromAPI" class="space-y-1">
         <!-- Gemini 3 Pro -->
@@ -877,6 +890,36 @@ interface AntigravityUsageResult {
   utilization: number
   resetTime: string | null
 }
+
+// 上游窗口逐项展示；与原有进度条共用组件、百分比和重置时间语义。
+const antigravityQuotaGroupBars = computed(() => {
+  const bars: Array<{
+    key: string
+    label: string
+    title: string
+    utilization: number
+    resetsAt: string | null
+    color: 'indigo' | 'emerald' | 'purple' | 'amber'
+  }> = []
+  for (const group of usageInfo.value?.antigravity_quota_groups ?? []) {
+    const family = group.key === 'gemini' ? 'Gemini' : group.key.startsWith('gemini-argon') ? 'Argon' : 'Other'
+    for (const window of group.windows ?? []) {
+      const weekly = window.window === 'weekly'
+      const label = window.window === '5h' || weekly
+        ? t(`admin.accounts.usageWindow.antigravity${family}${weekly ? 'Weekly' : '5h'}`)
+        : `${group.name} · ${window.window}`
+      bars.push({
+        key: `${group.key}-${window.window}`,
+        label,
+        title: group.description || group.name,
+        utilization: Math.round(window.utilization),
+        resetsAt: window.resets_at ?? null,
+        color: family === 'Other' ? (weekly ? 'purple' : 'amber') : (weekly ? 'indigo' : 'emerald')
+      })
+    }
+  }
+  return bars
+})
 
 // ===== Antigravity quota from API (usageInfo.antigravity_quota) =====
 

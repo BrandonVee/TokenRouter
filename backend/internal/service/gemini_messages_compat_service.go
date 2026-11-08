@@ -21,6 +21,7 @@ import (
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/ctxkey"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/gemini"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/geminicli"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/googleapi"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/logger"
@@ -786,7 +787,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 	// 所有 Gemini 账号类型都执行账号模型映射，OAuth 也必须与调度和可见模型解析保持一致。
 	mappedModel := resolveAccountMappedModelForForward(account, req.Model)
 
-	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body)
+	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body, mappedModel)
 	if err != nil {
 		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
@@ -1033,7 +1034,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 					stageName = "thinking+tools"
 					signatureRetryStage = 2
 				}
-				retryGeminiReq, txErr := convertClaudeMessagesToGeminiGenerateContent(strippedClaudeBody)
+				retryGeminiReq, txErr := convertClaudeMessagesToGeminiGenerateContent(strippedClaudeBody, mappedModel)
 				if txErr == nil {
 					logger.LegacyPrintf("service.gemini_messages_compat", "Gemini account %d: detected signature-related 400, retrying with downgraded Claude blocks (%s)", account.ID, stageName)
 					geminiReq = retryGeminiReq
@@ -3291,7 +3292,7 @@ func mapGeminiFinishReasonToClaudeStopReason(finishReason string) string {
 	}
 }
 
-func convertClaudeMessagesToGeminiGenerateContent(body []byte) ([]byte, error) {
+func convertClaudeMessagesToGeminiGenerateContent(body []byte, models ...string) ([]byte, error) {
 	var req map[string]any
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, err
@@ -3300,7 +3301,7 @@ func convertClaudeMessagesToGeminiGenerateContent(body []byte) ([]byte, error) {
 	toolUseIDToName := make(map[string]string)
 
 	systemText := extractClaudeSystemText(req["system"])
-	contents, err := convertClaudeMessagesToGeminiContents(req["messages"], toolUseIDToName)
+	contents, err := convertClaudeMessagesToGeminiContents(req["messages"], toolUseIDToName, len(models) > 0 && gemini.SupportsMultimodalFunctionResponses(models[0]))
 	if err != nil {
 		return nil, err
 	}
@@ -3380,7 +3381,8 @@ func extractClaudeSystemText(system any) string {
 	}
 }
 
-func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[string]string) ([]any, error) {
+func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[string]string, multimodalToolResultsArgs ...bool) ([]any, error) {
+	multimodalToolResults := len(multimodalToolResultsArgs) > 0 && multimodalToolResultsArgs[0]
 	arr, ok := messages.([]any)
 	if !ok {
 		return nil, errors.New("messages must be an array")
@@ -3400,6 +3402,7 @@ func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[str
 		}
 
 		parts := make([]any, 0)
+		droppedThinking := false
 		switch content := mm["content"].(type) {
 		case string:
 			// 字符串形式的 content，保留所有内容（包括空白）
@@ -3407,10 +3410,16 @@ func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[str
 		case []any:
 			// 如果只有一个 block，不过滤空白（让上游 API 报错）
 			singleBlock := len(content) == 1
+			var toolImageParts []any
 
 			for _, block := range content {
 				bm, ok := block.(map[string]any)
 				if !ok {
+					continue
+				}
+				// 历史思考块不回传给 Gemini：Gemini 的思考连续性由 thoughtSignature 承载。
+				if bt, _ := bm["type"].(string); bt == "thinking" || bt == "redacted_thinking" {
+					droppedThinking = true
 					continue
 				}
 				bt, _ := bm["type"].(string)
@@ -3447,14 +3456,21 @@ func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[str
 					if name == "" {
 						name = "tool"
 					}
-					parts = append(parts, map[string]any{
-						"functionResponse": map[string]any{
-							"name": name,
-							"response": map[string]any{
-								"content": extractClaudeContentText(bm["content"]),
-							},
-						},
-					})
+					text := extractClaudeContentText(bm["content"])
+					images := extractClaudeToolResultImageParts(bm["content"])
+					if text == "" && len(images) > 0 && !multimodalToolResults {
+						text = "[image attached below]"
+					}
+					response := map[string]any{
+						"name":     name,
+						"response": map[string]any{"content": text},
+					}
+					if multimodalToolResults && len(images) > 0 {
+						response["parts"] = images
+					} else {
+						toolImageParts = append(toolImageParts, images...)
+					}
+					parts = append(parts, map[string]any{"functionResponse": response})
 				case "image":
 					if src, ok := bm["source"].(map[string]any); ok {
 						if srcType, _ := src["type"].(string); srcType == "base64" {
@@ -3477,8 +3493,13 @@ func convertClaudeMessagesToGeminiContents(messages any, toolUseIDToName map[str
 					}
 				}
 			}
+			parts = append(parts, toolImageParts...)
 		default:
 			// ignore
+		}
+		// 只含思考块的消息去掉思考后为空，整条跳过（Gemini 拒收空 parts）。
+		if droppedThinking && len(parts) == 0 {
+			continue
 		}
 
 		out = append(out, map[string]any{
@@ -3790,4 +3811,38 @@ func (s *GeminiMessagesCompatService) geminiMaxAttemptsPerAccount() int {
 		return geminiDefaultSameAccountRetries + 1
 	}
 	return s.cfg.Gateway.MaxSameAccountRetriesGemini + 1
+}
+
+func extractClaudeToolResultImageParts(v any) []any {
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+
+	parts := make([]any, 0)
+	for _, part := range arr {
+		pm, ok := part.(map[string]any)
+		if !ok || pm["type"] != "image" {
+			continue
+		}
+		source, ok := pm["source"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if sourceType, _ := source["type"].(string); sourceType != "base64" {
+			continue
+		}
+		mediaType, _ := source["media_type"].(string)
+		data, _ := source["data"].(string)
+		if mediaType == "" || data == "" {
+			continue
+		}
+		parts = append(parts, map[string]any{
+			"inlineData": map[string]any{
+				"mimeType": mediaType,
+				"data":     data,
+			},
+		})
+	}
+	return parts
 }

@@ -54,9 +54,14 @@ type GeminiFunctionCall struct {
 
 // GeminiFunctionResponse Gemini 函数响应
 type GeminiFunctionResponse struct {
-	Name     string         `json:"name"`
-	Response map[string]any `json:"response"`
-	ID       string         `json:"id,omitempty"`
+	Parts    []GeminiFunctionResponsePart `json:"parts,omitempty"`
+	Name     string                       `json:"name"`
+	Response map[string]any               `json:"response"`
+	ID       string                       `json:"id,omitempty"`
+}
+
+type GeminiFunctionResponsePart struct {
+	InlineData *GeminiInlineData `json:"inlineData,omitempty"`
 }
 
 // GeminiGenerationConfig Gemini 生成配置
@@ -84,9 +89,13 @@ type GeminiThinkingConfig struct {
 
 // GeminiToolDeclaration Gemini 工具声明
 type GeminiToolDeclaration struct {
+	CodeExecution        *GeminiCodeExecution `json:"codeExecution,omitempty"`
 	FunctionDeclarations []GeminiFunctionDecl `json:"functionDeclarations,omitempty"`
 	GoogleSearch         *GeminiGoogleSearch  `json:"googleSearch,omitempty"`
 }
+
+// GeminiCodeExecution 表示显式启用内置代码执行，空对象即为该工具的线上声明。
+type GeminiCodeExecution struct{}
 
 // GeminiFunctionDecl Gemini 函数声明
 type GeminiFunctionDecl struct {
@@ -112,7 +121,8 @@ type GeminiImageSearch struct {
 
 // GeminiToolConfig Gemini 工具配置
 type GeminiToolConfig struct {
-	FunctionCallingConfig *GeminiFunctionCallingConfig `json:"functionCallingConfig,omitempty"`
+	FunctionCallingConfig            *GeminiFunctionCallingConfig `json:"functionCallingConfig,omitempty"`
+	IncludeServerSideToolInvocations *bool                        `json:"includeServerSideToolInvocations,omitempty"` // 仅由兼容上游显式声明支持时使用。
 }
 
 // GeminiFunctionCallingConfig 函数调用配置

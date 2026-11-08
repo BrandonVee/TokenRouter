@@ -74,6 +74,29 @@ describe('AccountUsageCell', () => {
     })
   })
 
+  // 模型池摘要存在时显示独立窗口，不能继续将旧的单模型限额误当成总额度。
+  it('优先展示 Antigravity 模型池的五小时和周窗口', async () => {
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: 98001 }),
+        requestBatchedUsage: vi.fn(),
+        batchedUsage: {
+          antigravity_quota_groups: [{
+            key: 'gemini', name: 'Gemini Models',
+            windows: [{ window: '5h', utilization: 13 }, { window: 'weekly', utilization: 42 }]
+          }],
+          antigravity_quota: { 'gemini-3-pro-high': { utilization: 99, reset_time: '' } }
+        }
+      },
+      global: { stubs: { UsageProgressBar: true, AccountQuotaInfo: true } }
+    })
+    await flushPromises()
+    const bars = wrapper.findAllComponents({ name: 'UsageProgressBar' })
+    expect(bars.map(bar => bar.props('utilization'))).toEqual([13, 42])
+    expect(wrapper.text()).not.toContain('admin.accounts.usageWindow.gemini3Pro')
+    wrapper.unmount()
+  })
+
   it('将账号额度警告悬浮层挂载到表格滚动容器外', async () => {
     getUsage.mockResolvedValue({})
     const wrapper = mount(AccountUsageCell, {

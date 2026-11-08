@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/claude"
@@ -186,12 +187,17 @@ type AnthropicEventToResponsesState struct {
 	CurrentCallID string
 	CurrentName   string
 
-	// 当前打开项的完整内容在关闭时写入 Outputs。
 	CurrentContent             []ResponsesContentPart // message
 	CurrentArgs                string                 // function_call
 	CurrentSummary             string                 // reasoning
 	CurrentThinking            AnthropicContentBlock
 	PreserveThinkingSignatures bool
+	textAccumBuffer            *strings.Builder
+	currentArgsBuffer          *strings.Builder
+	currentSummaryBuffer       *strings.Builder
+	currentSignatureBuffer     *strings.Builder
+
+	PendingToolInput string
 
 	// 累积所有已关闭输出项，供终止事件返回完整结果。
 	Outputs []ResponsesOutput
@@ -317,6 +323,8 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 		state.CurrentItemType = "reasoning"
 		state.CurrentThinking = *evt.ContentBlock
 		state.CurrentSummary = evt.ContentBlock.Thinking
+		state.currentSummaryBuffer = nil
+		state.currentSignatureBuffer = nil
 		state.ContentIndex = 0
 
 		events = append(events, makeResponsesEvent(state, "response.output_item.added", &ResponsesStreamEvent{
@@ -355,6 +363,7 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 			Part:         &ResponsesContentPart{Type: "output_text", Text: ""},
 		}))
 		state.TextAccum = ""
+		state.textAccumBuffer = nil
 
 	case "tool_use":
 		// Close previous item if any
@@ -364,6 +373,8 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 		state.CurrentItemType = "function_call"
 		state.CurrentCallID = toResponsesCallID(evt.ContentBlock.ID)
 		state.CurrentName = evt.ContentBlock.Name
+
+		state.PendingToolInput = seedToolArguments(evt.ContentBlock.Input)
 
 		events = append(events, makeResponsesEvent(state, "response.output_item.added", &ResponsesStreamEvent{
 			OutputIndex: state.OutputIndex,
@@ -390,7 +401,7 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 		if evt.Delta.Text == "" {
 			return nil
 		}
-		state.TextAccum += evt.Delta.Text
+		state.TextAccum = appendStreamString(&state.textAccumBuffer, state.TextAccum, evt.Delta.Text)
 		return []ResponsesStreamEvent{makeResponsesEvent(state, "response.output_text.delta", &ResponsesStreamEvent{
 			OutputIndex:  state.OutputIndex,
 			ContentIndex: state.ContentIndex,
@@ -402,7 +413,7 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 		if evt.Delta.Thinking == "" {
 			return nil
 		}
-		state.CurrentSummary += evt.Delta.Thinking
+		state.CurrentSummary = appendStreamString(&state.currentSummaryBuffer, state.CurrentSummary, evt.Delta.Thinking)
 		return []ResponsesStreamEvent{makeResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
 			OutputIndex:  state.OutputIndex,
 			SummaryIndex: 0,
@@ -414,7 +425,9 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 		if evt.Delta.PartialJSON == "" {
 			return nil
 		}
-		state.CurrentArgs += evt.Delta.PartialJSON
+
+		state.PendingToolInput = ""
+		state.CurrentArgs = appendStreamString(&state.currentArgsBuffer, state.CurrentArgs, evt.Delta.PartialJSON)
 		return []ResponsesStreamEvent{makeResponsesEvent(state, "response.function_call_arguments.delta", &ResponsesStreamEvent{
 			OutputIndex: state.OutputIndex,
 			Delta:       evt.Delta.PartialJSON,
@@ -424,9 +437,9 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 		})}
 
 	case "signature_delta":
-		// 签名仅写入不透明桥接载体，不暴露到可见正文。
+
 		if state.PreserveThinkingSignatures {
-			state.CurrentThinking.Signature += evt.Delta.Signature
+			state.CurrentThinking.Signature = appendStreamString(&state.currentSignatureBuffer, state.CurrentThinking.Signature, evt.Delta.Signature)
 		}
 		return nil
 	}
@@ -449,34 +462,55 @@ func anthToResHandleContentBlockStop(evt *AnthropicStreamEvent, state *Anthropic
 		return events
 
 	case "function_call":
-		// Emit function_call_arguments.done + output item done
-		events := []ResponsesStreamEvent{
-			makeResponsesEvent(state, "response.function_call_arguments.done", &ResponsesStreamEvent{
+		var events []ResponsesStreamEvent
+
+		if state.CurrentArgs == "" && state.PendingToolInput != "" {
+			state.CurrentArgs = state.PendingToolInput
+			state.currentArgsBuffer = nil
+			events = append(events, makeResponsesEvent(state, "response.function_call_arguments.delta", &ResponsesStreamEvent{
 				OutputIndex: state.OutputIndex,
+				Delta:       state.PendingToolInput,
 				ItemID:      state.CurrentItemID,
 				CallID:      state.CurrentCallID,
 				Name:        state.CurrentName,
-			}),
+			}))
 		}
+		state.PendingToolInput = ""
+
+		events = append(events, makeResponsesEvent(state, "response.function_call_arguments.done", &ResponsesStreamEvent{
+			OutputIndex: state.OutputIndex,
+			ItemID:      state.CurrentItemID,
+			CallID:      state.CurrentCallID,
+			Name:        state.CurrentName,
+			Arguments:   state.CurrentArgs,
+		}))
 		events = append(events, closeCurrentResponsesItem(state)...)
 		return events
 
 	case "message":
-		// 文本块结束时按 OpenAI 顺序发送两个完成事件，并携带完整文本；
-		// message 输出项保持打开，以便继续接收后续文本块。
+
 		text := state.TextAccum
 		state.TextAccum = ""
+		state.textAccumBuffer = nil
+		contentIndex := state.ContentIndex
 		state.CurrentContent = append(state.CurrentContent, ResponsesContentPart{Type: "output_text", Text: text})
+		// 关掉一个 part 就推进 content_index：上面那句注释说的「item 保持打开，
+		// 因为后面可能还有块」正是这里的触发条件。不推进的话，同一 item 里第二个
+		// text 块会再发一次 content_part.added(content_index=0)，与第一个 part 撞在
+		// 同一下标上——SDK 的累积式 stream helper 按 content[content_index] 写入，
+		// 后一个 part 直接覆盖前一个，可见文本丢失。
+		// 只在这里推进：新 item 的 content_index 由 closeCurrentResponsesItem 归 0。
+		state.ContentIndex++
 		return []ResponsesStreamEvent{
 			makeResponsesEvent(state, "response.output_text.done", &ResponsesStreamEvent{
 				OutputIndex:  state.OutputIndex,
-				ContentIndex: state.ContentIndex,
+				ContentIndex: contentIndex,
 				ItemID:       state.CurrentItemID,
 				Text:         text,
 			}),
 			makeResponsesEvent(state, "response.content_part.done", &ResponsesStreamEvent{
 				OutputIndex:  state.OutputIndex,
-				ContentIndex: state.ContentIndex,
+				ContentIndex: contentIndex,
 				ItemID:       state.CurrentItemID,
 				Part:         &ResponsesContentPart{Type: "output_text", Text: text},
 			}),
@@ -529,6 +563,15 @@ func anthropicResponsesStreamTerminalState(stopReason string) (string, *Response
 	return "completed", nil
 }
 
+func seedToolArguments(input json.RawMessage) string {
+	trimmed := strings.TrimSpace(string(input))
+	switch trimmed {
+	case "", "{}", "null":
+		return ""
+	}
+	return trimmed
+}
+
 func closeCurrentResponsesItem(state *AnthropicEventToResponsesState) []ResponsesStreamEvent {
 	if state.CurrentItemType == "" {
 		return nil
@@ -570,9 +613,14 @@ func closeCurrentResponsesItem(state *AnthropicEventToResponsesState) []Response
 	state.CurrentName = ""
 	state.CurrentContent = nil
 	state.CurrentArgs = ""
+	state.currentArgsBuffer = nil
+	state.PendingToolInput = ""
 	state.CurrentSummary = ""
+	state.currentSummaryBuffer = nil
 	state.CurrentThinking = AnthropicContentBlock{}
+	state.currentSignatureBuffer = nil
 	state.TextAccum = ""
+	state.textAccumBuffer = nil
 	state.OutputIndex++
 	state.ContentIndex = 0
 

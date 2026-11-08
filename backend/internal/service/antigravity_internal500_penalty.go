@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -16,6 +19,64 @@ const (
 	internal500PenaltyTier2Duration  = 2 * time.Hour    // 第 2 轮：临时不可调度 2 小时
 	internal500PenaltyTier3Threshold = 3                // 第 3+ 轮：永久禁用
 )
+
+// isAntigravityGeminiImageModel 仅把明确的 Gemini 图片模型故障限制到模型，不能扩大到文本账号。
+func isAntigravityGeminiImageModel(model string) bool {
+	model = normalizeAntigravityModelName(model)
+	return strings.HasPrefix(model, "gemini-") && strings.Contains(model, "-image")
+}
+
+const (
+	internal500ImageCooldownEnv     = "GATEWAY_ANTIGRAVITY_INTERNAL500_IMAGE_COOLDOWN_SECONDS"
+	internal500Tier1Env             = "GATEWAY_ANTIGRAVITY_INTERNAL500_TIER1_SECONDS"
+	internal500Tier2Env             = "GATEWAY_ANTIGRAVITY_INTERNAL500_TIER2_SECONDS"
+	internal500DisableEnv           = "GATEWAY_ANTIGRAVITY_INTERNAL500_DISABLE_ACCOUNT"
+	defaultInternal500ImageCooldown = 2 * time.Minute
+)
+
+func positiveSecondsFromEnv(name string, fallback time.Duration) time.Duration {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		return fallback
+	}
+	return time.Duration(seconds) * time.Second
+}
+
+func internal500ImageCooldown() time.Duration {
+	return positiveSecondsFromEnv(internal500ImageCooldownEnv, defaultInternal500ImageCooldown)
+}
+
+func internal500PenaltyTiers() (tier1, tier2 time.Duration, disable bool) {
+	tier1 = positiveSecondsFromEnv(internal500Tier1Env, internal500PenaltyTier1Duration)
+	tier2 = positiveSecondsFromEnv(internal500Tier2Env, internal500PenaltyTier2Duration)
+	disable = true
+	if raw := strings.TrimSpace(os.Getenv(internal500DisableEnv)); raw != "" {
+		if parsed, err := strconv.ParseBool(raw); err == nil {
+			disable = parsed
+		}
+	}
+	return tier1, tier2, disable
+}
+
+func (s *AntigravityGatewayService) handleInternal500ForModel(
+	ctx context.Context, prefix string, account *Account, modelKey string,
+) {
+	if account != nil && isAntigravityGeminiImageModel(modelKey) {
+		until := time.Now().Add(internal500ImageCooldown())
+		if setModelRateLimitByModelName(ctx, s.accountRepo, account.ID, modelKey, prefix, http.StatusInternalServerError, until, false) {
+			s.updateAccountModelRateLimitInCache(ctx, account, modelKey, until)
+		}
+		slog.Info("internal500_image_model_cooldown",
+			"account_id", account.ID, "account_name", account.Name, "model", modelKey,
+			"duration", time.Until(until).Truncate(time.Second))
+		return
+	}
+	s.handleInternal500RetryExhausted(ctx, prefix, account)
+}
 
 // isAntigravityInternalServerError 检测特定的 INTERNAL 500 错误
 // 必须同时匹配 error.code==500, error.message=="Internal error encountered.", error.status=="INTERNAL"
@@ -35,6 +96,10 @@ func isAntigravityInternalServerError(statusCode int, body []byte) bool {
 func (s *AntigravityGatewayService) applyInternal500Penalty(
 	ctx context.Context, prefix string, account *Account, count int64,
 ) {
+	tier1, tier2, disable := internal500PenaltyTiers()
+	if !disable && count > 2 {
+		count = 2
+	}
 	switch {
 	case count >= int64(internal500PenaltyTier3Threshold):
 		reason := fmt.Sprintf("INTERNAL 500 consecutive failures: %d rounds", count)
@@ -45,25 +110,25 @@ func (s *AntigravityGatewayService) applyInternal500Penalty(
 		slog.Warn("internal500_account_disabled",
 			"account_id", account.ID, "account_name", account.Name, "consecutive_count", count)
 	case count == 2:
-		until := time.Now().Add(internal500PenaltyTier2Duration)
-		reason := fmt.Sprintf("INTERNAL 500 x%d (temp unsched %v)", count, internal500PenaltyTier2Duration)
+		until := time.Now().Add(tier2)
+		reason := fmt.Sprintf("INTERNAL 500 x%d (temp unsched %v)", count, tier2)
 		if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); err != nil {
 			slog.Error("internal500_temp_unsched_failed", "account_id", account.ID, "error", err)
 			return
 		}
 		slog.Warn("internal500_temp_unschedulable",
 			"account_id", account.ID, "account_name", account.Name,
-			"duration", internal500PenaltyTier2Duration, "consecutive_count", count)
+			"duration", tier2, "consecutive_count", count)
 	case count == 1:
-		until := time.Now().Add(internal500PenaltyTier1Duration)
-		reason := fmt.Sprintf("INTERNAL 500 x%d (temp unsched %v)", count, internal500PenaltyTier1Duration)
+		until := time.Now().Add(tier1)
+		reason := fmt.Sprintf("INTERNAL 500 x%d (temp unsched %v)", count, tier1)
 		if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); err != nil {
 			slog.Error("internal500_temp_unsched_failed", "account_id", account.ID, "error", err)
 			return
 		}
 		slog.Info("internal500_temp_unschedulable",
 			"account_id", account.ID, "account_name", account.Name,
-			"duration", internal500PenaltyTier1Duration, "consecutive_count", count)
+			"duration", tier1, "consecutive_count", count)
 	}
 }
 

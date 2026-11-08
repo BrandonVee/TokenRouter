@@ -568,6 +568,14 @@ func convertResponsesUserToAnthropicContent(raw json.RawMessage) (json.RawMessag
 					Source: src,
 				})
 			}
+		case "input_file":
+			src := dataURIToAnthropicFileSource(p.FileData)
+			if src != nil {
+				blocks = append(blocks, AnthropicContentBlock{
+					Type:   "document",
+					Source: src,
+				})
+			}
 		}
 	}
 
@@ -653,6 +661,10 @@ func dataURIToAnthropicImageSource(dataURI string) *AnthropicImageSource {
 		MediaType: mediaType,
 		Data:      data,
 	}
+}
+
+func dataURIToAnthropicFileSource(fileData string) *AnthropicImageSource {
+	return dataURIToAnthropicImageSource(fileData)
 }
 
 // mergeConsecutiveMessages merges consecutive messages with the same role
@@ -742,6 +754,8 @@ func normalizeAnthropicInputSchema(schema json.RawMessage) json.RawMessage {
 	if err := json.Unmarshal(schema, &m); err != nil {
 		return json.RawMessage(emptyObjectSchema)
 	}
+
+	flattenAnthropicRootUnions(m)
 
 	typeRaw, ok := m["type"]
 	if !ok || strings.TrimSpace(string(typeRaw)) == "" || string(typeRaw) == "null" {

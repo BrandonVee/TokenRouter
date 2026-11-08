@@ -13,9 +13,6 @@ import (
 // Non-streaming: ResponsesResponse → ChatCompletionsResponse
 // ---------------------------------------------------------------------------
 
-// ResponsesToChatCompletions converts a Responses API response into a Chat
-// Completions response. Text output items are concatenated into
-// choices[0].message.content; function_call items become tool_calls.
 func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatCompletionsResponse {
 	id := resp.ID
 	if id == "" {
@@ -30,6 +27,7 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 	}
 
 	var contentText string
+	var refusalText string
 	var reasoningText string
 	var toolCalls []ChatToolCall
 
@@ -37,8 +35,11 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 		switch item.Type {
 		case "message":
 			for _, part := range item.Content {
-				if part.Type == "output_text" && part.Text != "" {
+				switch {
+				case part.Type == "output_text" && part.Text != "":
 					contentText += part.Text
+				case part.Type == "refusal" && part.Refusal != "":
+					refusalText += part.Refusal
 				}
 			}
 		case "function_call":
@@ -57,7 +58,7 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 		}
 	}
 
-	msg := ChatMessage{Role: "assistant"}
+	msg := ChatMessage{Role: "assistant", Refusal: refusalText}
 	if len(toolCalls) > 0 {
 		msg.ToolCalls = toolCalls
 	}
@@ -120,6 +121,8 @@ type ResponsesEventToChatState struct {
 	Finalized              bool        // true after finish chunk has been emitted
 	NextToolCallIndex      int         // next sequential tool_call index to assign
 	OutputIndexToToolIndex map[int]int // Responses output_index → Chat tool_calls index
+	OutputIndexToArguments map[int]string
+	argumentBuffers        map[int]*strings.Builder
 	IncludeUsage           bool
 	Usage                  *ChatUsage
 }
@@ -130,6 +133,7 @@ func NewResponsesEventToChatState() *ResponsesEventToChatState {
 		ID:                     generateChatCmplID(),
 		Created:                time.Now().Unix(),
 		OutputIndexToToolIndex: make(map[int]int),
+		OutputIndexToArguments: make(map[int]string),
 	}
 }
 
@@ -141,6 +145,8 @@ func ResponsesEventToChatChunks(evt *ResponsesStreamEvent, state *ResponsesEvent
 		return resToChatHandleCreated(evt, state)
 	case "response.output_text.delta":
 		return resToChatHandleTextDelta(evt, state)
+	case "response.refusal.delta":
+		return resToChatHandleRefusalDelta(evt, state)
 	case "response.output_item.added":
 		return resToChatHandleOutputItemAdded(evt, state)
 	case "response.function_call_arguments.delta",
@@ -148,6 +154,8 @@ func ResponsesEventToChatChunks(evt *ResponsesStreamEvent, state *ResponsesEvent
 		// 均按 OutputIndex 累加到对应工具调用。
 		"response.custom_tool_call_input.delta":
 		return resToChatHandleFuncArgsDelta(evt, state)
+	case "response.function_call_arguments.done", "response.custom_tool_call_input.done":
+		return resToChatHandleFuncArgsDone(evt, state)
 	case "response.reasoning_summary_text.delta",
 		// 原始推理文本增量（真实 Codex 客户端消费的 reasoning_text.delta），
 		// 与 reasoning summary 一样映射为 reasoning_content。
@@ -234,6 +242,14 @@ func resToChatHandleTextDelta(evt *ResponsesStreamEvent, state *ResponsesEventTo
 	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{Content: &content})}
 }
 
+func resToChatHandleRefusalDelta(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
+	if evt.Delta == "" {
+		return nil
+	}
+	refusal := evt.Delta
+	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{Refusal: &refusal})}
+}
+
 func resToChatHandleOutputItemAdded(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
 	// function_call 与 custom_tool_call（custom/freeform 工具）均按工具调用注册，
 	// 以便后续 *_input.delta / *_arguments.delta 能映射到正确的工具索引。
@@ -267,12 +283,41 @@ func resToChatHandleFuncArgsDelta(evt *ResponsesStreamEvent, state *ResponsesEve
 	if !ok {
 		return nil
 	}
+	state.OutputIndexToArguments[evt.OutputIndex] = appendIndexedStreamString(&state.argumentBuffers, evt.OutputIndex, state.OutputIndexToArguments[evt.OutputIndex], evt.Delta)
 
 	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{
 		ToolCalls: []ChatToolCall{{
 			Index: &idx,
 			Function: ChatFunctionCall{
 				Arguments: evt.Delta,
+			},
+		}},
+	})}
+}
+
+func resToChatHandleFuncArgsDone(evt *ResponsesStreamEvent, state *ResponsesEventToChatState) []ChatCompletionsChunk {
+	idx, ok := state.OutputIndexToToolIndex[evt.OutputIndex]
+	if !ok {
+		return nil
+	}
+
+	completed := evt.Arguments
+	if evt.Type == "response.custom_tool_call_input.done" {
+		completed = evt.Input
+	}
+	current := state.OutputIndexToArguments[evt.OutputIndex]
+	if completed == "" || !strings.HasPrefix(completed, current) || completed == current {
+		return nil
+	}
+
+	remainder := completed[len(current):]
+	state.OutputIndexToArguments[evt.OutputIndex] = completed
+	delete(state.argumentBuffers, evt.OutputIndex)
+	return []ChatCompletionsChunk{makeChatDeltaChunk(state, ChatDelta{
+		ToolCalls: []ChatToolCall{{
+			Index: &idx,
+			Function: ChatFunctionCall{
+				Arguments: remainder,
 			},
 		}},
 	})}
@@ -436,9 +481,10 @@ func generateChatCmplID() string {
 // ---------------------------------------------------------------------------
 
 type bufferedFuncCall struct {
-	CallID string
-	Name   string
-	Args   strings.Builder
+	OutputIndex int // 保留上游输出索引，不能把工具在切片中的顺序当成完整输出的索引。
+	CallID      string
+	Name        string
+	Args        strings.Builder
 }
 
 // BufferedResponseAccumulator collects content from Responses SSE delta events
@@ -446,6 +492,7 @@ type bufferedFuncCall struct {
 // (response.completed / response.done) carries an empty output array.
 type BufferedResponseAccumulator struct {
 	text                 strings.Builder
+	refusal              strings.Builder
 	reasoning            strings.Builder
 	funcCalls            []bufferedFuncCall
 	outputIndexToFuncIdx map[int]int
@@ -467,13 +514,18 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 		if event.Delta != "" {
 			_, _ = a.text.WriteString(event.Delta)
 		}
+	case "response.refusal.delta":
+		if event.Delta != "" {
+			_, _ = a.refusal.WriteString(event.Delta)
+		}
 	case "response.output_item.added":
 		if event.Item != nil && (event.Item.Type == "function_call" || event.Item.Type == "custom_tool_call") {
 			idx := len(a.funcCalls)
 			a.outputIndexToFuncIdx[event.OutputIndex] = idx
 			a.funcCalls = append(a.funcCalls, bufferedFuncCall{
-				CallID: event.Item.CallID,
-				Name:   event.Item.Name,
+				OutputIndex: event.OutputIndex,
+				CallID:      event.Item.CallID,
+				Name:        event.Item.Name,
 			})
 		}
 	case "response.function_call_arguments.delta", "response.custom_tool_call_input.delta":
@@ -491,7 +543,7 @@ func (a *BufferedResponseAccumulator) ProcessEvent(event *ResponsesStreamEvent) 
 
 // HasContent reports whether any content has been accumulated.
 func (a *BufferedResponseAccumulator) HasContent() bool {
-	return a.text.Len() > 0 || len(a.funcCalls) > 0 || a.reasoning.Len() > 0
+	return a.text.Len() > 0 || a.refusal.Len() > 0 || len(a.funcCalls) > 0 || a.reasoning.Len() > 0
 }
 
 // BuildOutput constructs a []ResponsesOutput from the accumulated delta
@@ -510,14 +562,18 @@ func (a *BufferedResponseAccumulator) BuildOutput() []ResponsesOutput {
 		})
 	}
 
-	if a.text.Len() > 0 {
+	if a.text.Len() > 0 || a.refusal.Len() > 0 {
+		var content []ResponsesContentPart
+		if a.text.Len() > 0 {
+			content = append(content, ResponsesContentPart{Type: "output_text", Text: a.text.String()})
+		}
+		if a.refusal.Len() > 0 {
+			content = append(content, ResponsesContentPart{Type: "refusal", Refusal: a.refusal.String()})
+		}
 		out = append(out, ResponsesOutput{
-			Type: "message",
-			Role: "assistant",
-			Content: []ResponsesContentPart{{
-				Type: "output_text",
-				Text: a.text.String(),
-			}},
+			Type:    "message",
+			Role:    "assistant",
+			Content: content,
 		})
 	}
 
@@ -537,11 +593,81 @@ func (a *BufferedResponseAccumulator) BuildOutput() []ResponsesOutput {
 // when the terminal event delivered an empty output array. If resp.Output is
 // already populated, this is a no-op (preserves backward compatibility).
 func (a *BufferedResponseAccumulator) SupplementResponseOutput(resp *ResponsesResponse) {
-	if resp == nil || len(resp.Output) > 0 {
+	if resp == nil {
 		return
 	}
-	if !a.HasContent() {
+	if len(resp.Output) == 0 {
+		if a.HasContent() {
+			resp.Output = a.BuildOutput()
+		}
 		return
 	}
-	resp.Output = a.BuildOutput()
+
+	if a.text.Len() > 0 && !responsesOutputHasText(resp.Output) {
+		if !fillResponsesOutputText(resp.Output, a.text.String()) {
+			resp.Output = append(resp.Output, ResponsesOutput{
+				Type: "message",
+				Role: "assistant",
+				Content: []ResponsesContentPart{{
+					Type: "output_text",
+					Text: a.text.String(),
+				}},
+			})
+		}
+	}
+
+	for outputIndex := range resp.Output {
+		item := &resp.Output[outputIndex]
+		if item.Type != "function_call" || item.Arguments != "" {
+			continue
+		}
+		for funcIndex := range a.funcCalls {
+			call := &a.funcCalls[funcIndex]
+			matchesCallID := item.CallID != "" && item.CallID == call.CallID
+			if !matchesCallID && call.OutputIndex != outputIndex {
+				continue
+			}
+			if call.Args.Len() > 0 {
+				item.Arguments = call.Args.String()
+			}
+			break
+		}
+	}
+}
+
+func responsesOutputHasText(output []ResponsesOutput) bool {
+	for i := range output {
+		if output[i].Type != "message" {
+			continue
+		}
+		for _, part := range output[i].Content {
+			if part.Type == "output_text" && strings.TrimSpace(part.Text) != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func fillResponsesOutputText(output []ResponsesOutput, text string) bool {
+	for i := range output {
+		if output[i].Type != "message" {
+			continue
+		}
+		for j := range output[i].Content {
+			if output[i].Content[j].Type != "output_text" {
+				continue
+			}
+			if strings.TrimSpace(output[i].Content[j].Text) == "" {
+				output[i].Content[j].Text = text
+				return true
+			}
+		}
+		output[i].Content = append(output[i].Content, ResponsesContentPart{
+			Type: "output_text",
+			Text: text,
+		})
+		return true
+	}
+	return false
 }
