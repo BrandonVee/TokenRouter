@@ -167,7 +167,7 @@ func (p *VertexBatchImageProvider) Name() string {
 }
 
 func (p *VertexBatchImageProvider) SupportsAccount(account *Account) bool {
-	if account == nil || account.Platform != PlatformGemini || account.Type != AccountTypeServiceAccount {
+	if account == nil || account.Platform != PlatformGemini || account.Type != AccountTypeServiceAccount || account.IsVertexAPIKey() {
 		return false
 	}
 	_, err := parseVertexServiceAccountKey(account)
@@ -353,7 +353,7 @@ func (p *VertexBatchImageProvider) Cleanup(ctx context.Context, job *BatchImageJ
 }
 
 func (p *VertexBatchImageProvider) validateAccount(account *Account) error {
-	if account == nil || account.Platform != PlatformGemini || account.Type != AccountTypeServiceAccount {
+	if account == nil || account.Platform != PlatformGemini || account.Type != AccountTypeServiceAccount || account.IsVertexAPIKey() {
 		return ErrBatchImageProviderUnsupportedAccount
 	}
 	if _, err := parseVertexServiceAccountKey(account); err != nil {

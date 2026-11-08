@@ -339,3 +339,46 @@ func safeUpstreamURL(rawURL string) string {
 	}
 	return rawURL
 }
+
+// MarkOpsRequestScopedError 登记错误类型，并标记失败由请求内容决定：上游错误上下文不参与 ops 归因。
+func MarkOpsRequestScopedError(c *gin.Context, errType string) {
+	if c == nil {
+		return
+	}
+	SetOpsLocalErrorType(c, errType, "")
+	c.Set(OpsRequestScopedErrorKey, true)
+}
+
+// IsOpsRequestScopedError 判断 MarkOpsRequestScopedError 是否标记了本次请求的失败。
+func IsOpsRequestScopedError(c *gin.Context) bool {
+	return c != nil && c.GetBool(OpsRequestScopedErrorKey)
+}
+
+// SetOpsLocalErrorType 登记响应错误体缺少的错误类型与错误码，并清除请求级失败标记；errType 为空表示不登记。
+func SetOpsLocalErrorType(c *gin.Context, errType, code string) {
+	if c == nil {
+		return
+	}
+	c.Set(OpsLocalErrorTypeKey, strings.TrimSpace(errType))
+	c.Set(OpsLocalErrorCodeKey, strings.TrimSpace(code))
+	c.Set(OpsRequestScopedErrorKey, false)
+}
+
+// OpsLocalErrorType 返回 SetOpsLocalErrorType 登记的错误类型与错误码；未登记时返回空串。
+func OpsLocalErrorType(c *gin.Context) (errType, code string) {
+	if c == nil {
+		return "", ""
+	}
+	errType = c.GetString(OpsLocalErrorTypeKey)
+	if errType == "" {
+		return "", ""
+	}
+	return errType, c.GetString(OpsLocalErrorCodeKey)
+}
+
+// Google 错误响应补充本地类型；缓存引用失败只归因到请求。
+const (
+	OpsLocalErrorTypeKey     = "ops_local_error_type"
+	OpsLocalErrorCodeKey     = "ops_local_error_code"
+	OpsRequestScopedErrorKey = "ops_request_scoped_error"
+)

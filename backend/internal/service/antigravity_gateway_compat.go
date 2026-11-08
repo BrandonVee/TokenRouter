@@ -277,6 +277,9 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 		(claudeRequest.Thinking.Type == "enabled" || claudeRequest.Thinking.Type == "adaptive")
 	modelCtx := WithThinkingEnabled(ctx, thinkingEnabled, false)
 	mappedModel := resolveFinalAntigravityModelKey(modelCtx, account, request.originalModel)
+	if geminiImageGenerationDenied(c, nil, request.originalModel, mappedModel) {
+		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
+	}
 	if mappedModel == "" {
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
 		message := fmt.Sprintf("model %s not in whitelist", request.originalModel)

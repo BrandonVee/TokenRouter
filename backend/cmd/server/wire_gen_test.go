@@ -102,6 +102,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		nil, // tlsFingerprintCollector
 		nil, // ollamaCloudUsage
 		nil, // auditLog
+		nil, // 该关闭测试未启动显式缓存恢复。
 	)
 
 	require.NotPanics(t, func() {

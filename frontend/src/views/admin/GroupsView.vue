@@ -6891,6 +6891,7 @@ watch(
 watch(
   () => createForm.platform,
   (newVal) => {
+    if (["gemini", "antigravity"].includes(newVal)) createForm.allow_image_generation = true;
     createForm.allowed_client_protocols = defaultGroupClientProtocols(newVal);
     createForm.unavailable_fallback_group_id = null;
     if (!["anthropic", "antigravity"].includes(newVal)) {

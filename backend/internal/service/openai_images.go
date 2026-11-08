@@ -1796,3 +1796,10 @@ func dedupeStrings(values []string) []string {
 	}
 	return out
 }
+
+// Gemini 图片模型单独判定，避免改变 OpenAI 原生工具、价格与限流规则。
+func isGeminiCompatibleImageModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "gemini-") &&
+		(strings.HasSuffix(model, "-image") || strings.Contains(model, "-image-"))
+}

@@ -122,6 +122,7 @@ func ProvideGatewayHandler(
 	gatewayService *service.GatewayService,
 	openAIGatewayService *service.OpenAIGatewayService,
 	geminiCompatService *service.GeminiMessagesCompatService,
+	geminiCachedContentService *service.GeminiCachedContentService,
 	antigravityGatewayService *service.AntigravityGatewayService,
 	userService *service.UserService,
 	concurrencyService *service.ConcurrencyService,
@@ -140,6 +141,7 @@ func ProvideGatewayHandler(
 	gatewayHandler := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, billingCacheService, usageService, apiKeyService, usageRecordWorkerPool,
 		errorPassthroughService, contentModerationService, userMsgQueueService, cfg, settingService)
+	gatewayHandler.geminiCachedContentService = geminiCachedContentService
 	gatewayHandler.SetImageHistoryDeps(imageHistoryService, imageHistorySaveWorkerPool)
 	return gatewayHandler
 }

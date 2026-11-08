@@ -56,6 +56,7 @@ HTTP 请求上下文已经取消时，通用响应层不再写错误响应体，
 - Ops system log sink 只索引选定等级/组件，按批写 PostgreSQL；队列满时不阻塞主请求，而是增加 dropped counter。落库连续失败后从 2 秒开始指数退避，最长 60 秒；退避期间直接丢弃观测批次并计入 dropped，避免日志链路持续占用数据库连接，任意一次成功会立即恢复正常写入。停止时会尽力排空。
 - 运维指标采集器、小时/日聚合器、告警评估器、计划报告和清理任务各自维护周期、开关、leader lock 与 job heartbeat。
 - Usage cleanup 任务持久化为 pending/running/succeeded/failed/canceled，分批删除；进程中断后 stale running 任务可以重新抢占继续执行。
+- Gemini 显式缓存恢复循环每分钟接管过期修改租约并回滚上游 TTL，所有权由数据库 mutation token 确定，多实例不能同时修改同一条记录；绑定资源及恢复条件见 [Gemini 缓存](../interfaces/gemini_upstream.md#explicit_context_cache)。
 - Audit、data-sharing capture、scheduler snapshot outbox、幂等记录和批量图片清理有各自 worker。不能用某一 worker 健康推断整个后台体系健康。
 
 需要全局唯一执行的任务优先使用 Redis leader lock，部分服务在 Redis 不可用时回退 PostgreSQL advisory lock。锁失败通常应跳过本轮而非并发执行；管理恢复时应先确认 heartbeat、锁 TTL 和数据库维护状态，不能直接启动第二套清理任务。

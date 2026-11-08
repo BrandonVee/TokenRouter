@@ -198,6 +198,10 @@ security:
 # 网关配置
 # =============================================================================
 gateway:
+  # Gemini 显式缓存单次创建/续期的最长有效期（秒）。
+  gemini_cached_content_max_ttl_seconds: 86400
+  # 上游模型列表每页响应体积上限，支持 Vertex 分页。
+  models_list_read_max_bytes: 8388608
   # 国产供应商余额、套餐窗口及聚合平台钱包周期探测。
   cn_providers:
     balance_check_enabled: true

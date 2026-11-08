@@ -32,7 +32,7 @@ Kimi、智谱 GLM、DeepSeek、MiniMax API Key 账号支持 `adaptive` 协议：
 
 | 平台 | OAuth | Setup Token | API Key | Upstream | Bedrock | Service Account | Cosy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Anthropic | 正式支持 | 正式支持 | 正式支持 | 兼容导入，无正式转发契约 | 正式支持 | 正式支持（Vertex AI） | 不支持 |
+| Anthropic | 正式支持 | 正式支持 | 正式支持 | 兼容导入，无正式转发契约 | 正式支持 | 正式支持（Vertex SA JSON / API Key） | 不支持 |
 | OpenAI | 正式支持 | 兼容导入，无正式转发契约 | 正式支持 | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 不支持 |
 | Gemini | 正式支持 | 兼容导入，无正式转发契约 | 正式支持 | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 正式支持（Vertex AI） | 不支持 |
 | Antigravity | 正式支持 | 兼容导入，无正式转发契约 | 契约冲突，见下文 | 兼容保留（旧 Claude 直连） | 兼容导入，无正式转发契约 | 兼容导入，无正式转发契约 | 不支持 |
@@ -84,6 +84,7 @@ Kimi、智谱 GLM、DeepSeek、MiniMax API Key 账号支持 `adaptive` 协议：
 | 同步图片生成/编辑 | 仅 OpenAI 与 Grok；OpenAI API Key 兼容上游包含 `doubao-seedream-*`，分组图片开关和账号能力继续收窄范围 | [OpenAI 上游](openai_upstream.md)、[Grok / xAI 上游](grok_upstream.md) |
 | 批量图片作业 | Gemini/Vertex 使用独立任务生命周期；供应商范围由批量图片领域契约定义 | [批量图片作业](../domains/batch_image_jobs.md) |
 | 视频生成、编辑、扩展、查询和下载 | OpenAI API Key 可用显式 `seedance` 能力承接 Ark 原生创建/查询/删除；Grok 保留 OpenAI 风格生成、编辑、扩展、查询和下载；复合 Key 均凭持久任务绑定查询既有任务 | [OpenAI 上游](openai_upstream.md)、[Grok / xAI 上游](grok_upstream.md) |
+| Gemini 显式缓存：`/v1beta/cachedContents` | 普通 Gemini 分组的官方 API Key / Vertex SA JSON，或声明支持显式缓存的自定义上游；不含 Vertex Key、OAuth、Antigravity、Composite | [缓存契约](gemini_upstream.md#explicit_context_cache) |
 | Gemini v1beta：`/v1beta/models/*` | Gemini/Antigravity 分组允许 Gemini 协议时承接生成、流式生成和 token 统计；模型列表 GET 不受开关影响 | [Gemini 上游](gemini_upstream.md)、[Antigravity 上游](antigravity_upstream.md) |
 | Antigravity 专用入口：`/antigravity/*` | 强制只选择 Antigravity 账号，不参与混合调度 | [Antigravity 上游](antigravity_upstream.md) |
 

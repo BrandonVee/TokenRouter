@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	dbent "github.com/BrandonVee/TokenRouter/ent"
@@ -75,7 +76,11 @@ func (r *userSubscriptionRepository) GetByID(ctx context.Context, id int64) (*se
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
 	}
-	return userSubscriptionEntityToService(m), nil
+	sub := userSubscriptionEntityToService(m)
+	if err := r.hydrateCurrentPlanGroups(ctx, []service.UserSubscription{*sub}); err != nil {
+		return nil, err
+	}
+	return sub, nil
 }
 
 // GetByIDIncludeDeleted 绕过软删除过滤查询订阅，供恢复撤销订阅时读取原始记录。
@@ -222,7 +227,51 @@ func (r *userSubscriptionRepository) ListActiveByUserID(ctx context.Context, use
 	if err != nil {
 		return nil, err
 	}
-	return userSubscriptionEntitiesToService(subs), nil
+	out := userSubscriptionEntitiesToService(subs)
+	if err := r.hydrateCurrentPlanGroups(ctx, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// hydrateCurrentPlanGroups 与扣费事务使用同一关系表，避免历史 JSON 镜像中的倍率和分组范围滞后。
+func (r *userSubscriptionRepository) hydrateCurrentPlanGroups(ctx context.Context, subs []service.UserSubscription) error {
+	plans := make(map[int64][]*service.SubscriptionPlan)
+	for i := range subs {
+		if plan := subs[i].Plan; plan != nil {
+			plans[plan.ID] = append(plans[plan.ID], plan)
+		}
+	}
+	if len(plans) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(plans))
+	for id, entries := range plans {
+		ids = append(ids, id)
+		for _, plan := range entries {
+			plan.GroupIDs = nil
+			plan.GroupRateMultipliers = map[int64]float64{}
+		}
+	}
+	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx, "SELECT plan_id, group_id, rate_multiplier FROM subscription_plan_groups WHERE plan_id=ANY($1) ORDER BY group_id", pq.Array(ids))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var planID, groupID int64
+		var rate sql.NullFloat64
+		if err := rows.Scan(&planID, &groupID, &rate); err != nil {
+			return err
+		}
+		for _, plan := range plans[planID] {
+			plan.GroupIDs = append(plan.GroupIDs, groupID)
+			if rate.Valid && rate.Float64 > 0 {
+				plan.GroupRateMultipliers[groupID] = rate.Float64
+			}
+		}
+	}
+	return rows.Err()
 }
 
 func (r *userSubscriptionRepository) FilterByGroup(ctx context.Context, subs []service.UserSubscription, groupID int64) ([]service.UserSubscription, error) {

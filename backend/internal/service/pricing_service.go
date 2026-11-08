@@ -277,6 +277,8 @@ var (
 // LiteLLMModelPricing LiteLLM价格数据结构
 // 只保留我们需要的字段，使用指针来处理可能缺失的值
 type LiteLLMModelPricing struct {
+	// 显式缓存存储费以 token 小时计，可由价格覆盖文件设置。
+	CacheStorageCostPerTokenPerHour     float64 `json:"cache_storage_cost_per_token_per_hour"`
 	InputCostPerToken                   float64 `json:"input_cost_per_token"`
 	InputCostPerTokenPriority           float64 `json:"input_cost_per_token_priority"`
 	OutputCostPerToken                  float64 `json:"output_cost_per_token"`
@@ -311,6 +313,7 @@ type PricingRemoteClient interface {
 
 // LiteLLMRawEntry 用于解析原始JSON数据
 type LiteLLMRawEntry struct {
+	CacheStorageCostPerTokenPerHour     *float64 `json:"cache_storage_cost_per_token_per_hour"`
 	InputCostPerToken                   *float64 `json:"input_cost_per_token"`
 	InputCostPerTokenPriority           *float64 `json:"input_cost_per_token_priority"`
 	OutputCostPerToken                  *float64 `json:"output_cost_per_token"`
@@ -654,6 +657,9 @@ func (s *PricingService) parsePricingData(body []byte) (map[string]*LiteLLMModel
 		}
 		if entry.OutputCostPerTokenPriority != nil {
 			pricing.OutputCostPerTokenPriority = *entry.OutputCostPerTokenPriority
+		}
+		if entry.CacheStorageCostPerTokenPerHour != nil {
+			pricing.CacheStorageCostPerTokenPerHour = *entry.CacheStorageCostPerTokenPerHour
 		}
 		if entry.CacheCreationInputTokenCost != nil {
 			pricing.CacheCreationInputTokenCost = *entry.CacheCreationInputTokenCost
@@ -1822,4 +1828,62 @@ func isNumeric(s string) bool {
 		}
 	}
 	return true
+}
+
+// GetIdentifiedModelPricing 在价格表中确定性地识别模型，识别不到时返回 nil。
+// 与 GetModelPricing 的区别：不会退化成按 "opus"/"haiku" 之类子串猜出的系列兜底价。
+// 用于必须区分"这是价格表里已知的模型"和"这只是名字里带某个关键词"的场景。
+func (s *PricingService) GetIdentifiedModelPricing(modelName string) *LiteLLMModelPricing {
+	if s == nil {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	modelLower := strings.ToLower(strings.TrimSpace(modelName))
+	if modelLower == "" {
+		return nil
+	}
+	return s.lookupIdentifiedModelPricingLocked(s.buildModelLookupCandidates(modelLower))
+}
+
+// lookupIdentifiedModelPricingLocked 只做"确定性识别"的三步查找：精确键、已知拼写
+// 变体、去掉日期/版本后缀后的同名条目。它刻意不包含 matchByModelFamily /
+// matchOpenAIModel 这类按子串猜系列的兜底——那些兜底会给任意名字都返回一个价格。
+// 调用方必须持有 s.mu 读锁。
+func (s *PricingService) lookupIdentifiedModelPricingLocked(lookupCandidates []string) *LiteLLMModelPricing {
+	if len(lookupCandidates) == 0 {
+		return nil
+	}
+
+	// 1. 精确匹配
+	for _, candidate := range lookupCandidates {
+		if candidate == "" {
+			continue
+		}
+		if pricing, ok := s.pricingData[candidate]; ok {
+			return pricing
+		}
+	}
+
+	// 2. 处理常见的模型名称变体
+	// claude-opus-4-5-20251101 -> claude-opus-4.5-20251101
+	for _, candidate := range lookupCandidates {
+		normalized := strings.ReplaceAll(candidate, "-4-5-", "-4.5-")
+		if pricing, ok := s.pricingData[normalized]; ok {
+			return pricing
+		}
+	}
+
+	// 3. 尝试模糊匹配（去掉版本号后缀）
+	// claude-opus-4-5-20251101 -> claude-opus-4.5
+	baseName := s.extractBaseName(lookupCandidates[0])
+	for key, pricing := range s.pricingData {
+		keyBase := s.extractBaseName(strings.ToLower(key))
+		if keyBase == baseName {
+			return pricing
+		}
+	}
+
+	return nil
 }

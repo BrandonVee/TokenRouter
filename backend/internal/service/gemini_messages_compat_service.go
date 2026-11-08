@@ -16,6 +16,7 @@ import (
 	mathrand "math/rand"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -42,9 +43,8 @@ const (
 
 const geminiAppliedTempPolicyHeader = "X-TokenRouter-Internal-Temp-Policy-Applied"
 
-// Gemini tool calling now requires `thoughtSignature` in parts that include `functionCall`.
-// Many clients don't send it; we inject a known dummy signature to satisfy the validator.
-// Ref: https://ai.google.dev/gemini-api/docs/thought-signatures
+// Gemini 工具调用需要 thoughtSignature；客户端缺失时注入已知占位签名。
+// 协议说明：https://ai.google.dev/gemini-api/docs/thought-signatures
 const geminiDummyThoughtSignature = "skip_thought_signature_validator"
 
 type GeminiMessagesCompatService struct {
@@ -704,7 +704,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForAIStudioEndpoints(ctx cont
 			case acc.LastUsedAt == nil && selected.LastUsedAt != nil:
 				selected = acc
 			case acc.LastUsedAt != nil && selected.LastUsedAt == nil:
-				// keep selected
+				// 保留当前账号。
 			case acc.LastUsedAt == nil && selected.LastUsedAt == nil:
 				if acc.Type == AccountTypeOAuth && selected.Type != AccountTypeOAuth {
 					selected = acc
@@ -790,6 +790,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 	geminiReq, err := convertClaudeMessagesToGeminiGenerateContent(body, mappedModel)
 	if err != nil {
 		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+	}
+	if geminiImageGenerationDenied(c, geminiReq, originalModel, mappedModel) {
+		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
 	}
 	geminiReq = ensureGeminiFunctionCallThoughtSignatures(geminiReq)
 	originalClaudeBody := body
@@ -918,19 +921,11 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 
 	case AccountTypeServiceAccount:
 		buildReq = func(ctx context.Context) (*http.Request, string, error) {
-			if s.tokenProvider == nil {
-				return nil, "", errors.New("gemini token provider not configured")
-			}
-			accessToken, err := s.tokenProvider.GetAccessToken(ctx, account)
-			if err != nil {
-				return nil, "", err
-			}
-
 			action := "generateContent"
 			if req.Stream {
 				action = "streamGenerateContent"
 			}
-			fullURL, err := buildVertexGeminiURL(account.VertexProjectID(), account.VertexLocation(mappedModel), mappedModel, action, req.Stream)
+			fullURL, err := buildVertexGeminiAccountURL(account, mappedModel, action, req.Stream)
 			if err != nil {
 				return nil, "", err
 			}
@@ -941,7 +936,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 				return nil, "", err
 			}
 			upstreamReq.Header.Set("Content-Type", "application/json")
-			upstreamReq.Header.Set("Authorization", "Bearer "+accessToken)
+			if err := setVertexGeminiAuth(ctx, upstreamReq, account, s.tokenProvider); err != nil {
+				return nil, "", err
+			}
 			return upstreamReq, "x-request-id", nil
 		}
 		requestIDHeader = "x-request-id"
@@ -957,6 +954,9 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 	for attempt := 1; attempt <= maxAttempts+signatureRetryStage; attempt++ {
 		upstreamReq, idHeader, err := buildReq(ctx)
 		if err != nil {
+			if failoverErr := s.handleVertexServiceAccountNotFound(ctx, c, account, err); failoverErr != nil {
+				return nil, failoverErr
+			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil, err
 			}
@@ -1275,6 +1275,9 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 
 	// 渠道映射后的模型进入账号后统一解析为最终上游模型，不按凭据类型跳过。
 	mappedModel := resolveAccountMappedModelForForward(account, originalModel)
+	if action != "countTokens" && geminiImageGenerationDenied(c, body, originalModel, mappedModel) {
+		return nil, s.writeGoogleError(c, http.StatusBadRequest, ImageGenerationPermissionMessage())
+	}
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {
@@ -1393,15 +1396,7 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 
 	case AccountTypeServiceAccount:
 		buildReq = func(ctx context.Context) (*http.Request, string, error) {
-			if s.tokenProvider == nil {
-				return nil, "", errors.New("gemini token provider not configured")
-			}
-			accessToken, err := s.tokenProvider.GetAccessToken(ctx, account)
-			if err != nil {
-				return nil, "", err
-			}
-
-			fullURL, err := buildVertexGeminiURL(account.VertexProjectID(), account.VertexLocation(mappedModel), mappedModel, upstreamAction, useUpstreamStream)
+			fullURL, err := buildVertexGeminiAccountURL(account, mappedModel, upstreamAction, useUpstreamStream)
 			if err != nil {
 				return nil, "", err
 			}
@@ -1411,7 +1406,9 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 				return nil, "", err
 			}
 			upstreamReq.Header.Set("Content-Type", "application/json")
-			upstreamReq.Header.Set("Authorization", "Bearer "+accessToken)
+			if err := setVertexGeminiAuth(ctx, upstreamReq, account, s.tokenProvider); err != nil {
+				return nil, "", err
+			}
 			return upstreamReq, "x-request-id", nil
 		}
 		requestIDHeader = "x-request-id"
@@ -1425,6 +1422,9 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		upstreamReq, idHeader, err := buildReq(ctx)
 		if err != nil {
+			if failoverErr := s.handleVertexServiceAccountNotFound(ctx, c, account, err); failoverErr != nil {
+				return nil, failoverErr
+			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil, err
 			}
@@ -1467,6 +1467,14 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 			}
 			setOpsUpstreamError(c, 0, safeErr, "")
 			return nil, s.writeGoogleError(c, http.StatusBadGateway, "Upstream request failed after retries: "+safeErr)
+		}
+
+		// 缓存引用错误不属于账号健康，绑定上游网关的限流也交回 handler 处理。
+		if passthrough, rebuilt := s.cachedContentPassthroughInLoop(ctx, account, resp); passthrough {
+			resp = rebuilt
+			break
+		} else {
+			resp = rebuilt
 		}
 
 		// 错误策略优先：匹配则跳过重试直接处理。
@@ -1560,6 +1568,12 @@ func (s *GeminiMessagesCompatService) ForwardNative(ctx context.Context, c *gin.
 
 	if resp.StatusCode >= 400 {
 		respBody := s.readUpstreamErrorBody(resp)
+		if isGeminiCachedContentNotFound(resp.StatusCode, respBody) {
+			return nil, s.writeGeminiCachedContentNotFound(c, account, resp, respBody, requestID, isOAuth)
+		}
+		if isGeminiBoundCacheUpstreamPassthrough(ctx, account, resp.StatusCode) {
+			return nil, s.boundCacheUpstreamPassthroughError(c, account, resp.StatusCode, respBody, requestID)
+		}
 		// Best-effort fallback for OAuth tokens missing AI Studio scopes when calling countTokens.
 		// This avoids Gemini SDKs failing hard during preflight token counting.
 		// Checked before error policy so it always works regardless of custom error codes.
@@ -3066,6 +3080,12 @@ func (s *GeminiMessagesCompatService) handleGeminiUpstreamError(ctx context.Cont
 			} else {
 				logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini 429] Account %d (Google One OAuth, tier=%s, project=%s) rate limited, cooldown=%v", account.ID, tierID, projectID, time.Until(ra).Truncate(time.Second))
 			}
+		} else if account.IsVertexServiceAccount() {
+			// 共享容量不足由请求退避重试消化，不当作账号每日额度耗尽。
+			if isVertexSharedCapacity429(body) {
+				return
+			}
+			ra = time.Now().Add(time.Minute)
 		} else {
 			// API Key / AI Studio OAuth: PST 午夜
 			if ts := nextGeminiDailyResetUnix(); ts != nil {
@@ -3125,44 +3145,13 @@ func (s *GeminiMessagesCompatService) applyGeminiUpstreamErrorPolicy(
 
 // ParseGeminiRateLimitResetTime 解析 Gemini 格式的 429 响应，返回重置时间的 Unix 时间戳
 func ParseGeminiRateLimitResetTime(body []byte) *int64 {
-	// 第一阶段：gjson 结构化提取
 	errMsg := gjson.GetBytes(body, "error.message").String()
 	if looksLikeGeminiDailyQuota(errMsg) {
 		if ts := nextGeminiDailyResetUnix(); ts != nil {
 			return ts
 		}
 	}
-
-	// 遍历 error.details 查找 quotaResetDelay
-	var found *int64
-	gjson.GetBytes(body, "error.details").ForEach(func(_, detail gjson.Result) bool {
-		v := detail.Get("metadata.quotaResetDelay").String()
-		if v == "" {
-			return true
-		}
-		if dur, err := time.ParseDuration(v); err == nil {
-			// Use ceil to avoid undercounting fractional seconds (e.g. 10.1s should not become 10s),
-			// which can affect scheduling decisions around thresholds (like 10s).
-			ts := time.Now().Unix() + int64(math.Ceil(dur.Seconds()))
-			found = &ts
-			return false
-		}
-		return true
-	})
-	if found != nil {
-		return found
-	}
-
-	// 第二阶段：regex 回退匹配 "Please retry in Xs"
-	matches := retryInRegex.FindStringSubmatch(string(body))
-	if len(matches) == 2 {
-		if dur, err := time.ParseDuration(matches[1] + "s"); err == nil {
-			ts := time.Now().Unix() + int64(math.Ceil(dur.Seconds()))
-			return &ts
-		}
-	}
-
-	return nil
+	return parseGeminiRetryDelayResetTime(body)
 }
 
 func looksLikeGeminiDailyQuota(message string) bool {
@@ -3846,3 +3835,213 @@ func extractClaudeToolResultImageParts(v any) []any {
 	}
 	return parts
 }
+
+// isGeminiCachedContentNotFound 识别请求引用的显式缓存不存在（含已过期、已删除、不属于当前项目）时上游的响应，
+// 这类响应由请求的 cachedContent 决定，与账号凭据状态无关：
+//   - AI Studio 及本系统网关：一律 403 "CachedContent not found (or permission denied)"；
+//   - Vertex 生成请求：400 "Invalid resource state for cache content {id}."；
+//   - Vertex 缓存资源 GET / PATCH / DELETE：404 "Cached content {id} is not found."。
+func isGeminiCachedContentNotFound(statusCode int, body []byte) bool {
+	lower := strings.ToLower(string(body))
+	switch statusCode {
+	case http.StatusForbidden:
+		return strings.Contains(lower, "cachedcontent not found")
+	case http.StatusBadRequest:
+		return strings.Contains(lower, "invalid resource state for cache content")
+	case http.StatusNotFound:
+		return strings.Contains(lower, "cached content") && strings.Contains(lower, "not found")
+	default:
+		return false
+	}
+}
+
+// cachedContentPassthroughInLoop 判断上游响应是否跳过同号重试与错误策略直接处理：引用缓存不存在，
+// 或绑定缓存的请求在上游网关账号上收到的 429 / 5xx。读取过的响应体以内存副本重建。
+func (s *GeminiMessagesCompatService) cachedContentPassthroughInLoop(ctx context.Context, account *Account, resp *http.Response) (passthrough bool, rebuilt *http.Response) {
+	if isGeminiBoundCacheUpstreamPassthrough(ctx, account, resp.StatusCode) {
+		return true, resp
+	}
+	switch resp.StatusCode {
+	case http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound:
+	default:
+		return false, resp
+	}
+	body := s.readUpstreamErrorBody(resp)
+	_ = resp.Body.Close()
+	rebuilt = &http.Response{
+		StatusCode: resp.StatusCode,
+		Header:     resp.Header.Clone(),
+		Body:       io.NopCloser(bytes.NewReader(body)),
+	}
+	return isGeminiCachedContentNotFound(resp.StatusCode, body), rebuilt
+}
+
+// writeGeminiCachedContentNotFound 记录上游原始错误，并向客户端统一返回缓存不存在的 403：
+// 各上游的响应形态不同，且 Vertex 的文案含上游缓存资源 ID。失败由请求引用的缓存决定，ops 按客户端请求错误统计。
+func (s *GeminiMessagesCompatService) writeGeminiCachedContentNotFound(c *gin.Context, account *Account, resp *http.Response, respBody []byte, requestID string, isOAuth bool) error {
+	respBody = unwrapIfNeeded(isOAuth, respBody)
+	upstreamMsg := s.recordGeminiNativeUpstreamError(c, account, resp.StatusCode, respBody, requestID)
+	MarkOpsRequestScopedError(c, "permission_error")
+	MarkResponseCommitted(c)
+	c.Data(http.StatusForbidden, "application/json", []byte(GeminiCachedContentNotFoundResponse))
+	return fmt.Errorf("gemini upstream error: %d message=%s", resp.StatusCode, upstreamMsg)
+}
+
+// recordGeminiNativeUpstreamError 把上游错误响应登记到 ops 上下文，返回脱敏后的上游错误文案。
+func (s *GeminiMessagesCompatService) recordGeminiNativeUpstreamError(c *gin.Context, account *Account, statusCode int, respBody []byte, requestID string) string {
+	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
+	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	upstreamDetail := s.upstreamErrorDetail(respBody)
+	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
+		logger.LegacyPrintf("service.gemini_messages_compat", "[Gemini] native upstream error %d: %s", statusCode, truncateForLog(respBody, s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes))
+	}
+	setOpsUpstreamError(c, statusCode, upstreamMsg, upstreamDetail)
+	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		Platform:           account.Platform,
+		AccountID:          account.ID,
+		AccountName:        account.Name,
+		UpstreamStatusCode: statusCode,
+		UpstreamRequestID:  requestID,
+		Kind:               "http_error",
+		Message:            upstreamMsg,
+		Detail:             upstreamDetail,
+	})
+	return upstreamMsg
+}
+
+// boundCacheUpstreamPassthroughError 构造绑定显式缓存的请求在上游网关账号上收到 429 / 5xx 时的 failover 错误。
+// 缓存只存在于该账号，handler 不换号；池模式账号对 pool_mode_retry_status_codes 内的状态码按 pool_mode_retry_count
+// 同账号重试，用尽或不可重试时原样回写上游响应。故障在上游网关持有缓存的账号上，与本账号健康无关，
+// 因此可重试的错误标为请求级瞬时故障：重试用尽也不临时封禁本账号。可重试时每次尝试登记一条 retry 事件，
+// 重试成功的请求在 ops 记为恢复。
+func (s *GeminiMessagesCompatService) boundCacheUpstreamPassthroughError(c *gin.Context, account *Account, statusCode int, respBody []byte, upstreamRequestID string) *UpstreamFailoverError {
+	retryable := account.IsPoolMode() && account.IsPoolModeRetryableStatus(statusCode)
+	if retryable {
+		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+			Platform:           account.Platform,
+			AccountID:          account.ID,
+			AccountName:        account.Name,
+			UpstreamStatusCode: statusCode,
+			UpstreamRequestID:  upstreamRequestID,
+			Kind:               "retry",
+			Message:            sanitizeUpstreamErrorMessage(strings.TrimSpace(extractUpstreamErrorMessage(respBody))),
+			Detail:             s.upstreamErrorDetail(respBody),
+		})
+	}
+	return &UpstreamFailoverError{
+		StatusCode:               statusCode,
+		ResponseBody:             respBody,
+		BoundUpstreamPassthrough: true,
+		RetryableOnSameAccount:   retryable,
+		RequestScopedTransient:   retryable,
+	}
+}
+
+// upstreamErrorDetail 按配置截断上游错误响应体，用于 ops 错误日志的 Detail 字段；
+// 未开启 LogUpstreamErrorBody 时返回空。
+func (s *GeminiMessagesCompatService) upstreamErrorDetail(body []byte) string {
+	if s.cfg == nil || !s.cfg.Gateway.LogUpstreamErrorBody {
+		return ""
+	}
+	maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
+	if maxBytes <= 0 {
+		maxBytes = 2048
+	}
+	return truncateString(string(body), maxBytes)
+}
+
+// isVertexSharedCapacity429 判断 Vertex 429 是否为按量付费共享容量不足：RESOURCE_EXHAUSTED、
+// 不带任何错误明细（RetryInfo / QuotaFailure / ErrorInfo），文案为 "Resource exhausted ... try again later"
+// 且不涉及项目配额或预留吞吐。其他形态的 429 按账号自身限速处理。
+func isVertexSharedCapacity429(body []byte) bool {
+	errObj := gjson.GetBytes(body, "error")
+	if !errObj.Exists() {
+		errObj = gjson.GetBytes(body, "0.error")
+	}
+	if !errObj.IsObject() {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(errObj.Get("status").String()), "RESOURCE_EXHAUSTED") {
+		return false
+	}
+	if len(errObj.Get("details").Array()) > 0 {
+		return false
+	}
+	msg := strings.ToLower(errObj.Get("message").String())
+	if !strings.Contains(msg, "resource exhausted") || !strings.Contains(msg, "try again later") {
+		return false
+	}
+	return !strings.Contains(msg, "quota") && !strings.Contains(msg, "provisioned throughput")
+}
+
+// AntigravityGeminiModelIDs 返回可调度账号的 Gemini 映射，混合路由必须同时尊重账号开关。
+func (s *GeminiMessagesCompatService) AntigravityGeminiModelIDs(ctx context.Context, groupID *int64, requireMixed bool) ([]string, error) {
+	accounts, err := s.listSchedulableAccountsOnce(ctx, groupID, PlatformAntigravity, false)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]struct{})
+	for _, account := range accounts {
+		if account.Platform != PlatformAntigravity || (requireMixed && !account.IsMixedSchedulingEnabled()) {
+			continue
+		}
+		for model := range account.GetModelMapping() {
+			if isAntigravityGeminiModel(model) {
+				seen[model] = struct{}{}
+			}
+		}
+	}
+	models := make([]string, 0, len(seen))
+	for model := range seen {
+		models = append(models, model)
+	}
+	sort.Strings(models)
+	return models, nil
+}
+
+// parseGeminiRetryDelayResetTime 只解析响应里显式给出的重试时长，返回重置时间的 Unix 时间戳。
+func parseGeminiRetryDelayResetTime(body []byte) *int64 {
+	// 第一阶段：gjson 结构化提取
+	// 遍历 error.details 查找 quotaResetDelay（AI Studio）或 RetryInfo.retryDelay（Vertex）
+	var found *int64
+	gjson.GetBytes(body, "error.details").ForEach(func(_, detail gjson.Result) bool {
+		if v := detail.Get("metadata.quotaResetDelay").String(); v != "" {
+			if dur, err := time.ParseDuration(v); err == nil {
+				// 小数秒向上取整，避免缩短实际冷却时间。
+				ts := time.Now().Unix() + int64(math.Ceil(dur.Seconds()))
+				found = &ts
+				return false
+			}
+			return true
+		}
+		// Vertex 标准错误格式：google.rpc.RetryInfo.retryDelay（"39s" / "1.5s"）
+		if detail.Get("@type").String() == geminiRetryInfoTypeURL {
+			if dur, err := time.ParseDuration(detail.Get("retryDelay").String()); err == nil && dur > 0 {
+				if dur > geminiRetryInfoMaxDelay {
+					dur = geminiRetryInfoMaxDelay
+				}
+				ts := time.Now().Unix() + int64(math.Ceil(dur.Seconds()))
+				found = &ts
+				return false
+			}
+		}
+		return true
+	})
+	if found != nil {
+		return found
+	}
+
+	// 第二阶段：regex 回退匹配 "Please retry in Xs"
+	matches := retryInRegex.FindStringSubmatch(string(body))
+	if len(matches) == 2 {
+		if dur, err := time.ParseDuration(matches[1] + "s"); err == nil {
+			ts := time.Now().Unix() + int64(math.Ceil(dur.Seconds()))
+			return &ts
+		}
+	}
+
+	return nil
+}
+
+const geminiRetryInfoTypeURL = "type.googleapis.com/google.rpc.RetryInfo"
+const geminiRetryInfoMaxDelay = 15 * time.Minute

@@ -66,7 +66,7 @@
 1. 初始化 bootstrap 日志并用 `LoadForBootstrap` 读取配置。启动阶段允许 JWT secret 暂空，但会使用临时值完成初次结构校验。
 2. 初始化正式日志；`simple` 模式在此明确发出跳过计费和配额的警告。
 3. Wire 构建依赖图。`repository.InitEnt` 先初始化时区和 PostgreSQL 连接池，在十分钟超时内执行嵌入式 SQL 迁移，再从配置或数据库补齐系统密钥并执行完整配置校验。`simple` 模式还会补齐默认分组与管理员并发值。
-4. 创建 Redis 客户端、仓储、服务、handler、中间件和 Gin server。多个 provider 会在构造后立即启动各自 worker，例如 token 刷新、到期处理、调度快照、用量记录、聚合、清理、备份、批量图片作业、生图历史转存、国产供应商余额/套餐探测、OpenCode 请求驱动用量刷新和支付订单过期处理。
+4. 创建 Redis 客户端、仓储、服务、handler、中间件和 Gin server。多个 provider 会在构造后立即启动各自 worker，例如 token 刷新、到期处理、调度快照、用量记录、聚合、清理、备份、批量图片作业、生图历史转存、国产供应商余额/套餐探测、OpenCode 请求驱动用量刷新、Gemini 缓存修改恢复和支付订单过期处理。
 5. 在 goroutine 中调用 `ListenAndServe`，主 goroutine 等待 `SIGINT` 或 `SIGTERM`。
 
 收到终止信号后先给 HTTP server 五秒完成优雅关闭，停止接收新请求；函数返回时执行应用 `Cleanup`。关闭过程有独立三十秒上下文：大部分互不依赖的 worker 并行停止，然后按顺序停止数据共享/配额等需要 drain 或 flush 的服务，最后关闭 Redis 和 Ent/PostgreSQL。单个关闭步骤失败会记录日志并继续，超时会告警而不会无限阻塞进程退出。

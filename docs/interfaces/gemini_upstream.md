@@ -20,6 +20,8 @@ Gemini 正式支持：
 | `apikey` | 使用 Base URL 和 API Key 直连；`credentials.provider_type=third_party` 表示 Gemini 兼容第三方提供商，缺失或 `official` 表示 Google AI Studio 官方接入 |
 | `service_account` | 使用 Google Service Account 换取 Vertex token，并解析 project/location 上下文 |
 
+Gemini 的 `service_account` 也可设置 `credentials.auth_mode=apikey` 使用 Vertex API Key。没有 `project_id` 时走全局 Express 端点，有 project 时走项目/区域端点；使用 `x-goog-api-key`，不换取 SA token。它不参与显式缓存与 Vertex 批量图片。Anthropic Vertex 仍只接受 Service Account JSON。账号测试保持 fork 的原生 `generateContent` JSON 和配置的 User-Agent。SA 换取令牌明确返回账号不存在时停用账号，记录凭据阶段失败后换号；凭据错误不能当成模型端点能力问题。
+
 Code Assist/Google One 需要有效 project；AI Studio 的 project 可选并使用选择的 tier。第三方 API Key 保持 `type=apikey` 和 Gemini 兼容请求形状，但必须配置非 Google 官方域名的 Base URL；它没有 Google 官方账号等级，因此不写 `tier_id`，也不参与本地模拟 RPD/RPM 预检或用量窗口。第三方上游实际返回 `429` 时始终使用通用冷却，不解析 Google 日配额的重置语义。OAuth refresh 会重试并兼容历史 client 元数据；token provider 使用过期前偏移和并发锁，避免同账号重复刷新。其它导入类型没有 Gemini 正式转发契约，见[上游账号能力矩阵](upstream_account_matrix.md)。
 
 仓库和发布产物不内置 Gemini CLI OAuth Client ID 或 Client Secret。任一环境变量缺失时，Code Assist/Google One 授权按配置错误拒绝，不能回退到硬编码凭证；已经公开过的 Client Secret 必须在 Google Cloud 控制台撤销并轮换。
@@ -53,9 +55,26 @@ Messages 和 OpenAI 兼容入口按最终映射模型选择工具媒体形状：
 
 图片输出计数同时识别 `inlineData`/`inline_data` 和 `fileData`/`file_data`，要求图片 MIME 和非空数据或 URI，同一 part 只算一张。累积式 SSE 继续使用单个 payload 的最大图片数，避免重复计费。被拦截 prompt 只返回缓存命中时，净输入 token 截断为非负数，不产生负费用。
 
+`allow_image_generation` 同时限制 Gemini、Antigravity 与 Composite 的 Gemini 图片输出：请求模型、渠道映射、账号映射或 `responseModalities` 的 IMAGE（含数字枚举和蛇形字段）任一命中即可识别。入口先拒绝，转发层在账号映射后复核；`countTokens` 不受生图开关限制。迁移 271 为历史 Gemini/Antigravity 分组开启开关，保持此前可生图行为；管理员之后可显式关闭。
+
+模型列表优先使用 fork 的自定义展示配置；账号全部声明映射时按声明目录与允许混合的 Antigravity 模型合并。否则选择可服务模型接口的账号：AI Studio 优先，Vertex SA 读取对应区域 Google 发布方模型并分页转换为 AI Studio 形状，Vertex API Key 因上游列表不接受 Key 而返回内置目录。单页响应受 `gateway.models_list_read_max_bytes` 限制，分页有上限；未完成分页不能当作完整目录覆盖配置。
+
+<a id="explicit_context_cache"></a>
+## 显式上下文缓存
+
+`/v1beta/cachedContents` 提供 POST/GET，以及 `/:cacheID` 的 GET/PATCH/DELETE。只有普通 Gemini 分组支持；创建和续期遵守 Gemini 协议准入、内容审核及资金检查。官方 AI Studio API Key、Vertex SA JSON 可用；自定义 Gemini 上游必须在账号声明 `explicit_cache_upstream=true`，可额外配置 `explicit_cache_upstream_max_ttl_seconds`。OAuth、Antigravity 和 Vertex API Key 不支持这些管理操作。
+
+客户端只见随机缓存 ID，本地绑定 API Key、付款/请求归属、分组、模型和持有账号，查询列表不会读取共享上游的其他租户缓存。生成请求可引用本 Key、当前分组仍有效且模型一致的缓存；网关替换上游资源名并只允许持有账号，禁用会话摘要复用和换号。不存在、过期或无权访问统一返回 Google 形状的 403，不处罚账号。绑定上游网关的 429/5xx 可按池配置同号重试，耗尽后保留其状态，不能切到无缓存的账号。
+
+创建一次收取缓存内容的输入费用和完整 TTL 的存储费，延长只收新增长度的存储费；缩短或删除不退已收费用。单次最长 TTL 默认 86400 秒，上游声明更小上限时取小值。存储单价来自确定识别的价格目录 `cache_storage_cost_per_token_per_hour`，否则按内置 Gemini 价卡；无价拒绝创建。存储成本单独加入总费用和账号成本，纯续期不再收一次模型请求费。创建和每次延长使用独立 `gcache:` 计费 ID，不能被同一客户端 request ID 合并。
+
+已知费用用[固定费用准入](../domains/routing_and_billing.md#fixed_charge_admission)检查。创建后才能取得 token 数，不足时清理上游缓存，仅结算已发生的输入；续期在上游调用前检查完整费用。修改 TTL 先在数据库登记带令牌的租约，提交前保持旧到期时间；上游成功而本地未提交时，后台恢复按旧值回滚。恢复循环随进程启动/关闭，过期租约可接管，账户暂不可用时保留意图，只有可确定上游缓存必已过期才清理失联记录。
+
 ## 配额与调度
 
 Gemini tier、上游配额和按模型 reset 信息作为账号资格与容量信号。普通账号的 429 响应可以更新账号或模型的 `rate_limited_until`，后续调度在恢复时间前过滤该候选；公共池账号由请求级同账号重试或切号消化 429，不写默认本地账号限流，但管理员显式配置的自定义错误策略仍然优先。实时配额查询失败不应伪造剩余额度。
+
+Vertex 的共享容量不足不写账号每日冷却，由请求同号退避与切号处理；项目配额等账号自身限速没有可解析 reset 时使用短冷却。`google.rpc.RetryInfo.retryDelay` 可提供精确恢复时间，异常长值上限为 15 分钟。
 
 显式开启 mixed scheduling 的 Antigravity 账号可以加入 Gemini 分组候选，但仍需满足目标分组、模型、endpoint、额度、并发和凭据约束。普通 Gemini 请求保持 Gemini 协议和计费归属；专用 Antigravity 路由不混入 Gemini 账号。
 

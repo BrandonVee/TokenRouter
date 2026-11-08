@@ -96,6 +96,7 @@ type apiKeyRateLimitLoader interface {
 type BillingCacheService struct {
 	cache                 BillingCache
 	userRepo              UserRepository
+	subRepo               UserSubscriptionRepository
 	apiKeyRateLimitLoader apiKeyRateLimitLoader
 	userRPMCache          UserRPMCache
 	userGroupRateRepo     UserGroupRateRepository
@@ -120,7 +121,7 @@ type BillingCacheService struct {
 func NewBillingCacheService(
 	cache BillingCache,
 	userRepo UserRepository,
-	_ UserSubscriptionRepository,
+	subRepo UserSubscriptionRepository,
 	apiKeyRepo APIKeyRepository,
 	userRPMCache UserRPMCache,
 	userGroupRateRepo UserGroupRateRepository,
@@ -130,6 +131,7 @@ func NewBillingCacheService(
 	svc := &BillingCacheService{
 		cache:                 cache,
 		userRepo:              userRepo,
+		subRepo:               subRepo,
 		apiKeyRateLimitLoader: apiKeyRepo,
 		userRPMCache:          userRPMCache,
 		userGroupRateRepo:     userGroupRateRepo,

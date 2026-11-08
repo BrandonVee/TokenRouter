@@ -61,6 +61,8 @@
 
 `gateway.cn_providers.balance_check_enabled` 默认 true，`balance_threshold` 默认 0.5（按各上游返回币种），`balance_check_interval_minutes` 默认 10。关闭开关或周期不大于零时不启动余额/套餐周期探测。OpenCode Go 的用量刷新另外使用数据库设置 `opencode_go_usage_settings`，默认关闭，最长等待默认 15 分钟（5–1440）、静默期默认 1 分钟（1–60）；账号自动刷新也须独立启用。
 
+`gateway.gemini_cached_content_max_ttl_seconds` 默认 86400，限制显式缓存单次创建或续期 TTL，非正数使用默认值；`gateway.models_list_read_max_bytes` 默认 8 MiB，限制每页上游目录响应，Vertex 分页也适用。认证和费用边界见 [Gemini 显式缓存](gemini_upstream.md#explicit_context_cache)。
+
 ### 余额在途预占
 
 `billing.inflight_reservation` 默认启用，`simple` 模式忽略。`ttl_seconds` 默认 900，`default_max_tokens` 默认 8192，`max_output_tokens` 默认 128000，`max_input_tokens` 默认 200000；token 上限为 0 时不截断，TTL 或默认输出为 0 时使用内置默认值。`max_reservation_usd` 默认 0 表示不设金额上限。`fail_closed_on_unpriced` 默认 false，开启后拒绝无法估价的余额请求，显式零价不被拒绝。所有数值须非负，金额必须有限。配置修改后重启，语义和故障放行边界见[余额在途估算](../domains/routing_and_billing.md#inflight_reservations)。

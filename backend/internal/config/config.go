@@ -954,7 +954,13 @@ const (
 )
 
 // GatewayConfig API网关相关配置
+// DefaultModelsListReadMaxBytes 限制上游模型列表的单页响应体积。
+const DefaultModelsListReadMaxBytes int64 = 8 * 1024 * 1024
+
 type GatewayConfig struct {
+	ModelsListReadMaxBytes int64 `mapstructure:"models_list_read_max_bytes"`
+	// Gemini 显式缓存单次最长 TTL，非正数时使用 24 小时。
+	GeminiCachedContentMaxTTLSeconds int `mapstructure:"gemini_cached_content_max_ttl_seconds"`
 	// 余额/订阅窗口探测与响应式冷却共享配置，默认按十分钟周期恢复。
 	CNProviders GatewayCNProvidersConfig `mapstructure:"cn_providers"`
 	// MinOutputTokens 是协议转换的输出 token 下限，默认 128，最小 16。
@@ -2029,6 +2035,8 @@ func configureConfigSource(setConfigFile, addConfigPath func(string)) {
 }
 
 func setDefaults() {
+	viper.SetDefault("gateway.models_list_read_max_bytes", DefaultModelsListReadMaxBytes)
+	viper.SetDefault("gateway.gemini_cached_content_max_ttl_seconds", 86400)
 	viper.SetDefault("run_mode", RunModeStandard)
 
 	// Server

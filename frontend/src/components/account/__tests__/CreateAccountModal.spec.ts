@@ -323,6 +323,23 @@ describe('CreateAccountModal Gemini API Key provider source', () => {
     createAccountMock.mockReset().mockResolvedValue({ id: 43, platform: 'gemini', type: 'apikey' })
   })
 
+  it('creates a Vertex API Key account without requiring service account JSON or a project', async () => {
+    const wrapper = mountModal()
+    await wrapper.get('[data-testid="create-account-platform-gemini"]').trigger('click')
+    await selectButtonByText(wrapper, 'Vertex')
+    await wrapper.get('[data-testid="vertex-auth-mode"]').setValue('apikey')
+    await wrapper.get('form#create-account-form input[type="text"]').setValue('Vertex key')
+    await wrapper.get('[data-testid="vertex-api-key-input"]').setValue('vertex-example-key')
+    await wrapper.get('form#create-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(createAccountMock).toHaveBeenCalledTimes(1)
+    expect(createAccountMock.mock.calls[0]?.[0]).toMatchObject({
+      platform: 'gemini', type: 'service_account',
+      credentials: { auth_mode: 'apikey', api_key: 'vertex-example-key', location: 'global' }
+    })
+    expect(createAccountMock.mock.calls[0]?.[0]?.credentials).not.toHaveProperty('service_account_json')
+  })
+
   it('creates a third-party Gemini API Key without an official tier', async () => {
     const wrapper = mountModal()
     await wrapper.get('[data-testid="create-account-platform-gemini"]').trigger('click')

@@ -3,10 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/antigravity"
@@ -30,9 +33,10 @@ const (
 
 // UpstreamModelSyncError 包装内部失败细节，同时提供可安全返回给客户端的消息。
 type UpstreamModelSyncError struct {
-	Kind    UpstreamModelSyncErrorKind
-	Message string
-	Err     error
+	StatusCode int // 上游 HTTP 状态，仅用于内部回退判断。
+	Kind       UpstreamModelSyncErrorKind
+	Message    string
+	Err        error
 }
 
 func (e *UpstreamModelSyncError) Error() string {
@@ -79,6 +83,10 @@ func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, a
 	}
 	if account == nil {
 		return nil, newUpstreamModelSyncConfigError("Account is required", nil)
+	}
+
+	if account.Platform == PlatformGemini && account.IsVertexServiceAccount() {
+		return s.fetchVertexGeminiUpstreamModels(ctx, account)
 	}
 
 	if account.Platform == PlatformAntigravity && account.Type != AccountTypeAPIKey {
@@ -650,4 +658,151 @@ func extractUpstreamModelRawEntries(body []byte) ([]json.RawMessage, error) {
 		return nil, fmt.Errorf("parse upstream model catalog: %w", err)
 	}
 	return entries, nil
+}
+
+// listVertexGeminiPublisherModels 按区域分页读取 Google 发布方模型列表，只保留 gemini- 前缀的模型（去重排序）。
+// 区域端点还会列出 Gemma、Veo、AutoML 等非 Gemini 的模型花园条目；global 端点只含 Gemini。
+// fetchPage 负责发送请求并处理非 2xx 响应，返回该页的响应体；它返回的错误原样透出。
+func listVertexGeminiPublisherModels(location string, fetchPage func(page int, listURL string) ([]byte, error)) ([]string, error) {
+	models := make([]string, 0)
+	pageToken := ""
+	for page := 0; page < vertexPublisherModelsMaxPages; page++ {
+		listURL, err := buildVertexPublisherModelsURL(location, pageToken)
+		if err != nil {
+			return nil, newUpstreamModelSyncConfigError("Invalid Vertex location", err)
+		}
+		body, err := fetchPage(page, listURL)
+		if err != nil {
+			return nil, err
+		}
+		var response struct {
+			PublisherModels []struct {
+				Name string `json:"name"`
+			} `json:"publisherModels"`
+			NextPageToken string `json:"nextPageToken"`
+		}
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, newUpstreamModelSyncUpstreamError("Upstream model list response was not valid JSON", err)
+		}
+		for _, entry := range response.PublisherModels {
+			name := strings.TrimSpace(entry.Name)
+			if !strings.HasPrefix(name, vertexGooglePublisherModelPrefix) {
+				continue
+			}
+			modelID := strings.TrimPrefix(name, vertexGooglePublisherModelPrefix)
+			if strings.HasPrefix(modelID, "gemini-") && len(modelID) > len("gemini-") {
+				models = append(models, modelID)
+			}
+		}
+
+		pageToken = strings.TrimSpace(response.NextPageToken)
+		if pageToken == "" {
+			if len(models) == 0 {
+				return nil, newUpstreamModelSyncUpstreamError("Upstream returned no supported models", nil)
+			}
+			return dedupeAndSortModelIDs(models), nil
+		}
+	}
+	return nil, newUpstreamModelSyncUpstreamError(
+		"Upstream model list pagination did not finish",
+		fmt.Errorf("more than %d pages", vertexPublisherModelsMaxPages),
+	)
+}
+
+// buildVertexPublisherModelsURL 构造 Google 发布方模型列表地址。该接口只有 v1beta1 版本，pageSize 上限 300。
+func buildVertexPublisherModelsURL(location, pageToken string) (string, error) {
+	location = strings.TrimSpace(location)
+	if location == "" {
+		location = vertexDefaultLocation
+	}
+	if !vertexLocationPattern.MatchString(location) {
+		return "", fmt.Errorf("invalid vertex location: %s", location)
+	}
+	host := location + "-aiplatform.googleapis.com"
+	if location == "global" {
+		host = vertexGlobalHost
+	}
+	query := url.Values{"pageSize": []string{strconv.Itoa(vertexPublisherModelsPageSize)}}
+	if pageToken != "" {
+		query.Set("pageToken", pageToken)
+	}
+	return fmt.Sprintf("https://%s/v1beta1/publishers/google/models?%s", host, query.Encode()), nil
+}
+
+const vertexPublisherModelsMaxPages = 20
+const vertexGooglePublisherModelPrefix = "publishers/google/models/"
+
+const vertexPublisherModelsPageSize = 300
+
+// fetchVertexGeminiUpstreamModels 按账号默认区域读取 Vertex 上可用的 Gemini 模型。列表接口不接受 API Key。
+func (s *AccountTestService) fetchVertexGeminiUpstreamModels(ctx context.Context, account *Account) ([]string, error) {
+	if account.IsVertexAPIKey() {
+		return nil, newUpstreamModelSyncUnsupportedError("Vertex API key accounts do not support upstream model listing", nil)
+	}
+	if _, err := parseVertexServiceAccountKey(account); err != nil {
+		return nil, newUpstreamModelSyncConfigError("Invalid Vertex service account credentials", err)
+	}
+	location := account.VertexLocation("")
+	if _, err := buildVertexPublisherModelsURL(location, ""); err != nil {
+		return nil, newUpstreamModelSyncConfigError("Invalid Vertex location", err)
+	}
+	if s.geminiTokenProvider == nil {
+		return nil, newUpstreamModelSyncConfigError("Gemini token provider is not configured", nil)
+	}
+	accessToken, err := s.geminiTokenProvider.GetAccessToken(ctx, account)
+	if err != nil {
+		return nil, newUpstreamModelSyncUpstreamError("Failed to get Vertex access token", err)
+	}
+	accessToken = strings.TrimSpace(accessToken)
+	if accessToken == "" {
+		return nil, newUpstreamModelSyncConfigError("No Vertex access token is available", nil)
+	}
+
+	return listVertexGeminiPublisherModels(location, func(page int, listURL string) ([]byte, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
+		if err != nil {
+			return nil, newUpstreamModelSyncConfigError("Invalid Vertex model list URL", err)
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+
+		body, err := s.readUpstreamModelsResponse(req, account)
+		if err != nil {
+			// 只有首页的 404/405 表示列表端点不可用；翻页途中的失败不触发配置模型回退。
+			var syncErr *UpstreamModelSyncError
+			if page > 0 && errors.As(err, &syncErr) {
+				syncErr.StatusCode = 0
+			}
+			return nil, err
+		}
+		return body, nil
+	})
+}
+
+// readUpstreamModelsResponse 发送模型列表请求并读取受限大小的响应体；非 2xx 返回带状态码的同步错误。
+func (s *AccountTestService) readUpstreamModelsResponse(req *http.Request, account *Account) ([]byte, error) {
+	resp, err := s.doUpstreamModelsRequest(req, upstreamModelsProxyURL(account), account)
+	if err != nil {
+		return nil, newUpstreamModelSyncUpstreamError("Failed to request upstream model list", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	bodyLimit := resolveModelsListReadLimit(s.cfg)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, bodyLimit+1))
+	if err != nil {
+		return nil, newUpstreamModelSyncUpstreamError("Failed to read upstream model list", err)
+	}
+	if int64(len(body)) > bodyLimit {
+		return nil, newUpstreamModelSyncUpstreamError("Upstream model list response is too large", fmt.Errorf("response exceeds %d bytes", bodyLimit))
+	}
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, &UpstreamModelSyncError{
+			Kind:       UpstreamModelSyncErrorUpstream,
+			Message:    fmt.Sprintf("Upstream model list request failed with HTTP %d", resp.StatusCode),
+			StatusCode: resp.StatusCode,
+			Err:        fmt.Errorf("upstream model list returned HTTP %d", resp.StatusCode),
+		}
+	}
+	return body, nil
 }

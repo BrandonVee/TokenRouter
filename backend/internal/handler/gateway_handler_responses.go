@@ -92,6 +92,10 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
 	// 生图能力和模型级限流以渠道模型 C 及其请求体为准。
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	if geminiImageGenerationRejected(c, apiKey, nil, reqModel, channelMapping.MappedModel) {
+		h.responsesErrorResponse(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage())
+		return
+	}
 	forwardBody, _, imageIntent := resolveOpenAIChannelMappedImageIntent(
 		"/v1/responses", reqModel, body, channelMapping, openAICompatibleRequestPlatform(c.Request.Context(), apiKey), h.gatewayService.ReplaceModelInBody,
 	)

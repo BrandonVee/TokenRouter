@@ -56,6 +56,9 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
 		return nil, s.writeClaudeError(c, http.StatusForbidden, "permission_error", fmt.Sprintf("model %s not in whitelist", claudeReq.Model))
 	}
+	if geminiImageGenerationDenied(c, nil, originalModel, mappedModel) {
+		return nil, s.writeClaudeError(c, http.StatusBadRequest, "invalid_request_error", ImageGenerationPermissionMessage())
+	}
 	billingModel := mappedModel
 
 	// 获取 access_token

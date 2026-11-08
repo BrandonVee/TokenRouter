@@ -1287,7 +1287,19 @@
 
       <!-- Vertex Service Account -->
       <div v-if="(form.platform === 'gemini' || form.platform === 'anthropic') && accountCategory === 'service_account'" class="space-y-4">
-        <div>
+        <div v-if="form.platform === 'gemini'">
+          <label class="input-label">{{ t('admin.accounts.vertexAuthMode') }}</label>
+          <Select data-testid="vertex-auth-mode" v-model="vertexAuthMode" :options="[
+            {value: 'service_account', label: t('admin.accounts.vertexAuthModeServiceAccount')},
+            {value: 'apikey', label: t('admin.accounts.vertexAuthModeApiKey')}
+          ]" />
+        </div>
+        <div v-if="vertexUsesApiKey">
+          <label class="input-label">API Key</label>
+          <input v-model="vertexApiKey" type="password" class="input font-mono" data-testid="vertex-api-key-input" autocomplete="off" />
+          <p class="input-hint">{{ t('admin.accounts.vertexApiKeyHint') }}</p>
+        </div>
+        <div v-if="!vertexUsesApiKey">
           <label class="input-label">Service Account JSON</label>
           <input
             ref="vertexServiceAccountFileInput"
@@ -1343,13 +1355,14 @@
             <label class="input-label">Project ID</label>
             <input
               v-model="vertexProjectId"
+              data-testid="vertex-api-key-project-id-input"
               type="text"
               class="input font-mono"
-              readonly
-              :placeholder="t('admin.accounts.vertexProjectIdPlaceholder')"
+              :readonly="!vertexUsesApiKey"
+              :placeholder="t(vertexUsesApiKey ? 'admin.accounts.vertexApiKeyProjectIdPlaceholder' : 'admin.accounts.vertexProjectIdPlaceholder')"
             />
           </div>
-          <div>
+          <div v-if="!vertexUsesApiKey || vertexProjectId.trim()">
             <label class="input-label">Location</label>
             <Select
               v-model="vertexLocation"
@@ -1530,6 +1543,7 @@
             @select="onCnPresetSelect"
           />
         </div>
+
         <div v-else>
           <label class="input-label">{{ t('admin.accounts.cnProviders.apiProtocol.endpoints') }}</label>
           <div class="mt-2 space-y-3">
@@ -1823,6 +1837,47 @@
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.poolModeRetryStatusCodesHint', { default: DEFAULT_POOL_MODE_RETRY_STATUS_CODES.join(', ') }) }}
+            </p>
+          </div>
+        </div>
+
+        <div
+          v-if="form.platform === 'gemini' && !isOfficialGeminiBaseUrl(apiKeyBaseUrl)"
+          class="border-t border-gray-200 pt-4 dark:border-dark-600"
+          data-testid="explicit-cache-upstream-section"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <label class="input-label mb-0">{{ t('admin.accounts.explicitCacheUpstream') }}</label>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.explicitCacheUpstreamHint') }}
+              </p>
+            </div>
+            <Toggle
+              v-model="explicitCacheUpstreamEnabled"
+              data-testid="explicit-cache-upstream-toggle"
+              :aria-label="t('admin.accounts.explicitCacheUpstream')"
+            />
+          </div>
+          <div v-if="explicitCacheUpstreamEnabled" class="mt-3 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+            <p class="text-xs text-blue-700 dark:text-blue-400">
+              <Icon name="exclamationCircle" size="sm" class="mr-1 inline" :stroke-width="2" />
+              {{ t('admin.accounts.explicitCacheUpstreamInfo') }}
+            </p>
+          </div>
+          <div v-if="explicitCacheUpstreamEnabled" class="mt-3">
+            <label class="input-label">{{ t('admin.accounts.explicitCacheUpstreamMaxTTL') }}</label>
+            <input
+              v-model="explicitCacheUpstreamMaxTTL"
+              data-testid="explicit-cache-upstream-max-ttl"
+              type="number"
+              min="1"
+              step="1"
+              class="input"
+              placeholder="86400"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.explicitCacheUpstreamMaxTTLHint') }}
             </p>
           </div>
         </div>
@@ -4083,6 +4138,7 @@
 </template>
 
 <script setup lang="ts">
+import { applyExplicitCacheUpstreamCredentials, isOfficialGeminiBaseUrl } from '@/utils/geminiExplicitCache'
 import { supportsAccountQuota } from '@/utils/accountQuota'
 import { ref, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -4134,6 +4190,7 @@ import type { OpenAIOAuthImportDefaults } from '@/api/admin/settings'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
+import Toggle from '@/components/common/Toggle.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
@@ -4385,6 +4442,8 @@ const submitting = ref(false)
 // 支持 API Key 的平台默认使用 API 账号；仅平台专属流程保留自己的默认类型。
 const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_account'>('apikey')
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
+const explicitCacheUpstreamEnabled = ref(false)
+const explicitCacheUpstreamMaxTTL = ref<string | number>('')
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const accountMode = ref<string>('payg')
 const apiProtocol = ref<CnApiProtocol>('adaptive')
@@ -4596,6 +4655,9 @@ const bedrockRegion = ref('us-east-1')
 const bedrockForceGlobal = ref(false)
 const bedrockApiKeyValue = ref('')
 const vertexServiceAccountFileInput = ref<HTMLInputElement | null>(null)
+const vertexAuthMode = ref<'service_account' | 'apikey'>('service_account')
+const vertexApiKey = ref('')
+const vertexUsesApiKey = computed(() => form.platform === 'gemini' && vertexAuthMode.value === 'apikey')
 const vertexServiceAccountJson = ref('')
 const vertexProjectId = ref('')
 const vertexClientEmail = ref('')
@@ -5303,6 +5365,10 @@ watch(
     bedrockForceGlobal.value = false
     bedrockAuthMode.value = 'sigv4'
     bedrockApiKeyValue.value = ''
+    explicitCacheUpstreamEnabled.value = false
+  explicitCacheUpstreamMaxTTL.value = ''
+  vertexAuthMode.value = 'service_account'
+    vertexApiKey.value = ''
     vertexServiceAccountJson.value = ''
     vertexProjectId.value = ''
     vertexClientEmail.value = ''
@@ -5856,7 +5922,11 @@ const resetForm = () => {
   antigravityProjectId.value = ''
   upstreamBaseUrl.value = ''
   upstreamApiKey.value = ''
-  vertexServiceAccountJson.value = ''
+  explicitCacheUpstreamEnabled.value = false
+  explicitCacheUpstreamMaxTTL.value = ''
+  vertexAuthMode.value = 'service_account'
+    vertexApiKey.value = ''
+    vertexServiceAccountJson.value = ''
   vertexProjectId.value = ''
   vertexClientEmail.value = ''
   vertexLocation.value = 'global'
@@ -6311,6 +6381,16 @@ const handleSubmit = async () => {
       appStore.showError(t('admin.accounts.pleaseEnterAccountName'))
       return
     }
+    if (vertexUsesApiKey.value) {
+      if (!vertexApiKey.value.trim()) { appStore.showError(t('admin.accounts.vertexApiKeyRequired')); return }
+      const credentials: Record<string, unknown> = {
+        auth_mode: 'apikey', api_key: vertexApiKey.value.trim(),
+        location: vertexLocation.value.trim() || 'global', tier_id: 'vertex'
+      }
+      if (vertexProjectId.value.trim()) credentials.project_id = vertexProjectId.value.trim()
+      await createAccountAndFinish('gemini', 'service_account' as AccountType, credentials)
+      return
+    }
     if (!parseVertexServiceAccountJson()) {
       return
     }
@@ -6366,6 +6446,7 @@ const handleSubmit = async () => {
     base_url: enteredBaseUrl || (form.platform==='typesafe'?'https://api.typesafe.ai':defaultBaseUrl),
     api_key: apiKeyValue.value.trim()
   }
+  applyExplicitCacheUpstreamCredentials(credentials, form.platform === 'gemini' && !isOfficialGeminiBaseUrl(apiKeyBaseUrl.value) && explicitCacheUpstreamEnabled.value, explicitCacheUpstreamMaxTTL.value)
   if (isCNPlatform.value) {
     credentials.account_mode = resolveProviderAccountMode(form.platform, accountMode.value)
     credentials.api_protocol = apiProtocol.value

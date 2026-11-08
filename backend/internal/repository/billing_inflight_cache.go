@@ -115,6 +115,7 @@ var (
 		for i = 1, #vals do
 			sum = sum + (tonumber(vals[i]) or 0)
 		end
+		sum = sum - (tonumber(redis.call('HGET', KEYS[2], ARGV[3])) or 0)
 		redis.call('ZADD', KEYS[1], tonumber(ARGV[2]), ARGV[3])
 		redis.call('HSET', KEYS[2], ARGV[3], ARGV[4])
 		redis.call('PEXPIRE', KEYS[1], ARGV[5])
@@ -177,6 +178,16 @@ func (c *billingCache) RenewInflightBalance(ctx context.Context, userID int64, r
 // ReserveInflightScope 实现 service.InflightScopeReservationCache。
 func (c *billingCache) ReserveInflightScope(ctx context.Context, scope, requestID string, amount float64, ttl time.Duration) (float64, error) {
 	zkey, hkey := billingInflightScopeKeys(scope)
+	return c.registerInflightAmount(ctx, zkey, hkey, requestID, amount, ttl)
+}
+
+// RegisterInflightBalance 与普通估算共用余额键；先登记再读数据库，避免扣费释放与旧余额读取交错。
+func (c *billingCache) RegisterInflightBalance(ctx context.Context, userID int64, requestID string, amount float64, ttl time.Duration) (float64, error) {
+	zkey, hkey := billingInflightKeys(userID)
+	return c.registerInflightAmount(ctx, zkey, hkey, requestID, amount, ttl)
+}
+
+func (c *billingCache) registerInflightAmount(ctx context.Context, zkey, hkey, requestID string, amount float64, ttl time.Duration) (float64, error) {
 	now := time.Now().UnixMilli()
 	ttlMs := ttl.Milliseconds()
 	if ttlMs <= 0 {
@@ -202,7 +213,8 @@ func (c *billingCache) ReleaseInflightScope(ctx context.Context, scope, requestI
 }
 
 var (
-	_ service.InflightBalanceReservationCache   = (*billingCache)(nil)
-	_ service.InflightBalanceReservationRenewer = (*billingCache)(nil)
-	_ service.InflightScopeReservationCache     = (*billingCache)(nil)
+	_ service.InflightBalanceReservationCache      = (*billingCache)(nil)
+	_ service.InflightBalanceReservationRenewer    = (*billingCache)(nil)
+	_ service.InflightScopeReservationCache        = (*billingCache)(nil)
+	_ service.InflightFixedBalanceReservationCache = (*billingCache)(nil)
 )

@@ -257,7 +257,7 @@ func defaultModelsListCandidateIDs(platform string) []string {
 
 func defaultAllowImageGenerationForPlatform(platform string) bool {
 	// Grok 图片和视频生成路由共用历史图片生成开关；旧客户端不会显式传 true。
-	return platform == PlatformGrok
+	return platform == PlatformGrok || platform == PlatformGemini || platform == PlatformAntigravity
 }
 
 func canCopyAccountsFromGroupPlatform(targetPlatform, sourcePlatform string) bool {

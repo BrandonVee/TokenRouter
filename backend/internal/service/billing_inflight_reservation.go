@@ -35,6 +35,11 @@ type InflightScopeReservationCache interface {
 	ReleaseInflightScope(ctx context.Context, scope, requestID string) error
 }
 
+// InflightFixedBalanceReservationCache 在读取权威余额前登记确定费用，与普通余额估算共享同一占用池。
+type InflightFixedBalanceReservationCache interface {
+	RegisterInflightBalance(ctx context.Context, userID int64, requestID string, amount float64, ttl time.Duration) (float64, error)
+}
+
 // InflightBalanceReservationRenewer 可选：续期仍存活的预留（流式长请求期间防止 TTL 过期）。
 type InflightBalanceReservationRenewer interface {
 	// RenewInflightBalance 若 requestID 仍存在则把其过期时间推迟到 now+ttl；返回是否仍存在。
@@ -65,11 +70,13 @@ const (
 // 所有方法对 nil 接收者安全。
 type InflightReservation struct {
 	// cache 为 nil 表示未登记余额维度的预留。
-	cache     InflightBalanceReservationCache
-	userID    int64
-	requestID string
-	amount    float64
-	ttl       time.Duration
+	cache      InflightBalanceReservationCache
+	userID     int64
+	requestID  string
+	amount     float64
+	scopeCache InflightScopeReservationCache
+	scopes     []string
+	ttl        time.Duration
 
 	refs        atomic.Int64
 	releaseOnce sync.Once
@@ -130,6 +137,13 @@ func (r *InflightReservation) Release() {
 		if r.cache != nil {
 			if err := r.cache.ReleaseInflightBalance(relCtx, r.userID, r.requestID); err != nil {
 				logger.LegacyPrintf("service.billing_cache", "Warning: inflight reservation release failed for user %d (expires by ttl): %v", r.userID, err)
+			}
+		}
+		if r.scopeCache != nil {
+			for _, scope := range r.scopes {
+				if err := r.scopeCache.ReleaseInflightScope(relCtx, scope, r.requestID); err != nil {
+					logger.LegacyPrintf("service.billing_cache", "fixed charge scope release failed (expires by ttl): %v", err)
+				}
 			}
 		}
 	})

@@ -27,6 +27,12 @@ func TestVertexProvider_SupportsOnlyGeminiServiceAccount(t *testing.T) {
 	provider := newTestVertexProvider(&fakeVertexBatchClient{}, &fakeVertexObjectStore{})
 
 	require.True(t, provider.SupportsAccount(vertexServiceAccount()))
+	// 即使历史导入残留 SA JSON，API Key 模式也不能加入批量图片候选。
+	apiKeyMode := vertexServiceAccount()
+	apiKeyMode.Credentials["auth_mode"] = "apikey"
+	require.False(t, provider.SupportsAccount(apiKeyMode))
+	_, err := provider.Submit(context.Background(), nil, apiKeyMode, validVertexBatchInput())
+	require.ErrorIs(t, err, ErrBatchImageProviderUnsupportedAccount)
 	require.False(t, provider.SupportsAccount(&Account{Platform: PlatformGemini, Type: AccountTypeAPIKey, Credentials: map[string]any{"api_key": "sk"}}))
 	require.False(t, provider.SupportsAccount(&Account{Platform: PlatformGemini, Type: AccountTypeOAuth, Credentials: map[string]any{"access_token": "tok"}}))
 	require.False(t, provider.SupportsAccount(&Account{Platform: PlatformAnthropic, Type: AccountTypeServiceAccount, Credentials: vertexServiceAccount().Credentials}))

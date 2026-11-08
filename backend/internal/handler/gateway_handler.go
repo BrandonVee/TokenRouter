@@ -41,6 +41,7 @@ var gatewayCompatibilityMetricsLogCounter atomic.Uint64
 type GatewayHandler struct {
 	gatewayService             *service.GatewayService
 	openAIGatewayService       *service.OpenAIGatewayService
+	geminiCachedContentService *service.GeminiCachedContentService
 	geminiCompatService        *service.GeminiMessagesCompatService
 	antigravityGatewayService  *service.AntigravityGatewayService
 	userService                *service.UserService
@@ -213,6 +214,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 解析渠道级模型映射
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, reqModel)
+	if geminiImageGenerationRejected(c, apiKey, nil, reqModel, channelMapping.MappedModel) {
+		h.handleStreamingAwareError(c, http.StatusBadRequest, "invalid_request_error", service.ImageGenerationPermissionMessage(), false)
+		return
+	}
 
 	// 设置 max_tokens=1 + haiku 探测请求标识到 context 中
 	// 必须在 SetClaudeCodeClientContext 之前设置，因为 ClaudeCodeValidator 需要读取此标识进行绕过判断

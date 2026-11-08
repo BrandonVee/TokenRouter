@@ -508,6 +508,12 @@ func RegisterGatewayRoutes(
 	gemini.Use(compositeGeminiTarget)
 	gemini.Use(requireGroupGoogle)
 	{
+		// 显式缓存管理与原生模型请求共享鉴权；写入口遵守分组的 Gemini 协议开关。
+		gemini.POST("/cachedContents", requireGroupClientProtocol(service.GroupClientProtocolGeminiGenerateContent, groupClientProtocolErrorGoogle), h.Gateway.GeminiCachedContentsCreate)
+		gemini.GET("/cachedContents", h.Gateway.GeminiCachedContentsList)
+		gemini.GET("/cachedContents/:cacheID", h.Gateway.GeminiCachedContentsGet)
+		gemini.PATCH("/cachedContents/:cacheID", requireGroupClientProtocol(service.GroupClientProtocolGeminiGenerateContent, groupClientProtocolErrorGoogle), h.Gateway.GeminiCachedContentsPatch)
+		gemini.DELETE("/cachedContents/:cacheID", h.Gateway.GeminiCachedContentsDelete)
 		gemini.GET("/models", h.Gateway.GeminiV1BetaListModels)
 		gemini.GET("/models/*model", h.Gateway.GeminiV1BetaGetModel)
 		// Gin treats ":" as a param marker, but Gemini uses "{model}:{action}" in the same segment.

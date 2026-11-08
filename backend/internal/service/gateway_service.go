@@ -599,15 +599,16 @@ type ForwardResult struct {
 	// ImageEndpoint 标记请求来自专用图片端点（/v1/images/*、图片模型端点）。
 	// 分组 image_count_billing 开关只对这类请求生效，混合的 Responses/Chat/WS
 	// 请求带图片工具时仍按 token 计费。
-	ImageEndpoint      bool
-	ImageSize          string // 最终计费尺寸 "1K", "2K", "4K"
-	ImageInputSize     string // 请求中的原始图片尺寸
-	ImageOutputSize    string // 上游响应中的图片尺寸
-	ImageOutputSizes   []string
-	ImageSizeSource    string
-	ImageSizeBreakdown map[string]int
-	SearchCount        int
-	AudioUsage         *AudioUsage
+	ImageEndpoint          bool
+	ImageSize              string // 最终计费尺寸 "1K", "2K", "4K"
+	ImageInputSize         string // 请求中的原始图片尺寸
+	ImageOutputSize        string // 上游响应中的图片尺寸
+	ImageOutputSizes       []string
+	ImageSizeSource        string
+	ImageSizeBreakdown     map[string]int
+	CacheStorageTokenHours float64 // 显式缓存存储量，单位 token 小时。
+	SearchCount            int
+	AudioUsage             *AudioUsage
 }
 
 // GatewayFailureStage 标识请求失败的阶段。零值有意按推理阶段处理，
@@ -643,6 +644,7 @@ type GatewayFailureReason string
 // UpstreamFailoverError 表示可能触发账号切换的上游或凭据错误。
 // 新增元数据保持现有复合字面量源码兼容，并保留旧版切换账号行为。
 type UpstreamFailoverError struct {
+	BoundUpstreamPassthrough bool // 显式缓存绑定账号的限流/不可用需要保留上游状态。
 	StatusCode               int
 	ResponseBody             []byte      // 上游响应体，用于错误透传规则匹配
 	ResponseHeaders          http.Header // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
