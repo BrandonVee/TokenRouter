@@ -394,6 +394,8 @@ type UpdateGroupInput struct {
 }
 
 type CreateAccountInput struct {
+	// ProxyMode 由受限写事务解析，最终仍保存真实代理关联。
+	ProxyMode          string
 	Name               string
 	Notes              *string
 	Platform           string
@@ -425,6 +427,8 @@ type ShadowOptions struct {
 }
 
 type UpdateAccountInput struct {
+	// ProxyMode 由受限写事务解析，最终仍保存真实代理关联。
+	ProxyMode             string
 	Name                  string
 	Notes                 *string
 	Type                  string // Account type: oauth, setup-token, apikey

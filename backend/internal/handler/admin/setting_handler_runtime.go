@@ -13,6 +13,9 @@ import (
 // GetAdminAPIKey 获取管理员 API Key 状态
 // GET /api/v1/admin/settings/admin-api-key
 func (h *SettingHandler) GetAdminAPIKey(c *gin.Context) {
+	if !requireAdminKeyJWT(c) {
+		return
+	}
 	maskedKey, exists, err := h.settingService.GetAdminAPIKeyStatus(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -28,6 +31,9 @@ func (h *SettingHandler) GetAdminAPIKey(c *gin.Context) {
 // RegenerateAdminAPIKey 生成/重新生成管理员 API Key
 // POST /api/v1/admin/settings/admin-api-key/regenerate
 func (h *SettingHandler) RegenerateAdminAPIKey(c *gin.Context) {
+	if !requireAdminKeyJWT(c) {
+		return
+	}
 	key, err := h.settingService.GenerateAdminAPIKey(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -42,6 +48,9 @@ func (h *SettingHandler) RegenerateAdminAPIKey(c *gin.Context) {
 // DeleteAdminAPIKey 删除管理员 API Key
 // DELETE /api/v1/admin/settings/admin-api-key
 func (h *SettingHandler) DeleteAdminAPIKey(c *gin.Context) {
+	if !requireAdminKeyJWT(c) {
+		return
+	}
 	if err := h.settingService.DeleteAdminAPIKey(c.Request.Context()); err != nil {
 		response.ErrorFrom(c, err)
 		return

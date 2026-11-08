@@ -706,7 +706,7 @@ func ProvideOpsIngressRejectAggregator(opsRepo OpsRepository, opsService *OpsSer
 }
 
 // ProvideSettingService wires SettingService with group reader and proxy repo.
-func ProvideSettingService(settingRepo SettingRepository, dashboardAdRepo DashboardAdRepository, paymentConfigService *PaymentConfigService, proxyRepo ProxyRepository, cfg *config.Config) *SettingService {
+func ProvideSettingService(scopedKeys ScopedAdminKeyRepository, settingRepo SettingRepository, dashboardAdRepo DashboardAdRepository, paymentConfigService *PaymentConfigService, proxyRepo ProxyRepository, cfg *config.Config) *SettingService {
 	svc := NewSettingService(settingRepo, cfg)
 	svc.SetDashboardAdRepository(dashboardAdRepo)
 	svc.SetDefaultSubscriptionPlanReader(paymentConfigService)
@@ -715,6 +715,7 @@ func ProvideSettingService(settingRepo SettingRepository, dashboardAdRepo Dashbo
 		logger.LegacyPrintf("service.setting", "Warning: load forwarded client IP settings failed: %v", err)
 	}
 	antigravity.SetUserAgentVersionResolver(svc.GetAntigravityUserAgentVersion)
+	svc.SetScopedAdminKeyRepository(scopedKeys)
 	return svc
 }
 

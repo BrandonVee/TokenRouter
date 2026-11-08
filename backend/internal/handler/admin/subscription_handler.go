@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/handler/dto"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/pagination"
@@ -48,7 +49,7 @@ type AssignSubscriptionRequest struct {
 
 // BulkAssignSubscriptionRequest 表示批量分配订阅请求。
 type BulkAssignSubscriptionRequest struct {
-	UserIDs      []int64 `json:"user_ids" binding:"required,min=1"`
+	UserIDs      []int64 `json:"user_ids" binding:"required,min=1,max=100,dive,gt=0"`
 	PlanID       int64   `json:"plan_id" binding:"required"`
 	ValidityDays int     `json:"validity_days" binding:"omitempty,max=36500"` // max 100 years
 	Notes        string  `json:"notes"`
@@ -93,7 +94,7 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 	for i := range subscriptions {
 		out = append(out, *dto.UserSubscriptionFromServiceAdmin(&subscriptions[i]))
 	}
-	response.PaginatedWithResult(c, out, toResponsePagination(pagination))
+	response.PaginatedWithResult(c, adminSubscriptionResponse(c, out), toResponsePagination(pagination))
 }
 
 // GetByID 根据 ID 获取订阅。
@@ -111,7 +112,7 @@ func (h *SubscriptionHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.UserSubscriptionFromServiceAdmin(subscription))
+	response.Success(c, adminSubscriptionResponse(c, dto.UserSubscriptionFromServiceAdmin(subscription)))
 }
 
 // GetProgress 获取订阅用量进度。
@@ -156,7 +157,7 @@ func (h *SubscriptionHandler) Assign(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.UserSubscriptionFromServiceAdmin(subscription))
+	response.Success(c, adminSubscriptionResponse(c, dto.UserSubscriptionFromServiceAdmin(subscription)))
 }
 
 // BulkAssign 为多个用户批量分配订阅。
@@ -183,7 +184,24 @@ func (h *SubscriptionHandler) BulkAssign(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.BulkAssignResultFromService(result))
+	response.Success(c, adminSubscriptionResponse(c, dto.BulkAssignResultFromService(result)))
+}
+
+// BulkAction 对有界订阅集合逐项执行操作，并返回每项结果。
+// POST /api/v1/admin/subscriptions/bulk-action
+func (h *SubscriptionHandler) BulkAction(c *gin.Context) {
+	var req service.BulkSubscriptionActionInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if err := req.Validate(); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	executeAdminIdempotentJSONWithTimeout(c, "admin.subscriptions.bulk-action", req, service.DefaultWriteIdempotencyTTL(), 2*time.Minute, func(ctx context.Context) (any, error) {
+		return h.subscriptionService.BulkSubscriptionAction(ctx, &req)
+	})
 }
 
 // Extend 将订阅调整为指定的目标有效期。
@@ -208,13 +226,13 @@ func (h *SubscriptionHandler) Extend(c *gin.Context) {
 		SubscriptionID: subscriptionID,
 		Body:           req,
 	}
-	executeAdminIdempotentJSON(c, "admin.subscriptions.extend", idempotencyPayload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+	executeAdminIdempotentJSONWithResponse(c, "admin.subscriptions.extend", idempotencyPayload, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
 		subscription, execErr := h.subscriptionService.SetSubscriptionValidityDays(ctx, subscriptionID, req.Days)
 		if execErr != nil {
 			return nil, execErr
 		}
 		return dto.UserSubscriptionFromServiceAdmin(subscription), nil
-	})
+	}, func(data any) any { return adminSubscriptionResponse(c, data) })
 }
 
 // ResetSubscriptionQuotaRequest 表示重置配额请求。
@@ -246,7 +264,7 @@ func (h *SubscriptionHandler) ResetQuota(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	response.Success(c, dto.UserSubscriptionFromServiceAdmin(sub))
+	response.Success(c, adminSubscriptionResponse(c, dto.UserSubscriptionFromServiceAdmin(sub)))
 }
 
 // Revoke 撤销订阅。
@@ -283,7 +301,7 @@ func (h *SubscriptionHandler) Restore(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.UserSubscriptionFromServiceAdmin(subscription))
+	response.Success(c, adminSubscriptionResponse(c, dto.UserSubscriptionFromServiceAdmin(subscription)))
 }
 
 // ListByPlan handles listing subscriptions for a plan.
@@ -306,7 +324,7 @@ func (h *SubscriptionHandler) ListByPlan(c *gin.Context) {
 	for i := range subscriptions {
 		out = append(out, *dto.UserSubscriptionFromServiceAdmin(&subscriptions[i]))
 	}
-	response.PaginatedWithResult(c, out, toResponsePagination(pagination))
+	response.PaginatedWithResult(c, adminSubscriptionResponse(c, out), toResponsePagination(pagination))
 }
 
 // ListByUser 列出指定用户的订阅。
@@ -328,7 +346,7 @@ func (h *SubscriptionHandler) ListByUser(c *gin.Context) {
 	for i := range subscriptions {
 		out = append(out, *dto.UserSubscriptionFromServiceAdmin(&subscriptions[i]))
 	}
-	response.Success(c, out)
+	response.Success(c, adminSubscriptionResponse(c, out))
 }
 
 // getAdminIDFromContext 从上下文读取管理员 ID。

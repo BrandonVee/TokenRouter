@@ -74,6 +74,12 @@ Gemini 显式缓存管理使用 `/v1beta/cachedContents`：POST 创建、GET 列
 
 TypeSafe 使用独立 `POST /v1/systemone` 非流式网关，限制为 TypeSafe 及兼容 Composite 分组；通用文本入口不接受 TypeSafe。协议、用量与后台刷新接口见[多协议与 System One 上游](multi_protocol_upstream.md)。
 
+独立管理员 Key 生命周期位于 `/api/v1/admin/settings/admin-api-keys`：GET 列表、POST 创建、PUT `/:id` 更新、POST `/:id/rotate` 轮换、DELETE `/:id` 撤销、DELETE `/:id/record` 隐藏已撤销项。全部操作仅允许管理员 JWT，写入执行 step-up；Key 自身不能创建或扩权管理凭据。精确路由授权与 fork 资源目录见[管理员访问密钥](../domains/administrator_access_keys.md)。
+
+OpenAI 邀请管理使用 POST `/api/v1/admin/openai/accounts/:id/referrals/refresh` 与 `/invite`。发送前重新检查上游资格和收件人确认，发送不自动重试；邮件已发送而后续刷新失败时仍返回已发送结果，防止重复操作。请求沿用 fork 的代理、TLS 指纹及 Agent Identity 认证链。
+
+POST `/api/v1/admin/subscriptions/bulk-action` 接受至多 100 个订阅 ID，执行延期、窗口重置、撤销或恢复，去重后保持输入顺序返回逐项结果。每项独立事务，部分成功不重放已完成写入；批量延期为增减天数，已有单项 `/extend` 继续保留 fork 的目标有效期语义。
+
 ## 生图历史接口
 
 生图历史位于用户 JWT 路由族 `/api/v1/user/image-history`，所有对象操作都使用当前认证用户 ID 约束查询，不能用 API Key、记录 UUID 或预览 URL 替代对象归属校验：

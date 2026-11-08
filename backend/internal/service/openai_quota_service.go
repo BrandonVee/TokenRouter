@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/model"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/adminaccess"
 	infraerrors "github.com/BrandonVee/TokenRouter/internal/pkg/errors"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/tlsfingerprint"
 )
@@ -73,6 +74,7 @@ type OpenAIRateLimitResetCredits struct {
 
 // OpenAIQuotaUsage 是暴露给前端的 /wham/usage 精简结果。
 type OpenAIQuotaUsage struct {
+	Credits               *OpenAICredits               `json:"credits,omitempty"`
 	UserID                string                       `json:"user_id,omitempty"`
 	AccountID             string                       `json:"account_id,omitempty"`
 	Email                 string                       `json:"email,omitempty"`
@@ -103,6 +105,7 @@ type OpenAIQuotaResetResult struct {
 
 // OpenAIQuotaService 查询和消耗 OpenAI OAuth 账号的 Codex 限流重置次数。
 type OpenAIQuotaService struct {
+	referralClient      OpenAIReferralClient
 	adminService        AdminService
 	httpUpstream        HTTPUpstream
 	openAITokenProvider *OpenAITokenProvider
@@ -169,6 +172,9 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 // CacheResetCreditsSnapshot 保存显式查询得到的完整重置次数快照。
 // 正数次数必须附带到期明细，否则保留旧缓存，避免前端长期展示无法自然失效的次数。
 func (s *OpenAIQuotaService) CacheResetCreditsSnapshot(ctx context.Context, accountID int64, credits *OpenAIRateLimitResetCredits) error {
+	if err := scopedAccountIDAccess(ctx, s.accountRepo, accountID, scopedAccountOperation(ctx, "openai.quota.read"), true); err != nil {
+		return err
+	}
 	if credits == nil || (credits.AvailableCount > 0 && len(credits.Credits) == 0) {
 		return infraerrors.New(
 			http.StatusBadGateway,
@@ -213,6 +219,7 @@ func (s *OpenAIQuotaService) queryResetCreditDetails(ctx context.Context, accoun
 
 // ResetCredit 消耗一次限流窗口重置次数。
 func (s *OpenAIQuotaService) ResetCredit(ctx context.Context, accountID int64) (*OpenAIQuotaResetResult, error) {
+	ctx = WithScopedAdminAccountOperation(ctx, "openai.quota.reset")
 	account, err := s.loadQuotaAccount(ctx, accountID)
 	if err != nil {
 		return nil, err
@@ -265,6 +272,9 @@ func (s *OpenAIQuotaService) prepareAccount(ctx context.Context, accountID int64
 	if err != nil {
 		return nil, err
 	}
+	if err := scopedAccountAccess(ctx, s.accountRepo, account, scopedAccountOperation(ctx, "openai.quota.read"), true); err != nil {
+		return nil, err
+	}
 	if !account.IsOpenAIOAuth() {
 		return nil, infraerrors.BadRequest("OPENAI_QUOTA_UNSUPPORTED_ACCOUNT", "only OpenAI OAuth accounts support quota reset")
 	}
@@ -272,6 +282,9 @@ func (s *OpenAIQuotaService) prepareAccount(ctx context.Context, accountID int64
 	if account.IsShadow() {
 		parent, resolveErr := s.loadQuotaAccount(ctx, *account.ParentAccountID)
 		if resolveErr != nil {
+			if adminaccess.RestrictedFromContext(ctx) != nil {
+				return nil, infraerrors.NotFound("SCOPED_ACCOUNT_NOT_FOUND", "账户不存在")
+			}
 			return nil, infraerrors.Newf(http.StatusBadGateway, "OPENAI_QUOTA_SHADOW_RESOLVE_FAILED", "failed to resolve shadow account: %v", resolveErr)
 		}
 		if parent.IsShadow() {
@@ -328,10 +341,19 @@ func (s *OpenAIQuotaService) loadQuotaAccount(ctx context.Context, accountID int
 	}
 	account, err := s.adminService.GetAccount(ctx, accountID)
 	if err != nil {
+		if adminaccess.RestrictedFromContext(ctx) != nil {
+			return nil, infraerrors.NotFound("SCOPED_ACCOUNT_NOT_FOUND", "账户不存在")
+		}
 		return nil, err
 	}
 	if account == nil {
 		return nil, infraerrors.NotFound("ACCOUNT_NOT_FOUND", "account not found")
+	}
+	if err := scopedAccountAccess(ctx, s.accountRepo, account, scopedAccountOperation(ctx, "openai.quota.read"), false); err != nil {
+		if adminaccess.RestrictedFromContext(ctx) != nil {
+			return nil, infraerrors.NotFound("SCOPED_ACCOUNT_NOT_FOUND", "账户不存在")
+		}
+		return nil, err
 	}
 	return account, nil
 }
@@ -433,6 +455,9 @@ func (s *OpenAIQuotaService) postJSON(ctx context.Context, accountCtx *openAIQuo
 func (s *OpenAIQuotaService) applyHeaders(req *http.Request, accountCtx *openAIQuotaAccountContext) (string, error) {
 	if req == nil || accountCtx == nil || accountCtx.account == nil {
 		return "", errors.New("openai quota request context is unavailable")
+	}
+	if err := scopedAccountIDAccess(req.Context(), s.accountRepo, accountCtx.account.ID, scopedAccountOperation(req.Context(), "openai.quota.read"), false); err != nil {
+		return "", err
 	}
 	*req = *req.WithContext(WithHTTPUpstreamProfile(req.Context(), HTTPUpstreamProfileOpenAI))
 	req.Host = "chatgpt.com"
@@ -644,4 +669,12 @@ func mapOpenAIQuotaUpstreamStatus(status int) int {
 	default:
 		return http.StatusBadGateway
 	}
+}
+
+// SetAccountRepository 注入凭据与授权复核使用的账号仓储。
+func (s *OpenAIQuotaService) SetAccountRepository(repo AccountRepository) { s.accountRepo = repo }
+
+// SetReferralClient 注入邀请传输适配器，默认复用 fork 的指纹请求链。
+func (s *OpenAIQuotaService) SetReferralClient(client OpenAIReferralClient) {
+	s.referralClient = client
 }

@@ -17,6 +17,7 @@ type AuditLogMiddleware gin.HandlerFunc
 
 // 审计相关 gin context 覆写键：handler / 认证中间件可通过这些键补充审计信息。
 const (
+	auditCtxKeyExtra      = "audit_extra"
 	auditCtxKeyAction     = "audit_action"
 	auditCtxKeyActorID    = "audit_actor_id"
 	auditCtxKeyActorEmail = "audit_actor_email"
@@ -45,6 +46,64 @@ func SetAuditActor(c *gin.Context, userID int64, email string) {
 // SkipAudit 跳过当前请求的审计记录。
 func SkipAudit(c *gin.Context) {
 	c.Set(auditCtxKeySkip, true)
+}
+
+// auditExtraAllowedKeys 仅允许非敏感标量摘要，不接受请求正文或任意对象。
+var auditExtraAllowedKeys = map[string]struct{}{
+	"admin_key_id": {}, "full_access": {}, "full_access_before": {},
+	"mcp_grant_id": {}, "mcp_tool": {},
+	"result": {}, "error_code": {}, "enabled": {}, "blocking_enabled": {},
+	"config_version": {}, "endpoint_count": {}, "scanner_count": {},
+	"all_groups": {}, "group_count": {}, "guard_endpoint_id": {},
+	"http_status": {}, "latency_ms": {}, "token_applied": {}, "retryable": {},
+	"event_id": {}, "requested_count": {}, "deleted_events": {}, "deleted_jobs": {},
+	"matched_count": {}, "snapshot_max_id": {}, "filter_hash": {}, "confirm": {},
+}
+
+// SetAuditExtra 合并允许的标量审计字段，重复调用时以后值为准。
+func SetAuditExtra(c *gin.Context, fields map[string]any) {
+	if c == nil || len(fields) == 0 {
+		return
+	}
+	current := map[string]any{}
+	if value, ok := c.Get(auditCtxKeyExtra); ok {
+		if existing, ok := value.(map[string]any); ok {
+			for key, item := range existing {
+				current[key] = item
+			}
+		}
+	}
+	for key, value := range fields {
+		if _, ok := auditExtraAllowedKeys[key]; !ok || !isAuditExtraScalar(value) {
+			continue
+		}
+		if text, ok := value.(string); ok {
+			value = truncateAuditExtraString(text, 128)
+		}
+		current[key] = value
+	}
+	c.Set(auditCtxKeyExtra, current)
+}
+
+func isAuditExtraScalar(value any) bool {
+	switch value.(type) {
+	case string, bool,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return true
+	default:
+		return false
+	}
+}
+
+func truncateAuditExtraString(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit])
 }
 
 // auditSensitiveReads 需要审计的敏感 GET 读取（method+FullPath → 动作名）。
@@ -89,7 +148,7 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 }
 
 // NewAuditLogMiddleware 创建审计中间件。
-// 记录范围：变更类请求（POST/PUT/PATCH/DELETE）+ 白名单内的敏感 GET 读取。
+// 记录范围：变更类请求（POST/PUT/PATCH/DELETE）+ 白名单内的敏感 GET 读取 + MCP OAuth 的全部读取。
 // 挂载位置：admin / user / admin-payment 组挂在各自认证中间件之后（只审计已认证请求，
 // 未过认证的 401/403 不入库）；auth 组（登录/注册/刷新）无前置认证，天然记录失败尝试。
 func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddleware {
@@ -108,6 +167,9 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 			if v, ok := auditSensitiveReads[routeKey]; ok {
 				record = true
 				action = v
+			} else if c.GetString("auth_method") == "mcp_oauth" {
+				// 机器凭据可批量读取用户资料；MCP 工具调用通过 grant 审计字段定位授权来源。
+				record = true
 			}
 		}
 		if !record {
@@ -200,6 +262,13 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 		entry.CredentialMasked = MaskedRequestCredential(c)
 
 		extra := map[string]any{}
+		if value, ok := c.Get(auditCtxKeyExtra); ok {
+			if details, ok := value.(map[string]any); ok {
+				for key, item := range details {
+					extra[key] = item
+				}
+			}
+		}
 		if len(c.Params) > 0 {
 			params := make(map[string]string, len(c.Params))
 			for _, p := range c.Params {
@@ -214,6 +283,11 @@ func NewAuditLogMiddleware(auditService *service.AuditLogService) AuditLogMiddle
 			entry.Extra = extra
 		}
 
+		if value, ok := c.Get(auditCtxKeyExtra); ok {
+			if extra, ok := value.(map[string]any); ok {
+				entry.Extra = extra
+			}
+		}
 		auditService.Record(entry)
 	})
 }

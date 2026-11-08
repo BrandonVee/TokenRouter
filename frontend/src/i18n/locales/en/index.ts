@@ -10,7 +10,10 @@ import misc from './misc'
 import team from './team'
 import imageHistory from './imageHistory'
 
+import adminAccessKeys from './adminAccessKeys'
+
 export default {
+  adminAccessKeys,
   ...home,
   ...keyUsage,
   ...setup,

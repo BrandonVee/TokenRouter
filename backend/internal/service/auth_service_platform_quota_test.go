@@ -67,8 +67,8 @@ func TestSnapshotPlatformQuotaDefaults_PassesToRepoBulkInsert(t *testing.T) {
 	if err := s.snapshotPlatformQuotaDefaults(context.Background(), 999, plan); err != nil {
 		t.Fatal(err)
 	}
-	if len(fakeRepo.records) != 4 {
-		t.Errorf("expected 4 records, got %d", len(fakeRepo.records))
+	if len(fakeRepo.records) != 1 {
+		t.Errorf("expected only the configured platform record, got %d", len(fakeRepo.records))
 	}
 	found := false
 	for _, r := range fakeRepo.records {

@@ -12,7 +12,7 @@
 
 ## 额度模型
 
-每个用户和平台最多一条 `user_platform_quotas` 活跃记录。允许的平台由 `domain/platforms.go` 统一提供，包含 Qoder 和所有已登记具体平台，不含 Composite。每条记录分别保存日/周/月 limit、usage 和 window start。
+每个用户和平台最多一条 `user_platform_quotas` 活跃记录。允许的平台由 `domain/platforms.go` 统一提供，包含 Qoder 和所有已登记具体平台，不含 Composite。每条记录分别保存日/周/月 limit、usage 和 window start。至少一档 limit 非空时才保存配置行，三档全空与不存在的行均表示不限额；显式零仍保留。
 
 limit 的三态语义是领域不变量：
 
@@ -38,9 +38,9 @@ limit 的三态语义是领域不变量：
 Redis 用 Lua 同步累加三个窗口并标记脏 key，使下一次预检查立即看到新 usage，把并发超额范围限制在 in-flight 请求内。数据库有两种持久化模式：
 
 - Flusher 关闭：成功结算后异步调用 `IncrementUsageWithReset`，数据库原子重置过期窗口并累加。
-- Flusher 开启：Redis 为执法热状态，dirty set 由 `UserPlatformQuotaUsageFlusher` 分批读取绝对快照并 UPSERT 到数据库镜像。
+- Flusher 开启：Redis 为执法热状态，dirty set 由 `UserPlatformQuotaUsageFlusher` 分批读取绝对快照并更新仍配置限额的数据库行。
 
-Flusher 每批 Pop dirty key、批量读取 Redis、写入绝对 usage/window snapshot。普通写失败会把 key 加回 dirty set；外键违反表示用户已删除，整批数据库镜像可能暂时缺失，但 Redis 执法状态不受影响。停止服务时会尝试最后一次 flush。Flusher 是异步镜像优化，不改变 Redis 预检查和成功结算的先后关系。
+Flusher 每批 Pop dirty key、批量读取 Redis、只为仍存在且至少有一档限额的活跃行写入绝对 usage/window snapshot，不能在管理员清空配置后重新建全空行。普通写失败会把 key 加回 dirty set；用户或配置已删除时不再有写入对象，也不会重新建行；其它数据库写入失败仍会重试，Redis 执法状态不受影响。停止服务时会尝试最后一次 flush。Flusher 是异步镜像优化，不改变 Redis 预检查和成功结算的先后关系。
 
 ## 默认值与管理操作
 

@@ -87,6 +87,7 @@
 
         <!-- Tab: Security — Admin API Key -->
         <div v-show="activeTab === 'security'" class="space-y-6">
+          <AdminAccessKeysSettings v-if="activeTab === 'security'" />
           <!-- Admin API Key Settings -->
           <div class="card">
             <div
@@ -8595,6 +8596,7 @@
 </template>
 
 <script setup lang="ts">
+import AdminAccessKeysSettings from '@/components/admin/settings/AdminAccessKeysSettings.vue';
 import { listPlatformIds } from '@/constants/platformCatalog'
 import type { AccountPlatform } from '@/types'
 const quotaPlatforms = listPlatformIds() as AccountPlatform[]

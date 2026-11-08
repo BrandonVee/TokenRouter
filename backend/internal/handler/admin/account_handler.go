@@ -1331,7 +1331,7 @@ func (h *AccountHandler) refreshSingleAccount(ctx context.Context, account *serv
 		tokenInfo, err := h.openaiOAuthService.RefreshAccountToken(ctx, account)
 		if err != nil {
 			// 刷新失败但 access_token 可能仍有效，尝试设置隐私
-			h.adminService.EnsureOpenAIPrivacy(ctx, account)
+			service.AfterAccountCommit(ctx, func(committed context.Context) { h.adminService.EnsureOpenAIPrivacy(committed, account) })
 			return nil, "", err
 		}
 
@@ -1383,7 +1383,8 @@ func (h *AccountHandler) refreshSingleAccount(ctx context.Context, account *serv
 			if updateErr != nil {
 				return nil, "", fmt.Errorf("failed to update credentials: %w", updateErr)
 			}
-			h.adminService.EnsureAntigravityPrivacy(ctx, updatedAccount)
+			h.invalidateScopedAccountToken(ctx, updatedAccount)
+			service.AfterAccountCommit(ctx, func(committed context.Context) { h.adminService.EnsureAntigravityPrivacy(committed, updatedAccount) })
 			return updatedAccount, "missing_project_id_temporary", nil
 		}
 
@@ -1439,17 +1440,20 @@ func (h *AccountHandler) refreshSingleAccount(ctx context.Context, account *serv
 		return nil, "", err
 	}
 
-	// 刷新成功后，清除 token 缓存，确保下次请求使用新 token
-	if h.tokenCacheInvalidator != nil {
-		if invalidateErr := h.tokenCacheInvalidator.InvalidateToken(ctx, updatedAccount); invalidateErr != nil {
-			log.Printf("[WARN] Failed to invalidate token cache for account %d: %v", updatedAccount.ID, invalidateErr)
+	service.AfterAccountCommit(ctx, func(ctx context.Context) {
+		// 刷新成功后，清除 token 缓存，确保下次请求使用新 token
+		if h.tokenCacheInvalidator != nil {
+			if invalidateErr := h.tokenCacheInvalidator.InvalidateToken(ctx, updatedAccount); invalidateErr != nil {
+				log.Printf("[WARN] Failed to invalidate token cache for account %d: %v", updatedAccount.ID, invalidateErr)
+			}
 		}
-	}
 
-	// OpenAI OAuth: 刷新成功后检查并设置 privacy_mode
-	h.adminService.EnsureOpenAIPrivacy(ctx, updatedAccount)
-	// Antigravity OAuth: 刷新成功后检查并设置 privacy_mode
-	h.adminService.EnsureAntigravityPrivacy(ctx, updatedAccount)
+		// OpenAI OAuth: 刷新成功后检查并设置 privacy_mode
+		h.adminService.EnsureOpenAIPrivacy(ctx, updatedAccount)
+		// Antigravity OAuth: 刷新成功后检查并设置 privacy_mode
+		h.adminService.EnsureAntigravityPrivacy(ctx, updatedAccount)
+
+	})
 
 	return updatedAccount, "", nil
 }
@@ -2667,6 +2671,12 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 		response.NotFound(c, "Account not found")
 		return
 	}
+
+	h.respondAvailableModels(c, account)
+}
+
+// respondAvailableModels 复用已完成资源授权的账号，避免受限查询二次加载改变身份。
+func (h *AccountHandler) respondAvailableModels(c *gin.Context, account *service.Account) {
 
 	// Handle OpenAI accounts
 	if account.IsOpenAI() {

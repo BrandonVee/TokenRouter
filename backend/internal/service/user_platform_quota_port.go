@@ -44,6 +44,12 @@ type UserPlatformQuotaRecord struct {
 	MonthlyWindowStart *time.Time
 }
 
+// HasAnyLimit 报告该记录是否至少配置了一档限额（0 也算配置）。
+// 三档全空的记录视为未配置：不写入 user_platform_quotas，等价于不限额。
+func (r UserPlatformQuotaRecord) HasAnyLimit() bool {
+	return r.DailyLimitUSD != nil || r.WeeklyLimitUSD != nil || r.MonthlyLimitUSD != nil
+}
+
 // UserPlatformQuotaRepository 定义 service 层所需的 user × platform quota 数据访问端口。
 // repository 包的 userPlatformQuotaRepository 实现此接口。
 type UserPlatformQuotaRepository interface {

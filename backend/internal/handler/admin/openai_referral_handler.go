@@ -1,0 +1,111 @@
+package admin
+
+import (
+	"context"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/BrandonVee/TokenRouter/internal/pkg/response"
+	"github.com/BrandonVee/TokenRouter/internal/service"
+	"github.com/gin-gonic/gin"
+)
+
+type openAIReferralService interface {
+	QueryReferralEligibility(context.Context, int64) (*service.OpenAIReferralEligibility, error)
+	CacheReferralSnapshot(context.Context, int64, *service.OpenAIReferralEligibility) error
+	SendReferralInvite(context.Context, int64, service.OpenAIReferralSendRequest) (*service.OpenAIReferralSendResult, error)
+}
+
+type openAIReferralRefreshResponse struct {
+	Eligibility    *service.OpenAIReferralEligibility `json:"eligibility"`
+	CachePersisted bool                               `json:"cache_persisted"`
+}
+
+type openAIReferralSendResponse struct {
+	service.OpenAIReferralSendResult
+	openAIReferralRefreshResponse
+	RefreshFailed bool `json:"refresh_failed"`
+}
+
+func (h *OpenAIOAuthHandler) referralAccountID(c *gin.Context) (int64, bool) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid account ID")
+		return 0, false
+	}
+	if h.referralService == nil {
+		response.BadRequest(c, "OpenAI referral service is not enabled")
+		return 0, false
+	}
+	return id, true
+}
+
+// RefreshReferrals 会保存展示快照，因此使用 POST 并记录管理审计。
+func (h *OpenAIOAuthHandler) RefreshReferrals(c *gin.Context) {
+	id, ok := h.referralAccountID(c)
+	if !ok {
+		return
+	}
+	if !h.scopedOpenAIAllowed(c, id, "openai.referrals.read", true) {
+		return
+	}
+	eligibility, err := h.referralService.QueryReferralEligibility(c.Request.Context(), id)
+	if err != nil {
+		scopedOpenAIError(c, err)
+		return
+	}
+	if eligibility == nil {
+		response.Error(c, http.StatusBadGateway, "Empty invitation eligibility response")
+		return
+	}
+	eligibility = h.scopedReferralDTO(c, eligibility)
+	cacheErr := h.referralService.CacheReferralSnapshot(c.Request.Context(), id, eligibility)
+	response.Success(c, openAIReferralRefreshResponse{Eligibility: eligibility, CachePersisted: cacheErr == nil})
+}
+
+func (h *OpenAIOAuthHandler) SendReferralInvite(c *gin.Context) {
+	id, ok := h.referralAccountID(c)
+	if !ok {
+		return
+	}
+	if !h.scopedOpenAIAllowed(c, id, "openai.referrals.invite", false) {
+		return
+	}
+	var input service.OpenAIReferralSendRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		response.BadRequest(c, "Invalid invitation request")
+		return
+	}
+	result, err := h.referralService.SendReferralInvite(c.Request.Context(), id, input)
+	if err != nil {
+		scopedOpenAIError(c, err)
+		return
+	}
+	if result == nil || !result.Sent {
+		response.Error(c, http.StatusBadGateway, "Invitation outcome is unknown; check Codex before sending again")
+		return
+	}
+	// 邮件已发送后，刷新失败仍返回已发送结果；客户端断开也不能诱导重复发送。
+	baseCtx := service.WithScopedAdminAccountOperation(context.WithoutCancel(c.Request.Context()), "openai.referrals.invite")
+	refreshCtx, cancelRefresh := context.WithTimeout(baseCtx, 8*time.Second)
+	eligibility, refreshErr := h.referralService.QueryReferralEligibility(refreshCtx, id)
+	cancelRefresh()
+	if refreshErr != nil {
+		eligibility = nil
+	}
+	// 刷新可能耗尽全部期限；持久化或清除过期快照需要独立的短时上下文。
+	cacheCtx, cancelCache := context.WithTimeout(baseCtx, 3*time.Second)
+	defer cancelCache()
+	eligibility = h.scopedReferralDTO(c, eligibility)
+	cacheErr := h.referralService.CacheReferralSnapshot(cacheCtx, id, eligibility)
+	responseEligibility := eligibility
+	if !h.scopedOpenAIHasPermission(c, id, "openai.referrals.read", true) {
+		responseEligibility = nil
+	}
+	response.Success(c, openAIReferralSendResponse{
+		OpenAIReferralSendResult:      *result,
+		openAIReferralRefreshResponse: openAIReferralRefreshResponse{Eligibility: responseEligibility, CachePersisted: cacheErr == nil},
+		RefreshFailed:                 eligibility == nil,
+	})
+}
