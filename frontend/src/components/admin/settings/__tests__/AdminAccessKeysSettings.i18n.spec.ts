@@ -9,7 +9,7 @@ import zh from '@/i18n/locales/zh'
 import enKeys from '@/i18n/locales/en/adminAccessKeys'
 import zhKeys from '@/i18n/locales/zh/adminAccessKeys'
 
-const catalogSource = readFileSync(resolve(process.cwd(), '../backend/internal/pkg/adminaccess/catalog.go'), 'utf8')
+const catalogSource = ['catalog.go','fork_catalog.go'].map(name => readFileSync(resolve(process.cwd(), '../backend/internal/pkg/adminaccess', name), 'utf8')).join('\n')
 const catalog = [...catalogSource.matchAll(/Permission\{"([^"]+)", "([^"]+)", "([^"]+)", "([^"]+)"\}/g)].map(([, id, label, category, scope]) => ({ id, label, category, scope }))
 const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), rotate: vi.fn(), revoke: vi.fn(), deleteRecord: vi.fn() }))
 vi.mock('@/api/admin/adminAccessKeys', () => mocks)

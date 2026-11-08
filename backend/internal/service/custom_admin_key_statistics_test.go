@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	"time"
 
@@ -287,4 +288,28 @@ func (s *scopedQuotaRedirectUpstream) DoWithTLS(req *http.Request, _ string, _ i
 	clone.URL.Scheme = parsed.URL.Scheme
 	clone.URL.Host = parsed.URL.Host
 	return s.server.Client().Do(clone)
+}
+
+// 只读授权的快照写入不得启动自动消费。
+func TestScopedAdminSnapshotWriteDoesNotNotifyAutomaticReset(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		a := &Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, GroupIDs: []int64{1}}
+		repo := &stubQuotaAccountRepo{accounts: map[int64]*Account{1: a}}
+		svc := &AccountUsageService{accountRepo: repo}
+		notifier := NewOpenAIQuotaAutoResetService(nil, nil, nil, nil, nil, nil, nil)
+		openAIAutoResetNotifierRegistry.Lock()
+		previous := openAIAutoResetNotifierRegistry.service
+		openAIAutoResetNotifierRegistry.service = notifier
+		openAIAutoResetNotifierRegistry.Unlock()
+		defer func() {
+			openAIAutoResetNotifierRegistry.Lock()
+			openAIAutoResetNotifierRegistry.service = previous
+			openAIAutoResetNotifierRegistry.Unlock()
+			notifier.cancel()
+		}()
+		svc.persistOpenAICodexProbeSnapshotContext(scopedStatisticsServiceContext("accounts.usage.read"), 1, map[string]any{"codex_5h_used_percent": 25.0})
+		synctest.Wait()
+		require.Equal(t, 1, len(repo.extraUpdates))
+		require.Empty(t, notifier.queue)
+	})
 }

@@ -840,6 +840,7 @@ var ProviderSet = wire.NewSet(
 	NewOpenAIGatewayService,
 	NewCodexInviteResetService,
 	ProvideOpenAIQuotaService,
+	ProvideOpenAIQuotaAutoResetService,
 	ProvideClaudeResetCreditService,
 	ProvideBatchImageModelPricingResolver,
 	NewBatchImagePublicService,
@@ -1031,5 +1032,12 @@ func ProvideClaudeResetCreditService(accounts AccountRepository, tokens *ClaudeT
 	s := NewClaudeResetCreditService(accounts, tokens, proxies, settings)
 	s.ConfigureRedemption(idem, locks)
 	s.SetHTTPUpstream(upstream, profiles)
+	return s
+}
+
+// ProvideOpenAIQuotaAutoResetService 启动去重通知与分钟补偿扫描，存量账号默认关闭自动消费。
+func ProvideOpenAIQuotaAutoResetService(accounts AccountRepository, quota *OpenAIQuotaService, recoverer *RateLimitService, idem *IdempotencyCoordinator, audit *AuditLogService, settings *SettingService, locks LeaderLockCache) *OpenAIQuotaAutoResetService {
+	s := NewOpenAIQuotaAutoResetService(accounts, quota, recoverer, idem, audit, settings, locks)
+	s.Start()
 	return s
 }

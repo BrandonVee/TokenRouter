@@ -7,8 +7,10 @@ import (
 	"strings"
 )
 
-// openAIRateLimitResetCreditDetailPayload 保存上游重置次数明细的兼容字段。
 type openAIRateLimitResetCreditDetailPayload struct {
+	ID             string `json:"id,omitempty"`
+	CreditID       string `json:"credit_id,omitempty"`
+	CreditIDCamel  string `json:"creditId,omitempty"`
 	ExpiresAt      string `json:"expires_at,omitempty"`
 	ExpiresAtCamel string `json:"expiresAt,omitempty"`
 	ResetType      string `json:"reset_type,omitempty"`
@@ -16,7 +18,6 @@ type openAIRateLimitResetCreditDetailPayload struct {
 	Status         string `json:"status,omitempty"`
 }
 
-// openAIRateLimitResetCreditDetailsPayload 兼容不同版本接口返回的计数和列表容器。
 type openAIRateLimitResetCreditDetailsPayload struct {
 	AvailableCount        json.RawMessage `json:"available_count,omitempty"`
 	AvailableCountCamel   json.RawMessage `json:"availableCount,omitempty"`
@@ -26,15 +27,21 @@ type openAIRateLimitResetCreditDetailsPayload struct {
 	Data                  json.RawMessage `json:"data,omitempty"`
 }
 
-// openAIRateLimitResetCreditDetails 是经过筛选、可安全合并到 usage 的明细结果。
 type openAIRateLimitResetCreditDetails struct {
 	AvailableCount       *int
 	AvailableCreditCount int
 	CreditListPresent    bool
 	Credits              []OpenAIRateLimitResetCreditDetail
+	AutoResetCandidates  []openAIAutoResetCreditCandidate
 }
 
-// parseOpenAIRateLimitResetCreditDetails 解析多种上游响应形状，并只保留可用的 Codex 次数。
+// openAIAutoResetCreditCandidate 仅在服务内部流转。上游卡 ID 不进入 API DTO、
+// 账号 extra 或日志，避免管理端响应扩大敏感标识暴露面。
+type openAIAutoResetCreditCandidate struct {
+	ID        string
+	ExpiresAt string
+}
+
 func parseOpenAIRateLimitResetCreditDetails(body []byte) (openAIRateLimitResetCreditDetails, error) {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {
@@ -68,6 +75,7 @@ func parseOpenAIRateLimitResetCreditDetails(body []byte) (openAIRateLimitResetCr
 	}
 
 	credits := make([]OpenAIRateLimitResetCreditDetail, 0, len(rawCredits))
+	autoResetCandidates := make([]openAIAutoResetCreditCandidate, 0, len(rawCredits))
 	availableCreditCount := 0
 	for _, raw := range rawCredits {
 		if raw == nil {
@@ -92,16 +100,27 @@ func parseOpenAIRateLimitResetCreditDetails(body []byte) (openAIRateLimitResetCr
 			continue
 		}
 		credits = append(credits, OpenAIRateLimitResetCreditDetail{ExpiresAt: expiresAt})
+		creditID := strings.TrimSpace(raw.ID)
+		if creditID == "" {
+			creditID = strings.TrimSpace(raw.CreditID)
+		}
+		if creditID == "" {
+			creditID = strings.TrimSpace(raw.CreditIDCamel)
+		}
+		autoResetCandidates = append(autoResetCandidates, openAIAutoResetCreditCandidate{
+			ID:        creditID,
+			ExpiresAt: expiresAt,
+		})
 	}
 	return openAIRateLimitResetCreditDetails{
 		AvailableCount:       availableCount,
 		AvailableCreditCount: availableCreditCount,
 		CreditListPresent:    creditListPresent,
 		Credits:              credits,
+		AutoResetCandidates:  autoResetCandidates,
 	}, nil
 }
 
-// parseOpenAIResetCreditAvailableCount 读取数字或数字字符串形式的可用次数。
 func parseOpenAIResetCreditAvailableCount(values ...json.RawMessage) *int {
 	for _, value := range values {
 		trimmed := bytes.TrimSpace(value)
@@ -130,7 +149,6 @@ func parseOpenAIResetCreditAvailableCount(values ...json.RawMessage) *int {
 	return nil
 }
 
-// firstPresentResetCreditPayload 返回第一个实际出现的列表，空列表也必须保留存在性。
 func firstPresentResetCreditPayload(values ...json.RawMessage) ([]*openAIRateLimitResetCreditDetailPayload, bool, error) {
 	for _, value := range values {
 		trimmed := bytes.TrimSpace(value)

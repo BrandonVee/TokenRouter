@@ -33,8 +33,8 @@ func TestCalculateCostUnified_NilResolver_FallsBackToOldPath(t *testing.T) {
 	require.NoError(t, err)
 	require.InDelta(t, expected.TotalCost, cost.TotalCost, 1e-10)
 	require.InDelta(t, expected.ActualCost, cost.ActualCost, 1e-10)
-	// BillingMode is NOT set by old path through CalculateCostUnified (resolver == nil)
-	require.Empty(t, cost.BillingMode)
+	// 旧解析器回退仍明确声明 token 计费，保证后续结算快照类型完整。
+	require.Equal(t, "token", cost.BillingMode)
 }
 
 func TestCalculateCostUnified_TokenMode(t *testing.T) {

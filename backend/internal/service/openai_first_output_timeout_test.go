@@ -466,7 +466,7 @@ func TestOpenAINativeFirstOutputStageOverflowFailsOverWithoutAttemptBytes(t *tes
 	require.ErrorAs(t, err, &failoverErr)
 	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
 	require.True(t, failoverErr.SafeToFailoverAfterWrite)
-	require.Contains(t, string(failoverErr.ResponseBody), "staging limit exceeded")
+	require.Contains(t, string(failoverErr.ResponseBody), "guarded first-output limit")
 	require.Empty(t, rec.Body.String())
 	require.Empty(t, rec.Header().Values("X-Request-Id"))
 	require.Empty(t, rec.Header().Values("X-Ratelimit-Remaining-Requests"))

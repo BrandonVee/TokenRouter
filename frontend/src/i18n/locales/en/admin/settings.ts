@@ -786,8 +786,6 @@ dataSharing: {
         openaiTTFTModeSemantic: 'Legacy-compatible (semantic event)',
         openaiTTFTModeVisible: 'Actual visible output',
         openaiTTFTModeHint: 'The default records first_token_ms at the first non-preamble semantic event. Actual visible output records it only when non-empty text, tool arguments, or image content arrives.',
-        cchSigning: 'CCH Signing',
-        cchSigningHint: 'Sign the billing header in forwarded requests with CCH hash. When disabled, the placeholder is preserved.',
         systemBlockTitle: 'System Block {index}',
         systemBlockPreset: 'Preset',
         systemBlockPresetBilling: 'Billing header',

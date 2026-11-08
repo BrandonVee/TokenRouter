@@ -74,6 +74,7 @@ type OpenAIRateLimitResetCredits struct {
 
 // OpenAIQuotaUsage 是暴露给前端的 /wham/usage 精简结果。
 type OpenAIQuotaUsage struct {
+	autoResetCandidates   []openAIAutoResetCreditCandidate
 	Credits               *OpenAICredits               `json:"credits,omitempty"`
 	UserID                string                       `json:"user_id,omitempty"`
 	AccountID             string                       `json:"account_id,omitempty"`
@@ -158,6 +159,7 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 		}
 		if details.CreditListPresent {
 			usage.RateLimitResetCredits.Credits = details.Credits
+			usage.autoResetCandidates = details.AutoResetCandidates
 		}
 		switch {
 		case hasDetailCount:
@@ -171,7 +173,7 @@ func (s *OpenAIQuotaService) QueryUsage(ctx context.Context, accountID int64) (*
 
 // CacheResetCreditsSnapshot 保存显式查询得到的完整重置次数快照。
 // 正数次数必须附带到期明细，否则保留旧缓存，避免前端长期展示无法自然失效的次数。
-func (s *OpenAIQuotaService) CacheResetCreditsSnapshot(ctx context.Context, accountID int64, credits *OpenAIRateLimitResetCredits) error {
+func (s *OpenAIQuotaService) cacheResetCreditsSnapshot(ctx context.Context, accountID int64, credits *OpenAIRateLimitResetCredits, updates map[string]any) error {
 	if err := scopedAccountIDAccess(ctx, s.accountRepo, accountID, scopedAccountOperation(ctx, "openai.quota.read"), true); err != nil {
 		return err
 	}
@@ -185,9 +187,11 @@ func (s *OpenAIQuotaService) CacheResetCreditsSnapshot(ctx context.Context, acco
 	if s == nil || s.accountRepo == nil {
 		return infraerrors.InternalServer("OPENAI_QUOTA_NOT_CONFIGURED", "openai quota cache repository is not configured")
 	}
-	if err := s.accountRepo.UpdateExtra(ctx, accountID, map[string]any{
-		openaiQuotaResetCreditsKey: credits,
-	}); err != nil {
+	if updates == nil {
+		updates = make(map[string]any)
+	}
+	updates[openaiQuotaResetCreditsKey] = credits
+	if err := s.accountRepo.UpdateExtra(ctx, accountID, updates); err != nil {
 		return infraerrors.New(
 			http.StatusInternalServerError,
 			"OPENAI_QUOTA_CACHE_WRITE_FAILED",
@@ -218,7 +222,25 @@ func (s *OpenAIQuotaService) queryResetCreditDetails(ctx context.Context, accoun
 }
 
 // ResetCredit 消耗一次限流窗口重置次数。
+// ResetCredit 保留手动消费的随机兑换 ID，不接受客户端选择卡片。
 func (s *OpenAIQuotaService) ResetCredit(ctx context.Context, accountID int64) (*OpenAIQuotaResetResult, error) {
+	id, err := generateOpenAIQuotaRedeemRequestID()
+	if err != nil {
+		return nil, err
+	}
+	return s.resetCredit(ctx, accountID, "", id)
+}
+
+// ResetCreditTargeted 自动消费只使用固定的卡及兑换 ID，重试不得降级为随机卡。
+func (s *OpenAIQuotaService) ResetCreditTargeted(ctx context.Context, accountID int64, creditID, redeemRequestID string) (*OpenAIQuotaResetResult, error) {
+	creditID, redeemRequestID = strings.TrimSpace(creditID), strings.TrimSpace(redeemRequestID)
+	if creditID == "" || redeemRequestID == "" {
+		return nil, infraerrors.BadRequest("OPENAI_QUOTA_TARGETED_RESET_INVALID", "credit_id and redeem_request_id are required")
+	}
+	return s.resetCredit(ctx, accountID, creditID, redeemRequestID)
+}
+
+func (s *OpenAIQuotaService) resetCredit(ctx context.Context, accountID int64, creditID, redeemRequestID string) (*OpenAIQuotaResetResult, error) {
 	ctx = WithScopedAdminAccountOperation(ctx, "openai.quota.reset")
 	account, err := s.loadQuotaAccount(ctx, accountID)
 	if err != nil {
@@ -232,14 +254,11 @@ func (s *OpenAIQuotaService) ResetCredit(ctx context.Context, accountID int64) (
 	if err != nil {
 		return nil, err
 	}
-	redeemRequestID, err := generateOpenAIQuotaRedeemRequestID()
-	if err != nil {
-		return nil, infraerrors.Newf(http.StatusInternalServerError, "OPENAI_QUOTA_REDEEM_ID_FAILED", "failed to generate redeem id: %v", err)
+	body := map[string]any{"redeem_request_id": redeemRequestID}
+	if creditID != "" {
+		body["credit_id"] = creditID
 	}
-
-	raw, err := s.postJSON(ctx, accountCtx, chatGPTRateLimitResetPath, map[string]any{
-		"redeem_request_id": redeemRequestID,
-	})
+	raw, err := s.postJSON(ctx, accountCtx, chatGPTRateLimitResetPath, body)
 	if err != nil {
 		return nil, err
 	}
@@ -677,4 +696,22 @@ func (s *OpenAIQuotaService) SetAccountRepository(repo AccountRepository) { s.ac
 // SetReferralClient 注入邀请传输适配器，默认复用 fork 的指纹请求链。
 func (s *OpenAIQuotaService) SetReferralClient(client OpenAIReferralClient) {
 	s.referralClient = client
+}
+
+// CacheResetCreditsSnapshot 只刷新安全的卡到期快照。
+func (s *OpenAIQuotaService) CacheResetCreditsSnapshot(ctx context.Context, accountID int64, credits *OpenAIRateLimitResetCredits) error {
+	return s.cacheResetCreditsSnapshot(ctx, accountID, credits, nil)
+}
+
+// CachePostResetSnapshot 在恢复后同时写入窗口、余额与重置机会，避免只更新其中一个投影。
+func (s *OpenAIQuotaService) CachePostResetSnapshot(ctx context.Context, accountID int64, usage *OpenAIQuotaUsage) error {
+	if usage == nil {
+		return s.cacheResetCreditsSnapshot(ctx, accountID, nil, nil)
+	}
+	updates := buildOpenAIAutoResetUsageUpdates(usage, time.Now())
+	if updates == nil {
+		updates = make(map[string]any)
+	}
+	updates[openaiQuotaCreditsKey] = openAICreditsSnapshot{Credits: usage.Credits, FetchedAt: usage.FetchedAt}
+	return s.cacheResetCreditsSnapshot(ctx, accountID, usage.RateLimitResetCredits, updates)
 }

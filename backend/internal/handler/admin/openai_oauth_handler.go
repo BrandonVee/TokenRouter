@@ -539,6 +539,11 @@ func (h *OpenAIOAuthHandler) RefreshQuota(c *gin.Context) {
 	}
 
 	refreshResponse := openAIQuotaRefreshResponse{OpenAIQuotaUsage: *usage}
+	if cache, ok := h.quotaService.(interface {
+		CacheCreditsSnapshot(context.Context, int64, *service.OpenAIQuotaUsage) error
+	}); ok {
+		refreshResponse.CreditsCachePersisted = cache.CacheCreditsSnapshot(c.Request.Context(), accountID, usage) == nil
+	}
 	// 快照写入失败属于部分成功：实时查询结果仍返回给前端，旧缓存保持不变。
 	if err := h.quotaService.CacheResetCreditsSnapshot(c.Request.Context(), accountID, usage.RateLimitResetCredits); err != nil {
 		slog.Warn("openai_quota_reset_credit_cache_persist_failed", "account_id", accountID, "error", err)
@@ -590,7 +595,7 @@ func (h *OpenAIOAuthHandler) CreateShadow(c *gin.Context) {
 // POST /api/v1/admin/openai/accounts/:id/reset-quota
 func (h *OpenAIOAuthHandler) ResetQuota(c *gin.Context) {
 	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
+	if err != nil || accountID <= 0 {
 		response.BadRequest(c, "Invalid account ID")
 		return
 	}
@@ -601,73 +606,46 @@ func (h *OpenAIOAuthHandler) ResetQuota(c *gin.Context) {
 		response.BadRequest(c, "openai quota service is not enabled")
 		return
 	}
-	if adminaccess.RestrictedFromContext(c.Request.Context()) != nil {
-		c.Request = c.Request.WithContext(service.WithScopedAdminAccountOperation(c.Request.Context(), "openai.quota.reset"))
-	}
-	result, err := h.quotaService.ResetCredit(c.Request.Context(), accountID)
+	ctx := service.WithScopedAdminAccountOperation(c.Request.Context(), "openai.quota.reset")
+	result, err := h.quotaService.ResetCredit(ctx, accountID)
 	if err != nil {
 		scopedOpenAIError(c, err)
 		return
 	}
 	if result == nil {
-		response.Error(c, http.StatusInternalServerError, "openai quota reset returned an empty result")
+		response.Error(c, 502, "openai quota reset returned an empty result")
 		return
 	}
-
-	resetResponse := openAIQuotaResetResponse{OpenAIQuotaResetResult: *result}
-	postCtx, cancelPost := openAIQuotaResetPostProcessContext(c.Request.Context())
-	defer cancelPost()
-
-	// 重置次数一旦消费就不可退还，优先恢复账号运行时状态，且不修改人工 schedulable 开关。
-	if h.rateLimitService == nil {
-		resetResponse.WarningCode = openAIQuotaResetWarningAccountRecoveryFailed
-		response.Success(c, resetResponse)
-		return
+	postCtx, cancel := openAIQuotaResetPostProcessContext(ctx)
+	defer cancel()
+	var loadAccount func(context.Context, int64) (*service.Account, error)
+	if h.adminService != nil {
+		loadAccount = h.adminService.GetAccount
 	}
-	if _, err := h.rateLimitService.RecoverAccountState(postCtx, accountID, service.AccountRecoveryOptions{
-		InvalidateToken: true,
-	}); err != nil {
-		slog.Warn("openai_quota_reset_account_recovery_failed", "account_id", accountID, "error", err)
-		resetResponse.WarningCode = openAIQuotaResetWarningAccountRecoveryFailed
-		response.Success(c, resetResponse)
-		return
+	post := service.RunOpenAIQuotaResetPostProcess(postCtx, accountID, openAIQuotaPostProcessAdapter{h.quotaService}, h.rateLimitService, loadAccount)
+	out := openAIQuotaResetResponse{OpenAIQuotaResetResult: *result, Quota: post.Quota, CacheRefreshed: post.CacheRefreshed, AccountStateRecovered: post.AccountStateRecovered, WarningCode: post.WarningCode}
+	if post.Account != nil {
+		out.Account = dto.AccountFromService(post.Account)
 	}
-	resetResponse.AccountStateRecovered = true
-
-	// 状态恢复后回读上游额度；回读或缓存失败不能掩盖已经完成的账号恢复。
-	usage, usageErr := h.quotaService.QueryUsage(postCtx, accountID)
-	switch {
-	case usageErr != nil || usage == nil:
-		slog.Warn("openai_quota_reset_cache_refresh_failed", "account_id", accountID, "error", usageErr)
-		resetResponse.WarningCode = openAIQuotaResetWarningCacheRefreshFailed
-	default:
-		if err := h.quotaService.CacheResetCreditsSnapshot(postCtx, accountID, usage.RateLimitResetCredits); err != nil {
-			slog.Warn("openai_quota_reset_cache_refresh_failed", "account_id", accountID, "error", err)
-			resetResponse.WarningCode = openAIQuotaResetWarningCacheRefreshFailed
-		} else {
-			resetResponse.Quota = usage
-			resetResponse.CacheRefreshed = true
-		}
-	}
-
-	// 返回恢复后的账号投影，供 API 调用方立即清除旧限流状态显示。
-	account, err := h.adminService.GetAccount(postCtx, accountID)
-	if err != nil {
-		slog.Warn("openai_quota_reset_account_refresh_failed", "account_id", accountID, "error", err)
-		if resetResponse.WarningCode == "" {
-			resetResponse.WarningCode = openAIQuotaResetWarningAccountRefreshFailed
-		}
-		response.Success(c, resetResponse)
-		return
-	}
-	resetResponse.Account = dto.AccountFromService(account)
-	if adminaccess.RestrictedFromContext(c.Request.Context()) != nil {
+	if adminaccess.RestrictedFromContext(ctx) != nil {
 		if h.scopedOpenAIHasPermission(c, accountID, "openai.quota.read", true) {
-			resetResponse.Quota = h.scopedQuotaDTO(c, accountID, resetResponse.Quota)
+			out.Quota = h.scopedQuotaDTO(c, accountID, out.Quota)
 		} else {
-			resetResponse.Quota = nil
+			out.Quota = nil
 		}
-		resetResponse.Account = nil
+		out.Account = nil
 	}
-	response.Success(c, resetResponse)
+	response.Success(c, out)
+}
+
+// openAIQuotaPostProcessAdapter 兼容只提供旧快照接口的调用方；正式服务同时更新窗口与余额。
+type openAIQuotaPostProcessAdapter struct{ openAIQuotaService }
+
+func (a openAIQuotaPostProcessAdapter) CachePostResetSnapshot(ctx context.Context, id int64, usage *service.OpenAIQuotaUsage) error {
+	if cache, ok := a.openAIQuotaService.(interface {
+		CachePostResetSnapshot(context.Context, int64, *service.OpenAIQuotaUsage) error
+	}); ok {
+		return cache.CachePostResetSnapshot(ctx, id, usage)
+	}
+	return a.CacheResetCreditsSnapshot(ctx, id, usage.RateLimitResetCredits)
 }

@@ -413,6 +413,7 @@ func isOpenAICompatibleAccountEligibleForRequest(ctx context.Context, account *A
 }
 
 type openAIQuotaAutoPauseDecision struct {
+	reason      string
 	window      string
 	threshold   float64
 	utilization float64
@@ -483,7 +484,11 @@ func grokQuotaSnapshotStaleForPause(snapshot *xai.QuotaSnapshot, now time.Time) 
 }
 
 func shouldAutoPauseOpenAIAccountByQuota(ctx context.Context, account *Account) (bool, openAIQuotaAutoPauseDecision) {
-	return evaluateOpenAIQuotaAutoPause(ctx, account, time.Now())
+	paused, decision := evaluateOpenAIQuotaAutoPause(ctx, account, time.Now())
+	if paused && ResolveOpenAIAutoResetCreditConfig(account).Enabled && !isOpenAIAutoResetContext(ctx) {
+		notifyOpenAIAutoResetFromScheduler(account.ID)
+	}
+	return paused, decision
 }
 
 // EvaluateOpenAIQuotaAutoPause 返回 OpenAI 账号当前是否因 5h/7d 配额阈值被自动暂停。
@@ -497,9 +502,35 @@ func evaluateOpenAIQuotaAutoPause(ctx context.Context, account *Account, now tim
 	if account == nil || !account.IsOpenAI() {
 		return false, openAIQuotaAutoPauseDecision{}
 	}
-	// 账号级显式禁用标记优先于全局默认值。否则账号阈值留空会表示“使用全局默认”，
-	// 一旦存在全局默认值，管理员就无法让单个账号豁免自动暂停。
-	// 禁用标记按窗口拆分，因此账号可以只退出 5h 或只退出 7d 自动暂停。
+	// 自动用卡有独立阈值：达到消费阈值时必须先退出调度；仅达到普通暂停阈值时，
+	// 只有新鲜状态明确存在可用卡才继续放行到消费阈值。
+	if config := ResolveOpenAIAutoResetCreditConfig(account); config.Enabled {
+		utilization5h, has5h := resolveOpenAIQuotaUtilization(account.Extra, "5h", now)
+		utilization7d, has7d := resolveOpenAIQuotaUtilization(account.Extra, "7d", now)
+		if has5h && utilization5h >= config.Threshold5h {
+			return true, openAIQuotaAutoPauseDecision{window: "5h", threshold: config.Threshold5h, utilization: utilization5h, reason: "quota_auto_reset_pending_5h"}
+		}
+		if has7d && utilization7d >= config.Threshold7d {
+			return true, openAIQuotaAutoPauseDecision{window: "7d", threshold: config.Threshold7d, utilization: utilization7d, reason: "quota_auto_reset_pending_7d"}
+		}
+
+		disabled5h := resolveAccountExtraBool(account.Extra, "auto_pause_5h_disabled")
+		disabled7d := resolveAccountExtraBool(account.Extra, "auto_pause_7d_disabled")
+		pause5h, pause7d := resolveOpenAIQuotaAutoPauseThresholds(ctx, account)
+		pauseReached5h := !disabled5h && pause5h > 0 && has5h && utilization5h >= pause5h
+		pauseReached7d := !disabled7d && pause7d > 0 && has7d && utilization7d >= pause7d
+		if pauseReached5h || pauseReached7d {
+			state := openAIAutoResetStateFromExtra(account.Extra)
+			if state != nil && state.Status == OpenAIAutoResetStatusAvailable && state.AvailableCount > 0 && !openAIAutoResetStateStale(state, now) {
+				return false, openAIQuotaAutoPauseDecision{}
+			}
+			if pauseReached5h {
+				return true, openAIQuotaAutoPauseDecision{window: "5h", threshold: pause5h, utilization: utilization5h, reason: "quota_auto_reset_credit_check_5h"}
+			}
+			return true, openAIQuotaAutoPauseDecision{window: "7d", threshold: pause7d, utilization: utilization7d, reason: "quota_auto_reset_credit_check_7d"}
+		}
+	}
+	// 账号按窗口显式关闭的标记优先于全局默认，留空阈值仍表示继承全局值。
 	disabled5h := resolveAccountExtraBool(account.Extra, "auto_pause_5h_disabled")
 	disabled7d := resolveAccountExtraBool(account.Extra, "auto_pause_7d_disabled")
 	threshold5h, threshold7d := resolveOpenAIQuotaAutoPauseThresholds(ctx, account)

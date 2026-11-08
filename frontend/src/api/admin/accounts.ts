@@ -3,6 +3,7 @@
  * Handles AI platform account management for administrators
  */
 
+import type { OpenAIReferralRefreshResult, OpenAIReferralSendResult } from '@/types/openaiReferrals'
 import { apiClient } from '../client'
 import type {
   Account,
@@ -108,7 +109,10 @@ export interface OpenAIRateLimitResetCredits {
   credits?: OpenAIRateLimitResetCreditDetail[]
 }
 
+export interface OpenAICredits {has_credits:boolean;unlimited:boolean;balance:string|null}
+
 export interface OpenAIQuotaUsage {
+  credits?:OpenAICredits|null
   user_id?: string
   account_id?: string
   email?: string
@@ -144,6 +148,7 @@ export interface OpenAIQuotaResetResult {
 }
 
 export interface OpenAIQuotaRefreshResult extends OpenAIQuotaUsage {
+  credits_cache_persisted?:boolean
   cache_persisted: boolean
 }
 
@@ -1309,6 +1314,8 @@ getOpenCodeGoUsageSettings,updateOpenCodeGoUsageSettings,getOpenCodeGoUsage,setO
   getCodexInviteResetStatus,
   sendCodexInviteResetInvite,
   consumeCodexInviteReset,
+  refreshOpenAIReferrals,
+  sendOpenAIReferralInvite,
   queryOpenAIQuota,
   refreshOpenAIQuota,
   revertProxyFallback,
@@ -1324,3 +1331,20 @@ getOpenCodeGoUsageSettings,updateOpenCodeGoUsageSettings,getOpenCodeGoUsage,setO
 }
 
 export default accountsAPI
+
+export async function refreshOpenAIReferrals(id: number): Promise<OpenAIReferralRefreshResult> {
+  const { data } = await apiClient.post<OpenAIReferralRefreshResult>(
+    `/admin/openai/accounts/${id}/referrals/refresh`
+  )
+  return data
+}
+
+export async function sendOpenAIReferralInvite(
+  id: number,
+  input: { email: string; program_id: string; confirmed: boolean }
+): Promise<OpenAIReferralSendResult> {
+  const { data } = await apiClient.post<OpenAIReferralSendResult>(
+    `/admin/openai/accounts/${id}/referrals/invite`, input, { timeout: 90_000 }
+  )
+  return data
+}

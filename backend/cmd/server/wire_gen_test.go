@@ -54,19 +54,24 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 	opsSystemLogSinkSvc := service.NewOpsSystemLogSink(nil)
 	imageHistorySaveWorkerPool := service.NewImageHistorySaveWorkerPool(service.NewImageHistoryService(nil, nil, nil), nil)
 
-	cleanup := provideCleanup(
-		nil, // entClient
-		nil, // redis
+	cleanup := provideCleanup(nil,
+		// entClient
+		nil,
+		// redis
 		&service.OpsMetricsCollector{},
 		&service.OpsAggregationService{},
 		&service.OpsAlertEvaluatorService{},
 		&service.OpsCleanupService{},
 		&service.OpsScheduledReportService{},
 		opsSystemLogSinkSvc,
-		nil, // opsService
-		nil, // opsIngressRejectAggregator
-		nil, // apiKeyService
-		nil, // authCacheInvalidationWorker
+		nil,
+		// opsService
+		nil,
+		// opsIngressRejectAggregator
+		nil,
+		// apiKeyService
+		nil,
+		// authCacheInvalidationWorker
 		schedulerSnapshotSvc,
 		tokenRefreshSvc,
 		accountExpirySvc,
@@ -75,15 +80,20 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		announcementExpirySvc,
 		&service.UsageCleanupService{},
 		idempotencyCleanupSvc,
+		nil,
 		&service.BatchImageCleanupService{},
-		nil, // batchImageWorker
+		nil,
+		// batchImageWorker
 		pricingSvc,
 		emailQueueSvc,
 		billingCacheSvc,
-		nil, // 国产供应商周期检测未在该关闭测试中启动。
-		nil, // OpenCode 用量刷新未在该关闭测试中启动。
+		nil,
+		// 国产供应商周期检测未在该关闭测试中启动。
+		nil,
+		// OpenCode 用量刷新未在该关闭测试中启动。
 		&service.UsageRecordWorkerPool{},
-		nil, // dataSharingService
+		nil,
+		// dataSharingService
 		&service.DataSharingCaptureWorkerPool{},
 		imageHistorySaveWorkerPool,
 		&service.SubscriptionService{},
@@ -92,17 +102,28 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		geminiOAuthSvc,
 		antigravityOAuthSvc,
 		qoderOAuthSvc,
-		nil, // grokOAuth
-		nil, // openAIGateway
-		nil, // scheduledTestRunner
-		nil, // groupAvailabilityProbeRunner
-		nil, // backupSvc
-		nil, // paymentOrderExpiry
-		nil, // quotaFlusher
-		nil, // tlsFingerprintCollector
-		nil, // ollamaCloudUsage
-		nil, // auditLog
-		nil, // 该关闭测试未启动显式缓存恢复。
+		nil,
+		// grokOAuth
+		nil,
+		// openAIGateway
+		nil,
+		// scheduledTestRunner
+		nil,
+		// groupAvailabilityProbeRunner
+		nil,
+		// backupSvc
+		nil,
+		// paymentOrderExpiry
+		nil,
+		// quotaFlusher
+		nil,
+		// tlsFingerprintCollector
+		nil,
+		// ollamaCloudUsage
+		nil,
+		// auditLog
+		nil,
+	// 该关闭测试未启动显式缓存恢复。,
 	)
 
 	require.NotPanics(t, func() {

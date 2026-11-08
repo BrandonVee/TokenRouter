@@ -1374,6 +1374,12 @@ export interface Account {
   extra?: (CodexUsageSnapshot & OpenAICompactState & {
     model_rate_limits?: Record<string, { rate_limited_at: string; rate_limit_reset_at: string }>
     antigravity_credits_overages?: Record<string, { activated_at: string; active_until: string }>
+    codex_credits_snapshot?: {credits:{has_credits:boolean;unlimited:boolean;balance:string|null}|null;fetched_at:number}
+    codex_referral_snapshot?:import('./openaiReferrals').OpenAIReferralEligibility|null
+    auto_reset_credit_enabled?:boolean
+    auto_reset_credit_5h_threshold?:number
+    auto_reset_credit_7d_threshold?:number
+    codex_auto_reset_credit_state?: {status?:'checking'|'available'|'resetting'|'success'|'no_credit'|'failed';trigger_window?:string;available_count?:number;checked_at?:string;last_result_at?:string;error_code?:string}
     codex_reset_credit_snapshot?: {
       available_count?: number
       credits?: { expires_at?: string }[]

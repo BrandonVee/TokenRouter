@@ -55,7 +55,8 @@ describe('OpenAIQuotaResetCell — fork 查询-only 语义', () => {
     const wrapper = mount(OpenAIQuotaResetCell, { props: { account } })
 
     const buttons = wrapper.findAll('button')
-    expect(buttons).toHaveLength(1)
+    expect(buttons.filter(button => button.text() === 'admin.accounts.openaiQuotaReset.reset')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="codex-credits"]').exists()).toBe(true)
     expect(buttons[0].attributes('title')).toBe('admin.accounts.openaiQuotaReset.countTooltipLoad')
     wrapper.unmount()
   })
@@ -65,7 +66,8 @@ describe('OpenAIQuotaResetCell — fork 查询-only 语义', () => {
     const wrapper = mount(OpenAIQuotaResetCell, { props: { account } })
 
     const buttons = wrapper.findAll('button')
-    expect(buttons).toHaveLength(1)
+    expect(buttons.filter(button => button.text() === 'admin.accounts.openaiQuotaReset.reset')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="codex-credits"]').exists()).toBe(true)
     expect(buttons[0].attributes('title')).toBe('admin.accounts.openaiQuotaReset.countTooltipLoad')
     wrapper.unmount()
   })
@@ -90,7 +92,7 @@ describe('OpenAIQuotaResetCell — fork 查询-only 语义', () => {
     expect(wrapper.text()).toContain('admin.accounts.openaiQuotaReset.expiresAt')
     expect(wrapper.text()).toContain('+1')
     // 第二个按钮仅用于展开到期明细，不是上游重置入口。
-    expect(wrapper.findAll('button')).toHaveLength(2)
+    expect(wrapper.findAll('button').filter(button => button.text() === 'admin.accounts.openaiQuotaReset.reset')).toHaveLength(0)
     wrapper.unmount()
   })
 
@@ -108,7 +110,7 @@ describe('OpenAIQuotaResetCell — fork 查询-only 语义', () => {
 
     expect(wrapper.text()).not.toContain('admin.accounts.openaiQuotaReset.count1')
     expect(wrapper.text()).not.toContain('admin.accounts.openaiQuotaReset.expiresAt')
-    expect(wrapper.findAll('button')).toHaveLength(1)
+    expect(wrapper.findAll('button').filter(button => button.text() === 'admin.accounts.openaiQuotaReset.reset')).toHaveLength(0)
     wrapper.unmount()
   })
 
@@ -128,7 +130,7 @@ describe('OpenAIQuotaResetCell — fork 查询-only 语义', () => {
     expect(refreshOpenAIQuota).toHaveBeenCalledWith(1)
     expect(wrapper.text()).toContain('admin.accounts.openaiQuotaReset.count2')
     expect(wrapper.text()).toContain('admin.accounts.openaiQuotaReset.refreshCachePersistFailed')
-    expect(wrapper.findAll('button')).toHaveLength(1)
+    expect(wrapper.findAll('button').filter(button => button.text() === 'admin.accounts.openaiQuotaReset.reset')).toHaveLength(0)
     wrapper.unmount()
   })
 })

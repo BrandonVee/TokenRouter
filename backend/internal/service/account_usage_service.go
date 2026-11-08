@@ -1049,7 +1049,9 @@ func (s *AccountUsageService) persistOpenAICodexProbeSnapshotContext(ctx context
 		if err := scopedAccountIDAccess(updateCtx, s.accountRepo, accountID, "accounts.usage.read", true); err != nil {
 			return
 		}
-		_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
+		if err := s.accountRepo.UpdateExtra(updateCtx, accountID, updates); err == nil && adminaccess.RestrictedFromContext(ctx) == nil && !isOpenAIAutoResetContext(ctx) {
+			notifyOpenAIAutoReset(accountID)
+		}
 	}()
 }
 

@@ -70,8 +70,8 @@ func TestResolve_UnknownModel(t *testing.T) {
 
 	require.NotNil(t, resolved)
 	require.Nil(t, resolved.BasePricing)
-	// Unknown model: GetModelPricing returns error, source is "fallback"
-	require.Equal(t, "fallback", resolved.Source)
+	// 未知模型显式标记为未定价，不把缺失价格伪装成可计费兜底。
+	require.Equal(t, "unpriced", resolved.Source)
 }
 
 func TestGetIntervalPricing_NoIntervals(t *testing.T) {

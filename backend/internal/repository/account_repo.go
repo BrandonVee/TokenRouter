@@ -591,7 +591,7 @@ COALESCE((
  (platform='opencode_go' AND $2='opencode_go' AND COALESCE(btrim(credentials ->> 'account_mode') <> 'zen',true) AND COALESCE(btrim($4::jsonb ->> 'account_mode') <> 'zen',true))
  OR (platform IN (`+opencodeGoUsageMountPlatformsSQL+`) AND $2 IN (`+opencodeGoUsageMountPlatformsSQL+`) AND `+opencodeGoBaseURLMatchSQLPrefix+`credentials ->> 'base_url'`+opencodeGoBaseURLMatchSQLSuffix+` AND `+opencodeGoBaseURLMatchSQLPrefix+`$4::jsonb ->> 'base_url'`+opencodeGoBaseURLMatchSQLSuffix+`)
 ) AND type='apikey' AND $3='apikey' AND credentials -> 'api_key' IS NOT DISTINCT FROM $4::jsonb -> 'api_key',false),
-extra -> 'opencode_go_usage_auto_refresh', extra -> 'opencode_go_usage_snapshot'
+extra -> 'opencode_go_usage_auto_refresh', extra -> 'opencode_go_usage_snapshot', extra -> 'codex_auto_reset_credit_state'
 		FROM accounts
 		WHERE id = $1 AND deleted_at IS NULL
 		FOR NO KEY UPDATE
@@ -615,6 +615,7 @@ extra -> 'opencode_go_usage_auto_refresh', extra -> 'opencode_go_usage_snapshot'
 		currentOllamaSnapshot                        []byte
 		openCodeIdentityUnchanged                    bool
 		currentOpenCodeAuto, currentOpenCodeSnapshot []byte
+		currentAutoResetState                        []byte
 	)
 	if err := rows.Scan(
 		&ollamaGroupIdentityUnchanged,
@@ -622,7 +623,7 @@ extra -> 'opencode_go_usage_auto_refresh', extra -> 'opencode_go_usage_snapshot'
 		&currentOllamaSession,
 		&currentOllamaAutoRefresh,
 		&currentOllamaSnapshot,
-		&openCodeIdentityUnchanged, &currentOpenCodeAuto, &currentOpenCodeSnapshot,
+		&openCodeIdentityUnchanged, &currentOpenCodeAuto, &currentOpenCodeSnapshot, &currentAutoResetState,
 	); err != nil {
 		return nil, err
 	}
@@ -672,6 +673,14 @@ extra -> 'opencode_go_usage_auto_refresh', extra -> 'opencode_go_usage_snapshot'
 			} else if ok {
 				extra[service.OpenCodeGoUsageSnapshotExtraKey] = value
 			}
+		}
+	}
+	delete(extra, service.OpenAIAutoResetCreditStateExtraKey)
+	if account.Platform == service.PlatformOpenAI && account.Type == service.AccountTypeOAuth && !account.IsShadow() {
+		if state, ok, err := decodeAccountExtraJSON(currentAutoResetState); err != nil {
+			return nil, err
+		} else if ok {
+			extra[service.OpenAIAutoResetCreditStateExtraKey] = state
 		}
 	}
 	return extra, nil
