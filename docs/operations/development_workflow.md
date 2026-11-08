@@ -34,6 +34,8 @@ Ent schema 加载依赖的 `golang.org/x/tools` 当前为 `v0.51.0`，以读取 
 
 前端国际化使用 Vue I18n 11 的 Composition API，消息编译器与运行时保持同版本；旧版 9.x 已停止维护。HTML 净化使用 DOMPurify 3.4.17 及以上，HTTP 重定向依赖固定为 follow-redirects 1.16.2，相关版本与锁文件共同通过安全扫描。前端审计使用官方 npm registry，例外校验器会拒绝端点错误或未知格式的报告，避免把扫描失败误认为通过。
 
+后端压缩依赖的安全基线为 `github.com/andybalholm/brotli v1.2.7` 与 `github.com/klauspost/compress v1.20.2`，分别修复恶意 Brotli 流导致的过量内存分配和压缩帧处理 panic。升级后验证上游响应解压、数据共享压缩/导出及 `govulncheck`，不能仅以应用编译通过作为发布依据。
+
 不要把个人数据库路径、固定密码或某台机器的服务配置写入工程文档。开发配置使用未提交的环境文件或 `backend/config.yaml`；可提交样例在 `deploy/`。前端开发服务器默认通过 `VITE_DEV_PROXY_TARGET` 代理后端，端口由 `VITE_DEV_PORT` 控制。
 
 常用入口：
