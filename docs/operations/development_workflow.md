@@ -7,7 +7,7 @@
 - [工具链与本地运行](#工具链与本地运行)：准备环境或更新依赖时读取。
 - [代码边界](#代码边界)：新增后端/前端模块时读取。
 - [生成代码与迁移](#生成代码与迁移)：修改 Ent schema、Wire 或数据库时读取。
-- [验证策略](#验证策略)：实现和提交前读取。
+- [验证策略](#验证策略)：提交后检查 GitHub CI 或按要求本地排障时读取。
 - [提交与文档](#提交与文档)：形成提交或维护 Project Doc 时读取。
 - [同步上游](#同步上游)：引入 upstream PR/commit 时读取。
 - [发布](#发布)：创建版本 tag 前读取。
@@ -22,11 +22,7 @@
 | golangci-lint | CI | `v2.14.0`，配置在 `backend/.golangci.yml` |
 | PostgreSQL、Redis | Compose 与集成测试 | 生产必需；测试可由 Testcontainers/Compose 提供 |
 
-本地应安装与 CI 相同的 lint 版本，避免规则集差异造成只在 CI 出现的结果：
-
-```bash
-go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
-```
+lint 由 GitHub CI 安装固定版本并执行，默认不在本机安装或重复运行。用户明确要求本地排障时，再按 CI 的工具版本复现。
 
 升级 Go 时必须同时修改 `backend/go.mod`，以及 `backend-ci.yml`（两处）、`release.yml`（两处）和 `security-scan.yml` 中的 `go version` 硬断言；workflow 都通过 `go-version-file: backend/go.mod` 安装工具链，任一断言遗漏都会在版本校验步骤失败。
 
@@ -34,7 +30,7 @@ Ent schema 加载依赖的 `golang.org/x/tools` 当前为 `v0.51.0`，以读取 
 
 前端国际化使用 Vue I18n 11 的 Composition API，消息编译器与运行时保持同版本；旧版 9.x 已停止维护。HTML 净化使用 DOMPurify 3.4.17 及以上，HTTP 重定向依赖固定为 follow-redirects 1.16.2，相关版本与锁文件共同通过安全扫描。前端审计使用官方 npm registry，例外校验器会拒绝端点错误或未知格式的报告，避免把扫描失败误认为通过。
 
-后端压缩依赖的安全基线为 `github.com/andybalholm/brotli v1.2.7` 与 `github.com/klauspost/compress v1.20.2`，分别修复恶意 Brotli 流导致的过量内存分配和压缩帧处理 panic。升级后验证上游响应解压、数据共享压缩/导出及 `govulncheck`，不能仅以应用编译通过作为发布依据。
+后端压缩依赖的安全基线为 `github.com/andybalholm/brotli v1.2.7` 与 `github.com/klauspost/compress v1.20.2`，分别修复恶意 Brotli 流导致的过量内存分配和压缩帧处理 panic。升级后由 GitHub CI 验证相关回归，并由 Security Scan 执行 `govulncheck`，不能仅以应用编译通过作为发布依据。
 
 不要把个人数据库路径、固定密码或某台机器的服务配置写入工程文档。开发配置使用未提交的环境文件或 `backend/config.yaml`；可提交样例在 `deploy/`。前端开发服务器默认通过 `VITE_DEV_PROXY_TARGET` 代理后端，端口由 `VITE_DEV_PORT` 控制。
 
@@ -83,36 +79,21 @@ Ent schema 不是生产迁移器。数据库权威变更仍须新增 `backend/mi
 
 ## 验证策略
 
-验证范围随风险扩大，先运行受影响包/组件，再运行仓库门禁。后端常用命令：
+默认以目标提交 SHA 对应的 GitHub Actions 结果验收。提交、推送、发布或代码修改本身均不触发本地测试、构建验证、lint、类型检查、安全扫描或浏览器验证，也不为等待 CI 启动本机测试服务器、PostgreSQL/Redis 或测试容器。
 
-```bash
-# 受影响包
-(cd backend && go test ./internal/service ./internal/handler)
+| Workflow | 验证范围 |
+| --- | --- |
+| `backend-ci.yml`（CI） | 部署 shell/Compose 检查、后端 unit/integration、前端 lint/类型检查/关键 Vitest、golangci-lint |
+| `security-scan.yml`（Security Scan） | 后端 `govulncheck`、前端生产依赖审计及例外校验 |
+| `release.yml`（Release） | 前端构建、五个平台后端编译、归档校验和及容器镜像发布 |
 
-# 与 CI 一致的测试分层
-make -C backend test-unit
-make -C backend test-integration
+GitHub CI 继续复用 `backend/Makefile` 的 `test-unit`、`test-integration` 和根 Makefile 的 `test-frontend`；这些共享目标和测试源码应保留。后端集成测试由 CI 的 Testcontainers 提供 PostgreSQL/Redis，不依赖开发者手工配置的本机数据库 DSN。新增关键回归应接入相应 CI 分层，不另建只在个人机器上运行的测试入口。
 
-# 普通测试加 lint
-make -C backend test
-```
+本地完成代码编辑、必要代码生成、引用核对和 Git diff 审查；提交前执行 `git diff --check`，确认没有意外生成物、环境文件或秘密。推送后检查该提交的 CI 与 Security Scan，失败时根据远端日志修复并重新推送，不能把其它提交的成功结果当成本次验收证据。发布时还要核对对应 tag 的 Release 结果。
 
-集成测试可能启动 PostgreSQL/Redis 容器；环境没有 Docker 时要明确报告未运行，不能用单元测试结果代替。涉及迁移时还要运行 migration runner 和对应 schema/data regression tests。
+只有用户明确要求本地验证或本地排障时，才按问题范围运行必要检查，并复用 CI 的工具版本与命令。清理该任务产生的测试日志、预览内容、验证二进制和临时缓存，不清理生产数据、其它项目资源或全局依赖缓存。
 
-前端门禁：
-
-```bash
-# CI 使用 lint、类型检查和关键 Vitest 集
-make test-frontend
-
-# 变更涉及其它组件时运行其测试或完整套件
-npx --yes pnpm@9 --dir frontend run test:run
-npx --yes pnpm@9 --dir frontend run build
-```
-
-部署文件变更要运行 `.github/workflows/backend-ci.yml` 中对应的 shell/Compose 检查；依赖或安全边界变更还应运行 `make secret-scan`、`govulncheck` 或相应审计。最终至少执行 `git diff --check`，并确认没有意外生成物、环境文件或秘密。
-
-`make secret-scan` 使用 Python 标准库检查 Git 跟踪文件工作副本中的常见提供商 Key 和完整 PEM 私钥，仅输出路径、行号和类别，不回显凭据；不读取未跟踪环境文件或符号链接目标。明确的公开 OAuth 客户端标识和固定假凭据可在对应行使用 `secret-scan: allow`，不整体豁免测试目录。发现疑似凭据返回 1，文件读取或 Git 错误返回 2，不能把未完成的扫描当作通过。扫描器回归入口为 `python3 -m unittest discover -s tools -p 'test_secret_scan.py'`。
+按要求本地排障时可使用 `make secret-scan`：它使用 Python 标准库检查 Git 跟踪文件工作副本中的常见提供商 Key 和完整 PEM 私钥，仅输出路径、行号和类别，不回显凭据；不读取未跟踪环境文件或符号链接目标。明确的公开 OAuth 客户端标识和固定假凭据可在对应行使用 `secret-scan: allow`，不整体豁免测试目录。发现疑似凭据返回 1，文件读取或 Git 错误返回 2，不能把未完成的扫描当作通过。
 
 ## 提交与文档
 
@@ -124,7 +105,7 @@ npx --yes pnpm@9 --dir frontend run build
 
 ## 同步上游
 
-同步以 upstream PR/commit 为最小可审查单元，逐项理解变更并保留 fork 的产品、计费、安全和部署语义。冲突解决后运行该项涉及的测试，再形成符合 Conventional Commits 的本地提交；`SYNC.md` 只记录本地进度，不进入提交。
+同步以 upstream PR/commit 为最小可审查单元，逐项理解变更并保留 fork 的产品、计费、安全和部署语义。冲突解决后审查差异，形成符合 Conventional Commits 的提交并推送，由 GitHub CI 验收；`SYNC.md` 只记录本地进度，不进入提交。
 
 两个 fork 专属规则不可省略：
 
@@ -145,6 +126,6 @@ npx --yes pnpm@9 --dir frontend run build
 
 `.github/workflows/release.yml` 由 `v*` tag 或手动 dispatch 触发。标准发布只构建一次前端，再把 Linux、Windows 和 macOS 的五个 Go 目标分配到独立 runner 并行编译；最终 job 通过 `tools/goreleaser_prebuilt.sh` 把这些二进制导入 GoReleaser，统一生成 Release 归档、校验和、双架构镜像与 manifest。每个镜像架构只执行一次构建，并同时附加 GHCR 与可选 DockerHub 标签；未配置 DockerHub 时不会创建占位镜像。simple release 跳过二进制 matrix，只构建精简镜像集合。GoReleaser 在重跑时会替换部分失败后遗留的同名附件，避免 GitHub Release 资产上传返回 `422 already_exists`。workflow 从 annotated tag body 读取 release notes，并在成功后把 `backend/cmd/server/VERSION` 同步回默认分支。
 
-发布前确保目标提交已推送、CI 通过、数据库迁移可滚动升级且备份已验证。发布后检查 Release、镜像、二进制、VERSION 回写和部署 smoke test；tag 只标识代码版本，不替代迁移/恢复检查。
+发布前确保目标提交已推送，且该提交的 CI 与 Security Scan 通过。发布后检查对应 tag 的 Release、附件、镜像、校验和和 VERSION 回写，默认不下载到本机运行验证。实际生产升级还须确认数据库迁移、备份与部署 smoke test；tag 只标识代码版本，不替代迁移/恢复检查。
 
 相关文档：[项目总览](../project_overview.md)、[系统架构](../architecture/system_architecture.md)、[配置边界](../interfaces/configuration.md)、[部署与数据库迁移](deployment_and_migrations.md)、[运维目录](index.md)。

@@ -1,4 +1,4 @@
-.PHONY: wire build build-embed test-unit test-integration test-e2e test-cover-integration
+.PHONY: wire build build-embed test-unit test-integration test-cover-integration
 
 # 兼容从 backend、deploy 或仓库根目录调用本 Makefile。
 VERSION_SCRIPT ?= $(firstword $(wildcard ./scripts/resolve-version.sh ../backend/scripts/resolve-version.sh backend/scripts/resolve-version.sh))
@@ -25,10 +25,6 @@ test-unit:
 
 test-integration:
 	@go test -tags integration ./... -count=1 -race -parallel=8
-
-test-e2e:
-	@echo "运行 E2E 测试（需要本地服务器运行）..."
-	@go test -tags e2e ./internal/integration/... -count=1 -v
 
 test-cover-integration:
 	@echo "运行集成测试并生成覆盖率报告..."
