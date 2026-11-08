@@ -672,16 +672,16 @@ riskControl: {
         showGuide: 'Usage Guide',
         step1: {
           title: 'Create a Subscription Group',
-          line1: 'Go to "Group Management" page, click "Create Group"',
-          line2: 'Set billing type to "Subscription", configure daily/weekly/monthly quota limits',
-          line3: 'Save the group and ensure its status is "Active"',
-          link: 'Go to Group Management'
+          line1: 'Go to "Plan Management" and create a subscription plan',
+          line2: 'Configure the plan price, validity, applicable groups, and quota windows',
+          line3: 'Save the plan and choose whether to offer it for sale',
+          link: 'Go to Plan Management'
         },
         step2: {
           title: 'Assign Subscription to User',
           line1: 'Click the "Assign Subscription" button in the top right',
           line2: 'Search for a user by email and select them',
-          line3: 'Choose a subscription group, set validity days, then click "Assign"'
+          line3: 'Choose a subscription plan, set validity days, then click "Assign"'
         },
         step3: {
           title: 'Manage Existing Subscriptions'
@@ -694,7 +694,7 @@ riskControl: {
           revoke: 'Revoke',
           revokeDesc: 'Terminate an active subscription or cancel a pending one (restorable from the revoked list)'
         },
-        tip: 'Tip: Only groups with billing type "Subscription" and status "Active" appear in the group dropdown. If no options are available, create one in Group Management first.'
+        tip: 'Tip: Create a subscription plan before assigning it. New subscriptions follow the existing schedule for the same plan.'
       },
       batchAssign: {
         enable: 'Assign to multiple users',
@@ -717,7 +717,8 @@ riskControl: {
         selectionRequired: 'Select at least one subscription',
         confirmTargets: 'This action will process the following {count} subscriptions',
         groupFallback: 'Group #{id}',
-        extendHint: 'Enter a positive whole number to extend or a negative one to shorten, up to 36500 days. Expired subscriptions are extended from now and cannot be shortened. The new expiration must be in the future.',
+        planFallback: 'Plan #{id}',
+        extendHint: 'Enter a positive whole number to extend or a negative one to shorten, up to 36500 days. Expired subscriptions are extended from now and cannot be shortened. The new expiration must be after the subscription start time.',
         invalidDays: 'Enter a nonzero whole number of days between -36500 and 36500',
         resetWindows: 'Select quota windows to reset',
         resetHint: 'Usage in the selected windows will be zeroed and restarted from today.',

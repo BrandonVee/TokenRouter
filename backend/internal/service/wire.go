@@ -840,6 +840,7 @@ var ProviderSet = wire.NewSet(
 	NewOpenAIGatewayService,
 	NewCodexInviteResetService,
 	ProvideOpenAIQuotaService,
+	ProvideClaudeResetCreditService,
 	ProvideBatchImageModelPricingResolver,
 	NewBatchImagePublicService,
 	NewBatchImageDownloadService,
@@ -1023,4 +1024,12 @@ func ProvideGeminiCachedContentService(repo GeminiCachedContentRepository, compa
 	svc := NewGeminiCachedContentService(repo, compat, cfg)
 	svc.Start()
 	return svc
+}
+
+// ProvideClaudeResetCreditService 保留 fork 指纹传输，并使消费操作依赖持久幂等与分布式租约。
+func ProvideClaudeResetCreditService(accounts AccountRepository, tokens *ClaudeTokenProvider, proxies ProxyRepository, settings *SettingService, idem *IdempotencyCoordinator, locks LeaderLockCache, upstream HTTPUpstream, profiles *TLSFingerprintProfileService) *ClaudeResetCreditService {
+	s := NewClaudeResetCreditService(accounts, tokens, proxies, settings)
+	s.ConfigureRedemption(idem, locks)
+	s.SetHTTPUpstream(upstream, profiles)
+	return s
 }

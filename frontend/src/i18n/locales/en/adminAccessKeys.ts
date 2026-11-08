@@ -413,6 +413,14 @@ export default {
     "groups_ddisplay_dread": {
       "label": "Read display candidates for all groups (display only)",
       "category": "Groups"
+    },
+    "claude_dquota_dread": {
+      "label": "Read Claude native reset credits without consuming them",
+      "category": "Claude"
+    },
+    "claude_dquota_dreset": {
+      "label": "Consume Claude native reset credits",
+      "category": "Claude"
     }
   },
   "listSeparator": ", "

@@ -53,6 +53,17 @@ OpenAI API Key 的 Responses 能力探测只在 `openai_responses_mode=auto`（�
 
 OpenAI 重置次数查询把带到期时间的完整结果保存为账号展示快照；上游只返回正数次数却缺少到期明细时，实时结果仍返回给调用方，但旧快照必须保留。直接调用重置 API 成功消费次数后，服务先在脱离客户端取消信号的有界上下文中恢复账号 error、限流和临时不可调度状态，再回读额度快照与最新账号投影；恢复不修改人工 `schedulable` 开关。后续步骤部分失败时响应使用 `cache_refreshed`、`account_state_recovered` 和 `warning_code` 明确区分，调用方不得把已消费的次数当作可重试失败。
 
+<a id="claude_native_quota_reset"></a>
+### Claude 原生额度重置
+
+Anthropic OAuth 账号持有 `user:profile` scope 时，可查询原生 `cedar_ember` 重置机会。Setup Token、API Key 和其它平台不适用。查询只读且不消费次数；对外结果不含 grant、组织或上游请求 ID，界面区分持有次数与当前可消费资格。
+
+`GET /api/v1/admin/accounts/:id/claude/reset-credits` 查询；POST 同路径的 `/redeem` 以 `Idempotency-Key` 对应一次操作确认，不接收客户端选择的 grant。服务在提交前再次查询，只允许上游指定的下一机会、当前可用、未暂停/阻断、冷却结束且满足触限条件的机会。受限管理密钥分别使用 `claude.quota.read` 与 `claude.quota.reset`，写权限不额外返回完整次数。
+
+消费必须同时具备持久幂等仓储和 Redis 账号/组织租约；任一不可用都拒绝。组织级阻断记录位于幂等表，重复本地账号共用，账号编辑不能抹掉记录。发出请求前先持久化未知结果标记；同一确认崩溃后只重放，未知结果阻断该组织再次领取 24 小时，明确的上游不可用仅阻断 15 分钟。已明确成功的请求不会因后续刷新失败而盲目重发。
+
+请求使用 fork 的共享上游客户端、实际账号与代理、TLS 指纹和出站安全校验，携带 OAuth 的请求禁止跟随重定向。只读查询有完整 25 秒期限，消费使用独立于客户端断开的 60 秒幂等执行期限，收尾保存使用短时独立上下文。额度组件保持稳定实例，重试沿用同一次确认的 key。
+
 OpenAI API Key 可探测 Responses、Chat、Embeddings 等 endpoint capability。Responses 探测只有在响应足以下结论时才写入能力标记：2xx 响应若仍因 `max_output_tokens` 未完成，或响应状态为 `failed`，应保持 unknown，不能持久化为“不支持 Responses”；完成但没有 `function_call` 的响应仍判定为不支持。Ollama Cloud 等兼容 API Key 上游可以保存其管理会话和用量快照，但只有明确匹配的账号才进入探测，不能把探测协议推广到所有 `apikey`。Grok 计费与媒体资格、各平台额度探测也继续使用各自独立协议。
 
 多协议供应商的周期余额/套餐检测、Cline 钱包隔离和 OpenCode Go 请求驱动刷新见[多协议上游](../interfaces/multi_protocol_upstream.md#provider_usage)。这些 worker 与现有 Ollama、Qoder 探测独立启停，不恢复已下线的声明倍率探测。

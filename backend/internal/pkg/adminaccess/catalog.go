@@ -20,6 +20,8 @@ type permissionDefinition struct {
 // 接口按方法和 Gin 完整路径精确登记；新增接口不会继承同目录权限。
 // 全站权限与账户规则独立，选中分组绝不会隐式授予全站操作。
 var definitions = []permissionDefinition{
+	{Permission{"claude.quota.read", "查询 Claude 原生重置次数（不消费）", "Claude", "account"}, []string{"GET /accounts/:id/claude/reset-credits"}},
+	{Permission{"claude.quota.reset", "消费 Claude 原生重置次数", "Claude", "account"}, []string{"POST /accounts/:id/claude/reset-credits/redeem"}},
 	{Permission{"accounts.identity.read", "读取账户邮箱、套餐及创建时间（不含令牌）", "账户", "account"}, []string{"GET /accounts/:id"}},
 	{Permission{"accounts.usage.read", "读取及主动刷新授权账户额度与快照", "账户", "account"}, []string{"GET /accounts/:id/usage", "POST /accounts/usage/batch"}},
 	{Permission{"accounts.stats.read", "读取账户用量与费用统计", "账户", "account"}, []string{"GET /accounts/:id/today-stats", "POST /accounts/today-stats/batch", "GET /accounts/:id/stats"}},

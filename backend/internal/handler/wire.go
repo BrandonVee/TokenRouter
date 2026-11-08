@@ -10,6 +10,7 @@ import (
 
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
+	claudeResetCredits *service.ClaudeResetCreditService,
 	dashboardHandler *admin.DashboardHandler,
 	userHandler *admin.UserHandler,
 	groupHandler *admin.GroupHandler,
@@ -51,6 +52,7 @@ func ProvideAdminHandlers(
 	ollamaCloudUsage *service.OllamaCloudUsageService,
 	openCodeGoUsage *service.OpenCodeGoUsageService,
 ) *AdminHandlers {
+	accountHandler.SetClaudeResetCreditService(claudeResetCredits)
 	accountHandler.SetOllamaCloudUsageService(ollamaCloudUsage)
 	accountHandler.SetOpenCodeGoUsageService(openCodeGoUsage)
 	return &AdminHandlers{

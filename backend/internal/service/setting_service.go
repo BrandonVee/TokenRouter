@@ -114,6 +114,8 @@ type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[i
 
 // SettingService 系统设置服务
 type SettingService struct {
+	claudeCodeVersionCache      atomic.Value
+	claudeCodeVersionSF         singleflight.Group
 	scopedAdminKeyRepo          ScopedAdminKeyRepository
 	settingRepo                 SettingRepository
 	dashboardAdRepo             DashboardAdRepository

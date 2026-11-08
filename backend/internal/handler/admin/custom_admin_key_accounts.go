@@ -105,6 +105,26 @@ func (h *AccountHandler) ScopedAdminKeyAccounts(c *gin.Context) {
 		h.scopedAdminImportCodexSession(c)
 		return
 	}
+	if path == base+"/:id/claude/reset-credits" || path == base+"/:id/claude/reset-credits/redeem" {
+		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "账户 ID 无效")
+			return
+		}
+		action := "claude.quota.read"
+		if c.Request.Method == "POST" {
+			action = "claude.quota.reset"
+		}
+		if _, ok := scopedAuthorizedAccount(c, h.adminService, id, action, false); !ok {
+			return
+		}
+		if action == "claude.quota.reset" {
+			h.RedeemClaudeResetCredit(c)
+		} else {
+			h.ClaudeResetCredits(c)
+		}
+		return
+	}
 	if h.scopedAdminStatistics(c) {
 		return
 	}

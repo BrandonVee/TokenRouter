@@ -77,8 +77,18 @@
           color="amber"
         />
 
-        <!-- Passive sampling label + active query button -->
-        <div class="flex items-center gap-1.5 mt-0.5">
+
+      </div>
+
+      <!-- No data yet -->
+      <div v-else class="space-y-1">
+        <div class="text-xs text-gray-400">-</div>
+        <!-- 即使还没有被动额度 header，也允许手动触发上游额度探测。 -->
+        <GrokQuotaProbeCell :account="account" />
+      </div>
+      <!-- 稳定实例保留重置查询与消费状态，额度响应更新不会销毁进行中的请求。 -->
+      <ClaudeResetCreditsCell :account="account" class="mt-1" @redeemed="loadActiveUsage">
+        <template v-if="usageInfo" #pre-actions>
           <span
             v-if="usageInfo.source === 'passive'"
             class="text-[9px] text-gray-400 dark:text-gray-500 italic"
@@ -99,15 +109,8 @@
             />
             {{ t('admin.accounts.usageWindow.activeQuery') }}
           </button>
-        </div>
-      </div>
-
-      <!-- No data yet -->
-      <div v-else class="space-y-1">
-        <div class="text-xs text-gray-400">-</div>
-        <!-- 即使还没有被动额度 header，也允许手动触发上游额度探测。 -->
-        <GrokQuotaProbeCell :account="account" />
-      </div>
+        </template>
+      </ClaudeResetCreditsCell>
     </template>
 
     <!-- OpenAI OAuth 账号统一使用 /usage API 数据源 -->
@@ -737,6 +740,7 @@ import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
 import { formatCompactNumber } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
+import ClaudeResetCreditsCell from './ClaudeResetCreditsCell.vue'
 import UsageProgressBar from './UsageProgressBar.vue'
 import AccountQuotaInfo from './AccountQuotaInfo.vue'
 import OpenAIQuotaResetCell from './OpenAIQuotaResetCell.vue'

@@ -413,6 +413,14 @@ export default {
     "groups_ddisplay_dread": {
       "label": "读取全部分组展示候选（不限制调用）",
       "category": "分组"
+    },
+    "claude_dquota_dread": {
+      "label": "查询 Claude 原生重置次数（不消费）",
+      "category": "Claude"
+    },
+    "claude_dquota_dreset": {
+      "label": "消费 Claude 原生重置次数",
+      "category": "Claude"
     }
   },
   "listSeparator": "、"

@@ -157,7 +157,14 @@ backup: {
         retainDaysHint: '备份文件超过此天数后自动删除，0 = 永不过期',
         retainCount: '最大保留份数',
         retainCountHint: '最多保留的备份数量，0 = 不限制',
-        saved: '定时备份配置已保存'
+        saved: '定时备份配置已保存',
+        ordinaryRetention: '普通备份保留',
+        ordinaryHint: '达到任一清理条件时，清理最旧的普通备份；月度归档独立保留。',
+        preview: '保留效果',
+        previewBoth: '最近 {days} 天内最多保留 {count} 份普通备份。',
+        previewDays: '保留最近 {days} 天的普通备份，份数不限。',
+        previewCount: '保留最新 {count} 份普通备份，天数不限。',
+        previewUnlimited: '普通备份不自动清理。'
       },
       operations: {
         title: '备份记录',
@@ -243,6 +250,44 @@ backup: {
           unchecked: '不勾选'
         },
         freeTier: 'R2 免费额度：10GB 存储 + 每月 100 万次 A 类请求 + 1000 万次 B 类请求，对数据库备份完全够用。'
+      },
+      imageStorage: {
+        title: '异步生图对象存储',
+        description: '开启后，异步生图接口可用，生成结果转存到对象存储，只把短链接写入 Redis。与备份共用同一套 S3 客户端，保存后立即生效，无需重启。',
+        enabled: '启用异步生图',
+        reuseBackupS3: '复用上方备份的 S3 配置（只用不同的存储桶/前缀）',
+        bucket: '存储桶',
+        bucketInherited: '留空则沿用备份存储桶',
+        prefix: 'Key 前缀',
+        publicBaseUrl: '公开访问域名',
+        publicBaseUrlPlaceholder: '留空则返回预签名临时链接',
+        presignExpiryHours: '预签名链接有效期（小时）',
+        saved: '异步生图对象存储配置已保存'
+      },
+      archive: {
+        title: '月度归档',
+        enabled: '启用',
+        dates: '归档日期（可多选）',
+        selectDates: '请至少选择一个归档日期',
+        selectedDates: '已选择 {count} 个日期',
+        day: '{day} 日',
+        monthEnd: '月末',
+        done: '完成',
+        datesHint: '按备份计划的时区与备份开始日期匹配，每个日期归档首份成功的定时备份。',
+        retention: '归档保留方式',
+        count: '归档保留数量',
+        copies: '份',
+        forever: '永久保留',
+        foreverHint: '所有新归档均永久保留；已有永久归档不会因配置变更被自动删除。',
+        countHint: '所有选定日期的非永久归档合计计数，超出时清理最旧归档。',
+        fallbackHint: '当日无成功备份时，顺延至本月下次成功备份；当月没有所选日期时按月末处理，同一份备份只计一份。',
+        independentHint: '归档不额外执行备份，不占普通备份名额；本月无后续成功备份则不归档。',
+        disabledHint: '关闭后停止产生新归档，已有归档继续按原保留方式管理。',
+        invalidRetention: '保留天数和份数须为非负整数；非永久归档须填写至少 1 份。',
+        preview: '每月 {dates} 各归档一份，{retention}。',
+        retainLatest: '合计保留最近 {count} 份',
+        badge: '月度归档',
+        deleteConfirm: '这是月度归档备份。确定要解除归档保护并永久删除此备份吗？此操作无法撤销。',
       }
     },
 dataManagement: {
@@ -424,7 +469,9 @@ affiliates: {
       rebatesDescription: '查看每一笔产生返利的充值订单',
       transfersDescription: '查看返利额度转入账户余额的提取流水',
       errors: {
-        loadFailed: '加载邀请返利记录失败'
+        loadFailed: '加载邀请返利记录失败',
+        AFFILIATE_QUOTA_INSUFFICIENT: '可提取返利额度不足',
+        AFFILIATE_WITHDRAW_AMOUNT_INVALID: '提现金额无效'
       },
       records: {
         search: '搜索',
@@ -449,7 +496,8 @@ affiliates: {
         historyQuotaAfter: '转入后历史返利（{unitName}）',
         invitedAt: '邀请时间',
         rebatedAt: '返利时间',
-        transferredAt: '提取时间'
+        transferredAt: '提取时间',
+        outflowType: '类型'
       },
       overview: {
         title: '用户返利概览',
@@ -459,6 +507,31 @@ affiliates: {
         rebatedInviteeCount: '已产生返利人数',
         availableQuota: '可提返利（{unitName}）',
         historyQuota: '历史返利（{unitName}）'
+      },
+      outflowTypes: {
+        transfer: '转入余额',
+        withdraw: '线下提现'
+      },
+      withdraw: {
+        button: '登记线下提现',
+        title: '登记线下提现',
+        user: '用户',
+        userPlaceholder: '输入邮箱或用户名搜索',
+        noUserFound: '未找到匹配的用户',
+        changeUser: '更换用户',
+        availableQuota: '当前可提取额度',
+        frozenHint: '冻结期内的返利不计入可提取额度',
+        amount: '提现金额（USD）',
+        amountHint: '填写已在站外实际打款给该用户的金额',
+        fillAll: '全部',
+        warning: '登记后将从该用户的可提取返利额度中扣除，且无法撤销。请确认已完成站外打款。',
+        submit: '确认登记',
+        submitting: '登记中...',
+        success: '已登记线下提现 {amount}，剩余可提取 {remaining}',
+        replayed: '这笔线下提现此前已登记（{amount}），本次未重复扣减；登记后剩余可提取 {remaining}',
+        uncertainHint: '上次提交没有收到结果，可能已经登记成功。用户与金额已锁定，重新提交会沿用同一笔登记，已登记时不会重复扣减。',
+        amountRequired: '请输入大于 0 的金额',
+        amountExceeds: '提现金额不能超过当前可提取额度'
       }
     },
 // Users Management
@@ -616,7 +689,9 @@ affiliates: {
         apiKeyLimitEditPlaceholder: '0 表示不限制',
         apiKeyLimitCreateHint: '留空继承系统默认值；0 = 不限制',
         apiKeyLimitEditHint: '该用户的实际上限；0 = 不限制',
-        apiKeyLimitInvalid: 'API Key 数量上限必须是 0 到 2,147,483,647 之间的整数'
+        apiKeyLimitInvalid: 'API Key 数量上限必须是 0 到 2,147,483,647 之间的整数',
+        concurrencyPlaceholder: '0 表示不限制',
+        concurrencyHint: '该用户的最大并发请求数，0 = 不限制'
       },
       adjustBalance: '调整余额',
       adjustConcurrency: '调整并发数',
@@ -790,6 +865,7 @@ affiliates: {
           confirm: '确认重置该用户 {platform} 平台的 {window} 用量？此操作立即生效。',
           success: '已重置 {platform} {window} 用量',
           failed: '重置失败',
+          unavailable: '该平台未配置限额，没有可重置的用量窗口',
         },
         updateSuccess: '平台限额已更新',
         updateFailed: '保存失败',
@@ -802,7 +878,19 @@ affiliates: {
         cellColumnTooltip: '仅展示已设限额的平台',
         subscriptionWarning: '此用户有活跃订阅，平台限额仅在余额（标准）模式下生效，订阅模式请求不受此限额约束。',
         invalidNumber: '以下字段填写不是合法数字，请修正后再保存：{fields}',
-      }
+      },
+      bulkDelete: {
+        action: '批量删除（{count}）',
+        title: '删除已选用户',
+        confirm: '确定删除已选的 {count} 个用户吗？此操作无法撤销。管理员账号无法删除。',
+        success: '已删除 {count} 个用户',
+        failed: '{count} 个用户删除失败，已保留选中，可重试。'
+      },
+      passwordCopied: '密码已复制',
+      concurrencyNonNegative: '并发数不能为负数，0 表示不限制',
+      restrictPublicGroups: '限制可访问的公开分组',
+      restrictPublicGroupsHint: '开启后，该用户仅能使用下方勾选的公开分组；关闭则可使用全部公开分组。',
+      publicGroupsRestricted: '公开分组（已限制）'
     },
 // Groups Management
     groups: {
@@ -900,7 +988,24 @@ affiliates: {
         accountsPlaceholder: '选择账号（留空则不限制）',
         priorityLabel: '优先级',
         priorityHint: '数值越小优先级越高，用于账号调度',
-        statusLabel: '状态'
+        statusLabel: '状态',
+        maxReasoningEffortOverLimit: '超限访问控制',
+        maxReasoningEffortOverLimitDowngrade: '超过上限时自动降档',
+        maxReasoningEffortOverLimitDeny: '拒绝访问',
+        maxReasoningEffortOverLimitHint: '设置上限后生效。自动降档会将超过上限的请求改写为上限值后转发；拒绝访问则直接返回错误。',
+        reasoningEffortMappingsHint: '类型和模型均可留空，表示匹配全部模型。同一类型和模型下可添加多条请求值映射，例如前缀 gpt 同时将 high、xhigh 转到 medium。转发值可选拒绝，命中对应请求值时直接返回错误。精确优先于前后缀，更长前后缀优先。',
+        addReasoningEffortPair: '添加请求值',
+        removeReasoningEffortPair: '删除请求值',
+        reasoningEffortMatchType: '类型',
+        reasoningEffortModel: '模型',
+        reasoningEffortMatchExact: '精确',
+        reasoningEffortMatchPrefix: '前缀',
+        reasoningEffortMatchSuffix: '后缀',
+        reasoningEffortMatchTypePlaceholder: '全匹配',
+        reasoningEffortModelPlaceholder: '留空则全部 / gpt / gpt-5.4',
+        reasoningEffortToDeny: '拒绝',
+        unsupportedMatchType: '匹配类型仅支持精确、前缀或后缀',
+        duplicateScope: '类型和模型组合不能重复'
       },
       exclusiveObj: {
         yes: '是',
@@ -1246,7 +1351,8 @@ affiliates: {
         sources: {
           route: '路由',
           detector: '内置识别'
-        }
+        },
+        upstreamModelHint: '留空表示透传原始请求模型：前缀匹配下每个命中模型各自原样转发（如 deepseek-v4-flash、deepseek-v4-pro 分别转发）；填写则所有命中请求都固定转发该模型。'
       },
       claudeCode: {
         title: 'Claude Code 客户端限制',
@@ -1353,6 +1459,41 @@ affiliates: {
         geminiText: 'Gemini Text',
         geminiImage: 'Gemini Image',
         hint: '至少选择一个模型系列'
+      },
+      rateLabel: '倍率',
+      accountFilters: {
+        title: '账号过滤控制',
+        oauthOnly: '仅允许 OAuth 账号',
+        oauthOnlyEnabled: '已启用 — 排除 API Key 类型账号',
+        privacySetOnly: '仅允许隐私保护已设置的账号',
+        privacySetOnlyEnabled: '已启用 — Privacy 未设置的账号将被排除',
+        disabled: '未启用'
+      },
+      i18nField: {
+        default: '默认',
+        add: '新增 {language} 版',
+        edit: '编辑 {language} 版',
+        placeholder: '{language} 版，留空则显示默认内容'
+      },
+      codexModelsManifest: {
+        title: '固定账号获取模型列表',
+        hint: '开启后，普通模型列表与 Codex Model Manifest 均优先从选定账号获取并合并，再应用账号映射和分组列表过滤；限流/过载中的选定账号仍会被使用。',
+        enable: '使用特定账号获取模型列表',
+        enabledHint: '账号来源限定为当前分组内的 OpenAI 账号，最多选择 10 个。',
+        disabledHint: '未启用：普通列表使用本地映射或默认模型；Codex 优先使用本地目录，无本地目录时由调度器选账。',
+        accounts: '选定账号',
+        searchPlaceholder: '搜索账号（当前分组内 OpenAI 账号）',
+        searchEmpty: '未找到匹配账号',
+        fallback: '选定账号全部不可用时回退调度器',
+        fallbackHint: '关闭时返回 503 / 上游错误；开启时回退到现有调度器选账路径。',
+        selectAtLeastOne: '开启固定账号后至少选择一个账号'
+      },
+      openaiFast: {
+        title: 'OpenAI Fast 模式',
+        force: '强制使用 Fast（priority）',
+        hint: '开启后，此分组的 OpenAI 请求会强制写入 service_tier=priority；全局 Fast/Flex 策略仍可过滤或拦截。保存后新请求立即生效，已建立的 WebSocket 会话需重连。',
+        free: '免费 Fast',
+        freeHint: '该分组的 Fast 请求仍使用 priority 档位，但客户实际费用按同一请求的 Standard 价格计算。'
       }
     },
 }
