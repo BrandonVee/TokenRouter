@@ -1805,7 +1805,8 @@ func (s *PricingService) ListModelNamesByProvider(provider string) []string {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	names := make([]string, 0)
 	for name, p := range s.pricingData {
-		if strings.ToLower(p.LiteLLMProvider) == provider {
+		modelProvider := strings.ToLower(p.LiteLLMProvider)
+		if modelProvider == provider || (provider == "gemini" || provider == "google") && (modelProvider == "gemini" || modelProvider == "google") {
 			names = append(names, name)
 		}
 	}

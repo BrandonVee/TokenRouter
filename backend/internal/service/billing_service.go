@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -88,29 +90,30 @@ type BillingCache interface {
 
 // ModelPricing 模型价格配置（per-token价格，与LiteLLM格式一致）
 type ModelPricing struct {
-	InputPricePerToken                 float64  // 每token输入价格 (USD)
-	InputPricePerTokenPriority         float64  // priority service tier 下每token输入价格 (USD)
-	ImageInputPricePerToken            float64  // 图片输入 token 价格 (USD)，为 0 时回退到普通输入价格
-	OutputPricePerToken                float64  // 每token输出价格 (USD)
-	OutputPricePerTokenPriority        float64  // priority service tier 下每token输出价格 (USD)
-	CacheCreationPricePerToken         float64  // 缓存创建每token价格 (USD)
-	CacheCreationPricePerTokenPriority float64  // priority service tier 下缓存创建每token价格 (USD)
-	CacheCreationPriceExplicit         bool     // 是否由渠道/区间定价显式设定（为 true 时即使 == 0 也不回退）
-	CacheReadPricePerToken             float64  // 缓存读取每token价格 (USD)
-	CacheReadPricePerTokenPriority     float64  // priority service tier 下缓存读取每token价格 (USD)
-	CacheCreation5mPrice               float64  // 5分钟缓存创建每token价格 (USD)
-	CacheCreation1hPrice               float64  // 1小时缓存创建每token价格 (USD)
-	SupportsCacheBreakdown             bool     // 是否支持详细的缓存分类
-	SupportsServiceTier                bool     // 是否支持 service_tier（Fast/Flex）
-	FastModeMultiplier                 *float64 // 渠道配置的 Fast 模式收费倍率；nil 表示沿用模型默认 Fast 定价
-	FastMultiplier                     *float64 // 渠道显式 Fast/priority 倍率；nil 表示沿用模型目录行为
-	FlexMultiplier                     *float64 // 渠道显式 Flex 倍率；nil 表示沿用默认行为
-	LongContextInputThreshold          int      // 超过阈值后按整次会话提升输入价格
-	LongContextThresholdInclusive      bool     // 达到阈值即应用（xAI）；默认严格大于以兼容既有模型
-	LongContextInputMultiplier         float64  // 长上下文整次会话输入倍率
-	LongContextOutputMultiplier        float64  // 长上下文整次会话输出倍率
-	ImageOutputPricePerToken           float64  // 图片输出 token 价格 (USD)
-	ImageOutputPriceExplicit           bool     // 是否由渠道定价显式设定，显式设定后不再回退
+	ReasoningEffortMultipliers         map[string]float64 // 最终上游推理等级的显式倍率；缺省为一倍。
+	InputPricePerToken                 float64            // 每token输入价格 (USD)
+	InputPricePerTokenPriority         float64            // priority service tier 下每token输入价格 (USD)
+	ImageInputPricePerToken            float64            // 图片输入 token 价格 (USD)，为 0 时回退到普通输入价格
+	OutputPricePerToken                float64            // 每token输出价格 (USD)
+	OutputPricePerTokenPriority        float64            // priority service tier 下每token输出价格 (USD)
+	CacheCreationPricePerToken         float64            // 缓存创建每token价格 (USD)
+	CacheCreationPricePerTokenPriority float64            // priority service tier 下缓存创建每token价格 (USD)
+	CacheCreationPriceExplicit         bool               // 是否由渠道/区间定价显式设定（为 true 时即使 == 0 也不回退）
+	CacheReadPricePerToken             float64            // 缓存读取每token价格 (USD)
+	CacheReadPricePerTokenPriority     float64            // priority service tier 下缓存读取每token价格 (USD)
+	CacheCreation5mPrice               float64            // 5分钟缓存创建每token价格 (USD)
+	CacheCreation1hPrice               float64            // 1小时缓存创建每token价格 (USD)
+	SupportsCacheBreakdown             bool               // 是否支持详细的缓存分类
+	SupportsServiceTier                bool               // 是否支持 service_tier（Fast/Flex）
+	FastModeMultiplier                 *float64           // 渠道配置的 Fast 模式收费倍率；nil 表示沿用模型默认 Fast 定价
+	FastMultiplier                     *float64           // 渠道显式 Fast/priority 倍率；nil 表示沿用模型目录行为
+	FlexMultiplier                     *float64           // 渠道显式 Flex 倍率；nil 表示沿用默认行为
+	LongContextInputThreshold          int                // 超过阈值后按整次会话提升输入价格
+	LongContextThresholdInclusive      bool               // 达到阈值即应用（xAI）；默认严格大于以兼容既有模型
+	LongContextInputMultiplier         float64            // 长上下文整次会话输入倍率
+	LongContextOutputMultiplier        float64            // 长上下文整次会话输出倍率
+	ImageOutputPricePerToken           float64            // 图片输出 token 价格 (USD)
+	ImageOutputPriceExplicit           bool               // 是否由渠道定价显式设定，显式设定后不再回退
 }
 
 const (
@@ -1292,6 +1295,7 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 	if pricing == nil || channelPricing == nil {
 		return
 	}
+	pricing.ReasoningEffortMultipliers = maps.Clone(channelPricing.ReasoningEffortMultipliers)
 	if channelPricing.InputPrice != nil {
 		priority := channelTierOverridePrice(pricing.InputPricePerToken, pricing.InputPricePerTokenPriority, *channelPricing.InputPrice)
 		pricing.InputPricePerToken = *channelPricing.InputPrice
@@ -1308,7 +1312,13 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 		pricing.CacheCreationPricePerTokenPriority = priority
 		pricing.CacheCreationPriceExplicit = true
 		pricing.CacheCreation5mPrice = *channelPricing.CacheWritePrice
-		pricing.CacheCreation1hPrice = *channelPricing.CacheWritePrice
+		if channelPricing.CacheWrite1hPrice == nil {
+			pricing.CacheCreation1hPrice = *channelPricing.CacheWritePrice
+		}
+	}
+	if channelPricing.CacheWrite1hPrice != nil {
+		pricing.CacheCreation1hPrice = *channelPricing.CacheWrite1hPrice
+		pricing.SupportsCacheBreakdown = true
 	}
 	if channelPricing.CacheReadPrice != nil {
 		priority := channelTierOverridePrice(pricing.CacheReadPricePerToken, pricing.CacheReadPricePerTokenPriority, *channelPricing.CacheReadPrice)
@@ -1321,27 +1331,36 @@ func applyChannelTokenPriceOverrides(pricing *ModelPricing, channelPricing *Chan
 
 // CostInput 统一计费输入
 type CostInput struct {
-	Ctx            context.Context
-	Model          string
-	GroupID        *int64 // 用于渠道定价查找
-	Group          *Group
-	Tokens         UsageTokens
-	RequestCount   int     // 按次计费时使用
-	UsageUnits     float64 // 音频等连续计量单位（分钟/小时/百万字符）
-	SizeTier       string  // 按次/图片模式的层级标签（"1K","2K","4K","HD" 等）
-	RateMultiplier float64
-	PricingAt      time.Time             // 分时定价使用的计费时刻；零值时使用服务器当前时刻
-	ServiceTier    string                // "priority","flex","" 等
-	Resolver       *ModelPricingResolver // 定价解析器
-	Resolved       *ResolvedPricing      // 可选：预解析的定价结果（避免重复 Resolve 调用）
+	LongContextBillingEnabled      *bool
+	DisableModelLongContextPricing bool
+	ReasoningEffort                string // 已经实际转发的推理等级，不使用未经策略调整的请求值。
+	Ctx                            context.Context
+	Model                          string
+	GroupID                        *int64 // 用于渠道定价查找
+	Group                          *Group
+	Tokens                         UsageTokens
+	RequestCount                   int     // 按次计费时使用
+	UsageUnits                     float64 // 音频等连续计量单位（分钟/小时/百万字符）
+	SizeTier                       string  // 按次/图片模式的层级标签（"1K","2K","4K","HD" 等）
+	RateMultiplier                 float64
+	PricingAt                      time.Time             // 分时定价使用的计费时刻；零值时使用服务器当前时刻
+	ServiceTier                    string                // "priority","flex","" 等
+	Resolver                       *ModelPricingResolver // 定价解析器
+	Resolved                       *ResolvedPricing      // 可选：预解析的定价结果（避免重复 Resolve 调用）
 }
 
 // CalculateCostUnified 统一计费入口，支持三种计费模式。
 // 使用 ModelPricingResolver 解析定价，然后根据 BillingMode 分发计算。
+// @project-doc docs/domains/routing_and_billing.md#model_price_contracts
 func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, error) {
+	if input.ReasoningEffort == "" {
+		input.ReasoningEffort = usageReasoningEffort(input.Ctx)
+	}
+	if input.PricingAt.IsZero() {
+		input.PricingAt = GatewayTokenRequestPricingAtFromContext(input.Ctx)
+	}
 	if input.Resolver == nil {
-		// 无 Resolver，回退到旧路径
-		return s.calculateCostInternal(input.Model, input.Tokens, input.RateMultiplier, input.ServiceTier, nil)
+		input.Resolver = NewModelPricingResolver(nil, s)
 	}
 
 	// 优先使用预解析结果，避免重复 Resolve 调用
@@ -1364,6 +1383,9 @@ func (s *BillingService) CalculateCostUnified(input CostInput) (*CostBreakdown, 
 	switch resolved.Mode {
 	case BillingModePerRequest, BillingModeImage, BillingModeVideo:
 		breakdown, err = s.calculatePerRequestCost(resolved, input)
+		if err == nil && resolved.channelPricing != nil {
+			applyCostBreakdownMultiplier(breakdown, reasoningEffortBillingMultiplier(input.ReasoningEffort, resolved.channelPricing.ReasoningEffortMultipliers))
+		}
 	default: // BillingModeToken
 		breakdown, err = s.calculateTokenCost(resolved, input)
 	}
@@ -1430,8 +1452,16 @@ func (s *BillingService) calculateTokenCost(resolved *ResolvedPricing, input Cos
 
 	// 长上下文定价仅在无区间定价且分组允许时应用（区间定价已包含上下文分层）。
 	applyLongCtx := len(resolved.Intervals) == 0 && resolved.longContextPricingEnabled
+	if input.LongContextBillingEnabled != nil && !*input.LongContextBillingEnabled {
+		applyLongCtx = false
+	}
+	if input.DisableModelLongContextPricing {
+		applyLongCtx = false
+	}
 
-	return s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongCtx), nil
+	breakdown := s.computeTokenBreakdown(pricing, input.Tokens, input.RateMultiplier, input.ServiceTier, applyLongCtx)
+	applyCostBreakdownMultiplier(breakdown, reasoningEffortBillingMultiplier(input.ReasoningEffort, pricing.ReasoningEffortMultipliers))
+	return breakdown, nil
 }
 
 // computeTokenBreakdown 是 token 计费的核心逻辑，由 calculateTokenCost 和 calculateCostInternal 共用。
@@ -1552,14 +1582,13 @@ func (s *BillingService) computeTokenBreakdown(
 // multiplier 用于长上下文等场景下的整体价格缩放（普通调用传 1.0 即可）。
 func (s *BillingService) computeCacheCreationCost(pricing *ModelPricing, tokens UsageTokens, price, multiplier float64) float64 {
 	if pricing.SupportsCacheBreakdown && (pricing.CacheCreation5mPrice > 0 || pricing.CacheCreation1hPrice > 0) {
-		if tokens.CacheCreation5mTokens == 0 && tokens.CacheCreation1hTokens == 0 && tokens.CacheCreationTokens > 0 {
-			// API 未返回 ephemeral 明细，回退到全部按 5m 单价计费
-			return float64(tokens.CacheCreationTokens) * pricing.CacheCreation5mPrice * multiplier
-		}
-		return float64(tokens.CacheCreation5mTokens)*pricing.CacheCreation5mPrice*multiplier +
-			float64(tokens.CacheCreation1hTokens)*pricing.CacheCreation1hPrice*multiplier
+		// 上游可能只给出部分 TTL 明细；未分类的创建 token 仍按普通/5m 桶计费。
+		oneHour := max(0, tokens.CacheCreation1hTokens)
+		fiveMinutes := max(max(0, tokens.CacheCreation5mTokens), tokens.CacheCreationTokens-oneHour)
+		return float64(fiveMinutes)*pricing.CacheCreation5mPrice*multiplier + float64(oneHour)*pricing.CacheCreation1hPrice*multiplier
 	}
 	return float64(tokens.CacheCreationTokens) * price * multiplier
+
 }
 
 // calculatePerRequestCost 按次/图片计费
@@ -1609,18 +1638,8 @@ func (s *BillingService) CalculateCostWithServiceTier(model string, tokens Usage
 }
 
 func (s *BillingService) calculateCostInternal(model string, tokens UsageTokens, rateMultiplier float64, serviceTier string, channelPricing *ChannelModelPricing) (*CostBreakdown, error) {
-	var pricing *ModelPricing
-	var err error
-	if channelPricing != nil {
-		pricing, err = s.GetModelPricingWithChannel(model, channelPricing)
-	} else {
-		pricing, err = s.GetModelPricing(model)
-	}
-	if err != nil {
-		return nil, err
-	}
+	return s.calculateCostInternalWithPolicy(model, tokens, rateMultiplier, serviceTier, channelPricing, true)
 
-	return s.computeTokenBreakdown(pricing, tokens, rateMultiplier, serviceTier, true), nil
 }
 
 func (s *BillingService) applyModelSpecificPricingPolicy(model string, pricing *ModelPricing) *ModelPricing {
@@ -1886,42 +1905,48 @@ type ImagePriceConfig struct {
 // ModelDisplayPricing 是面向前端展示的模型价格快照。
 // 所有价格都已经应用了分组倍率，直接表示实际扣费单价。
 type ModelDisplayPricing struct {
-	PricingMode                  string
-	PriceStatus                  string
-	InputPricePerToken           float64
-	ImageInputPricePerToken      float64
-	OutputPricePerToken          float64
-	CacheWritePricePerToken      float64
-	CacheReadPricePerToken       float64
-	ImageOutputPricePerToken     float64
-	FastInputPricePerToken       float64
-	FastImageInputPricePerToken  float64
-	FastOutputPricePerToken      float64
-	FastCacheWritePricePerToken  float64
-	FastCacheReadPricePerToken   float64
-	FastImageOutputPricePerToken float64
-	ContextIntervals             []ModelDisplayPricingInterval
-	ImagePrice1K                 float64
-	ImagePrice2K                 float64
-	ImagePrice4K                 float64
+	ReasoningEffortMultipliers    map[string]float64
+	TimePricing                   *ChannelTimePricing
+	CacheWrite1hPricePerToken     *float64
+	FastCacheWrite1hPricePerToken *float64
+	PricingMode                   string
+	PriceStatus                   string
+	InputPricePerToken            float64
+	ImageInputPricePerToken       float64
+	OutputPricePerToken           float64
+	CacheWritePricePerToken       float64
+	CacheReadPricePerToken        float64
+	ImageOutputPricePerToken      float64
+	FastInputPricePerToken        float64
+	FastImageInputPricePerToken   float64
+	FastOutputPricePerToken       float64
+	FastCacheWritePricePerToken   float64
+	FastCacheReadPricePerToken    float64
+	FastImageOutputPricePerToken  float64
+	ContextIntervals              []ModelDisplayPricingInterval
+	ImagePrice1K                  float64
+	ImagePrice2K                  float64
+	ImagePrice4K                  float64
 }
 
 // ModelDisplayPricingInterval 是按上下文 token 区间展示的模型价格。
 type ModelDisplayPricingInterval struct {
-	MinTokens                    int
-	MaxTokens                    *int
-	InputPricePerToken           float64
-	ImageInputPricePerToken      float64
-	OutputPricePerToken          float64
-	CacheWritePricePerToken      float64
-	CacheReadPricePerToken       float64
-	ImageOutputPricePerToken     float64
-	FastInputPricePerToken       float64
-	FastImageInputPricePerToken  float64
-	FastOutputPricePerToken      float64
-	FastCacheWritePricePerToken  float64
-	FastCacheReadPricePerToken   float64
-	FastImageOutputPricePerToken float64
+	CacheWrite1hPricePerToken     *float64
+	FastCacheWrite1hPricePerToken *float64
+	MinTokens                     int
+	MaxTokens                     *int
+	InputPricePerToken            float64
+	ImageInputPricePerToken       float64
+	OutputPricePerToken           float64
+	CacheWritePricePerToken       float64
+	CacheReadPricePerToken        float64
+	ImageOutputPricePerToken      float64
+	FastInputPricePerToken        float64
+	FastImageInputPricePerToken   float64
+	FastOutputPricePerToken       float64
+	FastCacheWritePricePerToken   float64
+	FastCacheReadPricePerToken    float64
+	FastImageOutputPricePerToken  float64
 }
 
 // GetDisplayPricing 返回用于模型广场展示的价格信息。
@@ -1974,7 +1999,15 @@ func (s *BillingService) getDisplayPricingWithResolvedMultipliers(model string, 
 }
 
 // displayPricingFromResolved 将已解析的计费配置转换成模型广场展示价格。
-func displayPricingFromResolved(model string, rateMultiplier float64, imageRateMultiplier float64, resolved *ResolvedPricing) (ModelDisplayPricing, bool) {
+func displayPricingFromResolved(model string, rateMultiplier float64, imageRateMultiplier float64, resolved *ResolvedPricing) (display ModelDisplayPricing, ok bool) {
+	defer func() {
+		if ok && resolved != nil && resolved.channelPricing != nil {
+			value := resolved.channelPricing.Clone()
+			display.ReasoningEffortMultipliers = value.ReasoningEffortMultipliers
+			display.TimePricing = value.TimePricing
+		}
+	}()
+
 	if resolved == nil {
 		return ModelDisplayPricing{}, false
 	}
@@ -2105,7 +2138,9 @@ func resolvedRequestTierPrice(tiers []PricingInterval, label string, defaultPric
 	return defaultPrice
 }
 
-func buildTokenDisplayPricing(pricing *ModelPricing, rateMultiplier float64) ModelDisplayPricing {
+func buildTokenDisplayPricing(pricing *ModelPricing, rateMultiplier float64) (display ModelDisplayPricing) {
+	defer func() { display.ReasoningEffortMultipliers = maps.Clone(pricing.ReasoningEffortMultipliers) }()
+
 	if intervals := longContextDisplayPricingIntervals(pricing, rateMultiplier); len(intervals) > 0 {
 		return buildTokenIntervalDisplayPricing(intervals)
 	}
@@ -2120,7 +2155,15 @@ func buildTokenDisplayPricing(pricing *ModelPricing, rateMultiplier float64) Mod
 		CacheReadPricePerToken:   pricing.CacheReadPricePerToken * rateMultiplier,
 		ImageOutputPricePerToken: pricing.ImageOutputPricePerToken * rateMultiplier,
 	}
+	if pricing.SupportsCacheBreakdown {
+		value := pricing.CacheCreation1hPrice * rateMultiplier
+		displayPricing.CacheWrite1hPricePerToken = &value
+	}
 	if fastPricing, ok := fastModeDisplayPricing(pricing); ok {
+		if fastPricing.SupportsCacheBreakdown {
+			value := fastPricing.CacheCreation1hPrice * rateMultiplier
+			displayPricing.FastCacheWrite1hPricePerToken = &value
+		}
 		displayPricing.FastInputPricePerToken = fastPricing.InputPricePerToken * rateMultiplier
 		displayPricing.FastImageInputPricePerToken = fastPricing.ImageInputPricePerToken * rateMultiplier
 		displayPricing.FastOutputPricePerToken = fastPricing.OutputPricePerToken * rateMultiplier
@@ -2183,7 +2226,15 @@ func modelPricingDisplayInterval(minTokens int, maxTokens *int, pricing *ModelPr
 		CacheReadPricePerToken:   pricing.CacheReadPricePerToken * rateMultiplier,
 		ImageOutputPricePerToken: pricing.ImageOutputPricePerToken * rateMultiplier,
 	}
+	if pricing.SupportsCacheBreakdown {
+		value := pricing.CacheCreation1hPrice * rateMultiplier
+		interval.CacheWrite1hPricePerToken = &value
+	}
 	if fastPricing, ok := fastModeDisplayPricing(pricing); ok {
+		if fastPricing.SupportsCacheBreakdown {
+			value := fastPricing.CacheCreation1hPrice * rateMultiplier
+			interval.FastCacheWrite1hPricePerToken = &value
+		}
 		interval.FastInputPricePerToken = fastPricing.InputPricePerToken * rateMultiplier
 		interval.FastImageInputPricePerToken = fastPricing.ImageInputPricePerToken * rateMultiplier
 		interval.FastOutputPricePerToken = fastPricing.OutputPricePerToken * rateMultiplier
@@ -2659,4 +2710,55 @@ func getDefaultGrokImagineVideoPrice(model string, resolution string) (float64, 
 	default:
 		return 0, false
 	}
+}
+
+func applyCostBreakdownMultiplier(cost *CostBreakdown, multiplier float64) {
+	if cost == nil || multiplier == 1 {
+		return
+	}
+	cost.InputCost *= multiplier
+	cost.ImageInputCost *= multiplier
+	cost.OutputCost *= multiplier
+	cost.ImageOutputCost *= multiplier
+	cost.CacheCreationCost *= multiplier
+	cost.CacheReadCost *= multiplier
+	cost.TotalCost *= multiplier
+	cost.ActualCost *= multiplier
+}
+
+func reasoningEffortBillingMultiplier(effort string, multipliers map[string]float64) float64 {
+	effort = strings.ToLower(strings.TrimSpace(effort))
+	if effort != "none" {
+		effort = NormalizeMaxReasoningEffort(effort)
+	}
+	if effort == "" {
+		return 1
+	}
+	multiplier := multipliers[effort]
+	if multiplier <= 0 || math.IsNaN(multiplier) || math.IsInf(multiplier, 0) {
+		return 1
+	}
+	return multiplier
+}
+
+func (s *BillingService) calculateCostInternalWithPolicy(
+	model string,
+	tokens UsageTokens,
+	rateMultiplier float64,
+	serviceTier string,
+	channelPricing *ChannelModelPricing,
+	longContextBillingEnabled bool,
+) (*CostBreakdown, error) {
+	var pricing *ModelPricing
+	var err error
+	if channelPricing != nil {
+		pricing, err = s.GetModelPricingWithChannel(model, channelPricing)
+	} else {
+		pricing, err = s.GetModelPricing(model)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return s.computeTokenBreakdown(pricing, tokens, rateMultiplier, serviceTier, longContextBillingEnabled), nil
 }

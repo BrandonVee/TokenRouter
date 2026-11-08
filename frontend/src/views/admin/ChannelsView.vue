@@ -450,6 +450,7 @@
                   :entry="entry"
                   :platform="section.platform"
                   :show-fast-mode-multiplier="section.platform === 'openai'"
+                  enable-time-pricing
                   enable-tier-multipliers
                   @update="updatePricingEntry(sIdx, idx, $event)"
                   @remove="removePricingEntry(sIdx, idx)"
@@ -637,7 +638,7 @@ import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
 import type { PricingFormEntry } from '@/components/admin/channel/types'
-import { mTokToPerToken, perTokenToMTok, toNullableNumber, hasExplicitPricing, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, isValidPositiveMultiplier, validateIntervals, validatePeakRateWindows } from '@/components/admin/channel/types'
+import { apiTimePricingToForm, formTimePricingToAPI, formReasoningEffortMultipliersToAPI, validateReasoningEffortMultipliers, validateTimePricing, mTokToPerToken, perTokenToMTok, toNullableNumber, hasExplicitPricing, apiIntervalsToForm, formIntervalsToAPI, findModelConflict, isValidPositiveMultiplier, validateIntervals, validatePeakRateWindows } from '@/components/admin/channel/types'
 import type { AdminGroup, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import { platformTextClass, platformBadgeLightClass } from '@/utils/platformColors'
@@ -905,7 +906,7 @@ async function syncLatestModels(sectionIdx: number) {
       appStore.showSuccess(t('admin.channels.form.syncModelsAlreadyUpToDate'))
       return
     }
-    let defaultPricing: Pick<PricingFormEntry, 'input_price' | 'output_price' | 'cache_write_price' | 'cache_read_price' | 'image_input_price' | 'image_output_price'> = {
+    let defaultPricing: Pick<PricingFormEntry, 'input_price' | 'output_price' | 'cache_write_price' | 'cache_write_1h_price' | 'cache_read_price' | 'image_input_price' | 'image_output_price'> = {
       input_price: null,
       output_price: null,
       cache_write_price: null,
@@ -921,6 +922,8 @@ async function syncLatestModels(sectionIdx: number) {
             input_price: perTokenToMTok(pricing.input_price ?? null),
             output_price: perTokenToMTok(pricing.output_price ?? null),
             cache_write_price: perTokenToMTok(pricing.cache_write_price ?? null),
+        cache_write_1h_price: perTokenToMTok(pricing.cache_write_1h_price),
+
             cache_read_price: perTokenToMTok(pricing.cache_read_price ?? null),
             image_input_price: perTokenToMTok(pricing.image_input_price ?? null),
             image_output_price: perTokenToMTok(pricing.image_output_price ?? null)
@@ -946,6 +949,7 @@ async function syncLatestModels(sectionIdx: number) {
       input_price: defaultPricing.input_price,
       output_price: defaultPricing.output_price,
       cache_write_price: defaultPricing.cache_write_price,
+      cache_write_1h_price: defaultPricing.cache_write_1h_price,
       cache_read_price: defaultPricing.cache_read_price,
       image_input_price: defaultPricing.image_input_price,
       image_output_price: defaultPricing.image_output_price,
@@ -1137,6 +1141,9 @@ function accountStatsRulesToAPI(): AccountStatsPricingRule[] {
             input_price: mTokToPerToken(p.input_price),
             output_price: mTokToPerToken(p.output_price),
             cache_write_price: mTokToPerToken(p.cache_write_price),
+        cache_write_1h_price: mTokToPerToken(p.cache_write_1h_price),
+        reasoning_effort_multipliers: formReasoningEffortMultipliersToAPI(p.reasoning_effort_multipliers),
+        time_pricing: formTimePricingToAPI(p.time_pricing),
             cache_read_price: mTokToPerToken(p.cache_read_price),
             image_input_price: mTokToPerToken(p.image_input_price),
             image_output_price: mTokToPerToken(p.image_output_price),
@@ -1192,6 +1199,9 @@ function formToAPI(): { group_ids: number[], model_pricing: ChannelModelPricing[
         input_price: mTokToPerToken(entry.input_price),
         output_price: mTokToPerToken(entry.output_price),
         cache_write_price: mTokToPerToken(entry.cache_write_price),
+        cache_write_1h_price: mTokToPerToken(entry.cache_write_1h_price),
+        reasoning_effort_multipliers: formReasoningEffortMultipliersToAPI(entry.reasoning_effort_multipliers),
+        time_pricing: formTimePricingToAPI(entry.time_pricing),
         cache_read_price: mTokToPerToken(entry.cache_read_price),
         image_input_price: mTokToPerToken(entry.image_input_price),
         image_output_price: mTokToPerToken(entry.image_output_price),
@@ -1305,6 +1315,9 @@ function apiToForm(channel: Channel): PlatformSection[] {
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
+        cache_write_1h_price: perTokenToMTok(p.cache_write_1h_price),
+        reasoning_effort_multipliers: { ...p.reasoning_effort_multipliers },
+        time_pricing: apiTimePricingToForm(p.time_pricing),
         cache_read_price: perTokenToMTok(p.cache_read_price),
         image_input_price: perTokenToMTok(p.image_input_price),
         image_output_price: perTokenToMTok(p.image_output_price),
@@ -1502,6 +1515,9 @@ function distributeRulesToPlatforms(apiRules: AccountStatsPricingRule[]) {
         input_price: perTokenToMTok(p.input_price),
         output_price: perTokenToMTok(p.output_price),
         cache_write_price: perTokenToMTok(p.cache_write_price),
+        cache_write_1h_price: perTokenToMTok(p.cache_write_1h_price),
+        reasoning_effort_multipliers: { ...p.reasoning_effort_multipliers },
+        time_pricing: apiTimePricingToForm(p.time_pricing),
         cache_read_price: perTokenToMTok(p.cache_read_price),
         image_input_price: perTokenToMTok(p.image_input_price),
         image_output_price: perTokenToMTok(p.image_output_price),
@@ -1669,6 +1685,15 @@ async function handleSubmit() {
         activeTab.value = section.platform
         return
       }
+    }
+  }
+
+  // 新倍率按原始输入校验，不能把非法数值在序列化时悄悄转为缺省。
+  for (const section of form.platforms.filter(s => s.enabled)) {
+    for (const entry of [...section.model_pricing, ...section.account_stats_pricing_rules.flatMap(rule => rule.pricing)]) {
+      const error = validateReasoningEffortMultipliers(entry.reasoning_effort_multipliers, t) ||
+        (entry.time_pricing ? validateTimePricing(entry.time_pricing, t) : null)
+      if (error) { appStore.showError(error); activeTab.value = section.platform; return }
     }
   }
 

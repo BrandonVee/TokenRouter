@@ -444,6 +444,12 @@ func setOpsRequestContext(c *gin.Context, model string, stream bool) {
 	if c == nil {
 		return
 	}
+	// 首次进入网关时冻结价格时点；重试、回退和异步结算都沿用它。
+	if c.Request != nil && service.GatewayTokenRequestPricingAtFromContext(c.Request.Context()).IsZero() {
+		ctx, _ := service.WithGatewayTokenRequestPricing(c.Request.Context())
+		c.Request = c.Request.WithContext(ctx)
+	}
+
 	model = strings.TrimSpace(model)
 	hasClientModel := false
 	if c.Request != nil {

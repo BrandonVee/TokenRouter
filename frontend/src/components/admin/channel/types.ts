@@ -1,8 +1,10 @@
-import type { BillingMode, PricingInterval } from '@/api/admin/channels'
+import { REASONING_EFFORT_LEVELS } from '@/constants/channel'
+import type { BillingMode, ChannelTimePricing, PricingInterval } from '@/api/admin/channels'
 
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
 
 export interface IntervalFormEntry {
+  cache_write_1h_price?: number | string | null
   min_tokens: number
   max_tokens: number | null
   tier_label: string
@@ -27,6 +29,9 @@ export interface PeakRateWindowFormEntry {
 }
 
 export interface PricingFormEntry {
+  cache_write_1h_price?: number | string | null
+  reasoning_effort_multipliers?: Record<string, number | string> | null
+  time_pricing?: TimePricingFormEntry
   models: string[]
   billing_mode: BillingMode
   // 空值保留“未配置”语义，0 表示显式免费。
@@ -146,6 +151,7 @@ export function hasExplicitPricing(entry: PricingFormEntry): boolean {
     entry.input_price,
     entry.output_price,
     entry.cache_write_price,
+    entry.cache_write_1h_price,
     entry.cache_read_price,
     entry.image_input_price,
     entry.image_output_price,
@@ -157,6 +163,7 @@ export function hasExplicitPricing(entry: PricingFormEntry): boolean {
     iv.input_price,
     iv.output_price,
     iv.cache_write_price,
+    iv.cache_write_1h_price,
     iv.cache_read_price,
   ].some(hasConfiguredPrice))
 }
@@ -169,6 +176,7 @@ export function apiIntervalsToForm(intervals: PricingInterval[]): IntervalFormEn
     input_price: perTokenToMTok(iv.input_price),
     output_price: perTokenToMTok(iv.output_price),
     cache_write_price: perTokenToMTok(iv.cache_write_price),
+    cache_write_1h_price: perTokenToMTok(iv.cache_write_1h_price),
     cache_read_price: perTokenToMTok(iv.cache_read_price),
     input_multiplier: iv.input_multiplier,
     output_multiplier: iv.output_multiplier,
@@ -187,6 +195,7 @@ export function formIntervalsToAPI(intervals: IntervalFormEntry[]): PricingInter
     input_price: mTokToPerToken(iv.input_price),
     output_price: mTokToPerToken(iv.output_price),
     cache_write_price: mTokToPerToken(iv.cache_write_price),
+    cache_write_1h_price: mTokToPerToken(iv.cache_write_1h_price),
     cache_read_price: mTokToPerToken(iv.cache_read_price),
     input_multiplier: toNullableNumber(iv.input_multiplier),
     output_multiplier: toNullableNumber(iv.output_multiplier),
@@ -389,4 +398,160 @@ export function getPlatformTextClass(platform: string): string {
     case 'grok': return 'text-slate-700 dark:text-slate-300'
     default: return ''
   }
+}
+
+export interface TimePricingPeriodFormEntry {
+  start_time: string
+  end_time: string
+  multiplier: number | string
+}
+
+export interface TimePricingFormEntry {
+  timezone: string
+  weekdays_only: boolean
+  periods: TimePricingPeriodFormEntry[]
+}
+
+export const DEFAULT_TIME_PRICING_TIMEZONE = 'Asia/Shanghai'
+
+const CLOCK_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/
+
+const LEGACY_CLOCK_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+
+const TWO_DECIMAL_MULTIPLIER = /^\d+(?:\.\d{1,2})?$/
+
+export function isValidTimePricingMultiplier(value: number | string): boolean {
+  const multiplier = String(value)
+  const numericValue = Number(multiplier)
+  return TWO_DECIMAL_MULTIPLIER.test(multiplier) &&
+    Number.isFinite(numericValue) && numericValue > 0
+}
+
+export const COMMON_TIMEZONES = [
+  'UTC', 'Asia/Shanghai', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Singapore', 'Asia/Kolkata',
+  'Australia/Sydney', 'Europe/London', 'Europe/Paris', 'Europe/Berlin',
+  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+  'America/Toronto', 'America/Sao_Paulo', 'Pacific/Auckland', 'Pacific/Honolulu',
+]
+
+export function createDefaultTimePricingForm(): TimePricingFormEntry {
+  return { timezone: DEFAULT_TIME_PRICING_TIMEZONE, weekdays_only: false, periods: [] }
+}
+
+export function apiTimePricingToForm(value: ChannelTimePricing | null | undefined): TimePricingFormEntry {
+  if (!value) return createDefaultTimePricingForm()
+  return {
+    timezone: value.timezone || DEFAULT_TIME_PRICING_TIMEZONE,
+    weekdays_only: value.weekdays_only === true,
+    periods: (value.periods || []).map(period => ({
+      start_time: LEGACY_CLOCK_TIME.test(period.start_time) ? `${period.start_time}:00` : period.start_time,
+      end_time: LEGACY_CLOCK_TIME.test(period.end_time) ? `${period.end_time}:00` : period.end_time,
+      multiplier: Number(period.multiplier).toFixed(2),
+    })),
+  }
+}
+
+export function formTimePricingToAPI(value: TimePricingFormEntry | null | undefined): ChannelTimePricing | null {
+  if (!value?.periods?.length) return null
+  const timezone = typeof value.timezone === 'string' ? value.timezone.trim() : ''
+  return {
+    timezone,
+    weekdays_only: value.weekdays_only === true,
+    periods: value.periods.map(period => ({
+      start_time: period.start_time,
+      end_time: period.end_time,
+      multiplier: Number(period.multiplier),
+    })),
+  }
+}
+
+function timeToSeconds(time: string, isEnd: boolean): number {
+  if (isEnd && time === '00:00:00') return 24 * 60 * 60
+  const [hours, minutes, seconds] = time.split(':').map(Number)
+  return hours * 60 * 60 + minutes * 60 + seconds
+}
+
+function timePricingValidationMessage(t: TranslateFn, key: string): string {
+  return t(`admin.channels.timePricingValidation.${key}`)
+}
+
+export function validateTimePricing(value: TimePricingFormEntry, t: TranslateFn): string | null {
+  if (!value?.periods?.length) return null
+
+  if (typeof value.timezone !== 'string' || value.timezone.trim() === '') {
+    return timePricingValidationMessage(t, 'timezone')
+  }
+  const timezone = value.timezone.trim()
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone })
+  } catch {
+    return timePricingValidationMessage(t, 'timezone')
+  }
+
+  const periods = [] as { start: number, end: number }[]
+  for (const period of value.periods) {
+    if (!CLOCK_TIME.test(period.start_time) || !CLOCK_TIME.test(period.end_time)) {
+      return timePricingValidationMessage(t, 'format')
+    }
+    if (period.start_time === period.end_time) {
+      return timePricingValidationMessage(t, 'range')
+    }
+
+    const start = timeToSeconds(period.start_time, false)
+    const end = timeToSeconds(period.end_time, true)
+    if (start >= end) return timePricingValidationMessage(t, 'range')
+
+    if (!isValidTimePricingMultiplier(period.multiplier)) {
+      return timePricingValidationMessage(t, 'multiplier')
+    }
+    periods.push({ start, end })
+  }
+
+  const sorted = [...periods].sort((a, b) => a.start - b.start)
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].start < sorted[i - 1].end) {
+      return timePricingValidationMessage(t, 'overlap')
+    }
+  }
+  return null
+}
+
+export function formatTimezoneOffset(timezone: string, at = new Date()): string {
+  try {
+    const part = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(at).find(item => item.type === 'timeZoneName')?.value
+    if (!part || part === 'GMT') return 'UTC+00:00'
+    const match = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(part)
+    if (!match) return ''
+    return `UTC${match[1]}${match[2].padStart(2, '0')}:${match[3] || '00'}`
+  } catch {
+    return ''
+  }
+}
+
+export function formReasoningEffortMultipliersToAPI(
+  value: PricingFormEntry['reasoning_effort_multipliers'],
+): Record<string, number> | null {
+  const entries = Object.entries(value || {})
+    .filter(([, multiplier]) => multiplier !== '')
+    .map(([effort, multiplier]) => [effort, Number(multiplier)])
+  return entries.length ? Object.fromEntries(entries) : null
+}
+
+export function validateReasoningEffortMultipliers(
+  value: PricingFormEntry['reasoning_effort_multipliers'],
+  t: TranslateFn,
+): string | null {
+  for (const [effort, multiplier] of Object.entries(value || {})) {
+    if (!REASONING_EFFORT_LEVELS.some(level => level === effort)) {
+      return t('admin.channels.form.reasoningEffortLevelInvalid', { effort })
+    }
+    if (multiplier !== '' && !isValidPositiveMultiplier(multiplier)) {
+      return t('admin.channels.form.reasoningEffortMultiplierPositive', { effort })
+    }
+  }
+  return null
 }

@@ -1510,7 +1510,7 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 
 	switch value {
 	case "none", "minimal":
-		return ""
+		return value
 	case "low", "medium", "high":
 		return value
 	case "xhigh", "extrahigh":
@@ -1771,4 +1771,67 @@ func deepSeekResponsesURLValue(value any) string {
 	default:
 		return ""
 	}
+}
+
+// shouldPreserveOpenAIResponsesNoneReasoningEffort 只保留官方或显式透传账号的 none 语义。
+func shouldPreserveOpenAIResponsesNoneReasoningEffort(account *Account) bool {
+	if account == nil {
+		return false
+	}
+	if account.IsOpenAIPassthroughEnabled() {
+		return true
+	}
+	if account.Platform != PlatformOpenAI {
+		return false
+	}
+	if account.Type == AccountTypeOAuth {
+		return true
+	}
+	if account.Type != AccountTypeAPIKey {
+		return false
+	}
+	base := strings.TrimSpace(account.GetCredential("base_url"))
+	if base == "" {
+		return true
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return false
+	}
+	if parsed.Host != "api.openai.com" && parsed.Host != "api.openai.com:443" {
+		return false
+	}
+	switch parsed.EscapedPath() {
+	case "", "/", "/v1", "/v1/":
+		return true
+	default:
+		return false
+	}
+}
+
+func filterOpenAIResponsesNoneReasoningEffortForAccount(account *Account, body []byte) ([]byte, error) {
+	if len(body) == 0 || shouldPreserveOpenAIResponsesNoneReasoningEffort(account) {
+		return body, nil
+	}
+
+	out := body
+	for _, path := range []string{"reasoning.effort", "reasoning_effort"} {
+		effort := gjson.GetBytes(out, path)
+		if effort.Type != gjson.String || !strings.EqualFold(strings.TrimSpace(effort.String()), "none") {
+			continue
+		}
+		next, err := sjson.DeleteBytes(out, path)
+		if err != nil {
+			return body, fmt.Errorf("strip %s none placeholder: %w", path, err)
+		}
+		out = next
+	}
+	if reasoning := gjson.GetBytes(out, "reasoning"); reasoning.IsObject() && len(reasoning.Map()) == 0 {
+		next, err := sjson.DeleteBytes(out, "reasoning")
+		if err != nil {
+			return body, fmt.Errorf("strip empty reasoning object: %w", err)
+		}
+		out = next
+	}
+	return out, nil
 }

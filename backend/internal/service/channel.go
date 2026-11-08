@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 	"strings"
@@ -86,15 +87,19 @@ type AccountStatsPricingRule struct {
 
 // ChannelModelPricing 渠道模型定价条目
 type ChannelModelPricing struct {
-	ID                 int64       `json:"id,omitempty"`
-	ChannelID          int64       `json:"channel_id,omitempty"`
-	Platform           string      `json:"platform"` // 所属平台（anthropic/openai/gemini/...）
-	Models             []string    `json:"models"`
-	BillingMode        BillingMode `json:"billing_mode"`
-	PriceMultiplier    *float64    `json:"price_multiplier"`     // 最终定价倍率；nil 表示不调整价格
-	FastModeMultiplier *float64    `json:"fast_mode_multiplier"` // OpenAI Fast 模式收费倍率；nil 表示沿用模型默认 Fast 定价
-	FastMultiplier     *float64    `json:"fast_multiplier"`      // Fast/priority 服务层级倍率；nil 表示沿用模型默认值
-	FlexMultiplier     *float64    `json:"flex_multiplier"`      // Flex 服务层级倍率；nil 表示沿用模型默认值
+	// 新字段均可省略，保留既有峰谷和自定义价格合同。
+	ReasoningEffortMultipliers map[string]float64  `json:"reasoning_effort_multipliers,omitempty"`
+	TimePricing                *ChannelTimePricing `json:"time_pricing,omitempty"`
+	CacheWrite1hPrice          *float64            `json:"cache_write_1h_price"`
+	ID                         int64               `json:"id,omitempty"`
+	ChannelID                  int64               `json:"channel_id,omitempty"`
+	Platform                   string              `json:"platform"` // 所属平台（anthropic/openai/gemini/...）
+	Models                     []string            `json:"models"`
+	BillingMode                BillingMode         `json:"billing_mode"`
+	PriceMultiplier            *float64            `json:"price_multiplier"`     // 最终定价倍率；nil 表示不调整价格
+	FastModeMultiplier         *float64            `json:"fast_mode_multiplier"` // OpenAI Fast 模式收费倍率；nil 表示沿用模型默认 Fast 定价
+	FastMultiplier             *float64            `json:"fast_multiplier"`      // Fast/priority 服务层级倍率；nil 表示沿用模型默认值
+	FlexMultiplier             *float64            `json:"flex_multiplier"`      // Flex 服务层级倍率；nil 表示沿用模型默认值
 	// 峰谷时段仅作用于 token 计费；时间按服务器时区解释。
 	PeakRateEnabled    bool              `json:"peak_rate_enabled"`
 	PeakStart          string            `json:"peak_start"`
@@ -125,6 +130,9 @@ type PeakRateWindow struct {
 // PeakMultiplierAt 返回模型条目在指定时刻的峰谷倍率。
 // 新版多时段配置优先于旧版单时段字段；非法或未启用配置安全降级为 1 倍。
 func (p *ChannelModelPricing) PeakMultiplierAt(now time.Time) float64 {
+	if p != nil && p.TimePricing != nil && len(p.TimePricing.Periods) > 0 {
+		return p.TimePricing.MultiplierAt(now)
+	}
 	if p == nil || !p.PeakRateEnabled {
 		return 1.0
 	}
@@ -239,8 +247,23 @@ func ValidatePeakRateWindows(windows []PeakRateWindow) error {
 	return nil
 }
 
+// ChannelTimePricing 渠道模型定价的分时倍率配置。
+type ChannelTimePricing struct {
+	Timezone     string                     `json:"timezone"`
+	WeekdaysOnly bool                       `json:"weekdays_only,omitempty"`
+	Periods      []ChannelTimePricingPeriod `json:"periods"`
+}
+
+// ChannelTimePricingPeriod 是秒级的左闭右开分时倍率区间，并兼容历史 HH:mm 数据。
+type ChannelTimePricingPeriod struct {
+	StartTime  string  `json:"start_time"`
+	EndTime    string  `json:"end_time"`
+	Multiplier float64 `json:"multiplier"`
+}
+
 // PricingInterval 定价区间（token 区间 / 按次分层 / 图片分辨率分层）
 type PricingInterval struct {
+	CacheWrite1hPrice    *float64  `json:"cache_write_1h_price"`
 	ID                   int64     `json:"id,omitempty"`
 	PricingID            int64     `json:"pricing_id,omitempty"`
 	MinTokens            int       `json:"min_tokens"`
@@ -321,7 +344,7 @@ func (p *ChannelModelPricing) HasEffectivePricing() bool {
 	if mode == "" {
 		mode = BillingModeToken
 	}
-	if mode == BillingModeToken && p.PeakRateEnabled {
+	if mode == BillingModeToken && (p.PeakRateEnabled || p.TimePricing != nil && len(p.TimePricing.Periods) > 0 || len(p.ReasoningEffortMultipliers) > 0) {
 		return true
 	}
 	switch mode {
@@ -338,7 +361,7 @@ func (p *ChannelModelPricing) HasEffectivePricing() bool {
 	default:
 		if p.InputPrice != nil ||
 			p.OutputPrice != nil ||
-			p.CacheWritePrice != nil ||
+			p.CacheWritePrice != nil || p.CacheWrite1hPrice != nil ||
 			p.CacheReadPrice != nil ||
 			p.FastMultiplier != nil ||
 			p.FlexMultiplier != nil ||
@@ -350,7 +373,7 @@ func (p *ChannelModelPricing) HasEffectivePricing() bool {
 			iv := p.Intervals[i]
 			if iv.InputPrice != nil ||
 				iv.OutputPrice != nil ||
-				iv.CacheWritePrice != nil ||
+				iv.CacheWritePrice != nil || iv.CacheWrite1hPrice != nil ||
 				iv.CacheReadPrice != nil ||
 				iv.InputMultiplier != nil ||
 				iv.OutputMultiplier != nil ||
@@ -384,13 +407,13 @@ func (p *ChannelModelPricing) HasExplicitPriceFields() bool {
 		}
 		return false
 	}
-	if p.InputPrice != nil || p.OutputPrice != nil || p.CacheWritePrice != nil || p.CacheReadPrice != nil ||
+	if p.InputPrice != nil || p.OutputPrice != nil || p.CacheWritePrice != nil || p.CacheWrite1hPrice != nil || p.CacheReadPrice != nil ||
 		p.ImageInputPrice != nil || p.ImageOutputPrice != nil {
 		return true
 	}
 	for i := range p.Intervals {
 		interval := p.Intervals[i]
-		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil ||
+		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil || interval.CacheWrite1hPrice != nil ||
 			interval.CacheReadPrice != nil || interval.InputMultiplier != nil || interval.OutputMultiplier != nil ||
 			interval.CacheWriteMultiplier != nil || interval.CacheReadMultiplier != nil {
 			return true
@@ -399,19 +422,19 @@ func (p *ChannelModelPricing) HasExplicitPriceFields() bool {
 	return false
 }
 
-// HasOnlyPeakRateConfig 判断条目是否仅配置了 token 峰谷倍率。
+// HasOnlyPeakRateConfig 保留旧入口名称，判断条目是否只有峰谷、分时或思考倍率。
 // 这种配置需要继承模型目录的所有基础价格，不能把未填写的图片价格误判为显式免费。
 func (p *ChannelModelPricing) HasOnlyPeakRateConfig() bool {
-	if p == nil || !p.PeakRateEnabled || (p.BillingMode != "" && p.BillingMode != BillingModeToken) {
+	if p == nil || (!p.PeakRateEnabled && (p.TimePricing == nil || len(p.TimePricing.Periods) == 0) && len(p.ReasoningEffortMultipliers) == 0) || (p.BillingMode != "" && p.BillingMode != BillingModeToken) {
 		return false
 	}
 	if p.PriceMultiplier != nil || p.FastModeMultiplier != nil || p.FastMultiplier != nil || p.FlexMultiplier != nil ||
-		p.InputPrice != nil || p.OutputPrice != nil || p.CacheWritePrice != nil || p.CacheReadPrice != nil ||
+		p.InputPrice != nil || p.OutputPrice != nil || p.CacheWritePrice != nil || p.CacheWrite1hPrice != nil || p.CacheReadPrice != nil ||
 		p.ImageInputPrice != nil || p.ImageOutputPrice != nil || p.PerRequestPrice != nil {
 		return false
 	}
 	for _, interval := range p.Intervals {
-		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil ||
+		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil || interval.CacheWrite1hPrice != nil ||
 			interval.CacheReadPrice != nil || interval.InputMultiplier != nil || interval.OutputMultiplier != nil ||
 			interval.CacheWriteMultiplier != nil || interval.CacheReadMultiplier != nil || interval.PerRequestPrice != nil {
 			return false
@@ -423,6 +446,12 @@ func (p *ChannelModelPricing) HasOnlyPeakRateConfig() bool {
 // Clone 返回 ChannelModelPricing 的拷贝（切片独立，指针字段共享，调用方只读安全）
 func (p ChannelModelPricing) Clone() ChannelModelPricing {
 	cp := p
+	cp.ReasoningEffortMultipliers = maps.Clone(p.ReasoningEffortMultipliers)
+	if p.TimePricing != nil {
+		value := *p.TimePricing
+		value.Periods = append([]ChannelTimePricingPeriod(nil), value.Periods...)
+		cp.TimePricing = &value
+	}
 	if p.Models != nil {
 		cp.Models = make([]string, len(p.Models))
 		copy(cp.Models, p.Models)
@@ -605,6 +634,7 @@ func validateIntervalPrices(iv *PricingInterval, idx int) error {
 		{"input_price", iv.InputPrice},
 		{"output_price", iv.OutputPrice},
 		{"cache_write_price", iv.CacheWritePrice},
+		{"cache_write_1h_price", iv.CacheWrite1hPrice},
 		{"cache_read_price", iv.CacheReadPrice},
 		{"per_request_price", iv.PerRequestPrice},
 	}

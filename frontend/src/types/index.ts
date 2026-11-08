@@ -589,6 +589,8 @@ export type MarketplacePricingMode = 'token' | 'image' | 'unknown'
 export type MarketplacePriceStatus = 'priced' | 'unpriced'
 
 export interface MarketplacePricingInterval {
+  cache_write_1h_price_per_token?: number | null
+  fast_cache_write_1h_price_per_token?: number | null
   min_tokens: number
   max_tokens?: number | null
   input_price_per_token?: number
@@ -606,6 +608,10 @@ export interface MarketplacePricingInterval {
 }
 
 export interface MarketplaceModelPricing {
+  cache_write_1h_price_per_token?: number | null
+  fast_cache_write_1h_price_per_token?: number | null
+  reasoning_effort_multipliers?: Record<string, number>
+  time_pricing?: { timezone: string; weekdays_only?: boolean; periods: {start_time: string; end_time: string; multiplier: number}[] }
   pricing_mode: MarketplacePricingMode
   price_status: MarketplacePriceStatus
   input_price_per_token?: number

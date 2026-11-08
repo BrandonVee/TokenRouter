@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"strings"
+	"time"
 )
 
 // resolveAccountStatsCost 计算账号统计定价费用。
@@ -63,7 +64,7 @@ func resolveAccountStatsCostWithMapped(
 
 	// 优先级 1：自定义规则（始终尝试）
 	for _, customRuleModel := range accountStatsCustomRuleModels(platform, upstreamModel, requestedModel, channelMappedModel) {
-		if cost := tryCustomRules(channel, accountID, groupID, platform, customRuleModel, tokens, requestCount); cost != nil {
+		if cost := tryCustomRules(channel, accountID, groupID, platform, customRuleModel, tokens, requestCount, ctx); cost != nil {
 			return cost
 		}
 	}
@@ -87,13 +88,13 @@ func resolveAccountStatsCostWithMapped(
 				if qoderAliasRequiresManualPricingAny(model) {
 					continue
 				}
-				if cost := tryModelFilePricing(billingService, model, tokens, serviceTier); cost != nil {
+				if cost := tryModelFilePricing(billingService, model, tokens, serviceTier, ctx); cost != nil {
 					return cost
 				}
 			}
 			return nil
 		}
-		return tryModelFilePricing(billingService, upstreamModel, tokens, serviceTier)
+		return tryModelFilePricing(billingService, upstreamModel, tokens, serviceTier, ctx)
 	}
 
 	return nil
@@ -158,36 +159,30 @@ func uniqueNonEmptyAccountStatsModels(models []string) []string {
 }
 
 // tryModelFilePricing 使用模型定价文件（LiteLLM/fallback）中的价格计算费用。
-func tryModelFilePricing(billingService *BillingService, model string, tokens UsageTokens, serviceTier string) *float64 {
-	pricing, err := billingService.GetModelPricing(model)
-	if err != nil || pricing == nil {
+func tryModelFilePricing(billingService *BillingService, model string, tokens UsageTokens, serviceTier string, contexts ...context.Context) *float64 {
+	ctx := context.Background()
+	if len(contexts) > 0 && contexts[0] != nil {
+		ctx = contexts[0]
+	}
+	cost, err := billingService.CalculateCostUnified(CostInput{
+		Ctx: ctx, Model: model, Tokens: tokens, RateMultiplier: 1,
+		ServiceTier: normalizeBillingServiceTier(serviceTier), Resolver: NewModelPricingResolver(nil, billingService),
+	})
+	if err != nil || cost == nil || cost.TotalCost <= 0 {
 		return nil
 	}
-	normalizedTier := normalizeBillingServiceTier(serviceTier)
-	if normalizedTier == "priority" || normalizedTier == "fast" || normalizedTier == "flex" ||
-		billingService.shouldApplySessionLongContextPricing(tokens, pricing) {
-		breakdown, err := billingService.CalculateCostWithServiceTier(model, tokens, 1, normalizedTier)
-		if err != nil || breakdown == nil || breakdown.TotalCost <= 0 {
-			return nil
-		}
-		return &breakdown.TotalCost
-	}
-	cost := float64(tokens.InputTokens)*pricing.InputPricePerToken +
-		float64(tokens.OutputTokens)*pricing.OutputPricePerToken +
-		float64(tokens.CacheCreationTokens)*pricing.CacheCreationPricePerToken +
-		float64(tokens.CacheReadTokens)*pricing.CacheReadPricePerToken +
-		float64(tokens.ImageOutputTokens)*pricing.ImageOutputPricePerToken
-	if cost <= 0 {
-		return nil
-	}
-	return &cost
+	return &cost.TotalCost
 }
 
 // tryCustomRules 遍历自定义规则，按数组顺序先命中为准。
 func tryCustomRules(
 	channel *Channel, accountID, groupID int64,
-	platform, model string, tokens UsageTokens, requestCount int,
+	platform, model string, tokens UsageTokens, requestCount int, contexts ...context.Context,
 ) *float64 {
+	ctx := context.Background()
+	if len(contexts) > 0 && contexts[0] != nil {
+		ctx = contexts[0]
+	}
 	modelLower := strings.ToLower(model)
 	for _, rule := range channel.AccountStatsPricingRules {
 		if !matchAccountStatsRule(&rule, accountID, groupID) {
@@ -198,6 +193,14 @@ func tryCustomRules(
 			continue // 规则匹配但模型不在规则定价中，继续下一条
 		}
 		if cost := calculateStatsCost(pricing, tokens, requestCount); cost != nil {
+			*cost *= reasoningEffortBillingMultiplier(usageReasoningEffort(ctx), pricing.ReasoningEffortMultipliers)
+			at := GatewayTokenRequestPricingAtFromContext(ctx)
+			if at.IsZero() {
+				at = time.Now()
+			}
+			if pricing.BillingMode == "" || pricing.BillingMode == BillingModeToken {
+				*cost *= pricing.PeakMultiplierAt(at)
+			}
 			return cost
 		}
 	}
@@ -291,7 +294,7 @@ func calculateStatsCost(pricing *ChannelModelPricing, tokens UsageTokens, reques
 	}
 	var cost *float64
 	switch pricing.BillingMode {
-	case BillingModePerRequest, BillingModeImage:
+	case BillingModePerRequest, BillingModeImage, BillingModeVideo:
 		cost = calculatePerRequestStatsCost(pricing, requestCount)
 	default:
 		cost = calculateTokenStatsCost(pricing, tokens)
@@ -326,33 +329,30 @@ func calculatePerRequestStatsCost(pricing *ChannelModelPricing, requestCount int
 // If the pricing has intervals, find the matching interval by total token count
 // and use its prices instead of the flat pricing fields.
 func calculateTokenStatsCost(pricing *ChannelModelPricing, tokens UsageTokens) *float64 {
-	p := pricing
-	if validIntervals := filterValidTokenIntervals(pricing.Intervals); len(validIntervals) > 0 {
-		totalTokens := tokens.InputTokens + tokens.OutputTokens + tokens.CacheCreationTokens + tokens.CacheReadTokens
-		if iv := FindMatchingInterval(validIntervals, totalTokens); iv != nil {
-			p = &ChannelModelPricing{
-				InputPrice:       iv.InputPrice,
-				OutputPrice:      iv.OutputPrice,
-				CacheWritePrice:  iv.CacheWritePrice,
-				CacheReadPrice:   iv.CacheReadPrice,
-				ImageOutputPrice: pricing.ImageOutputPrice,
-			}
-		}
-	}
-	if !hasAnyTokenStatsPrice(p) || !hasAnyStatsTokenUsage(tokens) {
+	if !hasAnyTokenStatsPrice(pricing) || !hasAnyStatsTokenUsage(tokens) {
 		return nil
 	}
-	deref := func(ptr *float64) float64 {
-		if ptr == nil {
-			return 0
-		}
-		return *ptr
+	base := &ModelPricing{}
+	applyChannelTokenPriceOverrides(base, pricing)
+	if pricing.ImageInputPrice != nil {
+		base.ImageInputPricePerToken = *pricing.ImageInputPrice
 	}
-	cost := float64(tokens.InputTokens)*deref(p.InputPrice) +
-		float64(tokens.OutputTokens)*deref(p.OutputPrice) +
-		float64(tokens.CacheCreationTokens)*deref(p.CacheWritePrice) +
-		float64(tokens.CacheReadTokens)*deref(p.CacheReadPrice) +
-		float64(tokens.ImageOutputTokens)*deref(p.ImageOutputPrice)
+	if pricing.ImageOutputPrice != nil {
+		base.ImageOutputPricePerToken = *pricing.ImageOutputPrice
+		base.ImageOutputPriceExplicit = true
+	}
+	// 自定义统计价只继承本条规则的基础价格，不从模型目录补未知字段。
+	if validIntervals := filterValidTokenIntervals(pricing.Intervals); len(validIntervals) > 0 {
+		total := tokens.InputTokens + tokens.OutputTokens + tokens.CacheCreationTokens + tokens.CacheReadTokens
+		if iv := FindMatchingInterval(validIntervals, total); iv != nil {
+			base = intervalToModelPricingWithBase(iv, base.SupportsCacheBreakdown, pricing, base)
+		}
+	}
+	if tokens.CacheCreation5mTokens+tokens.CacheCreation1hTokens > 0 {
+		base.SupportsCacheBreakdown = true
+	}
+	// 与用户计费共用互斥的文本、图片和缓存桶，避免图片输出被重复计入文本输出。
+	cost := (&BillingService{}).computeTokenBreakdown(base, tokens, 1, "", false).TotalCost
 	if cost < 0 {
 		return nil
 	}
@@ -360,17 +360,25 @@ func calculateTokenStatsCost(pricing *ChannelModelPricing, tokens UsageTokens) *
 }
 
 func hasAnyTokenStatsPrice(pricing *ChannelModelPricing) bool {
-	return pricing != nil && (pricing.InputPrice != nil ||
-		pricing.OutputPrice != nil ||
-		pricing.CacheWritePrice != nil ||
-		pricing.CacheReadPrice != nil ||
-		pricing.ImageOutputPrice != nil)
+	if pricing == nil {
+		return false
+	}
+	if pricing.InputPrice != nil || pricing.ImageInputPrice != nil || pricing.OutputPrice != nil ||
+		pricing.CacheWritePrice != nil || pricing.CacheWrite1hPrice != nil || pricing.CacheReadPrice != nil || pricing.ImageOutputPrice != nil {
+		return true
+	}
+	for _, interval := range filterValidTokenIntervals(pricing.Intervals) {
+		if interval.InputPrice != nil || interval.OutputPrice != nil || interval.CacheWritePrice != nil || interval.CacheWrite1hPrice != nil || interval.CacheReadPrice != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func hasAnyStatsTokenUsage(tokens UsageTokens) bool {
-	return tokens.InputTokens > 0 ||
+	return tokens.InputTokens > 0 || tokens.ImageInputTokens > 0 ||
 		tokens.OutputTokens > 0 ||
-		tokens.CacheCreationTokens > 0 ||
+		tokens.CacheCreationTokens > 0 || tokens.CacheCreation5mTokens > 0 || tokens.CacheCreation1hTokens > 0 ||
 		tokens.CacheReadTokens > 0 ||
 		tokens.ImageOutputTokens > 0
 }

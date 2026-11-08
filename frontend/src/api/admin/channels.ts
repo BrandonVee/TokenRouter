@@ -8,6 +8,7 @@ import { apiClient } from '../client'
 export type BillingMode = 'token' | 'per_request' | 'image' | 'video'
 
 export interface PricingInterval {
+  cache_write_1h_price?: number | null
   id?: number
   min_tokens: number
   max_tokens: number | null
@@ -33,6 +34,9 @@ export interface PeakRateWindow {
 }
 
 export interface ChannelModelPricing {
+  cache_write_1h_price?: number | null
+  reasoning_effort_multipliers?: Record<string, number> | null
+  time_pricing?: ChannelTimePricing | null
   id?: number
   platform: string
   models: string[]
@@ -174,6 +178,7 @@ export async function remove(id: number): Promise<void> {
 }
 
 export interface ModelDefaultPricing {
+  cache_write_1h_price?: number | null
   found: boolean
   input_price?: number    // per-token price
   output_price?: number
@@ -206,3 +211,15 @@ export async function syncPricingModels(platform: string): Promise<SyncPricingMo
 
 const channelsAPI = { list, getById, create, update, remove, getModelDefaultPricing, syncPricingModels }
 export default channelsAPI
+
+export interface ChannelTimePricingPeriod {
+  start_time: string
+  end_time: string
+  multiplier: number
+}
+
+export interface ChannelTimePricing {
+  timezone: string
+  weekdays_only?: boolean
+  periods: ChannelTimePricingPeriod[]
+}

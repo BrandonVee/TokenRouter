@@ -20,6 +20,7 @@ import (
 
 // OpenAIRecordUsageInput input for recording usage
 type OpenAIRecordUsageInput struct {
+	PricingAt          time.Time // 异步结算保留请求准入时点。
 	Result             *OpenAIForwardResult
 	APIKey             *APIKey
 	User               *User
@@ -149,6 +150,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	if result == nil {
 		return errors.New("openai usage result is nil")
 	}
+	ctx = WithGatewayTokenRequestPricingAt(ctx, input.PricingAt)
+	ctx = withUsageReasoningEffort(ctx, result.ReasoningEffort)
+
 	if s.rateLimitService != nil && input.Account != nil && input.Account.Platform == PlatformOpenAI {
 		s.rateLimitService.ResetOpenAI403Counter(ctx, input.Account.ID)
 	}
@@ -487,6 +491,10 @@ func (s *OpenAIGatewayService) calculateOpenAIRecordUsageCost(
 	tokens UsageTokens,
 	serviceTier string,
 ) (*CostBreakdown, error) {
+	if result != nil {
+		ctx = withUsageReasoningEffort(ctx, result.ReasoningEffort)
+	}
+
 	billingModel := firstUsageBillingModel(billingModels)
 	if result != nil && result.WebSearchCalls > 0 {
 		// Codex alpha/search 网页搜索按次计费：上游不返回 usage/token 字段，单价只取

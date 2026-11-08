@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/BrandonVee/TokenRouter/internal/domain"
 	"log/slog"
+	"math"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/BrandonVee/TokenRouter/internal/domain"
 	infraerrors "github.com/BrandonVee/TokenRouter/internal/pkg/errors"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/pagination"
 	"github.com/tidwall/gjson"
@@ -691,7 +692,13 @@ func validatePricingEntries(pricing []ChannelModelPricing) error {
 	if err := validatePricingIntervals(pricing); err != nil {
 		return err
 	}
-	return validatePricingBillingMode(pricing)
+	if err := validatePricingBillingMode(pricing); err != nil {
+		return err
+	}
+	if err := validateReasoningEffortMultipliers(pricing); err != nil {
+		return err
+	}
+	return validatePricingTimePricing(pricing)
 }
 
 // validatePricingBillingMode 校验计费模式配置：按次/图片模式必须配价格或区间，所有价格和倍率不能为负，区间至少有一个价格字段。
@@ -791,6 +798,7 @@ func checkPricesNotNegative(p ChannelModelPricing) error {
 		{"input_price", p.InputPrice},
 		{"output_price", p.OutputPrice},
 		{"cache_write_price", p.CacheWritePrice},
+		{"cache_write_1h_price", p.CacheWrite1hPrice},
 		{"cache_read_price", p.CacheReadPrice},
 		{"image_input_price", p.ImageInputPrice},
 		{"image_output_price", p.ImageOutputPrice},
@@ -831,7 +839,7 @@ func validateAccountStatsPricingEntries(pricing []ChannelModelPricing) error {
 func checkIntervalsHavePrices(p ChannelModelPricing) error {
 	for _, iv := range p.Intervals {
 		if iv.InputPrice == nil && iv.OutputPrice == nil &&
-			iv.CacheWritePrice == nil && iv.CacheReadPrice == nil &&
+			iv.CacheWritePrice == nil && iv.CacheWrite1hPrice == nil && iv.CacheReadPrice == nil &&
 			iv.InputMultiplier == nil && iv.OutputMultiplier == nil &&
 			iv.CacheWriteMultiplier == nil && iv.CacheReadMultiplier == nil &&
 			iv.PerRequestPrice == nil {
@@ -1201,4 +1209,44 @@ type UpdateChannelInput struct {
 	FeaturesConfig             map[string]any
 	ApplyPricingToAccountStats *bool
 	AccountStatsPricingRules   *[]AccountStatsPricingRule
+}
+
+func validateReasoningEffortMultipliers(pricing []ChannelModelPricing) error {
+	for _, p := range pricing {
+		for effort, multiplier := range p.ReasoningEffortMultipliers {
+			switch effort {
+			case "none", "minimal", "low", "medium", "high", "xhigh", "max":
+			default:
+				return infraerrors.BadRequest("INVALID_REASONING_EFFORT_MULTIPLIER",
+					fmt.Sprintf("unsupported reasoning effort %q for models %v", effort, p.Models))
+			}
+			if math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
+				return infraerrors.BadRequest("INVALID_REASONING_EFFORT_MULTIPLIER",
+					fmt.Sprintf("reasoning_effort_multipliers.%s must be a finite number > 0", effort))
+			}
+		}
+	}
+	return nil
+}
+
+func validatePricingTimePricing(pricing []ChannelModelPricing) error {
+	for i := range pricing {
+		config := pricing[i].TimePricing
+		if config == nil {
+			continue
+		}
+		if len(config.Periods) == 0 {
+			pricing[i].TimePricing = nil
+			continue
+		}
+		mode := pricing[i].BillingMode
+		if mode != "" && mode != BillingModeToken {
+			return infraerrors.BadRequest("TIME_PRICING_UNSUPPORTED_MODE", "time pricing only supports token billing mode")
+		}
+		if err := validateChannelTimePricing(config); err != nil {
+			return infraerrors.BadRequest("INVALID_TIME_PRICING", fmt.Sprintf(
+				"invalid time pricing for platform '%s' models %v: %v", pricing[i].Platform, pricing[i].Models, err))
+		}
+	}
+	return nil
 }

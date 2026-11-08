@@ -277,12 +277,16 @@ func liftResponsesAdditionalTools(requestBody map[string]any) (bool, error) {
 
 // ExtractResponsesReasoningEffortFromBody reads Responses API reasoning.effort
 // and normalizes it for usage logging.
-func ExtractResponsesReasoningEffortFromBody(body []byte) *string {
+func ExtractResponsesReasoningEffortFromBody(body []byte, modelCandidates ...string) *string {
 	raw := strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String())
 	if raw == "" {
 		return nil
 	}
-	normalized := normalizeOpenAIReasoningEffort(raw)
+	model := strings.TrimSpace(firstNonEmpty(modelCandidates...))
+	if model == "" {
+		model = gjson.GetBytes(body, "model").String()
+	}
+	normalized := normalizeOpenAIReasoningEffortForModel(raw, model)
 	if normalized == "" {
 		return nil
 	}

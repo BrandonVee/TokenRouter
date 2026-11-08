@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -33,6 +34,7 @@ func (s *GatewayService) getUserGroupRateMultiplier(ctx context.Context, userID,
 // RecordUsageInput 记录使用量的输入参数。
 // 异步 worker 只接收计费所需快照，不能持有 ParsedRequest/RequestBodyRef 这类大请求体引用。
 type RecordUsageInput struct {
+	PricingAt          time.Time // 请求准入时冻结的计费时刻。
 	Result             *ForwardResult
 	APIKey             *APIKey
 	User               *User
@@ -507,6 +509,7 @@ type recordUsageOpts struct {
 // RecordUsage 记录使用量并扣费（或更新订阅用量）
 func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInput) error {
 	return s.recordUsageCore(ctx, &recordUsageCoreInput{
+		PricingAt:          input.PricingAt,
 		Result:             input.Result,
 		APIKey:             input.APIKey,
 		User:               input.User,
@@ -529,6 +532,7 @@ func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInpu
 
 // RecordUsageLongContextInput 记录使用量的输入参数（支持长上下文双倍计费）
 type RecordUsageLongContextInput struct {
+	PricingAt             time.Time
 	Result                *ForwardResult
 	APIKey                *APIKey
 	User                  *User
@@ -554,6 +558,7 @@ type RecordUsageLongContextInput struct {
 // RecordUsageWithLongContext 记录使用量并扣费，支持长上下文双倍计费（用于 Gemini）
 func (s *GatewayService) RecordUsageWithLongContext(ctx context.Context, input *RecordUsageLongContextInput) error {
 	return s.recordUsageCore(ctx, &recordUsageCoreInput{
+		PricingAt:          input.PricingAt,
 		Result:             input.Result,
 		APIKey:             input.APIKey,
 		User:               input.User,
@@ -579,6 +584,7 @@ func (s *GatewayService) RecordUsageWithLongContext(ctx context.Context, input *
 
 // recordUsageCoreInput 是 recordUsageCore 的公共输入字段，从两种输入结构体中提取。
 type recordUsageCoreInput struct {
+	PricingAt          time.Time
 	Result             *ForwardResult
 	APIKey             *APIKey
 	User               *User
@@ -602,6 +608,12 @@ type recordUsageCoreInput struct {
 // LongContextThreshold > 0 时 Token 计费回退走 CalculateCostWithLongContext。
 // @project-doc docs/domains/routing_and_billing.md#usage_settlement
 func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsageCoreInput, opts *recordUsageOpts) error {
+	if input == nil || input.Result == nil {
+		return errors.New("gateway usage result is nil")
+	}
+	ctx = WithGatewayTokenRequestPricingAt(ctx, input.PricingAt)
+	ctx = withUsageReasoningEffort(ctx, input.Result.ReasoningEffort)
+
 	result := input.Result
 	apiKey := input.APIKey
 	user := input.User
@@ -770,6 +782,10 @@ func (s *GatewayService) calculateRecordUsageCost(
 	imageMultiplier float64,
 	opts *recordUsageOpts,
 ) *CostBreakdown {
+	if result != nil {
+		ctx = withUsageReasoningEffort(ctx, result.ReasoningEffort)
+	}
+
 	// 图片生成：渠道定价为令牌计费时走令牌路径，否则走图片计费
 	if result.ImageCount > 0 {
 		// 先保留 fork 的计费模型来源解析，再决定是否强制按张。

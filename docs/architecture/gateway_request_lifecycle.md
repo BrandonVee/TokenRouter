@@ -153,6 +153,8 @@ client_model
 
 `simple` 模式跳过结算事务，只尽力写 Usage Log 并更新账号最后使用时间。请求热路径已经把响应交给客户端时，后台结算失败无法改写该响应，因此相关错误必须可观测并由幂等重试/对账流程处理。
 
+分时定价在请求首次建立网关上下文时冻结价格时点。异步用量任务通过 `usage_record_context.go` 只复制该时刻、请求 ID 和模型重定向信息，不持有 Gin Context 或完整请求；排队跨越价格时段不会重新按 worker 执行时间定价。实际档位由最终转发结果传入结算，`none`/`minimal` 只有实际保留转发时才参与对应倍率。
+
 ## 生图历史旁路
 
 只有部署者启用 `image_history` 且当前 API Key 所属用户主动开启保存时，OpenAI Images 与 Grok 图片生成/编辑 handler 才为本次请求附加捕获器。普通 JSON、SSE 和 OpenAI OAuth Images 转换层只收集最终图片，忽略 partial image 并在请求内去重；请求完成后才把图片引用及用户、Key、请求、endpoint、模型和 prompt 元数据提交给独立有界 worker pool。

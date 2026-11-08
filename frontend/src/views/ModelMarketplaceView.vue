@@ -299,6 +299,13 @@
           </div>
         </div>
 
+        <div v-if="pricingModifierRows(selectedPricing.model.pricing).length" class="grid gap-2 md:grid-cols-2" data-testid="pricing-modifiers">
+          <div v-for="row in pricingModifierRows(selectedPricing.model.pricing)" :key="row.key" class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2 text-sm dark:border-dark-700">
+            <span class="text-gray-500 dark:text-dark-400">{{ row.label }}</span>
+            <span class="text-right font-medium text-gray-900 dark:text-white">{{ row.value }}</span>
+          </div>
+        </div>
+
         <template
           v-if="pricingKind(selectedPricing.model.pricing) === 'token' && contextIntervalPricingRows(selectedPricing.model.pricing).length > 0"
         >
@@ -652,17 +659,21 @@ function hasPositiveValue(value?: number | null): value is number {
 }
 
 function hasContextIntervalPricing(pricing: MarketplaceModelPricing): boolean {
-  return pricing.context_intervals?.some((interval) => [
+  return pricing.context_intervals?.some((interval) =>
+    [interval.cache_write_1h_price_per_token, interval.fast_cache_write_1h_price_per_token]
+      .some(value => typeof value === 'number' && Number.isFinite(value) && value >= 0) || [
     interval.input_price_per_token,
     interval.image_input_price_per_token,
     interval.output_price_per_token,
     interval.cache_write_price_per_token,
+    interval.cache_write_1h_price_per_token,
     interval.cache_read_price_per_token,
     interval.image_output_price_per_token,
     interval.fast_input_price_per_token,
     interval.fast_image_input_price_per_token,
     interval.fast_output_price_per_token,
     interval.fast_cache_write_price_per_token,
+    interval.fast_cache_write_1h_price_per_token,
     interval.fast_cache_read_price_per_token,
     interval.fast_image_output_price_per_token,
   ].some(hasPositiveValue)) ?? false
@@ -885,6 +896,9 @@ function tokenPricingRowsFromValues(pricing: MarketplaceModelPricing | Marketpla
   if (hasPositiveValue(pricing.cache_write_price_per_token)) {
     rows.push({ key: 'cache_write', label: t('marketplace.cacheWrite'), value: formatPerMillion(pricing.cache_write_price_per_token) })
   }
+  if (typeof pricing.cache_write_1h_price_per_token === 'number' && Number.isFinite(pricing.cache_write_1h_price_per_token)) {
+    rows.push({ key: 'cache_write_1h', label: t('marketplace.cacheWrite1h'), value: formatPerMillion(pricing.cache_write_1h_price_per_token) })
+  }
   if (hasPositiveValue(pricing.cache_read_price_per_token)) {
     rows.push({ key: 'cache_read', label: t('marketplace.cacheRead'), value: formatPerMillion(pricing.cache_read_price_per_token) })
   }
@@ -903,6 +917,9 @@ function tokenPricingRowsFromValues(pricing: MarketplaceModelPricing | Marketpla
   if (hasPositiveValue(pricing.fast_cache_write_price_per_token)) {
     rows.push({ key: 'fast_cache_write', label: t('marketplace.fastCacheWrite'), value: formatPerMillion(pricing.fast_cache_write_price_per_token) })
   }
+  if (typeof pricing.fast_cache_write_1h_price_per_token === 'number' && Number.isFinite(pricing.fast_cache_write_1h_price_per_token)) {
+    rows.push({ key: 'fast_cache_1h', label: t('marketplace.fastCacheWrite1h'), value: formatPerMillion(pricing.fast_cache_write_1h_price_per_token) })
+  }
   if (hasPositiveValue(pricing.fast_cache_read_price_per_token)) {
     rows.push({ key: 'fast_cache_read', label: t('marketplace.fastCacheRead'), value: formatPerMillion(pricing.fast_cache_read_price_per_token) })
   }
@@ -910,6 +927,22 @@ function tokenPricingRowsFromValues(pricing: MarketplaceModelPricing | Marketpla
     rows.push({ key: 'fast_image_output', label: t('marketplace.fastImageOutput'), value: formatPerMillion(pricing.fast_image_output_price_per_token) })
   }
 
+  return rows
+}
+
+// 基础价格与可选倍率分开展示，避免把未配置的思考等级当作额外收费。
+function pricingModifierRows(pricing: MarketplaceModelPricing): PricingRow[] {
+  const rows = Object.entries(pricing.reasoning_effort_multipliers || {}).map(([effort, multiplier]) => ({
+    key: `effort-${effort}`, label: t('marketplace.reasoningMultiplier', { effort }), value: `×${multiplier}`
+  }))
+  const time = pricing.time_pricing
+  if (time?.periods.length) {
+    rows.push({ key: 'pricing-timezone', label: t('marketplace.pricingTimezone'), value: time.timezone })
+    if (time.weekdays_only) rows.push({ key: 'pricing-weekdays', label: t('marketplace.pricingDays'), value: t('marketplace.weekdaysOnly') })
+    for (const [index, period] of time.periods.entries()) {
+      rows.push({ key: `time-${index}`, label: `${period.start_time}–${period.end_time}`, value: `×${period.multiplier}` })
+    }
+  }
   return rows
 }
 

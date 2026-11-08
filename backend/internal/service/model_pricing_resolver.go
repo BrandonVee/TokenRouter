@@ -135,6 +135,13 @@ func (r *ModelPricingResolver) Resolve(ctx context.Context, input PricingInput) 
 
 	// 2. 如果有 GroupID，尝试渠道覆盖
 	if chPricing != nil {
+		// 只有倍率的配置不能把没有基础价格的未知模型变为免费模型。
+		if (basePricing == nil || source == PricingSourceUnpriced) && !chPricing.HasExplicitPriceFields() {
+			resolved.Source = PricingSourceUnpriced
+			resolved.BasePricing = nil
+			resolved.channelPricing = chPricing
+			return resolved
+		}
 		resolved.Source = PricingSourceChannel
 		resolved.channelPricing = chPricing
 		r.applyTokenOverrides(chPricing, resolved)
@@ -204,6 +211,11 @@ func (r *ModelPricingResolver) resolveConfiguredPricing(config *ChannelModelPric
 		return resolved
 	}
 	resolved.BasePricing, _ = r.resolveBasePricing(model)
+	if resolved.BasePricing == nil && !config.HasExplicitPriceFields() {
+		resolved.Source = PricingSourceUnpriced
+		return resolved
+	}
+
 	resolved.SupportsCacheBreakdown = resolved.BasePricing != nil && resolved.BasePricing.SupportsCacheBreakdown
 	resolved.SupportsServiceTier = resolved.BasePricing != nil && resolved.BasePricing.SupportsServiceTier
 	r.applyTokenOverrides(config, resolved)
@@ -241,7 +253,7 @@ func (r *ModelPricingResolver) resolveBasePricing(model string) (*ModelPricing, 
 	if err != nil {
 		slog.Debug("failed to get model pricing from LiteLLM, using fallback",
 			"model", model, "error", err)
-		return nil, PricingSourceFallback
+		return nil, PricingSourceUnpriced
 	}
 	return pricing, PricingSourceLiteLLM
 }
@@ -254,6 +266,12 @@ func (r *ModelPricingResolver) applyChannelOverrides(ctx context.Context, groupI
 	}
 	chPricing := r.channelService.GetEffectiveChannelModelPricing(ctx, groupID, model)
 	if chPricing == nil {
+		return
+	}
+
+	if resolved.BasePricing == nil && !chPricing.HasExplicitPriceFields() {
+		resolved.Source = PricingSourceUnpriced
+		resolved.channelPricing = chPricing
 		return
 	}
 
@@ -286,6 +304,7 @@ func (r *ModelPricingResolver) applyTokenOverrides(chPricing *ChannelModelPricin
 	}
 
 	applyChannelTokenPriceOverrides(resolved.BasePricing, chPricing)
+	resolved.SupportsCacheBreakdown = resolved.BasePricing.SupportsCacheBreakdown
 	resolved.BasePricing.FastMultiplier = chPricing.FastMultiplier
 	resolved.BasePricing.FlexMultiplier = chPricing.FlexMultiplier
 	if chPricing.HasOnlyPeakRateConfig() {
@@ -401,6 +420,7 @@ func multiplyPricingIntervals(intervals []PricingInterval, multiplier float64) [
 		scaled[i].InputPrice = multiplyPricePointer(intervals[i].InputPrice, multiplier)
 		scaled[i].OutputPrice = multiplyPricePointer(intervals[i].OutputPrice, multiplier)
 		scaled[i].CacheWritePrice = multiplyPricePointer(intervals[i].CacheWritePrice, multiplier)
+		scaled[i].CacheWrite1hPrice = multiplyPricePointer(intervals[i].CacheWrite1hPrice, multiplier)
 		scaled[i].CacheReadPrice = multiplyPricePointer(intervals[i].CacheReadPrice, multiplier)
 		scaled[i].PerRequestPrice = multiplyPricePointer(intervals[i].PerRequestPrice, multiplier)
 	}
@@ -415,6 +435,7 @@ func multiplyChannelPricingFields(pricing *ChannelModelPricing, multiplier float
 	pricing.InputPrice = multiplyPricePointer(pricing.InputPrice, multiplier)
 	pricing.OutputPrice = multiplyPricePointer(pricing.OutputPrice, multiplier)
 	pricing.CacheWritePrice = multiplyPricePointer(pricing.CacheWritePrice, multiplier)
+	pricing.CacheWrite1hPrice = multiplyPricePointer(pricing.CacheWrite1hPrice, multiplier)
 	pricing.CacheReadPrice = multiplyPricePointer(pricing.CacheReadPrice, multiplier)
 	pricing.ImageInputPrice = multiplyPricePointer(pricing.ImageInputPrice, multiplier)
 	pricing.ImageOutputPrice = multiplyPricePointer(pricing.ImageOutputPrice, multiplier)
@@ -437,7 +458,7 @@ func filterValidTokenIntervals(intervals []PricingInterval) []PricingInterval {
 	var valid []PricingInterval
 	for _, iv := range intervals {
 		if iv.InputPrice != nil || iv.OutputPrice != nil ||
-			iv.CacheWritePrice != nil || iv.CacheReadPrice != nil ||
+			iv.CacheWritePrice != nil || iv.CacheWrite1hPrice != nil || iv.CacheReadPrice != nil ||
 			iv.InputMultiplier != nil || iv.OutputMultiplier != nil ||
 			iv.CacheWriteMultiplier != nil || iv.CacheReadMultiplier != nil {
 			valid = append(valid, iv)
@@ -521,13 +542,20 @@ func intervalToModelPricingWithBase(iv *PricingInterval, supportsCacheBreakdown 
 		pricing.CacheCreationPricePerToken = *iv.CacheWritePrice
 		pricing.CacheCreationPriceExplicit = true
 		pricing.CacheCreation5mPrice = *iv.CacheWritePrice
-		pricing.CacheCreation1hPrice = *iv.CacheWritePrice
+		if iv.CacheWrite1hPrice == nil {
+			pricing.CacheCreation1hPrice = *iv.CacheWritePrice
+		}
 	} else if iv.CacheWriteMultiplier != nil {
 		pricing.CacheCreationPricePerToken = applyMultiplier(pricing.CacheCreationPricePerToken, iv.CacheWriteMultiplier)
 		pricing.CacheCreationPricePerTokenPriority = applyMultiplier(pricing.CacheCreationPricePerTokenPriority, iv.CacheWriteMultiplier)
 		pricing.CacheCreation5mPrice = applyMultiplier(pricing.CacheCreation5mPrice, iv.CacheWriteMultiplier)
 		pricing.CacheCreation1hPrice = applyMultiplier(pricing.CacheCreation1hPrice, iv.CacheWriteMultiplier)
 	}
+	if iv.CacheWrite1hPrice != nil {
+		pricing.CacheCreation1hPrice = *iv.CacheWrite1hPrice
+		pricing.SupportsCacheBreakdown = true
+	}
+
 	if iv.CacheReadPrice != nil {
 		pricing.CacheReadPricePerTokenPriority = channelTierOverridePrice(pricing.CacheReadPricePerToken, pricing.CacheReadPricePerTokenPriority, *iv.CacheReadPrice)
 		pricing.CacheReadPricePerToken = *iv.CacheReadPrice

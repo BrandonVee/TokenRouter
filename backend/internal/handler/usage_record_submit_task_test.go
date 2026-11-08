@@ -281,6 +281,22 @@ func TestOpenAIGatewayHandlerSubmitUsageRecordTask_PreservesRequestIDs(t *testin
 	}
 }
 
+// 回收 Gin 请求后，异步 worker 仍使用准入时冻结的价格时点。
+func TestUsageRecordTaskPreservesFrozenPricingAfterContextReuse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	at := time.Date(2026, 9, 18, 12, 0, 0, 0, time.UTC)
+	req := httptest.NewRequest("POST", "/v1/responses", nil)
+	c.Request = req.WithContext(service.WithGatewayTokenRequestPricingAt(req.Context(), at))
+	var actual time.Time
+	task := wrapUsageRecordTaskContext(c, func(ctx context.Context) {
+		actual = service.GatewayTokenRequestPricingAtFromContext(ctx)
+	})
+	c.Request = httptest.NewRequest("POST", "/next", nil)
+	task(context.Background())
+	require.Equal(t, at, actual)
+}
+
 func TestGatewayHandlerSubmitUsageRecordTask_PreservesRequestIDs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	pool := newUsageRecordTestPool(t)

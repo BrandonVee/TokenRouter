@@ -24,6 +24,7 @@ func usageRecordContextFromGin(c *gin.Context) context.Context {
 		}
 	}
 	dst = service.PropagateAPIKeyModelRedirectTrace(dst, src)
+	dst = service.WithGatewayTokenRequestPricingAt(dst, service.GatewayTokenRequestPricingAtFromContext(src))
 	return dst
 }
 
@@ -47,6 +48,7 @@ func wrapUsageRecordTaskContext(c *gin.Context, task func(context.Context)) func
 			}
 		}
 		base = service.PropagateAPIKeyModelRedirectTrace(base, requestCtx)
+		base = service.WithGatewayTokenRequestPricingAt(base, service.GatewayTokenRequestPricingAtFromContext(requestCtx))
 		task(base)
 	}
 }

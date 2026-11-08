@@ -78,7 +78,7 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 	setOpsRequestContext(c, model, false)
 	setOpsEndpointContext(c, "", int16(service.RequestTypeSync))
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
-	pricingAt := time.Now()
+	pricingAt := service.GatewayTokenRequestPricingAtFromContext(c.Request.Context())
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, model)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 
@@ -229,6 +229,7 @@ func (h *GatewayHandler) recordSystemOneUsage(c *gin.Context, apiKey *service.AP
 	h.submitMandatoryUsageRecordTask(c, func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 			Result:             &forwardResult,
+			PricingAt:          pricingAt,
 			APIKey:             apiKey,
 			User:               apiKey.User,
 			Account:            account,

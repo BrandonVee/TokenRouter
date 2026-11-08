@@ -147,7 +147,7 @@
             {{ t('admin.channels.form.defaultPrices', '默认价格（未命中区间时使用）') }}
             <span class="ml-1 font-normal text-gray-400">$/MTok</span>
           </label>
-          <div class="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-6">
+          <div class="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.inputPrice', '输入') }}</label>
               <input :value="entry.input_price" @input="emitField('input_price', ($event.target as HTMLInputElement).value)"
@@ -162,6 +162,11 @@
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWritePrice', '缓存写入') }}</label>
               <input :value="entry.cache_write_price" @input="emitField('cache_write_price', ($event.target as HTMLInputElement).value)"
                 type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder', '默认')" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheWrite1hPrice') }}</label>
+              <input :value="entry.cache_write_1h_price" @input="emitField('cache_write_1h_price', ($event.target as HTMLInputElement).value)"
+                type="number" step="any" min="0" class="input mt-0.5 text-sm" :placeholder="t('admin.channels.form.pricePlaceholder')" />
             </div>
             <div>
               <label class="text-xs text-gray-400">{{ t('admin.channels.form.cacheReadPrice', '缓存读取') }}</label>
@@ -195,6 +200,14 @@
             </div>
           </div>
 
+          <TimePricingSection
+            v-if="enableTimePricing || entry.time_pricing?.periods.length"
+            :model-value="entry.time_pricing ?? createDefaultTimePricingForm()"
+            @update:model-value="emit('update', { ...entry, time_pricing: $event })"
+          />
+          <p v-if="entry.time_pricing?.periods.length" class="mt-2 text-xs text-gray-500">
+            {{ t('admin.channels.form.timePricingOverridesPeak') }}
+          </p>
           <!-- 单模型峰谷价格，仅对 token 计费生效。 -->
           <section v-if="showPeakRate" class="peak-rate-panel mt-4">
             <div class="peak-rate-panel__header">
@@ -435,6 +448,42 @@
             />
           </div>
         </div>
+        <div class="mt-3 border-t border-gray-200 pt-3 dark:border-dark-600" data-testid="reasoning-effort-multipliers">
+          <div class="flex items-center justify-between gap-2">
+            <label class="text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('admin.channels.form.reasoningEffortMultipliers') }}
+            </label>
+            <button
+              v-if="Object.keys(entry.reasoning_effort_multipliers || {}).length"
+              type="button"
+              class="text-xs text-gray-500 hover:text-red-500"
+              @click="emit('update', { ...entry, reasoning_effort_multipliers: null })"
+            >
+              {{ t('admin.channels.form.clearReasoningEffortMultipliers') }}
+            </button>
+          </div>
+          <p class="mt-1 text-xs text-gray-400">{{ t('admin.channels.form.reasoningEffortMultipliersHint') }}</p>
+          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            <label v-for="effort in REASONING_EFFORT_LEVELS" :key="effort" class="text-xs text-gray-500 dark:text-gray-400">
+              {{ effort }}
+              <input
+                :value="entry.reasoning_effort_multipliers?.[effort]"
+                :aria-label="t('admin.channels.form.reasoningEffortMultiplierLabel', { effort })"
+                :aria-invalid="!isValidPositiveMultiplier(entry.reasoning_effort_multipliers?.[effort])"
+                :data-reasoning-effort="effort"
+                @input="updateReasoningEffortMultiplier(effort, ($event.target as HTMLInputElement).value)"
+                type="number"
+                step="any"
+                min="0"
+                class="input mt-0.5 text-sm"
+                :placeholder="t('admin.channels.form.reasoningEffortMultiplierDefault')"
+              />
+            </label>
+          </div>
+          <p v-if="reasoningEffortMultiplierError" role="alert" class="mt-1 text-xs text-red-500">
+            {{ reasoningEffortMultiplierError }}
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -448,6 +497,9 @@ import TimePicker from '@/components/common/TimePicker.vue'
 import Icon from '@/components/icons/Icon.vue'
 import IntervalRow from './IntervalRow.vue'
 import ModelTagInput from './ModelTagInput.vue'
+import TimePricingSection from './TimePricingSection.vue'
+import { REASONING_EFFORT_LEVELS, type ReasoningEffortLevel } from '@/constants/channel'
+import { createDefaultTimePricingForm, validateReasoningEffortMultipliers, isValidPositiveMultiplier } from './types'
 import type { PricingFormEntry, IntervalFormEntry, PeakRateWindowFormEntry } from './types'
 import { perTokenToMTok, getPlatformTagClass } from './types'
 import type { BillingMode } from '@/api/admin/channels'
@@ -461,12 +513,14 @@ const props = withDefaults(defineProps<{
   entry: PricingFormEntry
   platform?: string
   showFastModeMultiplier?: boolean
+  enableTimePricing?: boolean
   enableTierMultipliers?: boolean
   hideTokenIntervals?: boolean
   showPeakRate?: boolean
 }>(), {
   showFastModeMultiplier: false,
   enableTierMultipliers: false,
+  enableTimePricing: false,
   hideTokenIntervals: false,
   showPeakRate: true,
 })
@@ -500,6 +554,20 @@ const billingModeLabel = computed(() => {
   const opt = billingModeOptions.value.find(o => o.value === props.entry.billing_mode)
   return opt ? opt.label : props.entry.billing_mode
 })
+
+const reasoningEffortMultiplierError = computed(() =>
+  validateReasoningEffortMultipliers(props.entry.reasoning_effort_multipliers, t)
+)
+
+function updateReasoningEffortMultiplier(effort: ReasoningEffortLevel, value: string) {
+  const multipliers = { ...props.entry.reasoning_effort_multipliers }
+  if (value === '') delete multipliers[effort]
+  else multipliers[effort] = value
+  emit('update', {
+    ...props.entry,
+    reasoning_effort_multipliers: Object.keys(multipliers).length ? multipliers : null,
+  })
+}
 
 function emitField(field: keyof PricingFormEntry, value: string) {
   emit('update', { ...props.entry, [field]: value === '' ? null : value })
@@ -565,6 +633,7 @@ function onBillingModeUpdate(billingMode: BillingMode) {
     fast_mode_multiplier: billingMode === 'token' ? props.entry.fast_mode_multiplier : null,
     fast_multiplier: billingMode === 'token' ? props.entry.fast_multiplier : null,
     flex_multiplier: billingMode === 'token' ? props.entry.flex_multiplier : null,
+    time_pricing: billingMode === 'token' ? props.entry.time_pricing : createDefaultTimePricingForm(),
     peak_rate_enabled: billingMode === 'token' ? props.entry.peak_rate_enabled : false,
     peak_start: billingMode === 'token' ? props.entry.peak_start : '',
     peak_end: billingMode === 'token' ? props.entry.peak_end : '',
@@ -626,7 +695,7 @@ async function onModelsUpdate(newModels: string[]) {
   // 检查是否所有价格字段都为空
   const e = props.entry
   const hasPrice = e.input_price != null || e.output_price != null ||
-                   e.cache_write_price != null || e.cache_read_price != null
+                   e.cache_write_price != null || e.cache_write_1h_price != null || e.cache_read_price != null
   if (hasPrice) return
 
   // 查询第一个新增模型的默认价格
@@ -639,6 +708,7 @@ async function onModelsUpdate(newModels: string[]) {
         input_price: perTokenToMTok(result.input_price ?? null),
         output_price: perTokenToMTok(result.output_price ?? null),
         cache_write_price: perTokenToMTok(result.cache_write_price ?? null),
+        cache_write_1h_price: perTokenToMTok(result.cache_write_1h_price),
         cache_read_price: perTokenToMTok(result.cache_read_price ?? null),
         image_output_price: perTokenToMTok(result.image_output_price ?? null),
       })
