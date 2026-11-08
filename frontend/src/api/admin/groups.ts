@@ -472,6 +472,20 @@ export async function getCapacitySummary(): Promise<
   return data
 }
 
+// 获取调用白名单的完整候选，不受展示配置裁剪。
+export async function getModelAllowlistCandidates(
+  id: number,
+  platform?: GroupPlatform
+): Promise<string[]> {
+  const { data } = await apiClient.get<{ models: string[] }>(
+    `/admin/groups/${id}/model-allowlist-candidates`,
+    {
+      params: platform ? { platform } : undefined
+    }
+  )
+  return data.models || []
+}
+
 export const groupsAPI = {
   list,
   getAll,
@@ -480,6 +494,7 @@ export const groupsAPI = {
   getLiveCapability,
   getById,
   getModelsListCandidates,
+  getModelAllowlistCandidates,
   create,
   duplicate,
   update,

@@ -245,6 +245,7 @@ type SubscriptionPlanGroup struct {
 // 注意：普通用户接口不得返回 model_routing/account_count/account_groups 等内部信息。
 type AdminGroup struct {
 	Group
+	ModelAllowlist service.GroupModelAllowlist `json:"model_allowlist"`
 	// 利润配置属于内部经营信息，普通用户 Group 不返回。
 	ProfitControlEnabled bool    `json:"profit_control_enabled"`
 	ProfitMinMargin      float64 `json:"profit_min_margin"`

@@ -855,3 +855,7 @@ func (s *stubAdminService) CreateShadow(ctx context.Context, parentID int64, opt
 
 // Ensure stub implements interface.
 var _ service.AdminService = (*stubAdminService)(nil)
+
+func (s *stubAdminService) GetGroupModelAllowlistCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
+	return s.GetGroupModelsListCandidates(ctx, id, platform)
+}

@@ -694,8 +694,8 @@ func (w *opsCaptureWriter) shouldCapture() bool {
 	if w.ctx == nil {
 		return true
 	}
-	_, rejected := middleware2.GetIngressRejectReason(w.ctx)
-	return !rejected
+	reason, rejected := middleware2.GetIngressRejectReason(w.ctx)
+	return !rejected || reason == middleware2.IngressRejectModelNotAllowed
 }
 
 // OpsErrorLoggerMiddleware records error responses (status >= 400) into ops_error_logs.
@@ -719,7 +719,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 		c.Writer = w
 		c.Next()
 
-		if _, rejected := middleware2.GetIngressRejectReason(c); rejected {
+		if reason, rejected := middleware2.GetIngressRejectReason(c); rejected && reason != middleware2.IngressRejectModelNotAllowed {
 			return
 		}
 

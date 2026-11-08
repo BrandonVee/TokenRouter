@@ -119,9 +119,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 	}
 
-	originalBody := body
 	requestView := newOpenAIRequestView(body)
-	reqModel, reqStream, promptCacheKey := requestView.Model, requestView.Stream, requestView.PromptCacheKey
+	reqModel, reqStream := requestView.Model, requestView.Stream
 	originalModel := reqModel
 
 	if err := validateOpenAIReasoningEffort(body, originalModel); err != nil {
@@ -152,9 +151,9 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 	body = normalizeDeepSeekResponsesRequestBody(account, body)
 	// 规范化后的正文必须成为后续惰性解析和局部 patch 的共同基线，避免恢复旧 store/续接字段。
-	originalBody = body
+	originalBody := body
 	requestView = newOpenAIRequestView(body)
-	reqModel, reqStream, promptCacheKey = requestView.Model, requestView.Stream, requestView.PromptCacheKey
+	reqModel, reqStream, promptCacheKey := requestView.Model, requestView.Stream, requestView.PromptCacheKey
 
 	if account.Platform == PlatformOpenAI && account.Type == AccountTypeAPIKey {
 		sanitizedBody, changed, sanitizeErr := sanitizeOpenAIResponsesInputItemIDs(body)

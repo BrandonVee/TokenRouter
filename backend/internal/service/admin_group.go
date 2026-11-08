@@ -51,7 +51,7 @@ func (s *adminServiceImpl) GetGroup(ctx context.Context, id int64) (*Group, erro
 	return s.groupRepo.GetByID(ctx, id)
 }
 
-func (s *adminServiceImpl) GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
+func (s *adminServiceImpl) getGroupModelCandidates(ctx context.Context, id int64, platform string, filterDisplay bool) ([]string, error) {
 	platform = strings.TrimSpace(platform)
 	var existingGroup *Group
 	if id > 0 {
@@ -78,7 +78,7 @@ func (s *adminServiceImpl) GetGroupModelsListCandidates(ctx context.Context, id 
 	}
 
 	candidates := configuredModelsListCandidateIDs(accounts, platform)
-	if existingGroup != nil && existingGroup.Platform == platform && existingGroup.CustomModelsListEnabled() {
+	if filterDisplay && existingGroup != nil && existingGroup.Platform == platform && existingGroup.CustomModelsListEnabled() {
 		return filterModelsListCandidates(candidates, existingGroup.ModelsListConfig.Models), nil
 	}
 	if len(candidates) > 0 {
@@ -390,6 +390,11 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		return nil, infraerrors.BadRequest("INVALID_PROFIT_CONTROL", err.Error())
 	}
 
+	modelAllowlist, err := normalizeGroupModelAllowlist(input.ModelAllowlist)
+	if err != nil {
+		return nil, err
+	}
+
 	// 校验降级分组
 	if input.FallbackGroupID != nil {
 		if err := s.validateFallbackGroup(ctx, 0, *input.FallbackGroupID); err != nil {
@@ -523,6 +528,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DefaultMappedModel:              input.DefaultMappedModel,
 		MessagesDispatchModelConfig:     normalizeOpenAIMessagesDispatchModelConfig(input.MessagesDispatchModelConfig),
 		ModelsListConfig:                normalizeGroupModelsListConfig(input.ModelsListConfig),
+		ModelAllowlist:                  modelAllowlist,
 		AvailabilityProbeConfig:         availabilityProbeConfig,
 		RPMLimit:                        input.RPMLimit,
 		MaxReasoningEffort:              maxReasoningEffort,
@@ -978,6 +984,13 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.MessagesDispatchModelConfig != nil {
 		group.MessagesDispatchModelConfig = normalizeOpenAIMessagesDispatchModelConfig(*input.MessagesDispatchModelConfig)
+	}
+	if input.ModelAllowlist != nil {
+		normalized, err := normalizeGroupModelAllowlist(*input.ModelAllowlist)
+		if err != nil {
+			return nil, err
+		}
+		group.ModelAllowlist = normalized
 	}
 	if input.ModelsListConfig != nil {
 		group.ModelsListConfig = normalizeGroupModelsListConfig(*input.ModelsListConfig)
@@ -1436,4 +1449,14 @@ func compositeDefaultModelsListCandidateIDs() []string {
 		}
 	}
 	return ids
+}
+
+// GetGroupModelsListCandidates 保留原展示配置候选契约。
+func (s *adminServiceImpl) GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
+	return s.getGroupModelCandidates(ctx, id, platform, true)
+}
+
+// GetGroupModelAllowlistCandidates 返回准入可选模型全集，不受展示列表裁剪。
+func (s *adminServiceImpl) GetGroupModelAllowlistCandidates(ctx context.Context, id int64, platform string) ([]string, error) {
+	return s.getGroupModelCandidates(ctx, id, platform, false)
 }

@@ -116,6 +116,12 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return
 	}
 	res.Body = appendAPIKeyAliasesToGeminiModelsJSON(res.Body, apiKey.ModelMapping)
+	filtered, filterErr := filterGeminiModelListForAPIKey(res.Body, apiKey)
+	if filterErr != nil {
+		googleError(c, http.StatusBadGateway, "Invalid upstream model list")
+		return
+	}
+	res.Body = filtered
 	writeUpstreamResponse(c, res)
 }
 
@@ -128,6 +134,12 @@ func writeGeminiModelsListWithAPIKeyAliases(c *gin.Context, payload any, apiKey 
 	}
 	if apiKey != nil {
 		body = appendAPIKeyAliasesToGeminiModelsJSON(body, apiKey.ModelMapping)
+		var filterErr error
+		body, filterErr = filterGeminiModelListForAPIKey(body, apiKey)
+		if filterErr != nil {
+			googleError(c, http.StatusBadGateway, "Invalid model list")
+			return
+		}
 	}
 	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
 }
@@ -1073,4 +1085,35 @@ func googleClientErrorType(status int) string {
 func googleConcurrencyError(c *gin.Context, err error, slotType string) {
 	status, errType, message := concurrencyErrorResponse(err, slotType)
 	googleErrorWithType(c, status, errType, "", message)
+}
+
+// filterGeminiModelListForAPIKey 保留上游元数据与分页字段，只裁剪实际返回的模型对象。
+func filterGeminiModelListForAPIKey(body []byte, key *service.APIKey) ([]byte, error) {
+	if key == nil || !key.Group.ModelAllowlistEnabled() {
+		return body, nil
+	}
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+	var models []map[string]json.RawMessage
+	if err := json.Unmarshal(payload["models"], &models); err != nil {
+		return nil, err
+	}
+	filtered := make([]map[string]json.RawMessage, 0, len(models))
+	for _, model := range models {
+		var name string
+		if err := json.Unmarshal(model["name"], &name); err != nil {
+			return nil, err
+		}
+		if key.Group.ModelAllowlist.Allows(strings.TrimPrefix(name, "models/")) {
+			filtered = append(filtered, model)
+		}
+	}
+	raw, err := json.Marshal(filtered)
+	if err != nil {
+		return nil, err
+	}
+	payload["models"] = raw
+	return json.Marshal(payload)
 }

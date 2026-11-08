@@ -15,6 +15,7 @@ import (
 type IngressRejectReason string
 
 const (
+	IngressRejectModelNotAllowed        IngressRejectReason = "model_not_allowed"
 	IngressRejectQueryAPIKeyDeprecated  IngressRejectReason = "query_api_key_deprecated"
 	IngressRejectAPIKeyRequired         IngressRejectReason = "api_key_required"
 	IngressRejectInvalidAPIKey          IngressRejectReason = "invalid_api_key"

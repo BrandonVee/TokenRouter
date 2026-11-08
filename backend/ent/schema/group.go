@@ -265,6 +265,8 @@ func (Group) Fields() []ent.Field {
 			Default(domain.OpenAIMessagesDispatchModelConfig{}).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
 			Comment("OpenAI Messages 调度模型配置：按 Claude 系列/精确模型映射到目标 GPT 模型"),
+		// 调用准入与自定义展示分开保存，已有展示列表不自动升级为限制策略。
+		field.JSON("model_allowlist", domain.GroupModelAllowlist{}).Default(domain.GroupModelAllowlist{}).SchemaType(map[string]string{dialect.Postgres: "jsonb"}).Comment("分组可调用模型白名单，默认关闭"),
 		field.JSON("models_list_config", domain.GroupModelsListConfig{}).
 			Default(domain.GroupModelsListConfig{}).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).

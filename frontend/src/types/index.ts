@@ -794,6 +794,7 @@ export interface Group {
 }
 
 export interface AdminGroup extends Group {
+  model_allowlist: { enabled: boolean; models?: string[] }
   // 内部经营参数仅由管理接口返回。
   profit_control_enabled: boolean
   profit_min_margin: number
@@ -1030,6 +1031,7 @@ export interface UpdateApiKeyRequest {
 }
 
 export interface CreateGroupRequest {
+  model_allowlist?: { enabled: boolean; models?: string[] }
   profit_control_enabled?: boolean
   profit_min_margin?: number
   profit_safety_buffer?: number
@@ -1097,6 +1099,7 @@ export interface CreateGroupRequest {
 }
 
 export interface UpdateGroupRequest {
+  model_allowlist?: { enabled: boolean; models?: string[] }
   profit_control_enabled?: boolean
   profit_min_margin?: number
   profit_safety_buffer?: number

@@ -208,3 +208,7 @@ Apple Container 的 `APPLE_CONTAINER_NETWORK_SUBNET` 只在创建受管网络时
 升级完成后至少检查 `/health`、登录/API Key 鉴权、一个非流和流式网关请求、用量结算、关键后台任务及迁移表。保留旧产物和升级前备份，直到这些检查完成。
 
 相关文档：[系统架构](../architecture/system_architecture.md)、[配置边界](../interfaces/configuration.md)、[运维目录](index.md)。
+
+### 分组模型准入白名单
+
+迁移 274 新增独立的 `model_allowlist` JSONB 列，默认关闭，保留 `models_list_config` 列及全部旧展示配置。不要执行上游 235/236 的重命名及修复 SQL，否则会改变已有 fork 分组的调用权限。更新准入配置会将普通及复合 Key 的认证失效写入 outbox；认证快照 v38 保留两套独立配置并淘汰旧缓存。先完成全部后端实例升级再启用白名单，旧实例不执行该限制。回退旧后端会忽略新增列，不能在仍依赖该限制时回退。

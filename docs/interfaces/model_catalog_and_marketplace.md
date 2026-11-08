@@ -19,6 +19,8 @@
 
 管理员创建或编辑 API Key 账号时，可通过账号对应的 OpenAI 兼容或原生模型列表端点获取上游模型；同步结果会并入模型限制选择器，允许供应商新增的自定义模型参与白名单配置。Kimi 使用独立的 Kimi 模型候选目录，不回退到 Claude 默认目录。
 
+列表在追加 Key 别名后执行分组独立 `model_allowlist`，复合 Key 在加前缀前逐组取交集。旧 `models_list_config` 保留只控制展示的语义，两者互不覆盖。市场不含单 Key 别名，按已解析的公开模型直接取准入交集，参见[模型准入白名单](../domains/gateway_policy_controls.md#group_model_allowlist)。
+
 ## 市场可见性
 
 公开市场只返回 active、非 exclusive、且至少有一个 active account 的 Group。每个 Group 在解析后没有可请求模型时也会被隐藏。排序使用 Group 的显式顺序；市场不会按临时价格或实时错误任意重排产品。

@@ -666,7 +666,7 @@ func (s *ModelMarketplaceService) resolveGroupModels(ctx context.Context, group 
 		groupID := group.ID
 		resolution := s.gatewayService.ResolveRequestableModels(ctx, &groupID, group.Platform)
 		if len(resolution.Models) > 0 {
-			return buildMarketplaceModelDefsFromRequestable(resolution.Models, group.Platform)
+			return buildMarketplaceModelDefsFromRequestable(filterAllowlistedRequestableModels(group, resolution.Models), group.Platform)
 		}
 		// 已完成账号和渠道解析后，空结果必须保持为空，不能再次回退平台默认模型。
 		return nil
@@ -675,7 +675,7 @@ func (s *ModelMarketplaceService) resolveGroupModels(ctx context.Context, group 
 	if group == nil {
 		return nil
 	}
-	return defaultMarketplaceModelDefs(group.Platform)
+	return filterAllowlistedMarketplaceModels(group, defaultMarketplaceModelDefs(group.Platform))
 }
 
 // resolveGroupModelsWithAccounts 直接使用预取账号生成候选和执行 R -> C -> U 校验。
@@ -689,7 +689,7 @@ func (s *ModelMarketplaceService) resolveGroupModelsWithAccounts(ctx context.Con
 	if len(resolution.Models) == 0 {
 		return nil
 	}
-	return buildMarketplaceModelDefsFromRequestable(resolution.Models, group.Platform)
+	return buildMarketplaceModelDefsFromRequestable(filterAllowlistedRequestableModels(group, resolution.Models), group.Platform)
 }
 
 type marketplaceModelDef struct {
@@ -885,6 +885,32 @@ func marketplaceLookupCandidates(modelID string) []string {
 		}
 		seen[candidate] = struct{}{}
 		out = append(out, candidate)
+	}
+	return out
+}
+
+// 公开市场没有单 Key 别名，直接按各分组准入策略裁剪已解析的候选。
+func filterAllowlistedRequestableModels(group *Group, models []RequestableModel) []RequestableModel {
+	if !group.ModelAllowlistEnabled() {
+		return models
+	}
+	out := make([]RequestableModel, 0, len(models))
+	for _, model := range models {
+		if group.ModelAllowlist.Allows(model.ID) {
+			out = append(out, model)
+		}
+	}
+	return out
+}
+func filterAllowlistedMarketplaceModels(group *Group, models []marketplaceModelDef) []marketplaceModelDef {
+	if !group.ModelAllowlistEnabled() {
+		return models
+	}
+	out := make([]marketplaceModelDef, 0, len(models))
+	for _, model := range models {
+		if group.ModelAllowlist.Allows(model.ID) {
+			out = append(out, model)
+		}
 	}
 	return out
 }

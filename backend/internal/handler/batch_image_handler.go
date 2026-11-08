@@ -112,6 +112,9 @@ func (h *BatchImageHandler) Models(c *gin.Context) {
 				return
 			}
 			for _, model := range appendBatchImageAPIKeyModelAliases(models.Data, apiKey.ModelMapping) {
+				if !binding.Group.ModelAllowlist.Allows(model.ID) {
+					continue
+				}
 				model.ID = binding.Prefix + "/" + model.ID
 				out.Data = append(out.Data, model)
 			}
@@ -126,6 +129,15 @@ func (h *BatchImageHandler) Models(c *gin.Context) {
 	}
 	if apiKey != nil {
 		got.Data = appendBatchImageAPIKeyModelAliases(got.Data, apiKey.ModelMapping)
+		if apiKey.Group.ModelAllowlistEnabled() {
+			filtered := make([]service.BatchImagePublicModel, 0, len(got.Data))
+			for _, model := range got.Data {
+				if apiKey.Group.ModelAllowlist.Allows(model.ID) {
+					filtered = append(filtered, model)
+				}
+			}
+			got.Data = filtered
+		}
 	}
 	c.JSON(http.StatusOK, got)
 }

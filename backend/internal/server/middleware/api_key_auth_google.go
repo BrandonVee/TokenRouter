@@ -143,6 +143,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		if !captureGroupAllowlistModels(c, apiKey) {
+			return
+		}
 		apiKey, err = resolveCompositeAPIKeyRequest(c, apiKeyService, apiKey)
 		if err != nil {
 			abortCompositeKeyGoogleError(c, err)

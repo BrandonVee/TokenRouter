@@ -197,6 +197,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			AbortWithError(c, 401, "USER_INACTIVE", "User account is not active")
 			return
 		}
+		if !captureGroupAllowlistModels(c, apiKey) {
+			return
+		}
 		apiKey, err = resolveCompositeAPIKeyRequest(c, apiKeyService, apiKey)
 		if err != nil {
 			abortCompositeKeyError(c, err)

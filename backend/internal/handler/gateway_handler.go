@@ -1266,6 +1266,7 @@ func (h *GatewayHandler) compositeRequestableModels(c *gin.Context, apiKey *serv
 			available = filterModelsByCustomList(available, nil, group.ModelsListConfig.Models)
 		}
 		available = service.AppendAPIKeyModelAliases(available, apiKey.ModelMapping)
+		available = group.ModelAllowlist.FilterForListing(available)
 		for _, model := range available {
 			prefixed := binding.Prefix + "/" + model
 			if _, exists := seen[prefixed]; exists {
@@ -1315,6 +1316,7 @@ func writeCompositeModelsList(c *gin.Context, modelIDs []string) {
 }
 
 func writeModelsList(c *gin.Context, modelIDs []string) {
+	modelIDs = filterModelIDsForKeyGroup(c, modelIDs)
 	models := make([]claude.Model, 0, len(modelIDs))
 	for _, modelID := range modelIDs {
 		models = append(models, claude.Model{
@@ -1359,6 +1361,7 @@ type grokModelListItem struct {
 
 // writeGrokModelsList 返回 Grok Build 所需的 reasoning 能力，同时保留历史兼容字段。
 func writeGrokModelsList(c *gin.Context, modelIDs []string) {
+	modelIDs = filterModelIDsForKeyGroup(c, modelIDs)
 	defaults := xai.DefaultModels()
 	defaultsByID := make(map[string]xai.Model, len(defaults))
 	for _, model := range defaults {
@@ -1424,6 +1427,7 @@ func writeDefaultModelsList(c *gin.Context, platform string, modelIDs []string) 
 }
 
 func writeOpenAIModelsList(c *gin.Context, modelIDs []string) {
+	modelIDs = filterModelIDsForKeyGroup(c, modelIDs)
 	defaultsByID := make(map[string]openai.Model, len(openai.DefaultModels))
 	for _, model := range openai.DefaultModels {
 		defaultsByID[model.ID] = model
@@ -1452,6 +1456,7 @@ func writeOpenAIModelsList(c *gin.Context, modelIDs []string) {
 
 // writeClaudeCompatiblePlatformModelsList 保留各平台默认模型的展示元数据。
 func writeClaudeCompatiblePlatformModelsList(c *gin.Context, platform string, modelIDs []string) {
+	modelIDs = filterModelIDsForKeyGroup(c, modelIDs)
 	defaultsByID := make(map[string]claude.Model)
 	appendDefault := func(id, modelType, displayName, createdAt string) {
 		defaultsByID[id] = claude.Model{
@@ -2862,4 +2867,12 @@ func (h *GatewayHandler) getUserMsgQueueMode(account *service.Account, parsed *s
 		mode = h.cfg.Gateway.UserMessageQueue.GetEffectiveMode()
 	}
 	return mode
+}
+
+// filterModelIDsForKeyGroup 在别名扩展后取交集，允许公开别名独立于其内部目标配置策略。
+func filterModelIDsForKeyGroup(c *gin.Context, models []string) []string {
+	if key, ok := middleware2.GetAPIKeyFromContext(c); ok && key != nil && key.Group != nil {
+		return key.Group.ModelAllowlist.FilterForListing(models)
+	}
+	return models
 }

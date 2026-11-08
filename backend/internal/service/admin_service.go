@@ -43,6 +43,7 @@ type AdminService interface {
 	GetAllGroupsIncludingInactive(ctx context.Context) ([]Group, error)
 	GetGroup(ctx context.Context, id int64) (*Group, error)
 	GetGroupModelsListCandidates(ctx context.Context, id int64, platform string) ([]string, error)
+	GetGroupModelAllowlistCandidates(ctx context.Context, id int64, platform string) ([]string, error)
 	CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error)
 	// DuplicateGroup 创建停用状态的独立配置副本，并保留账号绑定及其优先级。
 	DuplicateGroup(ctx context.Context, id int64, actorScope, operationKey string) (*Group, error)
@@ -289,6 +290,7 @@ type CreateGroupInput struct {
 	RequireOAuthOnly            bool
 	RequirePrivacySet           bool
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
+	ModelAllowlist              GroupModelAllowlist
 	ModelsListConfig            GroupModelsListConfig
 	// AvailabilityProbeConfig 控制分组主动可用性探测。
 	AvailabilityProbeConfig GroupAvailabilityProbeConfig
@@ -377,6 +379,7 @@ type UpdateGroupInput struct {
 	RequireOAuthOnly            *bool
 	RequirePrivacySet           *bool
 	MessagesDispatchModelConfig *OpenAIMessagesDispatchModelConfig
+	ModelAllowlist              *GroupModelAllowlist
 	ModelsListConfig            *GroupModelsListConfig
 	// AvailabilityProbeConfig 为 nil 时不修改探测配置。
 	AvailabilityProbeConfig *GroupAvailabilityProbeConfig

@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 37 // v37：保留利润、隐私、OAuth-only 及 Messages 准入配置
+const apiKeyAuthSnapshotVersion = 38 // v38：保留独立的分组模型白名单
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -488,15 +488,15 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			AllowLive:                       apiKey.Group.AllowLive,
 			DefaultMappedModel:              apiKey.Group.DefaultMappedModel,
 			MessagesDispatchModelConfig:     apiKey.Group.MessagesDispatchModelConfig,
-			ModelsListConfig:                apiKey.Group.ModelsListConfig,
-			RPMLimit:                        apiKey.Group.RPMLimit,
-			MaxReasoningEffort:              apiKey.Group.MaxReasoningEffort,
-			ReasoningEffortMappings:         apiKey.Group.ReasoningEffortMappings,
-			PeakRateEnabled:                 apiKey.Group.PeakRateEnabled,
-			PeakStart:                       apiKey.Group.PeakStart,
-			PeakEnd:                         apiKey.Group.PeakEnd,
-			PeakRateMultiplier:              apiKey.Group.PeakRateMultiplier,
-			ProfitControlEnabled:            apiKey.Group.ProfitControlEnabled, ProfitMinMargin: apiKey.Group.ProfitMinMargin, ProfitSafetyBuffer: apiKey.Group.ProfitSafetyBuffer, RequireOAuthOnly: apiKey.Group.RequireOAuthOnly, RequirePrivacySet: apiKey.Group.RequirePrivacySet, AllowMessagesDispatch: apiKey.Group.AllowMessagesDispatch,
+			ModelsListConfig:                apiKey.Group.ModelsListConfig, ModelAllowlist: apiKey.Group.ModelAllowlist,
+			RPMLimit:                apiKey.Group.RPMLimit,
+			MaxReasoningEffort:      apiKey.Group.MaxReasoningEffort,
+			ReasoningEffortMappings: apiKey.Group.ReasoningEffortMappings,
+			PeakRateEnabled:         apiKey.Group.PeakRateEnabled,
+			PeakStart:               apiKey.Group.PeakStart,
+			PeakEnd:                 apiKey.Group.PeakEnd,
+			PeakRateMultiplier:      apiKey.Group.PeakRateMultiplier,
+			ProfitControlEnabled:    apiKey.Group.ProfitControlEnabled, ProfitMinMargin: apiKey.Group.ProfitMinMargin, ProfitSafetyBuffer: apiKey.Group.ProfitSafetyBuffer, RequireOAuthOnly: apiKey.Group.RequireOAuthOnly, RequirePrivacySet: apiKey.Group.RequirePrivacySet, AllowMessagesDispatch: apiKey.Group.AllowMessagesDispatch,
 		}
 	}
 	if apiKey.IsComposite {
@@ -630,15 +630,15 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			AllowLive:                       snapshot.Group.AllowLive,
 			DefaultMappedModel:              snapshot.Group.DefaultMappedModel,
 			MessagesDispatchModelConfig:     snapshot.Group.MessagesDispatchModelConfig,
-			ModelsListConfig:                snapshot.Group.ModelsListConfig,
-			RPMLimit:                        snapshot.Group.RPMLimit,
-			MaxReasoningEffort:              snapshot.Group.MaxReasoningEffort,
-			ReasoningEffortMappings:         snapshot.Group.ReasoningEffortMappings,
-			PeakRateEnabled:                 snapshot.Group.PeakRateEnabled,
-			PeakStart:                       snapshot.Group.PeakStart,
-			PeakEnd:                         snapshot.Group.PeakEnd,
-			PeakRateMultiplier:              snapshot.Group.PeakRateMultiplier,
-			ProfitControlEnabled:            snapshot.Group.ProfitControlEnabled, ProfitMinMargin: snapshot.Group.ProfitMinMargin, ProfitSafetyBuffer: snapshot.Group.ProfitSafetyBuffer, RequireOAuthOnly: snapshot.Group.RequireOAuthOnly, RequirePrivacySet: snapshot.Group.RequirePrivacySet, AllowMessagesDispatch: snapshot.Group.AllowMessagesDispatch,
+			ModelsListConfig:                snapshot.Group.ModelsListConfig, ModelAllowlist: snapshot.Group.ModelAllowlist,
+			RPMLimit:                snapshot.Group.RPMLimit,
+			MaxReasoningEffort:      snapshot.Group.MaxReasoningEffort,
+			ReasoningEffortMappings: snapshot.Group.ReasoningEffortMappings,
+			PeakRateEnabled:         snapshot.Group.PeakRateEnabled,
+			PeakStart:               snapshot.Group.PeakStart,
+			PeakEnd:                 snapshot.Group.PeakEnd,
+			PeakRateMultiplier:      snapshot.Group.PeakRateMultiplier,
+			ProfitControlEnabled:    snapshot.Group.ProfitControlEnabled, ProfitMinMargin: snapshot.Group.ProfitMinMargin, ProfitSafetyBuffer: snapshot.Group.ProfitSafetyBuffer, RequireOAuthOnly: snapshot.Group.RequireOAuthOnly, RequirePrivacySet: snapshot.Group.RequirePrivacySet, AllowMessagesDispatch: snapshot.Group.AllowMessagesDispatch,
 		}
 	}
 	if snapshot.IsComposite {
@@ -687,7 +687,7 @@ func authGroupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		ModelRoutingEnabled: group.ModelRoutingEnabled, MCPXMLInject: group.MCPXMLInject,
 		SupportedModelScopes: group.SupportedModelScopes, AllowedClientProtocols: cloneGroupClientProtocols(group.AllowedClientProtocols),
 		AllowLive: group.AllowLive, DefaultMappedModel: group.DefaultMappedModel,
-		MessagesDispatchModelConfig: group.MessagesDispatchModelConfig, ModelsListConfig: group.ModelsListConfig,
+		MessagesDispatchModelConfig: group.MessagesDispatchModelConfig, ModelsListConfig: group.ModelsListConfig, ModelAllowlist: group.ModelAllowlist,
 		RPMLimit: group.RPMLimit, MaxReasoningEffort: group.MaxReasoningEffort,
 		ReasoningEffortMappings: group.ReasoningEffortMappings, PeakRateEnabled: group.PeakRateEnabled,
 		PeakStart: group.PeakStart, PeakEnd: group.PeakEnd, PeakRateMultiplier: group.PeakRateMultiplier, ProfitControlEnabled: group.ProfitControlEnabled, ProfitMinMargin: group.ProfitMinMargin, ProfitSafetyBuffer: group.ProfitSafetyBuffer, RequireOAuthOnly: group.RequireOAuthOnly, RequirePrivacySet: group.RequirePrivacySet, AllowMessagesDispatch: group.AllowMessagesDispatch,
@@ -722,7 +722,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		ModelRoutingEnabled: snapshot.ModelRoutingEnabled, MCPXMLInject: snapshot.MCPXMLInject,
 		SupportedModelScopes: snapshot.SupportedModelScopes, AllowedClientProtocols: cloneGroupClientProtocols(snapshot.AllowedClientProtocols),
 		AllowLive: snapshot.AllowLive, DefaultMappedModel: snapshot.DefaultMappedModel,
-		MessagesDispatchModelConfig: snapshot.MessagesDispatchModelConfig, ModelsListConfig: snapshot.ModelsListConfig,
+		MessagesDispatchModelConfig: snapshot.MessagesDispatchModelConfig, ModelsListConfig: snapshot.ModelsListConfig, ModelAllowlist: snapshot.ModelAllowlist,
 		RPMLimit: snapshot.RPMLimit, MaxReasoningEffort: snapshot.MaxReasoningEffort,
 		ReasoningEffortMappings: snapshot.ReasoningEffortMappings, PeakRateEnabled: snapshot.PeakRateEnabled,
 		PeakStart: snapshot.PeakStart, PeakEnd: snapshot.PeakEnd, PeakRateMultiplier: snapshot.PeakRateMultiplier, ProfitControlEnabled: snapshot.ProfitControlEnabled, ProfitMinMargin: snapshot.ProfitMinMargin, ProfitSafetyBuffer: snapshot.ProfitSafetyBuffer, RequireOAuthOnly: snapshot.RequireOAuthOnly, RequirePrivacySet: snapshot.RequirePrivacySet, AllowMessagesDispatch: snapshot.AllowMessagesDispatch,

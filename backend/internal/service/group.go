@@ -142,6 +142,7 @@ type Group struct {
 	RequirePrivacySet           bool // 调度时仅允许 privacy 已成功设置的账号（OpenAI/Antigravity/Anthropic/Gemini）
 	DefaultMappedModel          string
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
+	ModelAllowlist              GroupModelAllowlist
 	ModelsListConfig            GroupModelsListConfig
 	// AvailabilityProbeConfig 控制该分组的主动可用性探测。
 	AvailabilityProbeConfig GroupAvailabilityProbeConfig
