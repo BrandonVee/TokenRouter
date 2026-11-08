@@ -45,11 +45,16 @@
             </div>
             <template v-else>
             <div class="card p-6">
+              <div v-if="renderedBonusNotice" class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" data-testid="recharge-bonus-notice" v-html="renderedBonusNotice"></div>
               <AmountInput
                 v-model="amount"
                 :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
                 :min="globalMinAmount"
                 :max="globalMaxAmount"
+                :bonus-tiers="rechargeBonusTiers"
+                :bonus-mode="rechargeBonusMode"
+                :multiplier="balanceRechargeMultiplier"
+                :currency="selectedCurrency"
               />
               <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
             </div>
@@ -96,7 +101,11 @@
               <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.paymentAmount') }}</span>
-                  <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(validAmount) }}</span>
+                  <span :class="discountAmount > 0 ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'">{{ formatSelectedPaymentAmount(validAmount) }}</span>
+                </div>
+                <div v-if="discountAmount > 0" class="flex justify-between" data-testid="recharge-discount-row">
+                  <span class="text-gray-500 dark:text-gray-400">{{ t('payment.rechargeBonus.discountLabelWithPercent', {percent:formatRechargeBonusNumber(bonusQuote.percent)}) }}</span>
+                  <span class="font-medium text-red-600 dark:text-red-400">-{{ formatSelectedPaymentAmount(discountAmount) }}</span>
                 </div>
                 <div v-if="rechargeFeeBreakdown.fixedFee > 0" class="flex justify-between">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fixedFee') }}</span>
@@ -110,11 +119,15 @@
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.feeTotal') }}</span>
                   <span class="text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(rechargeFeeBreakdown.totalFee) }}</span>
                 </div>
-                <div v-if="rechargeFeeBreakdown.totalFee > 0" class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
+                <div v-if="rechargeFeeBreakdown.totalFee > 0 || discountAmount > 0" class="flex justify-between border-t border-gray-200 pt-2 dark:border-dark-600">
                   <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
                   <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
                 </div>
-                <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': rechargeFeeBreakdown.totalFee <= 0 }">
+                <div v-if="bonusQuote.mode === 'bonus' && bonusQuote.bonus > 0" class="flex justify-between" data-testid="recharge-bonus-row">
+                  <span class="text-gray-500 dark:text-gray-400">{{ t('payment.rechargeBonus.amountLabelWithPercent', {percent:formatRechargeBonusNumber(bonusQuote.percent)}) }}</span>
+                  <span class="font-medium text-red-600 dark:text-red-400">+{{ formatBalanceAmount(bonusQuote.bonus, {fractionDigits:2}) }}</span>
+                </div>
+                <div v-if="balanceRechargeMultiplier !== 1 || bonusQuote.percent > 0" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': rechargeFeeBreakdown.totalFee <= 0 }">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
                   <span class="text-gray-900 dark:text-white">{{ formatBalanceAmount(creditedAmount, { fractionDigits: 2 }) }}</span>
                 </div>
@@ -332,6 +345,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { formatRechargeBonusNumber, normalizeRechargeBonusMode, normalizeRechargeBonusTiers, quoteRechargeBonus } from '@/utils/rechargeBonus'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useAuthStore } from '@/stores/auth'
@@ -611,7 +625,13 @@ const subscriptionUsdToCnyRate = computed(() => {
   const rate = checkout.value.subscription_usd_to_cny_rate
   return Number.isFinite(rate) && rate > 0 ? rate : 0
 })
-const creditedAmount = computed(() => Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100)
+const rechargeBonusTiers = computed(() => normalizeRechargeBonusTiers(checkout.value.recharge_bonus_tiers))
+const rechargeBonusMode = computed(() => normalizeRechargeBonusMode(checkout.value.recharge_bonus_mode))
+const renderedBonusNotice = computed(() => {
+  const raw = checkout.value.recharge_bonus_notice?.trim()
+  if (!raw) return ''
+  return DOMPurify.sanitize(marked.parse(raw, {async:false, gfm:true, breaks:true}))
+})
 const renderedHelpText = computed(() => {
   const content = checkout.value.help_text.trim()
   if (!content) return ''
@@ -719,6 +739,24 @@ function validateStripeBillingInfo(): boolean {
 }
 
 const selectedCurrency = computed(() => normalizePaymentCurrency(selectedLimit.value?.currency))
+// 同一输入金额先计算优惠，再用实际收款基数计算 fork 的固定和比例手续费。
+const bonusQuote = computed(() => quoteRechargeBonus(rechargeBonusTiers.value, validAmount.value, {
+  multiplier:balanceRechargeMultiplier.value, mode:rechargeBonusMode.value,
+  currencyDigits:paymentCurrencyFractionDigits(selectedCurrency.value),
+}))
+const payBaseAmount = computed(() => bonusQuote.value.payBase)
+const creditedAmount = computed(() => bonusQuote.value.credited)
+const discountAmount = computed(() => roundMoneyForCurrency(validAmount.value-payBaseAmount.value, selectedCurrency.value))
+
+function rechargePayAmountForMethod(method: string): number {
+  if (validAmount.value <= 0) return 0
+  const currency = normalizePaymentCurrency(visibleMethods.value[method]?.currency)
+  const quote = quoteRechargeBonus(rechargeBonusTiers.value, validAmount.value, {
+    multiplier:balanceRechargeMultiplier.value, mode:rechargeBonusMode.value, currencyDigits:paymentCurrencyFractionDigits(currency),
+  })
+  return calculateFeeBreakdown(quote.payBase, method).payAmount
+}
+
 const localeCode = computed(() => {
   const raw = i18n.locale as unknown
   if (typeof raw === 'string') return raw
@@ -748,7 +786,7 @@ const methodOptions = computed<PaymentMethodOption[]>(() =>
       fee_fixed: ml?.fee_fixed ?? 0,
       display_name: ml?.display_name,
       fee_rate: ml?.fee_rate ?? 0,
-      available: ml?.available !== false && amountFitsMethod(validAmount.value, type),
+      available: ml?.available !== false && amountFitsMethod(rechargePayAmountForMethod(type), type),
     }
   })
 )
@@ -795,27 +833,27 @@ function calculateFeeBreakdown(baseAmount: number, methodType: string): FeeBreak
   }
 }
 
-const rechargeFeeBreakdown = computed(() => calculateFeeBreakdown(validAmount.value, selectedMethod.value))
+const rechargeFeeBreakdown = computed(() => calculateFeeBreakdown(payBaseAmount.value, selectedMethod.value))
 const totalAmount = computed(() => rechargeFeeBreakdown.value.payAmount)
 
 const amountError = computed(() => {
   if (validAmount.value <= 0) return ''
   // No method can handle this amount
-  if (!enabledMethods.value.some((m) => amountFitsMethod(validAmount.value, m))) {
+  if (!enabledMethods.value.some((m) => amountFitsMethod(rechargePayAmountForMethod(m), m))) {
     return t('payment.amountNoMethod')
   }
   // Selected method can't handle this amount (but others can)
   const ml = selectedLimit.value
   if (ml) {
-    if (ml.single_min > 0 && validAmount.value < ml.single_min) return t('payment.amountTooLow', { min: formatSelectedPaymentAmount(ml.single_min) })
-    if (ml.single_max > 0 && validAmount.value > ml.single_max) return t('payment.amountTooHigh', { max: formatSelectedPaymentAmount(ml.single_max) })
+    if (ml.single_min > 0 && totalAmount.value < ml.single_min) return t('payment.amountTooLow', { min: formatSelectedPaymentAmount(ml.single_min) })
+    if (ml.single_max > 0 && totalAmount.value > ml.single_max) return t('payment.amountTooHigh', { max: formatSelectedPaymentAmount(ml.single_max) })
   }
   return ''
 })
 
 const canSubmit = computed(() =>
   validAmount.value > 0
-    && amountFitsMethod(validAmount.value, selectedMethod.value)
+    && amountFitsMethod(totalAmount.value, selectedMethod.value)
     && selectedLimit.value?.available !== false
     && (!isStripeSelected.value || (billingInfo.name.trim() !== '' && billingInfo.email.trim() !== ''))
 )

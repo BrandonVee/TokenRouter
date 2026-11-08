@@ -96,6 +96,7 @@ func TestCreateOrderInTx_WritesProviderSnapshot(t *testing.T) {
 				"secretKey": "do-not-copy",
 			},
 		},
+		0,
 	)
 	require.NoError(t, err)
 	require.Equal(t, strconv.FormatInt(instance.ID, 10), valueOrEmpty(order.ProviderInstanceID))
@@ -146,6 +147,7 @@ func TestCreateOrderInTx_WritesSubscriptionPlanCurrencySnapshot(t *testing.T) {
 		10,
 		payment.FeeBreakdown{BaseAmount: 72, PayAmount: 72},
 		&payment.InstanceSelection{ProviderKey: payment.TypeAlipay, PaymentMode: "redirect"},
+		0,
 	)
 	require.NoError(t, err)
 	require.Equal(t, "USD", order.PlanSnapshot.Currency)
@@ -180,12 +182,18 @@ func TestCreateOrderInTx_WritesFeeBreakdown(t *testing.T) {
 		&User{ID: user.ID, Email: user.Email, Username: user.Username},
 		nil,
 		&PaymentConfig{MaxPendingOrders: 3, OrderTimeoutMin: 30},
-		100,
+		120,
 		100,
 		breakdown,
 		&payment.InstanceSelection{InstanceID: strconv.FormatInt(instance.ID, 10), ProviderKey: payment.TypeStripe, SupportedTypes: "card,link", PaymentMode: "stripe"},
+		20,
 	)
 	require.NoError(t, err)
+	require.Equal(t, 120.0, order.Amount)
+	require.Equal(t, 20.0, order.BonusAmount)
+	require.Equal(t, 100.0, affiliateRebateBasePoints(order))
+	require.Equal(t, 104.7, calculateGatewayRefundAmount(order.Amount, order.PayAmount, order.Amount, "CNY"))
+	require.Equal(t, 52.35, calculateGatewayRefundAmount(order.Amount, order.PayAmount, 60, "CNY"))
 	require.Equal(t, 104.7, order.PayAmount)
 	require.Equal(t, 2.2, order.FeeRate)
 	require.Equal(t, 2.5, order.FeeFixed)

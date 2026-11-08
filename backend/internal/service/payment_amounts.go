@@ -34,7 +34,7 @@ func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {
 }
 
 // paymentOrderPurchasedReasoningPoints 返回订单用于邀请返利的推理积分基数。
-// 余额订单使用到账积分；30 天订阅套餐按月、周、日的优先级取第一个有效额度。
+// 余额订单使用扣除免费赠金后的到账积分；订阅套餐按月、周、日的优先级取第一个有效额度。
 func paymentOrderPurchasedReasoningPoints(order *dbent.PaymentOrder) (float64, bool) {
 	if order == nil {
 		return 0, false
@@ -43,7 +43,7 @@ func paymentOrderPurchasedReasoningPoints(order *dbent.PaymentOrder) (float64, b
 	var points float64
 	switch order.OrderType {
 	case payment.OrderTypeBalance:
-		points = order.Amount
+		points = paymentOrderAmountWithoutBonus(order)
 	case payment.OrderTypeSubscription:
 		limits := []*float64{
 			order.PlanSnapshot.MonthlyLimitUSD,

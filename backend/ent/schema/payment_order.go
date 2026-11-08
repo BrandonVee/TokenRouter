@@ -51,6 +51,8 @@ func (PaymentOrder) Fields() []ent.Field {
 		field.Float("fee_rate").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
 			Default(0),
+		// 免费赠金包含在到账总额内，单列记录用于展示和返利排除。
+		field.Float("bonus_amount").SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).Default(0),
 		field.Float("fee_fixed").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).
 			Default(0),

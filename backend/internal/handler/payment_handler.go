@@ -151,12 +151,13 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	}
 
 	response.Success(c, checkoutInfoResponse{
-		Methods:                       limitsResp.Methods,
-		GlobalMin:                     limitsResp.GlobalMin,
-		GlobalMax:                     limitsResp.GlobalMax,
-		Plans:                         planList,
-		BalanceDisabled:               cfg.BalanceDisabled,
-		BalanceRechargeMultiplier:     cfg.BalanceRechargeMultiplier,
+		Methods:                   limitsResp.Methods,
+		GlobalMin:                 limitsResp.GlobalMin,
+		GlobalMax:                 limitsResp.GlobalMax,
+		Plans:                     planList,
+		BalanceDisabled:           cfg.BalanceDisabled,
+		BalanceRechargeMultiplier: cfg.BalanceRechargeMultiplier,
+		RechargeBonusTiers:        cfg.RechargeBonusTiers, RechargeBonusMode: cfg.RechargeBonusMode, RechargeBonusNotice: cfg.RechargeBonusNotice,
 		SubscriptionUSDToCNYRate:      cfg.SubscriptionUSDToCNYRate,
 		RechargeFeeRate:               cfg.RechargeFeeRate,
 		MethodFees:                    cfg.MethodFees,
@@ -174,6 +175,9 @@ type checkoutInfoResponse struct {
 	GlobalMax                     float64                         `json:"global_max"`
 	Plans                         []checkoutPlan                  `json:"plans"`
 	BalanceDisabled               bool                            `json:"balance_disabled"`
+	RechargeBonusTiers            []service.RechargeBonusTier     `json:"recharge_bonus_tiers"`
+	RechargeBonusMode             string                          `json:"recharge_bonus_mode"`
+	RechargeBonusNotice           string                          `json:"recharge_bonus_notice"`
 	BalanceRechargeMultiplier     float64                         `json:"balance_recharge_multiplier"`
 	SubscriptionUSDToCNYRate      float64                         `json:"subscription_usd_to_cny_rate"`
 	RechargeFeeRate               float64                         `json:"recharge_fee_rate"`
@@ -519,6 +523,7 @@ func (h *PaymentHandler) VerifyOrder(c *gin.Context) {
 
 // PublicOrderResult 是签名恢复 token 可读取的订单结果；token 已证明持有支付会话。
 type PublicOrderResult struct {
+	BonusAmount         float64    `json:"bonus_amount"`
 	ID                  int64      `json:"id"`
 	OutTradeNo          string     `json:"out_trade_no"`
 	Amount              float64    `json:"amount"`
@@ -559,6 +564,7 @@ func buildPublicOrderResult(order *dbent.PaymentOrder) PublicOrderResult {
 		ID:                  order.ID,
 		OutTradeNo:          order.OutTradeNo,
 		Amount:              order.Amount,
+		BonusAmount:         order.BonusAmount,
 		PayAmount:           order.PayAmount,
 		FeeRate:             order.FeeRate,
 		FeeFixed:            order.FeeFixed,
@@ -668,6 +674,7 @@ func isMobile(c *gin.Context) bool {
 }
 
 type PaymentOrderResult struct {
+	BonusAmount         float64    `json:"bonus_amount"`
 	ID                  int64      `json:"id"`
 	UserID              int64      `json:"user_id"`
 	Amount              float64    `json:"amount"`
@@ -712,6 +719,7 @@ func sanitizePaymentOrderForResponse(order *dbent.PaymentOrder) *PaymentOrderRes
 		ID:                  order.ID,
 		UserID:              order.UserID,
 		Amount:              order.Amount,
+		BonusAmount:         order.BonusAmount,
 		PayAmount:           order.PayAmount,
 		FeeRate:             order.FeeRate,
 		FeeFixed:            order.FeeFixed,

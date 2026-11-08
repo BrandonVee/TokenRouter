@@ -70,8 +70,17 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			return nil, err
 		}
 	}
+	bonusAmount := 0.0
+	payBase := limitAmount
+	if req.OrderType == payment.OrderTypeBalance {
+		quote := quoteRechargeBonus(cfg, req.Amount, methodCurrency)
+		if err := validateRechargeQuote(quote); err != nil {
+			return nil, err
+		}
+		orderAmount, bonusAmount, payBase = quote.Credited, quote.Bonus, quote.PayBase
+	}
 	// 订阅订单先换算网关扣款基数，再统一应用 fork 的固定费与比例费模型。
-	feeBreakdown, payAmountStr, payAmount, err := calculateCreateOrderPayAmountForOrderType(limitAmount, methodFee, methodCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
+	feeBreakdown, payAmountStr, payAmount, err := calculateCreateOrderPayAmountForOrderType(payBase, methodFee, methodCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +96,14 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		selectedCurrency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
 	}
 	if selectedCurrency != methodCurrency {
-		feeBreakdown, payAmountStr, payAmount, err = calculateCreateOrderPayAmountForOrderType(limitAmount, methodFee, selectedCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
+		if req.OrderType == payment.OrderTypeBalance {
+			quote := quoteRechargeBonus(cfg, req.Amount, selectedCurrency)
+			if err := validateRechargeQuote(quote); err != nil {
+				return nil, err
+			}
+			orderAmount, bonusAmount, payBase = quote.Credited, quote.Bonus, quote.PayBase
+		}
+		feeBreakdown, payAmountStr, payAmount, err = calculateCreateOrderPayAmountForOrderType(payBase, methodFee, selectedCurrency, req.OrderType, cfg.SubscriptionUSDToCNYRate)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +129,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if oauthResp != nil {
 		return oauthResp, nil
 	}
-	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeBreakdown, sel)
+	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeBreakdown, sel, bonusAmount)
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +144,9 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 }
 
 func (s *PaymentService) validateOrderInput(ctx context.Context, req CreateOrderRequest, cfg *PaymentConfig) (*dbent.SubscriptionPlan, error) {
+	if req.OrderType != payment.OrderTypeBalance && req.OrderType != payment.OrderTypeSubscription {
+		return nil, infraerrors.BadRequest("INVALID_ORDER_TYPE", "unsupported order type")
+	}
 	if req.OrderType == payment.OrderTypeBalance && cfg.BalanceDisabled {
 		return nil, infraerrors.Forbidden("BALANCE_PAYMENT_DISABLED", "balance recharge has been disabled")
 	}
@@ -155,7 +174,7 @@ func (s *PaymentService) validateSubOrder(ctx context.Context, req CreateOrderRe
 	return plan, nil
 }
 
-func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount float64, feeBreakdown payment.FeeBreakdown, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount float64, feeBreakdown payment.FeeBreakdown, sel *payment.InstanceSelection, bonusAmount float64) (*dbent.PaymentOrder, error) {
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -189,6 +208,7 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 		SetUserName(user.Username).
 		SetNillableUserNotes(psNilIfEmpty(user.Notes)).
 		SetAmount(orderAmount).
+		SetBonusAmount(bonusAmount).
 		SetPayAmount(feeBreakdown.PayAmount).
 		SetFeeRate(feeBreakdown.FeeRate).
 		SetFeeFixed(feeBreakdown.FixedFee).
@@ -491,6 +511,7 @@ func (s *PaymentService) invokeProvider(ctx context.Context, order *dbent.Paymen
 	s.writeAuditLog(ctx, order.ID, "ORDER_CREATED", fmt.Sprintf("user:%d", req.UserID), map[string]any{
 		"paymentAmount":  req.Amount,
 		"creditedAmount": order.Amount,
+		"bonusAmount":    order.BonusAmount,
 		"payAmount":      order.PayAmount,
 		"paymentType":    req.PaymentType,
 		"orderType":      req.OrderType,
@@ -792,6 +813,7 @@ func buildCreateOrderResponse(order *dbent.PaymentOrder, req CreateOrderRequest,
 	return &CreateOrderResponse{
 		OrderID:       order.ID,
 		Amount:        order.Amount,
+		BonusAmount:   order.BonusAmount,
 		PayAmount:     payAmount,
 		FeeRate:       order.FeeRate,
 		FeeFixed:      order.FeeFixed,

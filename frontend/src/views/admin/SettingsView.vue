@@ -8072,6 +8072,13 @@
           </div>
 
           <!-- Provider Management -->
+          <RechargeBonusTierEditor
+            v-if="form.payment_enabled"
+            v-model="form.payment_recharge_bonus_tiers"
+            v-model:mode="form.payment_recharge_bonus_mode"
+            v-model:notice="form.payment_recharge_bonus_notice"
+          />
+
           <PaymentProviderList
             v-if="form.payment_enabled"
             :providers="providers"
@@ -8633,6 +8640,8 @@ import HelpTooltip from "@/components/common/HelpTooltip.vue";
 import ProviderIcon from "@/components/common/ProviderIcon.vue";
 import Select from "@/components/common/Select.vue";
 import ConfirmDialog from "@/components/common/ConfirmDialog.vue";
+import RechargeBonusTierEditor from "@/components/admin/settings/RechargeBonusTierEditor.vue";
+import { normalizeRechargeBonusMode, normalizeRechargeBonusTiers, sanitizeRechargeBonusTiersForSubmit, isRechargeBonusMinAmountValid, isRechargeBonusPercentValidForMode, isDuplicateRechargeBonusMinAmount, type RechargeBonusTierDraft, type RechargeBonusMode } from "@/utils/rechargeBonus";
 import PaymentProviderList from "@/components/payment/PaymentProviderList.vue";
 import PaymentProviderDialog from "@/components/payment/PaymentProviderDialog.vue";
 import Toggle from "@/components/common/Toggle.vue";
@@ -9221,10 +9230,16 @@ interface DefaultSubscriptionPlanOption {
 
 type SettingsForm = Omit<
   SystemSettings,
+  | "payment_recharge_bonus_tiers"
+  | "payment_recharge_bonus_mode"
+  | "payment_recharge_bonus_notice"
   | "wechat_connect_open_enabled"
   | "wechat_connect_mp_enabled"
   | "wechat_connect_mobile_enabled"
 > & {
+  payment_recharge_bonus_tiers: RechargeBonusTierDraft[];
+  payment_recharge_bonus_mode: RechargeBonusMode;
+  payment_recharge_bonus_notice: string;
   smtp_password: string;
   turnstile_secret_key: string;
   tencent_captcha_app_secret_key: string;
@@ -9329,6 +9344,9 @@ const form = reactive<SettingsForm>({
   payment_order_timeout_minutes: 30,
   payment_balance_disabled: false,
   payment_balance_recharge_multiplier: 1,
+  payment_recharge_bonus_tiers: [] as RechargeBonusTierDraft[],
+  payment_recharge_bonus_mode: 'bonus' as RechargeBonusMode,
+  payment_recharge_bonus_notice: '',
   payment_subscription_usd_to_cny_rate: 0,
   payment_recharge_fee_rate: 0,
   payment_method_fees: {},
@@ -10716,6 +10734,10 @@ async function loadSettings() {
           }))
         : defaultLoginAgreementDocuments();
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(settings));
+    form.payment_recharge_bonus_tiers = normalizeRechargeBonusTiers(settings.payment_recharge_bonus_tiers);
+    form.payment_recharge_bonus_mode = normalizeRechargeBonusMode(settings.payment_recharge_bonus_mode);
+    form.payment_recharge_bonus_notice = settings.payment_recharge_bonus_notice || '';
+
     form.default_platform_quotas = normalizePlatformQuotasMap(settings.default_platform_quotas);
     form.user_prompt_replacement_config =
       normalizeUserPromptReplacementConfig(
@@ -10912,6 +10934,16 @@ function findDuplicateDefaultSubscription(
 async function saveSettings() {
   saving.value = true;
   try {
+    // 完整但非法的优惠行必须修正；留空的草稿仍按编辑器契约忽略。
+    for (const [index, tier] of form.payment_recharge_bonus_tiers.entries()) {
+      if (tier.min_amount === null || tier.bonus_percent === null) continue;
+      let error = '';
+      if (!isRechargeBonusMinAmountValid(tier.min_amount)) error = 'invalidMinAmount';
+      else if (!isRechargeBonusPercentValidForMode(tier.bonus_percent, form.payment_recharge_bonus_mode)) error = form.payment_recharge_bonus_mode === 'discount' ? 'invalidDiscountPercent' : 'invalidPercent';
+      else if (isDuplicateRechargeBonusMinAmount(form.payment_recharge_bonus_tiers, index)) error = 'duplicateMinAmount';
+      if (error) { appStore.showError(t(`admin.settings.payment.rechargeBonus.${error}`)); activeTab.value = 'payment'; return; }
+    }
+
     const rawDefaultUserAPIKeyLimit = String(
       form.default_user_api_key_limit,
     ).trim();
@@ -11391,6 +11423,9 @@ async function saveSettings() {
       payment_order_timeout_minutes:
         Number(form.payment_order_timeout_minutes) || 0,
       payment_balance_disabled: form.payment_balance_disabled,
+      payment_recharge_bonus_tiers: sanitizeRechargeBonusTiersForSubmit(form.payment_recharge_bonus_tiers),
+      payment_recharge_bonus_mode: form.payment_recharge_bonus_mode,
+      payment_recharge_bonus_notice: form.payment_recharge_bonus_notice,
       payment_balance_recharge_multiplier:
         Number(form.payment_balance_recharge_multiplier) || 1,
       payment_subscription_usd_to_cny_rate:

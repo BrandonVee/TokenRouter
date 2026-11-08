@@ -13,6 +13,7 @@ import type {
   LoginAgreementDocument,
   NotifyEmailEntry,
 } from "@/types";
+import type { RechargeBonusTier } from "@/types/payment";
 import type { DashboardAd } from "@/types/dashboardAd";
 
 export interface PaymentMethodFeeConfig {
@@ -708,6 +709,9 @@ export interface SystemSettings {
   payment_enabled_types: string[];
   payment_balance_disabled: boolean;
   payment_balance_recharge_multiplier: number;
+  payment_recharge_bonus_tiers?: RechargeBonusTier[];
+  payment_recharge_bonus_mode?: string;
+  payment_recharge_bonus_notice?: string;
   payment_subscription_usd_to_cny_rate: number;
   payment_recharge_fee_rate: number;
   payment_method_fees: Record<string, PaymentMethodFeeConfig>;
@@ -1014,6 +1018,9 @@ export interface UpdateSettingsRequest {
   payment_enabled_types?: string[];
   payment_balance_disabled?: boolean;
   payment_balance_recharge_multiplier?: number;
+  payment_recharge_bonus_tiers?: RechargeBonusTier[];
+  payment_recharge_bonus_mode?: string;
+  payment_recharge_bonus_notice?: string;
   payment_subscription_usd_to_cny_rate?: number;
   payment_recharge_fee_rate?: number;
   payment_method_fees?: Record<string, PaymentMethodFeeConfig>;

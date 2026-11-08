@@ -165,7 +165,9 @@ marketplace: {
     notEnabledTitle: '该功能未开启',
     notEnabledDesc: '管理员暂未开启充值/订阅入口，请联系管理员。',
     notConfiguredTitle: '充值/订阅链接未配置',
-    notConfiguredDesc: '管理员已开启入口，但尚未配置充值/订阅链接，请联系管理员。'
+    notConfiguredDesc: '管理员已开启入口，但尚未配置充值/订阅链接，请联系管理员。',
+    rechargeDescription: '通过内嵌页面完成充值',
+    subscriptionDescription: '通过内嵌页面完成订阅'
   },
 // Custom Page (iframe embed)
   customPage: {
@@ -180,6 +182,10 @@ marketplace: {
     notConfiguredDesc: '该自定义页面的 URL 未正确配置。',
     markdownNotFound: '页面不存在',
     markdownLoadFailed: '页面加载失败',
+    tableOfContents: '目录',
+    copyCode: '复制',
+    copiedCode: '已复制',
+    copyCodeFailed: '失败',
   },
 // Announcements Page
   announcements: {
@@ -461,6 +467,10 @@ marketplace: {
         description: '<div class="tour-step-description"><p>普通成员只能查看自己发起的团队请求和个人请求，无法查看其他成员的用量或所有者的余额与订阅详情。</p></div>'
       },
       done: '完成导览'
+    },
+    navigation: {
+      flipPage: '翻页',
+      exit: '退出'
     }
   },
 // Payment System
@@ -551,6 +561,8 @@ marketplace: {
       actions: '操作',
       requestRefund: '申请退款',
       invoice: '账单',
+      bonusAmount: '赠送额度',
+      bonusIncluded: '含赠送 {amount}',
     },
     billing: {
       name: '账单抬头',
@@ -838,5 +850,13 @@ marketplace: {
         revoked: '已撤销',
       },
     },
+    rechargeBonus: {
+      creditedShort: '到账 {amount}',
+      payShort: '实付 {amount}',
+      amountLabel: '赠送额度',
+      amountLabelWithPercent: '赠送额度 (+{percent}%)',
+      discountLabelWithPercent: '优惠 ({percent}% OFF)',
+    },
+    billingUnavailable: '充值与订阅均暂未开放，请联系管理员。',
   },
 }

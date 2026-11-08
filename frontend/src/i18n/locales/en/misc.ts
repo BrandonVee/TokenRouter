@@ -167,7 +167,9 @@ marketplace: {
     notEnabledDesc: 'The administrator has not enabled the recharge/subscription entry. Please contact admin.',
     notConfiguredTitle: 'Recharge / Subscription URL not configured',
     notConfiguredDesc:
-      'The administrator enabled the entry but has not configured a recharge/subscription URL. Please contact admin.'
+      'The administrator enabled the entry but has not configured a recharge/subscription URL. Please contact admin.',
+    rechargeDescription: 'Recharge balance via the embedded page',
+    subscriptionDescription: 'Purchase subscription via the embedded page'
   },
 // Custom Page (iframe embed)
   customPage: {
@@ -182,6 +184,10 @@ marketplace: {
     notConfiguredDesc: 'The URL for this custom page has not been properly configured.',
     markdownNotFound: 'Page not found',
     markdownLoadFailed: 'Failed to load page',
+    tableOfContents: 'Contents',
+    copyCode: 'Copy',
+    copiedCode: 'Copied',
+    copyCodeFailed: 'Failed',
   },
 // Announcements Page
   announcements: {
@@ -437,6 +443,10 @@ marketplace: {
         description: '<div class="tour-step-description"><p>Members can only review their own team and personal requests. Other members\' usage and the owner\'s balance and subscription details remain private.</p></div>'
       },
       done: 'Finish guide'
+    },
+    navigation: {
+      flipPage: 'Flip Page',
+      exit: 'Exit'
     }
   },
 // Payment System
@@ -527,6 +537,8 @@ marketplace: {
       actions: 'Actions',
       requestRefund: 'Request Refund',
       invoice: 'Invoice',
+      bonusAmount: 'Bonus',
+      bonusIncluded: 'incl. bonus {amount}',
     },
     billing: {
       name: 'Billing Name',
@@ -814,5 +826,13 @@ marketplace: {
         revoked: 'Revoked',
       },
     },
+    rechargeBonus: {
+      creditedShort: 'Get {amount}',
+      payShort: 'Pay {amount}',
+      amountLabel: 'Bonus',
+      amountLabelWithPercent: 'Bonus (+{percent}%)',
+      discountLabelWithPercent: 'Discount ({percent}% OFF)',
+    },
+    billingUnavailable: 'Neither top-up nor subscriptions are currently available. Please contact the administrator.',
   },
 }

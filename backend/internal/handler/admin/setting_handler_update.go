@@ -328,6 +328,9 @@ type UpdateSettingsRequest struct {
 	PaymentMaxPendingOrders          *int                      `json:"payment_max_pending_orders"`
 	PaymentEnabledTypes              []string                  `json:"payment_enabled_types"`
 	PaymentBalanceDisabled           *bool                     `json:"payment_balance_disabled"`
+	PaymentRechargeBonusTiers        *[]dto.RechargeBonusTier  `json:"payment_recharge_bonus_tiers"`
+	PaymentRechargeBonusMode         *string                   `json:"payment_recharge_bonus_mode"`
+	PaymentRechargeBonusNotice       *string                   `json:"payment_recharge_bonus_notice"`
 	PaymentBalanceRechargeMultiplier *float64                  `json:"payment_balance_recharge_multiplier"`
 	PaymentSubscriptionUSDToCNYRate  *float64                  `json:"payment_subscription_usd_to_cny_rate"`
 	PaymentRechargeFeeRate           *float64                  `json:"payment_recharge_fee_rate"`
@@ -2153,6 +2156,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			EnabledTypes:                  req.PaymentEnabledTypes,
 			BalanceDisabled:               req.PaymentBalanceDisabled,
 			BalanceRechargeMultiplier:     req.PaymentBalanceRechargeMultiplier,
+			RechargeBonusTiers:            rechargeBonusTiersFromDTO(req.PaymentRechargeBonusTiers),
+			RechargeBonusMode:             req.PaymentRechargeBonusMode,
+			RechargeBonusNotice:           req.PaymentRechargeBonusNotice,
 			SubscriptionUSDToCNYRate:      req.PaymentSubscriptionUSDToCNYRate,
 			RechargeFeeRate:               req.PaymentRechargeFeeRate,
 			MethodFees:                    req.PaymentMethodFees,
@@ -2447,6 +2453,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentEnabledTypes:                              updatedPaymentCfg.EnabledTypes,
 		PaymentBalanceDisabled:                           updatedPaymentCfg.BalanceDisabled,
 		PaymentBalanceRechargeMultiplier:                 updatedPaymentCfg.BalanceRechargeMultiplier,
+		PaymentRechargeBonusTiers:                        rechargeBonusTiersToDTO(updatedPaymentCfg.RechargeBonusTiers),
+		PaymentRechargeBonusMode:                         rechargeBonusModeToDTO(updatedPaymentCfg.RechargeBonusMode),
+		PaymentRechargeBonusNotice:                       updatedPaymentCfg.RechargeBonusNotice,
 		PaymentSubscriptionUSDToCNYRate:                  updatedPaymentCfg.SubscriptionUSDToCNYRate,
 		PaymentRechargeFeeRate:                           updatedPaymentCfg.RechargeFeeRate,
 		PaymentMethodFees:                                updatedPaymentCfg.MethodFees,
@@ -2511,6 +2520,7 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentMaxAmount != nil || req.PaymentDailyLimit != nil ||
 		req.PaymentOrderTimeoutMin != nil || req.PaymentMaxPendingOrders != nil ||
 		req.PaymentEnabledTypes != nil || req.PaymentBalanceDisabled != nil ||
+		req.PaymentRechargeBonusTiers != nil || req.PaymentRechargeBonusMode != nil || req.PaymentRechargeBonusNotice != nil ||
 		req.PaymentBalanceRechargeMultiplier != nil || req.PaymentSubscriptionUSDToCNYRate != nil ||
 		req.PaymentRechargeFeeRate != nil || req.PaymentMethodFees != nil ||
 		req.PaymentLoadBalanceStrat != nil || req.PaymentProductNamePrefix != nil ||

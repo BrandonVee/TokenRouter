@@ -37,7 +37,11 @@
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.orders.payAmount') }}</p>
           <p class="text-sm font-medium text-gray-900 dark:text-white">{{ formatGatewayAmount(order.pay_amount) }}</p>
         </div>
-        <div v-if="order.amount !== order.pay_amount">
+        <div v-if="(order.bonus_amount ?? 0) > 0">
+          <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.orders.bonusAmount') }}</p>
+          <p class="text-sm font-medium text-amber-600 dark:text-amber-400">+{{ formatOrderAmount(order.bonus_amount ?? 0, order) }}</p>
+        </div>
+        <div v-if="order.amount !== order.pay_amount || (order.bonus_amount ?? 0) > 0">
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('payment.orders.creditedAmount') }}</p>
           <p class="text-sm font-medium text-gray-900 dark:text-white">{{ formatOrderAmount(order.amount, order) }}</p>
         </div>

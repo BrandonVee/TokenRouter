@@ -24,9 +24,15 @@ export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' 
 
 export type OrderType = 'balance' | 'subscription'
 
+/** 余额充值按输入金额匹配的赠金或折扣档位。 */
+export interface RechargeBonusTier { min_amount:number; bonus_percent:number }
+
 // ==================== Configuration ====================
 
 export interface PaymentConfig {
+  recharge_bonus_tiers?: RechargeBonusTier[]
+  recharge_bonus_mode?: string
+  recharge_bonus_notice?: string
   payment_enabled: boolean
   min_amount: number
   max_amount: number
@@ -72,6 +78,9 @@ export interface MethodLimitsResponse {
 
 /** Response from /payment/checkout-info API — single call for the payment page */
 export interface CheckoutInfoResponse {
+  recharge_bonus_tiers?: RechargeBonusTier[]
+  recharge_bonus_mode?: string
+  recharge_bonus_notice?: string
   methods: Record<string, MethodLimit>
   global_min: number
   global_max: number
@@ -94,6 +103,7 @@ export interface CheckoutInfoResponse {
 // ==================== Orders ====================
 
 export interface PaymentOrder {
+  bonus_amount?: number
   id: number
   user_id: number
   amount: number
@@ -243,6 +253,7 @@ export interface WechatJSAPIPayload {
 }
 
 export interface CreateOrderResult {
+  bonus_amount?: number
   order_id: number
   amount: number
   pay_url?: string

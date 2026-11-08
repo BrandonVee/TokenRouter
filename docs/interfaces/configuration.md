@@ -140,6 +140,8 @@ SMTP 的测试连接与实际发送共用同一建连路径和超时。`smtp_use
 
 不要把需要唯一约束、外键、状态机、列表查询或原子计数的数据编码成一个巨大 settings JSON。相反，只被单个进程组件启动时读取的连接池大小也不应新建业务表。
 
+支付配置的 `RECHARGE_BONUS_TIERS`、`RECHARGE_BONUS_MODE` 和 `RECHARGE_BONUS_NOTICE` 属于数据库运行时设置：档位默认空、模式默认 `bonus`、活动文案默认空。管理接口使用 `payment_recharge_bonus_*` 字段，checkout-info 使用 `recharge_bonus_*`。PATCH 省略字段保持当前配置，空档位数组明确关闭优惠；模式与已有档位组合必须一起合法。计算、订单快照与退款边界见[支付与权益](../domains/payments_and_entitlements.md#recharge_offers)。
+
 ## 定价目录与覆盖层
 
 模型定价由三层数据合成，优先级从低到高为远程目录（`pricing.remote_url`）、本地回退文件（`pricing.fallback_file`）和覆盖补丁文件（`pricing.override_file`）。三层都经过同一个解析器，因此覆盖层同样能修补 `*_above_<N>k_tokens` 长上下文档位与显式 `long_context_*` 字段，并参与同一次阶梯折算。
