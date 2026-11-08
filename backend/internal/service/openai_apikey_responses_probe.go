@@ -122,6 +122,11 @@ func (s *AccountTestService) ProbeOpenAIAPIKeyResponsesSupport(ctx context.Conte
 		return
 	}
 
+	// 强制协议模式不读取探测标记，跳过没有路由收益的上游调用。
+	if mode, _ := account.Extra[openai_compat.ExtraKeyResponsesMode].(string); openai_compat.NormalizeResponsesSupportMode(mode) != openai_compat.ResponsesSupportModeAuto {
+		return
+	}
+
 	apiKey := account.GetOpenAIProtocolAPIKey()
 	if apiKey == "" {
 		logger.LegacyPrintf("service.openai_probe", "probe_skip_no_apikey: account_id=%d", accountID)

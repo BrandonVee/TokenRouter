@@ -47,6 +47,10 @@ Cloudflare 1010 是边缘拦截，不消耗账号 403 连续错误次数，也�
 
 平台可维护独立的上游额度快照：OpenAI/Codex 窗口、Gemini tier/model quota、Antigravity credits、Grok 计费/媒体资格、Qoder Credits 等。快照用于调度、容量展示和诊断，不是 TokenRouter 用户余额或订阅账本。
 
+Anthropic Setup Token 的单账号查询与批量被动查询共用响应头采样的 5h、7d 和 7d_oi 窗口，不主动调用需要 profile scope 的 usage API。只有周窗口的成功响应和官方窗口限流的 429 也要采样，不能依赖 5h status 存在；5h 重置只清除本窗口利用率，保留独立周窗口的快照与采样时间，缺失数据仍不伪造为实时值。
+
+OpenAI API Key 的 Responses 能力探测只在 `openai_responses_mode=auto`（含未设置或无效值的默认归一化）时执行，强制 Responses/Chat 模式跳过无效上游调用。GPT Image 账号连接测试不发送上游拒绝的 `response_format`；其它兼容图片模型保留原有格式请求。
+
 OpenAI 重置次数查询把带到期时间的完整结果保存为账号展示快照；上游只返回正数次数却缺少到期明细时，实时结果仍返回给调用方，但旧快照必须保留。直接调用重置 API 成功消费次数后，服务先在脱离客户端取消信号的有界上下文中恢复账号 error、限流和临时不可调度状态，再回读额度快照与最新账号投影；恢复不修改人工 `schedulable` 开关。后续步骤部分失败时响应使用 `cache_refreshed`、`account_state_recovered` 和 `warning_code` 明确区分，调用方不得把已消费的次数当作可重试失败。
 
 OpenAI API Key 可探测 Responses、Chat、Embeddings 等 endpoint capability。Responses 探测只有在响应足以下结论时才写入能力标记：2xx 响应若仍因 `max_output_tokens` 未完成，或响应状态为 `failed`，应保持 unknown，不能持久化为“不支持 Responses”；完成但没有 `function_call` 的响应仍判定为不支持。Ollama Cloud 等兼容 API Key 上游可以保存其管理会话和用量快照，但只有明确匹配的账号才进入探测，不能把探测协议推广到所有 `apikey`。Grok 计费与媒体资格、各平台额度探测也继续使用各自独立协议。

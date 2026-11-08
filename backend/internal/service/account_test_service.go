@@ -458,7 +458,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		if err != nil {
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
-		apiURL = strings.TrimSuffix(normalizedBaseURL, "/") + "/v1/messages?beta=true"
+		apiURL = buildAnthropicMessagesURL(normalizedBaseURL)
 	} else {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Unsupported account type: %s", account.Type))
 	}
@@ -2356,6 +2356,10 @@ func (s *AccountTestService) testOpenAIImageAPIKey(c *gin.Context, ctx context.C
 		"prompt":          prompt,
 		"n":               1,
 		"response_format": "b64_json",
+	}
+	// GPT Image 默认返回 base64 且拒绝 response_format；其他兼容图片上游保留原请求。
+	if IsGPTImageGenerationModel(modelID) {
+		delete(payload, "response_format")
 	}
 	payloadBytes, _ := json.Marshal(payload)
 

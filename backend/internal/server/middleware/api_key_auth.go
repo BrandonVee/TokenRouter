@@ -17,6 +17,19 @@ import (
 
 const maxAPIKeyAuthorizationHeaderBytes = service.MaxAPIKeyCredentialBytes + 128
 
+// statusClientClosedRequest 表示客户端在认证查询完成前已取消请求。
+const statusClientClosedRequest = 499
+
+// abortIfAPIKeyLookupClientGone 仅把入站请求上下文已结束的查询失败记为客户端取消。
+// 数据库自身超时而客户端仍在线时，继续由调用方报告服务端错误。
+func abortIfAPIKeyLookupClientGone(c *gin.Context) bool {
+	if c.Request.Context().Err() == nil {
+		return false
+	}
+	c.AbortWithStatus(statusClientClosedRequest)
+	return true
+}
+
 // NewAPIKeyAuthMiddleware 创建 API Key 认证中间件
 func NewAPIKeyAuthMiddleware(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) APIKeyAuthMiddleware {
 	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, subscriptionService, cfg))
@@ -116,6 +129,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				return
 			}
 			if abortTeamAPIKeyError(c, err) {
+				return
+			}
+			if abortIfAPIKeyLookupClientGone(c) {
 				return
 			}
 			AbortWithError(c, 500, "INTERNAL_ERROR", "Failed to validate API key")

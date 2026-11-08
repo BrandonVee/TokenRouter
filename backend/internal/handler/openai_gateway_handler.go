@@ -2627,6 +2627,10 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 		return
 	}
 	if failoverErr.IsOpenAIRequestBodyTooLarge() {
+		// 切号耗尽后再应用管理员规则；上游 413 不能绕过显式的客户端错误改写。
+		if h.applyOpenAIFailoverPassthroughRule(c, failoverErr.StatusCode, failoverErr.ResponseBody, streamStarted) {
+			return
+		}
 		service.SetOpsUpstreamError(c, http.StatusRequestEntityTooLarge, service.OpenAIRequestBodyTooLargeClientMessage, "")
 		h.handleStreamingAwareError(
 			c,
@@ -2662,27 +2666,8 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	}
 
 	// 先检查透传规则
-	if h.errorPassthroughService != nil && len(responseBody) > 0 {
-		if rule := h.errorPassthroughService.MatchRule("openai", statusCode, responseBody); rule != nil {
-			// 确定响应状态码
-			respCode := statusCode
-			if !rule.PassthroughCode && rule.ResponseCode != nil {
-				respCode = *rule.ResponseCode
-			}
-
-			// 确定响应消息
-			msg := service.ExtractUpstreamErrorMessage(responseBody)
-			if !rule.PassthroughBody && rule.CustomMessage != nil {
-				msg = *rule.CustomMessage
-			}
-
-			if rule.SkipMonitoring {
-				c.Set(service.OpsSkipPassthroughKey, true)
-			}
-
-			h.handleStreamingAwareError(c, respCode, "upstream_error", msg, streamStarted)
-			return
-		}
+	if h.applyOpenAIFailoverPassthroughRule(c, statusCode, responseBody, streamStarted) {
+		return
 	}
 
 	// 记录原始上游状态码，以便 ops 错误日志捕获真实的上游错误
@@ -2692,6 +2677,31 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	// 使用默认的错误映射
 	status, errType, errMsg := h.mapUpstreamError(statusCode)
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
+}
+
+// applyOpenAIFailoverPassthroughRule 统一应用最终错误规则，命中并写入响应后返回 true。
+// @project-doc docs/interfaces/gateway_error_policy.md#error_passthrough_rule_matching
+func (h *OpenAIGatewayHandler) applyOpenAIFailoverPassthroughRule(c *gin.Context, statusCode int, responseBody []byte, streamStarted bool) bool {
+	if h.errorPassthroughService == nil || statusCode <= 0 || len(responseBody) == 0 {
+		return false
+	}
+	rule := h.errorPassthroughService.MatchRule("openai", statusCode, responseBody)
+	if rule == nil {
+		return false
+	}
+	respCode := statusCode
+	if !rule.PassthroughCode && rule.ResponseCode != nil {
+		respCode = *rule.ResponseCode
+	}
+	msg := service.ExtractUpstreamErrorMessage(responseBody)
+	if !rule.PassthroughBody && rule.CustomMessage != nil {
+		msg = *rule.CustomMessage
+	}
+	if rule.SkipMonitoring {
+		c.Set(service.OpsSkipPassthroughKey, true)
+	}
+	h.handleStreamingAwareError(c, respCode, "upstream_error", msg, streamStarted)
+	return true
 }
 
 func credentialFailoverClientResponse(failoverErr *service.UpstreamFailoverError) (int, string) {

@@ -141,6 +141,8 @@ gemini_generate_content
 
 认证成功只建立主体。资源 owner、团队成员、管理员 step-up、支付订单 user ID、批任务 owner 和分组能力仍由相应 handler/service 检查。不得因为路由已挂认证中间件就省略对象级授权。
 
+网关 Key 查询前拒绝非法 UTF-8、NUL、空值和超长凭据，按不存在的 Key 返回认证错误，不让数据库文本编码错误变成 `500`。普通与 Gemini 认证查询遇到非业务错误时，若入站请求 Context 已结束，以 `499` 记为客户端取消；客户端仍在线时的数据库错误继续按服务端失败处理。
+
 ## 外部支付管理集成
 
 外部支付服务应使用管理 API Key 通过 `x-api-key` 调用管理路由，管理员 JWT 只适合交互式管理端。支付成功后的余额发放优先使用 `POST /api/v1/admin/redeem-codes/create-and-redeem`，由服务端原子创建并兑换余额兑换码；调用方必须提供稳定的业务 `code` 和 `Idempotency-Key`，同一操作重试时复用二者，并按 200、409 和业务错误区分重放、冲突与失败。`GET /api/v1/admin/users/:id` 可用于前置查询，`POST /api/v1/admin/users/:id/balance` 只用于明确的人工增减或补偿，同样需要幂等键。

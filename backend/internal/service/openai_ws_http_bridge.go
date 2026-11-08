@@ -210,6 +210,26 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	if err != nil {
 		return nil, fmt.Errorf("prepare http bridge body: %w", err)
 	}
+	// 桥接请求与普通 HTTP 共用同一组指纹标识，Spark 影子账号仍由父账号提供身份。
+	var fingerprintIDs *codexFingerprintIDs
+	if account.IsOpenAIOAuth() {
+		credentialAccount, resolveErr := resolveCredentialAccount(ctx, s.accountRepo, account)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("resolve Codex fingerprint account: %w", resolveErr)
+		}
+		var clientHeaders http.Header
+		if c != nil && c.Request != nil {
+			clientHeaders = c.Request.Header
+		}
+		fingerprintIDs = resolveCodexFingerprintIDsFromRequest(credentialAccount, clientHeaders)
+		fingerprintBody, changed, fingerprintErr := applyCodexFingerprintClientMetadataRaw(body, fingerprintIDs)
+		if fingerprintErr != nil {
+			return nil, fmt.Errorf("apply http bridge Codex fingerprint: %w", fingerprintErr)
+		}
+		if changed {
+			body = fingerprintBody
+		}
+	}
 	responsesLite := account.Platform == PlatformOpenAI && isOpenAIResponsesLiteWebSocketPayload(payload)
 	if responsesLite {
 		liteBody, changed, liteErr := normalizeOpenAIResponsesLitePayloadForAccount(account, body)
@@ -263,6 +283,7 @@ func (s *OpenAIGatewayService) proxyOpenAIWSHTTPBridgeTurn(
 	if err != nil {
 		return nil, err
 	}
+	applyCodexFingerprintHeaders(upstreamReq.Header, fingerprintIDs)
 	if responsesLite {
 		upstreamReq.Header.Set(responsesLiteHeader, "true")
 	}

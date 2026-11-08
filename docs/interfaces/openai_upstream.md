@@ -26,6 +26,8 @@ OpenAI OAuth 账号的 `extra.codex_fingerprint_mode` 控制普通 Codex Respons
 <a id="openai_protocol_dispatch"></a>
 ## 协议与传输
 
+WebSocket 降级到 HTTP 的桥接同样按每轮请求解析凭据账号并生成一组指纹 ID，同时应用到请求体与出站 Header；Spark 影子沿用父账号配置，不能借用前一账号或前一轮的随机 turn ID，默认 `off` 仍保持原身份。
+
 `POST /v1/responses/input_tokens` 是独立的预检端点。官方 OpenAI 账号透传并返回真实 `input_tokens`；自定义中转、Grok 与国产供应商使用本地估算。路径别名会在入口规范化，预检不进入正常 Responses 用量结算。
 
 OpenAI 平台拥有以下正式协议族：
@@ -44,6 +46,8 @@ OpenAI 平台拥有以下正式协议族：
 OpenAI 分组支持 Messages、Responses 和 Chat，新建时默认启用 Responses 与 Chat；三项都可关闭。已有分组迁移时仅在旧 `allow_messages_dispatch` 开启时加入 Messages。该旧字段只作为 Messages 的弃用兼容镜像，专用 `messages_dispatch_model_config` 仍只负责 Claude 到 GPT 模型映射；系列和精确映射都只在目标值非空时生效，全部留空时不执行分组层模型映射。Responses WebSocket 是 OpenAI/Grok 的原生传输能力，不因其它平台启用兼容 Responses 而开放。
 
 OpenAI 兼容非流式响应的 usage 按 `usage`、`response.usage`、`data.usage`、`data.response.usage` 的顺序解析；前两条原生路径优先于 Cline 等兼容上游使用的 `data` envelope。同层的 hosted image usage 必须随对应路径读取，不能把不同 envelope 的 token 与图片用量混合。
+
+Responses 完整响应和 SSE 的 message item 共用序列化：`content` 保持数组，`output_text` 显式保留空文本及 `annotations` / `logprobs` 数组，拒绝分片使用 `refusal` 字段。Responses 非流式响应转换到 Chat Completions 或 Anthropic 时，优先读取 reasoning 的可见 `summary_text`；摘要为空才回退到 `content[].reasoning_text`，同时保留 Anthropic thinking 签名，不重复拼接两种载体。
 
 Chat Completions SSE 也按上述路径提取用量，各 token 桶保留最新的非零累计快照：重复事件不相加，末尾空、全零或只含输出的局部快照不能清除此前的输入和缓存用量。直通 Chat 的响应体继续透传；桥接到 Responses/Messages 时，终态用量和结算使用同一份合并结果。
 
@@ -93,6 +97,8 @@ OpenAI OAuth 的 HTTP、passthrough、旧版 Compact 与 WebSocket 出站会在�
 WebSocket 连接池把 routing hint 视为拨号和普通复用的软亲和：优先复用相同提示建立的连接，池满时仍可在硬兼容连接上排队，显式 continuation 也不会仅因提示变化而断链。握手 beta feature 与本 fork 的 TLS fingerprint profile 仍是硬兼容键，任一变化都禁止复用，并会使尚未完成的旧目标预热拨号失效。路由诊断只记录网关推导的最终模型、规范化 tier、传输类型、账号 ID、是否生成提示和 WS 亲和决策，不记录提示头值、token 或凭据。
 
 Responses WebSocket 的 TTFT 只从实际 token delta 计算；若上游没有 delta，则携带完整文本或工具参数的 `response.output_text.done`、`response.function_call_arguments.done` 可作为语义输出兜底。`response.completed`、`response.done` 以及 content part/output item 等结构终态不产生 TTFT，纯终态响应保持未观测状态，避免把总耗时误记为首 token 延迟。
+
+WebSocket relay 的连接级与每轮 TTFT 独立记录；不带 `response_id` 的 token delta 归属当前活跃轮次，第二轮及后续轮次不能因连接已记录首 token 而漏记。
 
 Responses HTTP/SSE 同样区分结构进度与可见输出：`response.created`、空 reasoning item 等进度可以提交当前 attempt、解除首输出超时并关闭 pre-output failover 窗口，但不记录 TTFT；非空文本/工具 delta、完整文本或工具参数、图片结果以及终态内实际 output 才开始 TTFT。只携带 usage 的终态必须保持 TTFT 未观测。
 

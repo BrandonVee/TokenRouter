@@ -308,6 +308,7 @@ type ResponsesContentPart struct {
 	PromptCacheBreakpoint json.RawMessage `json:"prompt_cache_breakpoint,omitempty"`
 	Type                  string          `json:"type"` // "input_text" | "output_text" | "input_image" | "input_file"
 	Text                  string          `json:"text,omitempty"`
+	Refusal               string          `json:"refusal,omitempty"`   // 拒绝内容使用独立字段，不能按普通文本序列化。
 	ImageURL              string          `json:"image_url,omitempty"` // data URI for input_image
 
 	// input_file 使用的文件引用字段。
@@ -410,26 +411,14 @@ type ResponsesOutput struct {
 	Action *WebSearchAction `json:"action,omitempty"`
 }
 
-// MarshalJSON 处理 tool_search_call 项的线上形态（复用 CallID/Arguments 字段）：
-// execution 固定为 "client"（codex 的必填字段，非 client 的调用会被静默忽略），
-// arguments 是 JSON 对象而非 function_call 语义下的字符串。其余类型走默认结构体
-// 序列化，输出逐字节不变。
+// MarshalJSON 让完整响应中的消息和工具搜索项与流式事件共用线上形态，
+// 保留必需的空文本、空数组和拒绝字段；其他类型沿用默认序列化。
 func (o ResponsesOutput) MarshalJSON() ([]byte, error) {
+	if o.Type == "message" || o.Type == "tool_search_call" {
+		return json.Marshal(responsesItemWire(&o))
+	}
 	type responsesOutputAlias ResponsesOutput
-	if o.Type != "tool_search_call" {
-		return json.Marshal(responsesOutputAlias(o))
-	}
-	m := map[string]any{
-		"type":      o.Type,
-		"id":        o.ID,
-		"call_id":   o.CallID,
-		"execution": "client",
-		"arguments": toolSearchCallArgumentsJSON(o.Arguments),
-	}
-	if o.Status != "" {
-		m["status"] = o.Status
-	}
-	return json.Marshal(m)
+	return json.Marshal(responsesOutputAlias(o))
 }
 
 // UnmarshalJSON 同时接受普通 function call 的字符串参数和 tool_search_call 的

@@ -494,11 +494,46 @@ func cleanGeminiRequest(body []byte) ([]byte, error) {
 		}
 	}
 
+	// Antigravity 的结构化输出只识别 responseSchema，先归一化客户端的新字段。
+	if normalizeGeminiResponseSchema(payload) {
+		modified = true
+	}
+
 	if !modified {
 		return body, nil
 	}
 
 	return json.Marshal(payload)
+}
+
+// normalizeGeminiResponseSchema 将两种命名的 responseJsonSchema 转为 responseSchema。
+// 已有 responseSchema 优先，清理规则与工具参数一致，避免上游静默忽略结构化输出。
+func normalizeGeminiResponseSchema(payload map[string]any) bool {
+	changed := false
+	for _, configKey := range []string{"generationConfig", "generation_config"} {
+		config, ok := payload[configKey].(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, schemaKey := range []string{"responseJsonSchema", "response_json_schema"} {
+			raw, exists := config[schemaKey]
+			if !exists {
+				continue
+			}
+			delete(config, schemaKey)
+			changed = true
+			_, hasSchema := config["responseSchema"]
+			_, hasSnakeSchema := config["response_schema"]
+			if hasSchema || hasSnakeSchema {
+				continue
+			}
+			if schema, ok := raw.(map[string]any); ok {
+				antigravity.DeepCleanUndefined(schema)
+				config["responseSchema"] = antigravity.CleanJSONSchema(schema)
+			}
+		}
+	}
+	return changed
 }
 
 // filterEmptyPartsFromGeminiRequest 过滤掉 parts 为空的消息

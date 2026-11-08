@@ -86,8 +86,14 @@ func (p *StreamingProcessor) ProcessLine(line string) []byte {
 
 	// 解包 v1internal 响应
 	var v1Resp V1InternalResponse
-	if err := json.Unmarshal([]byte(data), &v1Resp); err != nil {
-		// 尝试直接解析为 GeminiResponse
+	var envelope struct {
+		Response json.RawMessage `json:"response"`
+	}
+	if err := json.Unmarshal([]byte(data), &envelope); err != nil {
+		return nil
+	}
+	if len(envelope.Response) == 0 {
+		// 直接响应也能解码进包装结构，但会丢掉候选和用量；必须按字段显式区分形状。
 		var directResp GeminiResponse
 		if err2 := json.Unmarshal([]byte(data), &directResp); err2 != nil {
 			return nil
@@ -95,6 +101,8 @@ func (p *StreamingProcessor) ProcessLine(line string) []byte {
 		v1Resp.Response = directResp
 		v1Resp.ResponseID = directResp.ResponseID
 		v1Resp.ModelVersion = directResp.ModelVersion
+	} else if err := json.Unmarshal([]byte(data), &v1Resp); err != nil {
+		return nil
 	}
 
 	geminiResp := &v1Resp.Response

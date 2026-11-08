@@ -44,6 +44,8 @@ Antigravity 分组支持 Messages、Responses、Chat 和 Gemini GenerateContent�
 
 Anthropic Messages 经过 Antigravity request transformer 生成上游 Gemini/内部请求形状，响应和 SSE 再恢复为 Anthropic 协议。工具定义、tool choice、thinking、缓存断点、图片输入、token 用量和停止原因都需要双向转换；schema cleaner 会移除上游不接受的 JSON Schema 表达。
 
+Gemini 结构化输出将 `generationConfig` 或 `generation_config` 下的 `responseJsonSchema` / `response_json_schema` 清理后转换为上游可识别的 `responseSchema`；已有 `responseSchema` / `response_schema` 优先。SSE 转换按 `response` 字段是否存在区分 v1internal 包装和直接 Gemini 响应，不能仅依赖 JSON 解码报错来选择形状，否则直接响应中的候选内容和用量会被丢弃。
+
 通用 OpenAI Chat Completions 和 Responses 在选到原生 Antigravity OAuth 账号时走兼容适配器：
 
 ```text

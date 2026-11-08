@@ -415,6 +415,8 @@ func (s *RateLimitService) handleDefaultUpstreamError(ctx context.Context, accou
 	// Anthropic 官方 5h/7d 窗口耗尽属于账号级硬限流，必须先于本地临时不可调度规则处理。
 	// 否则宽泛的 429 关键字规则可能把多小时/多天冷却误缩短成本地暂停时间。
 	if statusCode == http.StatusTooManyRequests && account.Platform == PlatformAnthropic {
+		// 429 也携带真实用量，在窗口限流分支提前返回前保留耗尽时的周额度。
+		s.samplePassiveUsageFromHeaders(ctx, account, headers)
 		// 7d_oi 是 Fable 模型专属的 7d 窗口：只标记模型级限流，账号对其他模型仍可调度。
 		fableLimited := s.persistAnthropicFableWindowLimit(ctx, account, headers)
 		if s.persistAnthropicExhaustedWindowLimit(ctx, account, headers) {
@@ -1663,10 +1665,6 @@ func (s *RateLimitService) persistAnthropicFableWindowLimit(ctx context.Context,
 	if limit == nil {
 		return false
 	}
-	// 429 响应头本身携带最新的窗口用量（7d_oi utilization=1.0）。限流期内
-	// Fable 请求不再调度到该账号，若不在此处采样，7d F 进度条会冻结在
-	// 限流前的旧值直到窗口重置。
-	s.samplePassiveUsageFromHeaders(ctx, account, headers)
 	if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, anthropicFableRateLimitKey, limit.resetAt, limit.reason); err != nil {
 		slog.Warn("anthropic_fable_window_rate_limit_set_failed",
 			"account_id", account.ID,
@@ -1957,10 +1955,12 @@ func (s *RateLimitService) handle529(ctx context.Context, account *Account) {
 	slog.Info("account_overloaded", "account_id", account.ID, "until", until)
 }
 
-// UpdateSessionWindow 从成功响应更新5h窗口状态
+// UpdateSessionWindow 从成功响应更新5h窗口状态并采样可用的额度窗口。
 func (s *RateLimitService) UpdateSessionWindow(ctx context.Context, account *Account, headers http.Header) {
 	status := headers.Get("anthropic-ratelimit-unified-5h-status")
 	if status == "" {
+		// 部分套餐只返回周窗口，不能因缺少 5h 状态而丢弃真实的 7d 用量。
+		s.samplePassiveUsageFromHeaders(ctx, account, headers)
 		return
 	}
 
@@ -2005,15 +2005,10 @@ func (s *RateLimitService) UpdateSessionWindow(ctx context.Context, account *Acc
 		slog.Info("account_session_window_initialized", "account_id", account.ID, "window_start", start, "window_end", end, "status", status)
 	}
 
-	// 窗口重置时清除旧的 utilization 和被动采样数据，避免残留上个窗口的数据
+	// 5h 重置只清除本窗口利用率；周窗口独立重置，不能删除尚未到期的周用量快照。
 	if windowEnd != nil && needInitWindow {
 		_ = s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{
-			"session_window_utilization":      nil,
-			"passive_usage_7d_utilization":    nil,
-			"passive_usage_7d_reset":          nil,
-			"passive_usage_7d_oi_utilization": nil,
-			"passive_usage_7d_oi_reset":       nil,
-			"passive_usage_sampled_at":        nil,
+			"session_window_utilization": nil,
 		})
 	}
 

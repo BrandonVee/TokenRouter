@@ -398,8 +398,8 @@ func TestUpdateSessionWindow_SamplesFable7dOiHeaders(t *testing.T) {
 	}
 }
 
-func TestUpdateSessionWindow_ClearsFable7dOiOnWindowReset(t *testing.T) {
-	// 5h 窗口重置时应连同清除 7d_oi 被动采样数据，与 7d 行为一致。
+func TestUpdateSessionWindow_PreservesWeeklyUsageOnWindowReset(t *testing.T) {
+	// 5h 与周窗口独立重置，不能用新会话窗口删除仍然有效的周用量快照。
 	resetUnix := time.Now().Add(3 * time.Hour).Unix()
 
 	repo := &sessionWindowMockRepo{}
@@ -416,9 +416,9 @@ func TestUpdateSessionWindow_ClearsFable7dOiOnWindowReset(t *testing.T) {
 		t.Fatalf("expected 1 UpdateExtra (clear) call, got %d", len(repo.updateExtraCalls))
 	}
 	clearUpdates := repo.updateExtraCalls[0].Updates
-	for _, key := range []string{"passive_usage_7d_oi_utilization", "passive_usage_7d_oi_reset"} {
-		if val, present := clearUpdates[key]; !present || val != nil {
-			t.Errorf("expected %s cleared to nil on window reset, got present=%v val=%v", key, present, val)
+	for _, key := range []string{"passive_usage_7d_utilization", "passive_usage_7d_reset", "passive_usage_7d_oi_utilization", "passive_usage_7d_oi_reset", "passive_usage_sampled_at"} {
+		if val, present := clearUpdates[key]; present {
+			t.Errorf("expected %s preserved on 5h reset, got update=%v", key, val)
 		}
 	}
 }

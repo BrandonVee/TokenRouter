@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/ctxkey"
@@ -1254,7 +1255,8 @@ func (s *APIKeyService) GetByID(ctx context.Context, id int64) (*APIKey, error) 
 
 // GetByKey 根据Key字符串获取API Key（用于认证）
 func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, error) {
-	if len(key) == 0 || len(key) > MaxAPIKeyCredentialBytes {
+	// PostgreSQL 文本不能承载非法 UTF-8 或 NUL；在查询前按无效凭据拒绝，避免误报 500。
+	if len(key) == 0 || len(key) > MaxAPIKeyCredentialBytes || !utf8.ValidString(key) || strings.IndexByte(key, 0) >= 0 {
 		return nil, ErrAPIKeyNotFound
 	}
 	cacheKey := s.authCacheKey(key)
