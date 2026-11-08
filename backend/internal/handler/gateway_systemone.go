@@ -103,6 +103,18 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		h.errorResponse(c, status, code, message)
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(model, body))
+	if inflightErr != nil {
+		err := inflightErr
+		reqLog.Info("systemone.billing_eligibility_check_failed", zap.Error(err))
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.errorResponse(c, status, code, message)
+		return
+	}
+	defer inflightDone()
 
 	fs := NewFailoverState(h.maxAccountSwitches, false)
 	for {

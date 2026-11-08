@@ -141,6 +141,18 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		h.chatCompletionsErrorResponse(c, status, code, message)
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+	if inflightErr != nil {
+		err := inflightErr
+		reqLog.Info("gateway.cc.billing_check_failed", zap.Error(err))
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.chatCompletionsErrorResponse(c, status, code, message)
+		return
+	}
+	defer inflightDone()
 
 	// Parse request for session hash
 	bodyRef := service.NewRequestBodyRef(body)

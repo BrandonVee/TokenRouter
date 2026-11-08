@@ -1942,3 +1942,24 @@ type usageBillingParams struct {
 	APIKeyService                   APIKeyQuotaUpdater
 	Platform                        string // 来自 APIKey 关联 Group 的平台标识
 }
+
+// billableModelWithFallback 在未配置显式别名价格时使用实际转发模型的价格，避免成功请求零计费。
+func (s *GatewayService) billableModelWithFallback(ctx context.Context, apiKey *APIKey, model, upstream, requested string) string {
+	for _, candidate := range usageBillingModelCandidates(model, upstream, requested) {
+		if s.resolver != nil {
+			in := PricingInput{Model: candidate, BaseModelHint: upstream}
+			if apiKey != nil {
+				in.GroupID, in.Group = apiKey.GroupID, apiKey.Group
+			}
+			resolved := s.resolver.Resolve(ctx, in)
+			if resolved != nil && !resolved.IsUnpriced() && (resolved.BasePricing != nil || resolved.HasEffectiveOverridePricing()) {
+				return candidate
+			}
+		} else if s.billingService != nil {
+			if pricing, err := s.billingService.GetModelPricing(candidate); err == nil && pricing != nil {
+				return candidate
+			}
+		}
+	}
+	return model
+}

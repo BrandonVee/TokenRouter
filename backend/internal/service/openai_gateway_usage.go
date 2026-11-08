@@ -208,9 +208,12 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
 	// 不并入上面的 Resolve，以免污染 user:group 倍率缓存。
 	baseMultiplier := multiplier
-	rateNow := timezone.Now()
-	if s.usageBillingNow != nil {
-		rateNow = s.usageBillingNow()
+	rateNow := GatewayTokenRequestPricingAtFromContext(ctx)
+	if rateNow.IsZero() {
+		rateNow = timezone.Now()
+		if s.usageBillingNow != nil {
+			rateNow = s.usageBillingNow()
+		}
 	}
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, baseMultiplier, rateNow)
 	subscriptionMultiplier, _ = computePeakAwareMultipliers(apiKey, subscriptionMultiplier, rateNow)

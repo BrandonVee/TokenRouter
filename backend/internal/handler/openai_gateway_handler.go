@@ -533,6 +533,18 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+	if inflightErr != nil {
+		err := inflightErr
+		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.handleStreamingAwareError(c, status, code, message, streamStarted)
+		return
+	}
+	defer inflightDone()
 
 	// Generate session hash (header first; fallback to prompt_cache_key)
 	explicitSessionHash := h.gatewayService.GenerateExplicitSessionHash(c, sessionHashBody)
@@ -1140,6 +1152,18 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		h.anthropicStreamingAwareError(c, status, code, message, streamStarted)
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+	if inflightErr != nil {
+		err := inflightErr
+		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.anthropicStreamingAwareError(c, status, code, message, streamStarted)
+		return
+	}
+	defer inflightDone()
 
 	sessionHash := h.gatewayService.GenerateSessionHash(c, body)
 	promptCacheKey := h.gatewayService.ExtractSessionID(c, body)
@@ -1909,6 +1933,16 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
 	}
+	// WebSocket 按首帧建立会话级预留，计费任务接管引用后再释放。
+	inflightCtx, inflightDone, inflightErr := reserveInflightBalanceCtx(ctx, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(gjson.GetBytes(firstMessage, "model").String(), firstMessage))
+	if inflightErr != nil {
+		reqLog.Info("openai.websocket_inflight_reservation_rejected", zap.Error(inflightErr))
+		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
+		return
+	}
+	defer inflightDone()
+	ctx = inflightCtx
+	c.Request = c.Request.WithContext(ctx)
 
 	sessionHash := h.gatewayService.GenerateSessionHashWithFallback(
 		c,
@@ -2544,9 +2578,12 @@ func (h *OpenAIGatewayHandler) submitUsageRecordTask(c *gin.Context, task servic
 	if task == nil {
 		return
 	}
-	task = wrapUsageRecordTaskContext(c, task)
+	task, abandon := wrapInflightUsageRecordTask(c, task)
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); mode != service.UsageRecordSubmitModeDroppedStopped {
+			if mode.Dropped() {
+				abandon()
+			}
 			return
 		}
 		// 池已停止时处于进程关停窗口，计费任务不能静默丢失。
@@ -2581,7 +2618,7 @@ func (h *OpenAIGatewayHandler) submitMandatoryUsageRecordTask(c *gin.Context, ta
 	if task == nil {
 		return
 	}
-	task = wrapUsageRecordTaskContext(c, task)
+	task, _ = wrapInflightUsageRecordTask(c, task)
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); !mode.Dropped() {
 			return

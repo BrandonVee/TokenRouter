@@ -1077,6 +1077,20 @@ pricing:
 # 计费配置
 # =============================================================================
 billing:
+  # 余额在途估算：抑制并发透支；不是数据库冻结，最终按真实用量结算。
+  # 没有其它预占的首个请求沿用旧准入规则；Redis 故障时放行。
+  inflight_reservation:
+    enabled: true
+    # 流式请求每 TTL/3 续期，handler 与计费任务都结束后释放。
+    ttl_seconds: 900
+    default_max_tokens: 8192
+    max_output_tokens: 128000
+    # 请求体字节数 / 4 的输入 token 估算上限。
+    max_input_tokens: 200000
+    # 0 表示不限制单请求预占金额。
+    max_reservation_usd: 0
+    # 无价格时默认不预占；设 true 可拒绝无法估价的余额请求。
+    fail_closed_on_unpriced: false
   circuit_breaker:
     # Enable circuit breaker for billing service
     # 启用计费服务熔断器

@@ -154,6 +154,19 @@ func (h *QoderGatewayHandler) handle(c *gin.Context, endpoint qoderEndpoint) {
 			h.errorResponse(c, status, code, message, endpoint)
 			return
 		}
+		inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+		if inflightErr != nil {
+			err := inflightErr
+			reqLog.Info("qoder.billing_check_failed", zap.Error(err))
+			status, code, message, retryAfter := billingErrorDetails(err)
+			if retryAfter > 0 {
+				c.Header("Retry-After", strconv.Itoa(retryAfter))
+			}
+			h.errorResponse(c, status, code, message, endpoint)
+			return
+		}
+		defer inflightDone()
+
 	}
 	sessionHash := h.qoderSessionHash(c, endpoint, body, apiKey.ID)
 
@@ -766,10 +779,14 @@ func (h *QoderGatewayHandler) submitUsageRecordTask(c *gin.Context, task service
 	if task == nil {
 		return
 	}
-	task = wrapUsageRecordTaskContext(c, task)
+	task, abandon := wrapInflightUsageRecordTask(c, task)
 	if h.usageRecordWorkerPool != nil {
-		h.usageRecordWorkerPool.Submit(task)
-		return
+		if mode := h.usageRecordWorkerPool.Submit(task); mode != service.UsageRecordSubmitModeDroppedStopped {
+			if mode.Dropped() {
+				abandon()
+			}
+			return
+		}
 	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 10*time.Second)
 	defer cancel()

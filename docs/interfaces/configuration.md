@@ -61,6 +61,10 @@
 
 `gateway.cn_providers.balance_check_enabled` 默认 true，`balance_threshold` 默认 0.5（按各上游返回币种），`balance_check_interval_minutes` 默认 10。关闭开关或周期不大于零时不启动余额/套餐周期探测。OpenCode Go 的用量刷新另外使用数据库设置 `opencode_go_usage_settings`，默认关闭，最长等待默认 15 分钟（5–1440）、静默期默认 1 分钟（1–60）；账号自动刷新也须独立启用。
 
+### 余额在途预占
+
+`billing.inflight_reservation` 默认启用，`simple` 模式忽略。`ttl_seconds` 默认 900，`default_max_tokens` 默认 8192，`max_output_tokens` 默认 128000，`max_input_tokens` 默认 200000；token 上限为 0 时不截断，TTL 或默认输出为 0 时使用内置默认值。`max_reservation_usd` 默认 0 表示不设金额上限。`fail_closed_on_unpriced` 默认 false，开启后拒绝无法估价的余额请求，显式零价不被拒绝。所有数值须非负，金额必须有限。配置修改后重启，语义和故障放行边界见[余额在途估算](../domains/routing_and_billing.md#inflight_reservations)。
+
 ## 生图历史对象存储
 
 `image_history` 的 YAML/环境变量是部署默认配置，独立于备份、数据共享和已经下线的旧 `image_storage`。`enabled` 默认关闭；开启时 `bucket`、`access_key_id`、`secret_access_key` 和安全的非空 `prefix` 必填。`endpoint` 可为空以使用 AWS 默认端点，`region` 默认 `auto`，需要 path-style 的 MinIO 等实现通过 `force_path_style=true` 启用。桶应保持私有，列表预览只通过有效期受限的预签名 URL 暴露。

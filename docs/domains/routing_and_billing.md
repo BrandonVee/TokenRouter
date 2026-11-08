@@ -115,6 +115,15 @@ OpenAI 与 Composite 分组可显式开启 `image_count_billing`，前提是分�
 
 Grok 媒体、搜索和 Voice 使用独立计价维度。视频按输出秒计价，`video_model_prices` 可按规范模型族与 480p/720p/1080p 覆盖，未命中时依次回退 `video_price_*` 和模型族内置价；异步创建不扣费，首次完成观察才用任务级稳定 request ID 结算。搜索以 `search_price_per_1k` 按调用次数附加在 token 费用之上；独立 `/web_search` 和 `/x_search` 的纯工具请求也可单独结算。Realtime、TTS、STT 分别使用每分钟、每百万字符、每小时价格；Realtime 握手或纯文本会话不出账，只有任一方向观察到非空音频负载后才按该连接的会话时长结算。未知的数字版 Grok 文本模型可以回退到当前默认文本 token 价，但模型 ID 含 `imagine`、`image`、`video`、`audio`、`speech`、`tts`、`transcribe` 或 `realtime` 时必须排除这项兜底；`vision` 多模态对话仍按 token 计费。上述列 `NULL` 表示使用默认值，显式 `0` 表示免费，不能用“缺少 token usage”跳过已确认的媒体或工具用量。
 
+<a id="inflight_reservations"></a>
+### 余额在途估算
+
+标准模式默认启用 `billing.inflight_reservation`。请求通过常规权益检查后，按请求体字节数、输出 token 上限及当前分组/渠道/模型价格估算费用，在 Redis 原子登记付款主体的在途金额。已有其它预占时，缓存余额减去在途合计必须覆盖本次估算；没有其它预占的首个请求仍沿用旧准入规则。因此它抑制并发透支，但不保证最终扣费不会形成欠费，也不替代数据库结算事务或批量图片的持久冻结。
+
+`balance` Key 使用现金预占；`subscription` 以及 `auto` 已选中有效套餐时不登记普通现金预占，继续按套餐/混合结算规则分配。团队仍以 owner 为付款主体。批量图片已从可用余额扣走的冻结金额不能再次扣减。
+
+HTTP 流和 WebSocket 会话按 TTL 的三分之一周期续期。handler 结束会停止续期；每个异步计费任务持有独立引用，在真实余额缓存同步扣减后归还，任务被队列丢弃时立即归还；所有引用结束才释放。进程退出或任务卡住的残留预占由 TTL 清理。Redis、余额读取或缓存能力不可用时放行；未知价格默认不预占，`fail_closed_on_unpriced` 可改为拒绝；显式零价保持免费。估算使用候选账号映射模型的保守价格，实际费用按最终用量结算。通用网关的无价别名回退到实际转发模型，显式别名价格优先，Qoder 保持独立手工价约束。
+
 <a id="usage_settlement"></a>
 ## 用量结算
 

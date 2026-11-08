@@ -87,6 +87,17 @@ func (h *GatewayHandler) WebSearch(c *gin.Context) {
 		c.JSON(status, gin.H{"error": gin.H{"type": code, "message": message}})
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, service.InflightEstimateRequest{Model: searchModel, Kind: service.InflightEstimatePerRequest, SearchCalls: 1})
+	if inflightErr != nil {
+		err := inflightErr
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		c.JSON(status, gin.H{"error": gin.H{"type": code, "message": message}})
+		return
+	}
+	defer inflightDone()
 
 	subject, _ := middleware2.GetAuthSubjectFromContext(c)
 	reqLog := requestLogger(c, "handler.gateway.web_search")

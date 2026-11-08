@@ -52,3 +52,16 @@ func wrapUsageRecordTaskContext(c *gin.Context, task func(context.Context)) func
 		task(base)
 	}
 }
+
+// wrapInflightUsageRecordTask 将一个预留引用交给真正执行的计费任务，丢弃方需调用 abandon。
+func wrapInflightUsageRecordTask(c *gin.Context, task service.UsageRecordTask) (service.UsageRecordTask, func()) {
+	done := func() {}
+	if task == nil {
+		return nil, done
+	}
+	if c != nil && c.Request != nil {
+		done = service.InflightReservationFromContext(c.Request.Context()).Acquire()
+	}
+	captured := wrapUsageRecordTaskContext(c, task)
+	return func(ctx context.Context) { defer done(); captured(ctx) }, done
+}

@@ -335,6 +335,15 @@ func syncBalanceCacheAfterDeduction(ctx context.Context, p *usageBillingParams, 
 		}
 		return
 	}
+	// 在途引用释放前先更新缓存，避免异步扣费与预留释放之间出现新的透支窗口。
+	if deps.billingCacheService.InflightReservationEnabled() {
+		if err := deps.billingCacheService.DeductBalanceCache(ctx, p.User.ID, result.BalanceAmountUSD); err != nil {
+			slog.Warn("inflight balance cache deduction failed", "user_id", p.User.ID, "error", err)
+			_ = deps.billingCacheService.InvalidateUserBalance(ctx, p.User.ID)
+		}
+		return
+	}
+
 	deps.billingCacheService.QueueDeductBalance(p.User.ID, result.BalanceAmountUSD)
 }
 
@@ -661,9 +670,12 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	}
 	// token 倍率叠加高峰因子（token 计费含图片 token，图片按次倍率不受影响）。高峰因子按请求时刻现算，
 	// 不并入上面的 getUserGroupRateMultiplier，以免污染 user:group 倍率缓存。
-	rateNow := timezone.Now()
-	if s.usageBillingNow != nil {
-		rateNow = s.usageBillingNow()
+	rateNow := GatewayTokenRequestPricingAtFromContext(ctx)
+	if rateNow.IsZero() {
+		rateNow = timezone.Now()
+		if s.usageBillingNow != nil {
+			rateNow = s.usageBillingNow()
+		}
 	}
 	multiplier, imageMultiplier := computePeakAwareMultipliers(apiKey, multiplier, rateNow)
 	subscriptionMultiplier, _ = computePeakAwareMultipliers(apiKey, subscriptionMultiplier, rateNow)
@@ -689,6 +701,10 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	requestedModel := result.Model
 	if input.OriginalModel != "" {
 		requestedModel = input.OriginalModel
+	}
+
+	if !isQoderBillingContext(account, apiKey) {
+		billingModel = s.billableModelWithFallback(ctx, apiKey, billingModel, result.UpstreamModel, requestedModel)
 	}
 
 	// 计算费用
@@ -946,6 +962,11 @@ func (s *GatewayService) calculateTokenCost(
 	multiplier float64,
 	opts *recordUsageOpts,
 ) *CostBreakdown {
+	// 未配置单独价格的别名回退到实际转发模型，Qoder 继续严格遵守手工定价边界。
+	if !isQoderBillingContext(account, apiKey) {
+		billingModel = s.billableModelWithFallback(ctx, apiKey, billingModel, result.UpstreamModel, requestedModel)
+	}
+
 	serviceTier := claudeUsageServiceTier(result.Usage.Speed)
 	tokens := UsageTokens{
 		InputTokens:           result.Usage.InputTokens,

@@ -281,6 +281,18 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.handleStreamingAwareError(c, status, code, message, streamStarted)
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+	if inflightErr != nil {
+		err := inflightErr
+		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.handleStreamingAwareError(c, status, code, message, streamStarted)
+		return
+	}
+	defer inflightDone()
 
 	// 设置请求所属分组 ID（用于渠道级功能判断，如 WebSearch 模拟）
 	parsedReq.GroupID = apiKey.GroupID
@@ -2747,9 +2759,12 @@ func (h *GatewayHandler) submitUsageRecordTask(c *gin.Context, task service.Usag
 	if task == nil {
 		return
 	}
-	task = wrapUsageRecordTaskContext(c, task)
+	task, abandon := wrapInflightUsageRecordTask(c, task)
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); mode != service.UsageRecordSubmitModeDroppedStopped {
+			if mode.Dropped() {
+				abandon()
+			}
 			return
 		}
 		// 池已停止时处于进程关停窗口，计费任务不能静默丢失。
@@ -2777,7 +2792,7 @@ func (h *GatewayHandler) submitMandatoryUsageRecordTask(c *gin.Context, task ser
 	if task == nil {
 		return
 	}
-	task = wrapUsageRecordTaskContext(c, task)
+	task, _ = wrapInflightUsageRecordTask(c, task)
 	if h.usageRecordWorkerPool != nil {
 		if mode := h.usageRecordWorkerPool.Submit(task); !mode.Dropped() {
 			return

@@ -42,6 +42,17 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 		h.errorResponse(c, status, code, message)
 		return
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, service.InflightEstimateRequest{Model: "grok-4.5", Kind: service.InflightEstimateAudio, AudioMode: "realtime", AudioUnits: 1})
+	if inflightErr != nil {
+		err := inflightErr
+		status, code, message, retryAfter := billingErrorDetails(err)
+		if retryAfter > 0 {
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+		}
+		h.errorResponse(c, status, code, message)
+		return
+	}
+	defer inflightDone()
 
 	selection, _, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
 		c.Request.Context(),
@@ -174,6 +185,14 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 			return
 		}
 	}
+	inflightDone, inflightErr := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, grokVoiceInflightEstimate(endpoint, body))
+	if inflightErr != nil {
+		status, code, message, _ := billingErrorDetails(inflightErr)
+		h.errorResponse(c, status, code, message)
+		return
+	}
+	defer inflightDone()
+
 	contentType := c.GetHeader("Content-Type")
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/json"
