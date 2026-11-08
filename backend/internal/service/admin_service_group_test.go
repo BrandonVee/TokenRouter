@@ -18,6 +18,18 @@ func ptrGroupClientProtocols(value []GroupClientProtocol) *[]GroupClientProtocol
 	return &value
 }
 
+// 更新只改其中一个比例时也要校验最终合并值，配置错误保持 HTTP 400。
+func TestAdminServiceGroupProfitMergedConfigReturnsBadRequest(t *testing.T) {
+	existing := &Group{ID: 7, Name: "profit", Platform: PlatformOpenAI, Status: StatusActive, ProfitControlEnabled: true, ProfitMinMargin: .6}
+	repo := &groupRepoStubForAdmin{getByID: existing}
+	svc := &adminServiceImpl{groupRepo: repo}
+	buffer := .5
+	_, err := svc.UpdateGroup(context.Background(), existing.ID, &UpdateGroupInput{ProfitSafetyBuffer: &buffer})
+	require.Equal(t, http.StatusBadRequest, infraerrors.Code(err))
+	require.Equal(t, "INVALID_PROFIT_CONTROL", infraerrors.Reason(err))
+	require.Nil(t, repo.updated)
+}
+
 // compositeRouteRepoStubForAdmin 覆盖管理端复合路由测试所需的最小仓储行为。
 type compositeRouteRepoStubForAdmin struct {
 	routes  []CompositeModelRoute

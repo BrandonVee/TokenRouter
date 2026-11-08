@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"github.com/BrandonVee/TokenRouter/internal/pkg/ctxkey"
 	"time"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/timezone"
 )
 
 type gatewayTokenRequestPricingAtCtxKey struct{}
+type gatewayTokenRequestBillingGroupCtxKey struct{}
 
 // WithGatewayTokenRequestPricing 在首次准入时冻结价格时点，后续重试与异步结算复用该值。
 func WithGatewayTokenRequestPricing(ctx context.Context) (context.Context, time.Time) {
@@ -17,6 +19,10 @@ func WithGatewayTokenRequestPricing(ctx context.Context) (context.Context, time.
 	pricingAt := timezone.Now()
 	ctx = context.WithValue(ctx, gatewayTokenRequestPricingAtCtxKey{}, pricingAt)
 
+	if group, ok := ctx.Value(ctxkey.Group).(*Group); ok && IsGroupContextValid(group) {
+		copy := *group
+		ctx = context.WithValue(ctx, gatewayTokenRequestBillingGroupCtxKey{}, &copy)
+	}
 	return ctx, pricingAt
 }
 
@@ -63,4 +69,26 @@ func usageReasoningEffort(ctx context.Context) string {
 	}
 	effort, _ := ctx.Value(usageReasoningEffortCtxKey{}).(string)
 	return effort
+}
+
+// gatewayTokenRequestBillingGroupFromContext 保留计费分组，避免调度 fallback 覆盖 Group 后改变售价。
+func gatewayTokenRequestBillingGroupFromContext(ctx context.Context) *Group {
+	if ctx == nil {
+		return nil
+	}
+	group, _ := ctx.Value(gatewayTokenRequestBillingGroupCtxKey{}).(*Group)
+	if IsGroupContextValid(group) {
+		return group
+	}
+	return nil
+}
+
+// WithGatewayBillingGroupSnapshot 用于 fork 明确按兜底分组重新计费的路径，不改动冻结时点。
+func WithGatewayBillingGroupSnapshot(ctx context.Context, group *Group) context.Context {
+	if !IsGroupContextValid(group) {
+		return ctx
+	}
+	copy := *group
+	ctx = context.WithValue(ctx, gatewayTokenRequestBillingGroupCtxKey{}, &copy)
+	return context.WithValue(ctx, openAIProfitControlGateCtxKey{}, (*openAIProfitControlGate)(nil))
 }

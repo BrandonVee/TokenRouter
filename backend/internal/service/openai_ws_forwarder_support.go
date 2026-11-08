@@ -477,6 +477,7 @@ func (s *OpenAIGatewayService) SelectAccountByPreviousResponseID(
 	excludedIDs map[int64]struct{},
 	requireCompact bool,
 ) (*AccountSelectionResult, error) {
+	ctx = s.withOpenAIProfitControlGate(ctx, groupID)
 	routingModel := s.resolveChannelRoutingModel(ctx, groupID, requestedModel)
 	return s.selectAccountByPreviousResponseIDForCapability(ctx, groupID, previousResponseID, routingModel, excludedIDs, "", requireCompact)
 }
@@ -618,6 +619,9 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 	}
 	// 配额自动暂停也必须拦截 previous_response_id 粘性路径；否则超出 5h/7d 阈值的账号
 	// 仍会继续服务同一响应链。暂停是临时状态，因此不删除绑定，直接回落到普通调度。
+	if vetoed, _ := openAIProfitControlVetoReason(ctx, account); vetoed {
+		return 0, nil, "", nil
+	}
 	if paused, _ := shouldAutoPauseOpenAIAccountByQuota(ctx, account); paused {
 		return 0, nil, "", nil
 	}
@@ -639,6 +643,9 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 			return 0, nil, "", nil
 		}
 		if !latest.SupportsOpenAIEndpointCapability(requiredCapability) {
+			return 0, nil, "", nil
+		}
+		if vetoed, _ := openAIProfitControlVetoReason(ctx, latest); vetoed {
 			return 0, nil, "", nil
 		}
 		if paused, _ := shouldAutoPauseOpenAIAccountByQuota(ctx, latest); paused {

@@ -135,7 +135,7 @@ npx --yes pnpm@9 --dir frontend run build
 
 ### 稳定版兼容移植边界
 
-当前代码选择性移植上游 `v0.2.19`（`dece26153`）的模型、图片按张计费、Vertex 额度、配置、后台交互与安全修复，fork 的版本号独立演进。它不表示已逐提交合并至该上游版本。MiniMax、OpenCode、Command Code、Cline 和 TypeSafe 已按 fork 的平台目录、用户额度与协议准入接入；Qoder 和 DeepSeek 的既有能力继续保留。充值赠金/折扣、渠道扩展价格和普通余额在途估算已适配 fork 资金口径；Gemini 显式缓存和固定费用准入已接入多套餐/指定订阅/余额、幂等账本与缓存账号绑定；细粒度管理员 API Key 等其余能力仍需要结合本 fork 的团队和多分组权限适配；不能通过覆盖同名文件把这些边界替换回上游实现。
+当前代码选择性移植上游 `v0.2.19`（`dece26153`）的模型、图片按张计费、Vertex 额度、配置、后台交互与安全修复，fork 的版本号独立演进。它不表示已逐提交合并至该上游版本。MiniMax、OpenCode、Command Code、Cline 和 TypeSafe 已按 fork 的平台目录、用户额度与协议准入接入；Qoder 和 DeepSeek 的既有能力继续保留。充值赠金/折扣、渠道扩展价格和普通余额在途估算已适配 fork 资金口径；Gemini 显式缓存和固定费用准入已接入多套餐/指定订阅/余额、幂等账本与缓存账号绑定；分组利润控制已适配五个平台、基础/高级调度和多套餐最低资金倍率，并提供只读离线预演；细粒度管理员 API Key 等其余能力仍需要结合本 fork 的团队和多分组权限适配；不能通过覆盖同名文件把这些边界替换回上游实现。
 
 在此基础上继续移植 `v0.2.20`（`6b4b37db4`）的兼容与安全修复，包括 Bedrock 帧长度、Cloudflare Messages URL、认证错误分类、Setup Token 周用量、Antigravity 响应/Schema、Responses 消息与推理转换、WebSocket 每轮 TTFT/HTTP 桥接指纹、强制协议探测和 GPT Image 账号测试，并补齐上游 413 的最终错误规则优先级。入口正文内存预算、复合 Key 零拷贝预读、正文读取与下游写入的逐次空闲超时已接入；这些变更仍不代表全量对齐该版的新功能与迁移。
 

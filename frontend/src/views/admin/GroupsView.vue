@@ -1271,6 +1271,56 @@
           v-model:multiplier="createForm.peak_rate_multiplier"
         />
 
+        <div v-if="isProfitControlPlatform(createForm.platform)" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              v-model="createForm.profit_control_enabled"
+              type="checkbox"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{{ t("admin.groups.profitControl.enable") }}</span>
+          </label>
+          <p class="mb-3 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {{
+              createForm.profit_control_enabled
+                ? t("admin.groups.profitControl.enabledHint")
+                : t("admin.groups.profitControl.disabledHint")
+            }}
+          </p>
+          <div
+            v-if="createForm.profit_control_enabled"
+            class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <div>
+              <label class="input-label">{{ t("admin.groups.profitControl.minMargin") }}</label>
+              <input
+                v-model.number="createForm.profit_min_margin_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="99.99"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.profitControl.minMarginHint')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t("admin.groups.profitControl.safetyBuffer") }}</label>
+              <input
+                v-model.number="createForm.profit_safety_buffer_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="99.99"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.profitControl.safetyBufferHint')"
+              />
+            </div>
+          </div>
+        </div>
+
+
         <!-- 支持的模型系列（仅 antigravity 平台） -->
         <div v-if="createForm.platform === 'antigravity'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -3065,6 +3115,56 @@
           v-model:multiplier="editForm.peak_rate_multiplier"
         />
 
+        <div v-if="isProfitControlPlatform(editForm.platform)" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              v-model="editForm.profit_control_enabled"
+              type="checkbox"
+              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{{ t("admin.groups.profitControl.enable") }}</span>
+          </label>
+          <p class="mb-3 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+            {{
+              editForm.profit_control_enabled
+                ? t("admin.groups.profitControl.enabledHint")
+                : t("admin.groups.profitControl.disabledHint")
+            }}
+          </p>
+          <div
+            v-if="editForm.profit_control_enabled"
+            class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
+          >
+            <div>
+              <label class="input-label">{{ t("admin.groups.profitControl.minMargin") }}</label>
+              <input
+                v-model.number="editForm.profit_min_margin_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="99.99"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.profitControl.minMarginHint')"
+              />
+            </div>
+            <div>
+              <label class="input-label">{{ t("admin.groups.profitControl.safetyBuffer") }}</label>
+              <input
+                v-model.number="editForm.profit_safety_buffer_percent"
+                type="number"
+                step="0.1"
+                min="0"
+                max="99.99"
+                class="input"
+                placeholder="0"
+                :title="t('admin.groups.profitControl.safetyBufferHint')"
+              />
+            </div>
+          </div>
+        </div>
+
+
         <!-- 支持的模型系列（仅 antigravity 平台） -->
         <div v-if="editForm.platform === 'antigravity'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -4455,6 +4555,7 @@
 </template>
 
 <script setup lang="ts">
+import { isProfitControlPlatform, profitPercentToDecimal, profitDecimalToPercent, validateProfitControlFormState, type ProfitControlFormState } from "./groupsProfitControl";
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
@@ -5262,6 +5363,9 @@ const createForm = reactive({
   peak_start: "",
   peak_end: "",
   peak_rate_multiplier: 1.0,
+  profit_control_enabled: false,
+  profit_min_margin_percent: 0 as number | string | null,
+  profit_safety_buffer_percent: 0 as number | string | null,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   fallback_group_id: null as number | null,
@@ -5698,6 +5802,9 @@ const editForm = reactive({
   peak_start: "",
   peak_end: "",
   peak_rate_multiplier: 1.0,
+  profit_control_enabled: false,
+  profit_min_margin_percent: 0 as number | string | null,
+  profit_safety_buffer_percent: 0 as number | string | null,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   fallback_group_id: null as number | null,
@@ -5766,6 +5873,9 @@ type ImagePricingFormState = {
   peak_start: string;
   peak_end: string;
   peak_rate_multiplier: number;
+  profit_control_enabled: boolean;
+  profit_min_margin_percent: number | string | null;
+  profit_safety_buffer_percent: number | string | null;
 };
 
 type VideoPricingFormState = {
@@ -6197,6 +6307,9 @@ const closeCreateModal = () => {
   createForm.peak_start = "";
   createForm.peak_end = "";
   createForm.peak_rate_multiplier = 1.0;
+  createForm.profit_control_enabled = false;
+  createForm.profit_min_margin_percent = 0;
+  createForm.profit_safety_buffer_percent = 0;
   createForm.claude_code_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
@@ -6231,6 +6344,13 @@ const normalizeImageRateMultiplier = (
 const emptyToNull = <T>(value: T | ""): T | null =>
   value === "" ? null : value;
 
+// 利润比例先按实际提交精度校验，错误不进入保存请求。
+const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
+  const error = validateProfitControlFormState(form);
+  if (error) { appStore.showError(t(`admin.groups.profitControl.${error}`)); return false; }
+  return true;
+};
+
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
@@ -6243,12 +6363,16 @@ const handleCreateGroup = async () => {
   ) {
     return;
   }
+  if (!validateProfitControlForm(createForm)) return;
   submitting.value = true;
   try {
     const availabilityProbeConfig = buildAvailabilityProbeConfig(createForm);
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createForm,
+      profit_control_enabled: isProfitControlPlatform(createForm.platform) && createForm.profit_control_enabled,
+      profit_min_margin: profitPercentToDecimal(createForm.profit_min_margin_percent),
+      profit_safety_buffer: profitPercentToDecimal(createForm.profit_safety_buffer_percent),
       allowed_client_protocols: [...createForm.allowed_client_protocols],
       display_brand: normalizeDisplayBrand(createForm.display_brand),
       model_pricing: groupPricingToAPI(
@@ -6277,6 +6401,8 @@ const handleCreateGroup = async () => {
         createForm.reasoning_effort_mappings,
       ),
     };
+    delete (requestData as Record<string, unknown>).profit_min_margin_percent;
+    delete (requestData as Record<string, unknown>).profit_safety_buffer_percent;
     delete (requestData as any).availability_probe_enabled;
     delete (requestData as any).availability_probe_model_id;
     delete (requestData as any).availability_probe_prompt;
@@ -6400,6 +6526,9 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.peak_start = group.peak_start ?? "";
   editForm.peak_end = group.peak_end ?? "";
   editForm.peak_rate_multiplier = group.peak_rate_multiplier ?? 1.0;
+  editForm.profit_control_enabled = group.profit_control_enabled ?? false;
+  editForm.profit_min_margin_percent = profitDecimalToPercent(group.profit_min_margin);
+  editForm.profit_safety_buffer_percent = profitDecimalToPercent(group.profit_safety_buffer);
   editForm.claude_code_only = group.claude_code_only || false;
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
@@ -6471,6 +6600,9 @@ const closeEditModal = () => {
   editForm.peak_start = "";
   editForm.peak_end = "";
   editForm.peak_rate_multiplier = 1.0;
+  editForm.profit_control_enabled = false;
+  editForm.profit_min_margin_percent = 0;
+  editForm.profit_safety_buffer_percent = 0;
   editForm.video_rate_independent = false;
   editForm.video_rate_multiplier = 1;
   editForm.video_price_480p = null;
@@ -6503,12 +6635,16 @@ const handleUpdateGroup = async () => {
     return;
   }
 
+  if (!validateProfitControlForm(editForm)) return;
   submitting.value = true;
   try {
     const availabilityProbeConfig = buildAvailabilityProbeConfig(editForm);
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
+      profit_control_enabled: isProfitControlPlatform(editForm.platform) && editForm.profit_control_enabled,
+      profit_min_margin: profitPercentToDecimal(editForm.profit_min_margin_percent),
+      profit_safety_buffer: profitPercentToDecimal(editForm.profit_safety_buffer_percent),
       allowed_client_protocols: [...editForm.allowed_client_protocols],
       display_brand: normalizeDisplayBrand(editForm.display_brand),
       model_pricing: groupPricingToAPI(
@@ -6547,6 +6683,8 @@ const handleUpdateGroup = async () => {
         editForm.reasoning_effort_mappings,
       ),
     };
+    delete (payload as Record<string, unknown>).profit_min_margin_percent;
+    delete (payload as Record<string, unknown>).profit_safety_buffer_percent;
     delete (payload as any).availability_probe_enabled;
     delete (payload as any).availability_probe_model_id;
     delete (payload as any).availability_probe_prompt;
@@ -6891,6 +7029,7 @@ watch(
 watch(
   () => createForm.platform,
   (newVal) => {
+    if (!isProfitControlPlatform(newVal)) createForm.profit_control_enabled = false;
     if (["gemini", "antigravity"].includes(newVal)) createForm.allow_image_generation = true;
     createForm.allowed_client_protocols = defaultGroupClientProtocols(newVal);
     createForm.unavailable_fallback_group_id = null;
@@ -6926,6 +7065,7 @@ watch(
 watch(
   () => editForm.platform,
   (newVal) => {
+    if (!isProfitControlPlatform(newVal)) editForm.profit_control_enabled = false;
     editForm.allowed_client_protocols = defaultGroupClientProtocols(newVal);
   },
   { flush: "sync" },

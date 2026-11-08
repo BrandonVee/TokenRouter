@@ -155,6 +155,8 @@ client_model
 
 分时定价在请求首次建立网关上下文时冻结价格时点。异步用量任务通过 `usage_record_context.go` 只复制该时刻、请求 ID 和模型重定向信息，不持有 Gin Context 或完整请求；排队跨越价格时段不会重新按 worker 执行时间定价。实际档位由最终转发结果传入结算，`none`/`minimal` 只有实际保留转发时才参与对应倍率。
 
+开启分组[利润准入](account_scheduling_and_cache.md#profit_admission)时，候选过滤和抢槽后终检共用同一计费时点与资金倍率；终检否决先释放账号槽，再在独立预算内重选。Responses WebSocket 每轮更新冻结时点，并在提交该轮计费任务前拍成标量，空闲长连接跨高峰边界时不沿用建连价格。
+
 余额准入还可登记[在途估算](../domains/routing_and_billing.md#inflight_reservations)。handler 和每个已提交计费任务分别持有轻量引用，普通队列丢弃时归还任务引用，必须结算的任务在拒绝入队后同步执行。余额缓存使用仓储实际返回的 `BalanceAmountUSD` 同步扣减，再释放引用；不能以总费用代替实际余额分摊，也不能在异步扣费仍排队时先释放预占。WebSocket 的首帧建立会话级估算，连接存活期间续期。
 
 ## 生图历史旁路

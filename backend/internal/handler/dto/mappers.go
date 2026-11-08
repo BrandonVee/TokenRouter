@@ -246,6 +246,9 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 		return nil
 	}
 	out := &AdminGroup{
+		ProfitControlEnabled:        g.ProfitControlEnabled,
+		ProfitMinMargin:             g.ProfitMinMargin,
+		ProfitSafetyBuffer:          g.ProfitSafetyBuffer,
 		Group:                       groupFromServiceBase(g),
 		SchedulerType:               string(g.SchedulerType),
 		AdvancedSchedulerOverrides:  service.CloneGroupAdvancedSchedulerOverrides(g.AdvancedSchedulerOverrides),

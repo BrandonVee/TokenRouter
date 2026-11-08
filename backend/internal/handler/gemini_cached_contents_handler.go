@@ -167,6 +167,7 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 		return
 	}
 
+	profitVetoCount := 0
 	var lastUpstreamErr *service.GeminiCachedContentUpstreamError
 	var ttlRejectedLimit time.Duration
 	for attempts := 0; attempts < geminiCachedContentCreateMaxAttempts; {
@@ -200,6 +201,17 @@ func (h *GatewayHandler) GeminiCachedContentsCreate(c *gin.Context) {
 			return
 		}
 
+		latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, apiKey.GroupID, "", selection, accountReleaseFunc, reqLog)
+		if !admitted {
+			excluded[account.ID] = struct{}{}
+			profitVetoCount++
+			if profitVetoCount >= maxProfitVetoAttempts {
+				googlePlatformError(c, http.StatusServiceUnavailable, profitVetoExhaustedMessage)
+				return
+			}
+			continue
+		}
+		account = latest
 		attempts++
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 

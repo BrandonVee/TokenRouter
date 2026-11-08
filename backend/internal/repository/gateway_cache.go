@@ -46,7 +46,11 @@ func buildSessionOwnerKey(userID int64, source, sessionHash string) string {
 
 func (c *gatewayCache) GetSessionAccountID(ctx context.Context, groupID int64, sessionHash string) (int64, error) {
 	key := buildSessionKey(groupID, sessionHash)
-	return c.rdb.Get(ctx, key).Int64()
+	id, err := c.rdb.Get(ctx, key).Int64()
+	if err == redis.Nil {
+		return 0, fmt.Errorf("%w: %w", service.ErrStickySessionNotFound, err)
+	}
+	return id, err
 }
 
 func (c *gatewayCache) SetSessionAccountID(ctx context.Context, groupID int64, sessionHash string, accountID int64, ttl time.Duration) error {

@@ -172,6 +172,15 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		}
 
 		accountRelease = wrapReleaseOnDone(c.Request.Context(), accountRelease)
+		latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, apiKey.GroupID, "", selection, accountRelease, reqLog)
+		if !admitted {
+			if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
+				h.errorResponse(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage)
+				return
+			}
+			continue
+		}
+		account = latest
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
 		forwardStart := time.Now()

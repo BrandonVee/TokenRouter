@@ -94,6 +94,8 @@ OpenAI 与 Composite 分组可显式开启 `image_count_billing`，前提是分�
 
 账号成本基数优先使用 Usage Log 的 `account_stats_cost`，仅在该字段为 `nil` 时回退 `total_cost`；显式 `0` 表示账号成本为零。账号统计和账号 `quota_used` 都把这个基数乘以账号 `rate_multiplier`，从而保持同一成本口径。用户余额、订阅和 API Key 配额始终使用 `ActualCost`，不受账号成本覆盖影响。账号成本回退到模型文件定价时，必须使用 Usage Log 最终记录的服务层级，并与模型长上下文倍率组合计算；自定义账号统计价格以及已经由 `ApplyPricingToAccountStats` 取得的用户计费结果都是最终成本基数，不得再次叠加服务层级倍率。
 
+分组可选的[利润准入](../architecture/account_scheduling_and_cache.md#profit_admission)使用账号成本倍率和付款主体可用资金的最低倍率筛选候选。它不改写用户价格或最终资金分配；请求及 WebSocket 每轮的冻结时点必须与最终结算一致。
+
 渠道模型定价显式声明计费模式和计费模型来源：
 
 | 维度 | 可选语义 |

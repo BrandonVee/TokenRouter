@@ -257,7 +257,7 @@ func defaultModelsListCandidateIDs(platform string) []string {
 
 func defaultAllowImageGenerationForPlatform(platform string) bool {
 	// Grok 图片和视频生成路由共用历史图片生成开关；旧客户端不会显式传 true。
-	return platform == PlatformGrok || platform == PlatformGemini || platform == PlatformAntigravity
+	return platform == PlatformGrok
 }
 
 func canCopyAccountsFromGroupPlatform(targetPlatform, sourcePlatform string) bool {
@@ -378,6 +378,18 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		return nil, err
 	}
 
+	profitMinMargin, profitSafetyBuffer := 0.0, 0.0
+	if input.ProfitMinMargin != nil {
+		profitMinMargin = *input.ProfitMinMargin
+	}
+	if input.ProfitSafetyBuffer != nil {
+		profitSafetyBuffer = *input.ProfitSafetyBuffer
+	}
+	profitControlEnabled, profitMinMargin, profitSafetyBuffer := NormalizeProfitControlConfig(platform, input.ProfitControlEnabled, profitMinMargin, profitSafetyBuffer)
+	if err := ValidateProfitControlConfig(platform, profitControlEnabled, profitMinMargin, profitSafetyBuffer); err != nil {
+		return nil, infraerrors.BadRequest("INVALID_PROFIT_CONTROL", err.Error())
+	}
+
 	// 校验降级分组
 	if input.FallbackGroupID != nil {
 		if err := s.validateFallbackGroup(ctx, 0, *input.FallbackGroupID); err != nil {
@@ -456,34 +468,35 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		sortOrder = *input.SortOrder
 	}
 	group := &Group{
-		Name:                            input.Name,
-		Description:                     input.Description,
-		Platform:                        platform,
-		SchedulerType:                   schedulerType,
-		AdvancedSchedulerOverrides:      CloneGroupAdvancedSchedulerOverrides(input.AdvancedSchedulerOverrides),
-		DisplayBrand:                    strings.TrimSpace(input.DisplayBrand),
-		SortOrder:                       sortOrder,
-		RateMultiplier:                  input.RateMultiplier,
-		IsExclusive:                     input.IsExclusive,
-		IsDefault:                       input.IsDefault,
-		DataSharingEnabled:              input.DataSharingEnabled,
-		SessionIsolationEnabled:         input.SessionIsolationEnabled,
-		Status:                          StatusActive,
-		LongContextPricingEnabled:       longContextPricingEnabled,
-		ModelPricing:                    modelPricing,
-		AllowImageGeneration:            allowImageGeneration,
-		AllowBatchImageGeneration:       allowBatchImageGeneration,
-		ImageCountBilling:               imageCountBilling,
-		ImageRateIndependent:            input.ImageRateIndependent,
-		ImageRateMultiplier:             imageRateMultiplier,
-		BatchImageDiscountMultiplier:    batchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        batchImageHoldMultiplier,
-		VideoRateIndependent:            input.VideoRateIndependent,
-		VideoRateMultiplier:             videoRateMultiplier,
-		PeakRateEnabled:                 peakRateEnabled,
-		PeakStart:                       peakStart,
-		PeakEnd:                         peakEnd,
-		PeakRateMultiplier:              peakRateMultiplier,
+		Name:                         input.Name,
+		Description:                  input.Description,
+		Platform:                     platform,
+		SchedulerType:                schedulerType,
+		AdvancedSchedulerOverrides:   CloneGroupAdvancedSchedulerOverrides(input.AdvancedSchedulerOverrides),
+		DisplayBrand:                 strings.TrimSpace(input.DisplayBrand),
+		SortOrder:                    sortOrder,
+		RateMultiplier:               input.RateMultiplier,
+		IsExclusive:                  input.IsExclusive,
+		IsDefault:                    input.IsDefault,
+		DataSharingEnabled:           input.DataSharingEnabled,
+		SessionIsolationEnabled:      input.SessionIsolationEnabled,
+		Status:                       StatusActive,
+		LongContextPricingEnabled:    longContextPricingEnabled,
+		ModelPricing:                 modelPricing,
+		AllowImageGeneration:         allowImageGeneration,
+		AllowBatchImageGeneration:    allowBatchImageGeneration,
+		ImageCountBilling:            imageCountBilling,
+		ImageRateIndependent:         input.ImageRateIndependent,
+		ImageRateMultiplier:          imageRateMultiplier,
+		BatchImageDiscountMultiplier: batchImageDiscountMultiplier,
+		BatchImageHoldMultiplier:     batchImageHoldMultiplier,
+		VideoRateIndependent:         input.VideoRateIndependent,
+		VideoRateMultiplier:          videoRateMultiplier,
+		PeakRateEnabled:              peakRateEnabled,
+		PeakStart:                    peakStart,
+		PeakEnd:                      peakEnd,
+		PeakRateMultiplier:           peakRateMultiplier,
+		ProfitControlEnabled:         profitControlEnabled, ProfitMinMargin: profitMinMargin, ProfitSafetyBuffer: profitSafetyBuffer,
 		ImagePrice1K:                    imagePrice1K,
 		ImagePrice2K:                    imagePrice2K,
 		ImagePrice4K:                    imagePrice4K,
@@ -828,6 +841,19 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.PeakEnd != nil {
 		group.PeakEnd = *input.PeakEnd
+	}
+	if input.ProfitControlEnabled != nil {
+		group.ProfitControlEnabled = *input.ProfitControlEnabled
+	}
+	if input.ProfitMinMargin != nil {
+		group.ProfitMinMargin = *input.ProfitMinMargin
+	}
+	if input.ProfitSafetyBuffer != nil {
+		group.ProfitSafetyBuffer = *input.ProfitSafetyBuffer
+	}
+	group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer = NormalizeProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer)
+	if err := ValidateProfitControlConfig(group.Platform, group.ProfitControlEnabled, group.ProfitMinMargin, group.ProfitSafetyBuffer); err != nil {
+		return nil, infraerrors.BadRequest("INVALID_PROFIT_CONTROL", err.Error())
 	}
 	if input.PeakRateMultiplier != nil {
 		group.PeakRateMultiplier = *input.PeakRateMultiplier

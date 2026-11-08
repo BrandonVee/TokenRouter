@@ -1134,6 +1134,18 @@ affiliates: {
           '留空使用默认价 $0.01/次（官方定价 $10/1000 次）；填 0 表示免费。实际扣费会叠加分组费率倍数。',
         finalPricePreview: '应用当前倍率后的单次价格：{price}'
       },
+      profitControl: {
+        enable: '启用利润控制',
+        enabledHint: '按“账号成本倍率 ≤ 下游倍率 ×（1 − 最低毛利率 − 安全缓冲）”过滤文本候选。自动结算按可用套餐及余额中的最低倍率校验，账号倍率由管理员维护。媒体请求不参与。',
+        disabledHint: '关闭后调度不做利润过滤，账号倍率高于下游倍率的账号也会被选中，可能产生亏损请求。',
+        minMargin: '最低毛利率（%）',
+        minMarginHint: '百分比输入，如 30 表示 30%；后端按小数存储',
+        safetyBuffer: '安全缓冲（%）',
+        safetyBufferHint: '与最低毛利率相加后从下游倍率中扣除，默认 0',
+        marginRangeError: '最低毛利率应在 0 到 99.99 之间',
+        bufferRangeError: '安全缓冲应在 0 到 99.99 之间',
+        sumTooHigh: '最低毛利率与安全缓冲之和必须小于 100%，否则将排除全部账号'
+      },
       peakRate: {
         title: '峰谷倍率',
         statusEnabled: '已启用',

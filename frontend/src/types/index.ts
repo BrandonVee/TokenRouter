@@ -794,6 +794,10 @@ export interface Group {
 }
 
 export interface AdminGroup extends Group {
+  // 内部经营参数仅由管理接口返回。
+  profit_control_enabled: boolean
+  profit_min_margin: number
+  profit_safety_buffer: number
   // 仅管理端可配置，公开分组接口不返回调度器模式。
   scheduler_type: GroupSchedulerType
   advanced_scheduler_overrides?: GroupAdvancedSchedulerOverrides
@@ -1026,6 +1030,9 @@ export interface UpdateApiKeyRequest {
 }
 
 export interface CreateGroupRequest {
+  profit_control_enabled?: boolean
+  profit_min_margin?: number
+  profit_safety_buffer?: number
   name: string
   description?: string | null
   platform?: GroupPlatform
@@ -1090,6 +1097,9 @@ export interface CreateGroupRequest {
 }
 
 export interface UpdateGroupRequest {
+  profit_control_enabled?: boolean
+  profit_min_margin?: number
+  profit_safety_buffer?: number
   name?: string
   description?: string | null
   platform?: GroupPlatform

@@ -496,12 +496,23 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
-					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				if !selection.ProfitGateActive() {
+					if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
+						reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+					}
 				}
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
 			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+			latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, apiKey.GroupID, sessionKey, selection, accountReleaseFunc, reqLog)
+			if !admitted {
+				if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
+					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
+					return
+				}
+				continue
+			}
+			account = latest
 
 			// 转发请求 - 根据账号平台分流
 			var result *service.ForwardResult
@@ -808,12 +819,23 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					zap.String("session_key", sessionKey),
 					zap.Int64("account_id", account.ID),
 				)
-				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
-					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				if !selection.ProfitGateActive() {
+					if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+						reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+					}
 				}
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
 			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+			latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, currentAPIKey.GroupID, sessionKey, selection, accountReleaseFunc, reqLog)
+			if !admitted {
+				if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
+					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
+					return
+				}
+				continue
+			}
+			account = latest
 
 			// ===== 用户消息串行队列 START =====
 			var queueRelease func()
@@ -1013,6 +1035,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						ctx := context.WithValue(c.Request.Context(), ctxkey.ForcePlatform, "")
 						// 后续转发和用量计算必须读取兜底分组，而不是中间件写入的原分组。
 						ctx = context.WithValue(ctx, ctxkey.Group, fallbackGroup)
+						ctx = service.WithGatewayBillingGroupSnapshot(ctx, fallbackGroup)
+						ctx = service.WithProfitBillingContext(ctx, fallbackAPIKey, fallbackSubscription)
 						c.Request = c.Request.WithContext(ctx)
 						currentAPIKey = fallbackAPIKey
 						currentSubscription = fallbackSubscription

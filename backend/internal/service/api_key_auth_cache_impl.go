@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 36 // v36：认证快照包含分组按张计费配置
+const apiKeyAuthSnapshotVersion = 37 // v37：保留利润、隐私、OAuth-only 及 Messages 准入配置
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -496,6 +496,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			PeakStart:                       apiKey.Group.PeakStart,
 			PeakEnd:                         apiKey.Group.PeakEnd,
 			PeakRateMultiplier:              apiKey.Group.PeakRateMultiplier,
+			ProfitControlEnabled:            apiKey.Group.ProfitControlEnabled, ProfitMinMargin: apiKey.Group.ProfitMinMargin, ProfitSafetyBuffer: apiKey.Group.ProfitSafetyBuffer, RequireOAuthOnly: apiKey.Group.RequireOAuthOnly, RequirePrivacySet: apiKey.Group.RequirePrivacySet, AllowMessagesDispatch: apiKey.Group.AllowMessagesDispatch,
 		}
 	}
 	if apiKey.IsComposite {
@@ -637,6 +638,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			PeakStart:                       snapshot.Group.PeakStart,
 			PeakEnd:                         snapshot.Group.PeakEnd,
 			PeakRateMultiplier:              snapshot.Group.PeakRateMultiplier,
+			ProfitControlEnabled:            snapshot.Group.ProfitControlEnabled, ProfitMinMargin: snapshot.Group.ProfitMinMargin, ProfitSafetyBuffer: snapshot.Group.ProfitSafetyBuffer, RequireOAuthOnly: snapshot.Group.RequireOAuthOnly, RequirePrivacySet: snapshot.Group.RequirePrivacySet, AllowMessagesDispatch: snapshot.Group.AllowMessagesDispatch,
 		}
 	}
 	if snapshot.IsComposite {
@@ -688,7 +690,7 @@ func authGroupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		MessagesDispatchModelConfig: group.MessagesDispatchModelConfig, ModelsListConfig: group.ModelsListConfig,
 		RPMLimit: group.RPMLimit, MaxReasoningEffort: group.MaxReasoningEffort,
 		ReasoningEffortMappings: group.ReasoningEffortMappings, PeakRateEnabled: group.PeakRateEnabled,
-		PeakStart: group.PeakStart, PeakEnd: group.PeakEnd, PeakRateMultiplier: group.PeakRateMultiplier,
+		PeakStart: group.PeakStart, PeakEnd: group.PeakEnd, PeakRateMultiplier: group.PeakRateMultiplier, ProfitControlEnabled: group.ProfitControlEnabled, ProfitMinMargin: group.ProfitMinMargin, ProfitSafetyBuffer: group.ProfitSafetyBuffer, RequireOAuthOnly: group.RequireOAuthOnly, RequirePrivacySet: group.RequirePrivacySet, AllowMessagesDispatch: group.AllowMessagesDispatch,
 	}
 }
 
@@ -723,7 +725,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		MessagesDispatchModelConfig: snapshot.MessagesDispatchModelConfig, ModelsListConfig: snapshot.ModelsListConfig,
 		RPMLimit: snapshot.RPMLimit, MaxReasoningEffort: snapshot.MaxReasoningEffort,
 		ReasoningEffortMappings: snapshot.ReasoningEffortMappings, PeakRateEnabled: snapshot.PeakRateEnabled,
-		PeakStart: snapshot.PeakStart, PeakEnd: snapshot.PeakEnd, PeakRateMultiplier: snapshot.PeakRateMultiplier,
+		PeakStart: snapshot.PeakStart, PeakEnd: snapshot.PeakEnd, PeakRateMultiplier: snapshot.PeakRateMultiplier, ProfitControlEnabled: snapshot.ProfitControlEnabled, ProfitMinMargin: snapshot.ProfitMinMargin, ProfitSafetyBuffer: snapshot.ProfitSafetyBuffer, RequireOAuthOnly: snapshot.RequireOAuthOnly, RequirePrivacySet: snapshot.RequirePrivacySet, AllowMessagesDispatch: snapshot.AllowMessagesDispatch,
 	}
 }
 

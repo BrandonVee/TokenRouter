@@ -1692,3 +1692,11 @@ func (l *fallbackLimiter) Allow() bool {
 	l.count++
 	return true
 }
+
+// GetGroupByIDLite 只读取利润准入需要的分组配置，避免热路径聚合账号计数。
+func (s *SchedulerSnapshotService) GetGroupByIDLite(ctx context.Context, id int64) (*Group, error) {
+	if s.groupRepo == nil {
+		return nil, ErrGroupNotFound
+	}
+	return s.groupRepo.GetByIDLite(ctx, id)
+}

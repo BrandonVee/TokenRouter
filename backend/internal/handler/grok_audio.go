@@ -25,6 +25,9 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 		h.errorResponse(c, http.StatusUpgradeRequired, "invalid_request_error", "WebSocket upgrade required (Upgrade: websocket)")
 		return
 	}
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(service.WithOpenAIProfitControlSuppressed(c.Request.Context()))
+	}
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok || apiKey.Group == nil || apiKey.Group.Platform != service.PlatformGrok {
 		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Realtime API is not supported for this platform")
@@ -140,6 +143,9 @@ func isExpectedGrokRealtimeClose(err error) bool {
 
 // GrokVoice 处理 xAI Voice 的 TTS、STT 与 custom-voices HTTP 端点。
 func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
+	if c != nil && c.Request != nil {
+		c.Request = c.Request.WithContext(service.WithOpenAIProfitControlSuppressed(c.Request.Context()))
+	}
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok || apiKey.Group == nil || apiKey.Group.Platform != service.PlatformGrok {
 		h.errorResponse(c, http.StatusNotFound, "not_found_error", "Voice API is not supported for this platform")

@@ -365,6 +365,9 @@ func openAICompactSupportTier(account *Account) int {
 // 注意：对 spark 影子账号，调用方还须额外调用 parentHealthyForShadow(account, lookup)
 // 检查母账号凭据可用性；该检查未内置于本函数，以避免注入 DB 依赖。
 func isOpenAICompatibleAccountEligibleForRequest(ctx context.Context, account *Account, platform string, requestedModel string, requireCompact bool, requiredCapability OpenAIEndpointCapability) bool {
+	if vetoed, _ := openAIProfitControlVetoReason(ctx, account); vetoed {
+		return false
+	}
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	if account == nil || account.Platform != platform || !account.IsOpenAICompatible() || !account.IsSchedulableForModelWithContext(ctx, requestedModel) {
 		return false
@@ -816,7 +819,7 @@ func (s *OpenAIGatewayService) selectAccountForModelWithExclusionsForRouting(ctx
 	}
 
 	if sessionHash != "" {
-		_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, selected.ID, openaiStickySessionTTL)
+		_ = s.bindOpenAIStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID)
 	}
 
 	return hydrated, nil
@@ -993,6 +996,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 
 // selectAccountWithLoadAwarenessForRouting 使用已解析的账号层模型执行负载感知调度。
 func (s *OpenAIGatewayService) selectAccountWithLoadAwarenessForRouting(ctx context.Context, groupID *int64, platform string, sessionHash string, requestedModel string, routingModel string, excludedIDs map[int64]struct{}, requireCompact bool, requiredCapability OpenAIEndpointCapability) (*AccountSelectionResult, error) {
+	ctx = s.withOpenAIProfitControlGate(ctx, groupID)
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	if s.checkChannelPricingRestriction(ctx, groupID, requestedModel) {
 		slog.Warn("channel pricing restriction blocked request",
@@ -1223,7 +1227,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwarenessForRouting(ctx cont
 					return nil, true, selectErr
 				}
 				if sessionHash != "" {
-					_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, fresh.ID, openaiStickySessionTTL)
+					_ = s.bindOpenAIStickySessionDuringSelection(ctx, groupID, sessionHash, fresh.ID)
 				}
 				return selection, true, nil
 			}
@@ -1257,7 +1261,7 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwarenessForRouting(ctx cont
 					return nil, selectErr
 				}
 				if sessionHash != "" {
-					_ = s.setStickySessionAccountID(ctx, groupID, sessionHash, fresh.ID, openaiStickySessionTTL)
+					_ = s.bindOpenAIStickySessionDuringSelection(ctx, groupID, sessionHash, fresh.ID)
 				}
 				return selection, nil
 			}
@@ -1525,12 +1529,12 @@ func (s *OpenAIGatewayService) newSelectionResult(ctx context.Context, account *
 	if err != nil {
 		return nil, err
 	}
-	return &AccountSelectionResult{
+	return attachSelectionProfitGate(ctx, &AccountSelectionResult{
 		Account:     hydrated,
 		Acquired:    acquired,
 		ReleaseFunc: release,
 		WaitPlan:    waitPlan,
-	}, nil
+	}), nil
 }
 
 func (s *OpenAIGatewayService) newAcquiredSelectionResult(ctx context.Context, account *Account, release func()) (*AccountSelectionResult, error) {

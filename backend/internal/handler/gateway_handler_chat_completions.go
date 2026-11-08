@@ -260,6 +260,15 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, apiKey.GroupID, sessionHash, selection, accountReleaseFunc, reqLog)
+		if !admitted {
+			if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
+				h.chatCompletionsErrorResponse(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage)
+				return
+			}
+			continue
+		}
+		account = latest
 
 		if groupPlatform == service.PlatformGemini && account.Platform != service.PlatformGemini {
 			if accountReleaseFunc != nil {

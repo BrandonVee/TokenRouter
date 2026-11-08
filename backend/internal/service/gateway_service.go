@@ -552,6 +552,7 @@ type AccountWaitPlan struct {
 }
 
 type AccountSelectionResult struct {
+	profitGate        *openAIProfitControlGate // 携带本次实际调度分组的门，供抢槽后复核。
 	Account           *Account
 	Acquired          bool
 	ReleaseFunc       func()
@@ -1964,4 +1965,12 @@ func (s *GatewayService) billableModelWithFallback(ctx context.Context, apiKey *
 		}
 	}
 	return model
+}
+
+// ErrStickySessionNotFound 表示缓存不存在粘性绑定，不代表缓存读取失败。
+var ErrStickySessionNotFound = errors.New("sticky session not found")
+
+// ProfitGateActive 报告本次选号是否处于利润门之下。
+func (r *AccountSelectionResult) ProfitGateActive() bool {
+	return r != nil && r.profitGate != nil
 }

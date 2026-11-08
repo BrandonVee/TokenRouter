@@ -130,6 +130,8 @@ gemini_generate_content
 
 准入使用认证后最终选中的分组。普通 Key 在读取正文和调度前检查；复合 Key 需要先读取并恢复正文以解析目标分组，再按该最终分组检查。文本协议开关不扩展 Live、WebSocket、Embedding、图片或视频能力，也不会绕过账号 endpoint capability 等更窄限制。
 
+管理 Group 的 `profit_control_enabled`、`profit_min_margin`、`profit_safety_buffer` 仅出现在 AdminGroup DTO；普通用户、Key 内嵌分组和公开模型市场不返回。比例按小数提交，创建与 PATCH 合并后均按数据库四位小数精度校验，错误返回 400。平台范围和调度语义见[利润准入](../architecture/account_scheduling_and_cache.md#profit_admission)。
+
 ## 认证方式
 
 | 凭据 | 接收位置 | 权限边界 |

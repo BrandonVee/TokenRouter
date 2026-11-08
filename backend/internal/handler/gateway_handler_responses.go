@@ -260,6 +260,15 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			}
 		}
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, apiKey.GroupID, sessionHash, selection, accountReleaseFunc, reqLog)
+		if !admitted {
+			if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
+				h.responsesErrorResponse(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage)
+				return
+			}
+			continue
+		}
+		account = latest
 
 		// 5. Forward request
 		writerSizeBeforeForward := c.Writer.Size()

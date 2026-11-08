@@ -308,7 +308,7 @@ func (s *defaultOpenAIAccountScheduler) Select(
 			decision.SelectedAccountID = selection.Account.ID
 			decision.SelectedAccountType = selection.Account.Type
 			if req.SessionHash != "" {
-				_ = s.service.BindStickySession(ctx, req.GroupID, req.SessionHash, selection.Account.ID)
+				_ = s.service.bindOpenAIStickySessionDuringSelection(ctx, req.GroupID, req.SessionHash, selection.Account.ID)
 			}
 			return selection, decision, nil
 		}
@@ -805,7 +805,7 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrderWithBudget
 			}
 		}
 		if req.SessionHash != "" && !req.PreserveStickyBinding {
-			_ = s.service.BindStickySession(ctx, req.GroupID, req.SessionHash, fresh.ID)
+			_ = s.service.bindOpenAIStickySessionDuringSelection(ctx, req.GroupID, req.SessionHash, fresh.ID)
 		}
 		return &AccountSelectionResult{
 			Account:     fresh,
@@ -1219,6 +1219,9 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatible(ctx context.C
 
 // isAccountRequestCompatibleReason 返回账号是否兼容，并在拒绝时标明具体门禁原因。
 func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx context.Context, account *Account, req OpenAIAccountScheduleRequest) (bool, string) {
+	if vetoed, reason := openAIProfitControlVetoReason(ctx, account); vetoed {
+		return false, reason
+	}
 	if account == nil {
 		return false, "account_nil"
 	}
@@ -1676,7 +1679,12 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerForRouting(
 // resolveOpenAISchedulerGroup 解析 OpenAI 路径最终实际使用的分组。
 // 与通用网关保持一致：Claude Code 专属分组会在非 Claude Code 请求时沿回退链解析，
 // 因此高级调度器模式、渠道映射和粘性缓存均绑定到最终目标分组。
-func (s *OpenAIGatewayService) resolveOpenAISchedulerGroup(ctx context.Context, groupID *int64) (context.Context, *int64, error) {
+func (s *OpenAIGatewayService) resolveOpenAISchedulerGroup(ctx context.Context, groupID *int64) (profitCtx context.Context, profitGroupID *int64, profitErr error) {
+	defer func() {
+		if profitErr == nil {
+			profitCtx = s.withOpenAIProfitControlGate(profitCtx, profitGroupID)
+		}
+	}()
 	if groupID == nil || *groupID <= 0 {
 		return ctx, groupID, nil
 	}
@@ -1730,7 +1738,11 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerForRoutingOnce(
 	requireCompact bool,
 	platform string,
 	previousResponseCanMove bool,
-) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+) (profitSelected *AccountSelectionResult, profitDecision OpenAIAccountScheduleDecision, profitErr error) {
+	if requiredImageCapability == "" {
+		ctx = s.withOpenAIProfitControlGate(ctx, groupID)
+	}
+	defer func() { profitSelected = attachSelectionProfitGate(ctx, profitSelected) }()
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
 	platform = normalizeOpenAICompatiblePlatform(platform)
 	decision := OpenAIAccountScheduleDecision{}

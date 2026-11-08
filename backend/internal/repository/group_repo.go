@@ -149,7 +149,10 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetPeakRateEnabled(groupIn.PeakRateEnabled).
 		SetPeakStart(groupIn.PeakStart).
 		SetPeakEnd(groupIn.PeakEnd).
-		SetPeakRateMultiplier(groupIn.PeakRateMultiplier)
+		SetPeakRateMultiplier(groupIn.PeakRateMultiplier).
+		SetProfitControlEnabled(groupIn.ProfitControlEnabled).
+		SetProfitMinMargin(groupIn.ProfitMinMargin).
+		SetProfitSafetyBuffer(groupIn.ProfitSafetyBuffer)
 	if groupIn.DuplicateOperationID != "" {
 		builder = builder.SetDuplicateOperationID(groupIn.DuplicateOperationID)
 	}
@@ -341,7 +344,10 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetPeakRateEnabled(groupIn.PeakRateEnabled).
 		SetPeakStart(groupIn.PeakStart).
 		SetPeakEnd(groupIn.PeakEnd).
-		SetPeakRateMultiplier(groupIn.PeakRateMultiplier)
+		SetPeakRateMultiplier(groupIn.PeakRateMultiplier).
+		SetProfitControlEnabled(groupIn.ProfitControlEnabled).
+		SetProfitMinMargin(groupIn.ProfitMinMargin).
+		SetProfitSafetyBuffer(groupIn.ProfitSafetyBuffer)
 
 	if groupIn.ImagePrice1K != nil {
 		builder = builder.SetImagePrice1k(*groupIn.ImagePrice1K)

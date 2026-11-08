@@ -1137,6 +1137,18 @@ affiliates: {
           'Leave empty to use the default $0.01 per call (official pricing: $10 per 1,000 calls); 0 means free. The group rate multiplier is applied on top.',
         finalPricePreview: 'Per-call price after current multiplier: {price}'
       },
+      profitControl: {
+        enable: 'Enable profit control',
+        enabledHint: 'Admit text accounts when account cost multiplier is within the downstream multiplier after margin and buffer. Automatic billing uses the lowest applicable subscription or balance multiplier. Maintain account rates manually; media requests are excluded.',
+        disabledHint: 'When disabled, scheduling does no profit filtering: accounts whose account multiplier exceeds the downstream multiplier can still be selected, which may produce loss-making requests.',
+        minMargin: 'Min gross margin (%)',
+        minMarginHint: 'Percent input, e.g. 30 means 30%; stored as a decimal on the backend',
+        safetyBuffer: 'Safety buffer (%)',
+        safetyBufferHint: 'Added to min margin and deducted from the downstream multiplier; defaults to 0',
+        marginRangeError: 'Min gross margin must be between 0 and 99.99',
+        bufferRangeError: 'Safety buffer must be between 0 and 99.99',
+        sumTooHigh: 'Min gross margin plus safety buffer must be less than 100%, otherwise every account would be excluded'
+      },
       peakRate: {
         title: 'Peak multiplier',
         statusEnabled: 'Enabled',

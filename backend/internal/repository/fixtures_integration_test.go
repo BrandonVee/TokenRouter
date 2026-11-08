@@ -85,6 +85,12 @@ func mustCreateGroup(t *testing.T, client *dbent.Client, g *service.Group) *serv
 		SetPlatform(g.Platform).
 		SetStatus(g.Status).
 		SetRateMultiplier(g.RateMultiplier).
+		SetRequirePrivacySet(g.RequirePrivacySet).
+		SetRequireOauthOnly(g.RequireOAuthOnly).
+		SetAllowMessagesDispatch(g.AllowMessagesDispatch).
+		SetProfitControlEnabled(g.ProfitControlEnabled).
+		SetProfitMinMargin(g.ProfitMinMargin).
+		SetProfitSafetyBuffer(g.ProfitSafetyBuffer).
 		SetIsExclusive(g.IsExclusive)
 	if g.Description != "" {
 		create.SetDescription(g.Description)

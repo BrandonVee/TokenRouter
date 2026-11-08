@@ -43,6 +43,7 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 				return nil, err
 			}
 			ctx = s.withGroupContext(ctx, group)
+			ctx = s.withGatewayProfitControlGate(ctx, groupID)
 			resolvedGroup = group
 		}
 	} else if groupID != nil {
@@ -55,6 +56,7 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 		}
 		groupID = resolvedGroupID
 		ctx = s.withGroupContext(ctx, group)
+		ctx = s.withGatewayProfitControlGate(ctx, groupID)
 		resolvedGroup = group
 		platform = group.Platform
 		if group.Platform == PlatformComposite {
@@ -149,6 +151,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 		return nil, err
 	}
 	ctx = s.withGroupContext(ctx, group)
+	ctx = s.withGatewayProfitControlGate(ctx, groupID)
 	usesAdvancedScheduler := APIKeyRoutingStrategyFromContext(ctx) != APIKeyRoutingStrategyManual || (group != nil && group.UsesAdvancedScheduler())
 	// 高级调度开启粘性加权后，旧硬粘性不能抢在评分前返回；否则 session
 	// 粘性不会作为统一候选评分的一部分。关闭加权时保留原有硬粘性语义。
@@ -546,7 +549,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 							continue
 						}
 						if sessionHash != "" && s.cache != nil {
-							_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, item.account.ID, stickySessionTTL)
+							_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, item.account.ID)
 						}
 						if s.debugModelRoutingEnabled() {
 							logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routed select: group_id=%v model=%s session=%s account=%d", derefGroupID(groupID), requestedModel, shortSessionHash(sessionHash), item.account.ID)
@@ -828,7 +831,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					result.ReleaseFunc()
 				} else {
 					if sessionHash != "" && s.cache != nil {
-						_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.account.ID, stickySessionTTL)
+						_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.account.ID)
 					}
 					return s.newSelectionResult(ctx, selected.account, true, result.ReleaseFunc, nil)
 				}
@@ -969,7 +972,7 @@ func (s *GatewayService) tryAcquireByAdvancedScheduler(
 			continue
 		}
 		if sessionHash != "" && s.cache != nil && !shouldPreserveAdvancedSchedulerStickyBinding(ctx) {
-			_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, candidate.account.ID, stickySessionTTL)
+			_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, candidate.account.ID)
 		}
 		selection, selectErr := s.newSelectionResult(ctx, candidate.account, true, result.ReleaseFunc, nil)
 		if selectErr != nil {
@@ -1033,7 +1036,7 @@ func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates
 				continue
 			}
 			if sessionHash != "" && s.cache != nil {
-				_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, acc.ID, stickySessionTTL)
+				_ = s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, acc.ID)
 			}
 			selection, err := s.newSelectionResult(ctx, acc, true, result.ReleaseFunc, nil)
 			if err != nil {
@@ -1360,6 +1363,9 @@ func (s *GatewayService) isAccountSchedulableForSelection(account *Account) bool
 }
 
 func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Context, account *Account, requestedModel string) bool {
+	if !s.isGatewayAccountProfitEligible(ctx, account) {
+		return false
+	}
 	if account == nil {
 		return false
 	}
@@ -1375,6 +1381,9 @@ func (s *GatewayService) shouldClearStickySessionForAccountLayer(ctx context.Con
 
 // isAccountEligibleExceptModelSupport 判断账号除模型白名单/映射外是否具备本次请求资格。
 func (s *GatewayService) isAccountEligibleExceptModelSupport(ctx context.Context, account *Account, requestedModel string, platform string, excludedIDs map[int64]struct{}, useMixed bool, groupID *int64, schedGroup *Group) bool {
+	if !s.isGatewayAccountProfitEligible(ctx, account) {
+		return false
+	}
 	if account == nil {
 		return false
 	}
@@ -1841,7 +1850,7 @@ func (s *GatewayService) newSelectionResult(ctx context.Context, account *Accoun
 		// 让转发层只依据选择结果写入高级运行时反馈，避免基础分组污染统计。
 		selection.AdvancedScheduler = true
 	}
-	return selection, nil
+	return attachSelectionProfitGate(ctx, selection), nil
 }
 
 // filterByMinPriority 过滤出优先级最小的账号集合
@@ -2277,7 +2286,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 
 		if selected != nil {
 			if sessionHash != "" && s.cache != nil {
-				if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
+				if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 					logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 				}
 			}
@@ -2393,7 +2402,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	}
 
 	if sessionHash != "" && s.cache != nil {
-		if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
+		if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 			logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
 	}
@@ -2534,7 +2543,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 
 		if selected != nil {
 			if sessionHash != "" && s.cache != nil {
-				if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
+				if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 					logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 				}
 			}
@@ -2652,7 +2661,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	}
 
 	if sessionHash != "" && s.cache != nil {
-		if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
+		if err := s.bindGatewayStickySessionDuringSelection(ctx, groupID, sessionHash, selected.ID); err != nil {
 			logger.LegacyPrintf("service.gateway", "set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
 	}

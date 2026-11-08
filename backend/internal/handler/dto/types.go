@@ -245,6 +245,10 @@ type SubscriptionPlanGroup struct {
 // 注意：普通用户接口不得返回 model_routing/account_count/account_groups 等内部信息。
 type AdminGroup struct {
 	Group
+	// 利润配置属于内部经营信息，普通用户 Group 不返回。
+	ProfitControlEnabled bool    `json:"profit_control_enabled"`
+	ProfitMinMargin      float64 `json:"profit_min_margin"`
+	ProfitSafetyBuffer   float64 `json:"profit_safety_buffer"`
 	// SchedulerType 仅管理端可见，用于配置分组调度器。
 	SchedulerType string `json:"scheduler_type"`
 	// AdvancedSchedulerOverrides 仅管理端可见；空字段继承网关通用设置。

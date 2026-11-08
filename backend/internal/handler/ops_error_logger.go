@@ -447,6 +447,12 @@ func setOpsRequestContext(c *gin.Context, model string, stream bool) {
 	// 首次进入网关时冻结价格时点；重试、回退和异步结算都沿用它。
 	if c.Request != nil && service.GatewayTokenRequestPricingAtFromContext(c.Request.Context()).IsZero() {
 		ctx, _ := service.WithGatewayTokenRequestPricing(c.Request.Context())
+		key, _ := middleware2.GetAPIKeyFromContext(c)
+		sub, _ := middleware2.GetSubscriptionFromContext(c)
+		ctx = service.WithProfitBillingContext(ctx, key, sub)
+		if !profitControlledRequest(c) {
+			ctx = service.WithOpenAIProfitControlSuppressed(ctx)
+		}
 		c.Request = c.Request.WithContext(ctx)
 	}
 

@@ -405,6 +405,13 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldPeakStart,
 				group.FieldPeakEnd,
 				group.FieldPeakRateMultiplier,
+				group.FieldProfitControlEnabled,
+				group.FieldProfitMinMargin,
+				group.FieldProfitSafetyBuffer,
+				group.FieldRequireOauthOnly,
+				group.FieldRequirePrivacySet,
+				group.FieldAllowMessagesDispatch,
+				group.FieldUnavailableFallbackGroupID,
 			)
 		}).
 		WithCompositeGroups(func(q *dbent.APIKeyCompositeGroupQuery) {
@@ -1557,6 +1564,9 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		PeakStart:                       g.PeakStart,
 		PeakEnd:                         g.PeakEnd,
 		PeakRateMultiplier:              g.PeakRateMultiplier,
+		ProfitControlEnabled:            g.ProfitControlEnabled,
+		ProfitMinMargin:                 g.ProfitMinMargin,
+		ProfitSafetyBuffer:              g.ProfitSafetyBuffer,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}

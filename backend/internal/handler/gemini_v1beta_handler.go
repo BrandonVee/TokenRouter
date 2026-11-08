@@ -683,12 +683,23 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 				geminiConcurrency.DecrementAccountWaitCount(c.Request.Context(), account.ID)
 				accountWaitCounted = false
 			}
-			if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
-				reqLog.Warn("gemini.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+			if !selection.ProfitGateActive() {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
+					reqLog.Warn("gemini.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+				}
 			}
 		}
 		// 账号槽位/等待计数需要在超时或断开时安全回收
 		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		latest, admitted := admitGatewayProfitSelection(c, h.gatewayService, apiKey.GroupID, sessionKey, selection, accountReleaseFunc, reqLog)
+		if !admitted {
+			if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
+				googlePlatformError(c, http.StatusServiceUnavailable, profitVetoExhaustedMessage)
+				return
+			}
+			continue
+		}
+		account = latest
 
 		// 5) forward (根据平台分流)
 		var result *service.ForwardResult
