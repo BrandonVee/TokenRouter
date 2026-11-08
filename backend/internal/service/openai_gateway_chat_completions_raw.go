@@ -313,10 +313,15 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		refusalDetector.ObserveSSELine(line)
 		if payload, ok := extractOpenAISSEDataLine(line); ok {
 			trimmedPayload := strings.TrimSpace(payload)
+			if trimmedPayload == "[DONE]" {
+				if err := validateDeepseekUsage(c, account, requestID, usage, billingModel, upstreamModel); err != nil {
+					return nil, err
+				}
+			}
 			if trimmedPayload != "[DONE]" {
 				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
 				if u := extractCCStreamUsage(payload); u != nil {
-					usage = *u
+					mergeOpenAIChatStreamUsage(&usage, *u)
 				}
 				streamAccumulator.ObservePayload(payload)
 				if firstTokenMs == nil && !usageOnlyChunk {
@@ -345,7 +350,11 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				zap.String("request_id", requestID),
 			)
 		}
-	} else if !clientDisconnected && !clientOutputStarted {
+	}
+	if err := validateDeepseekUsage(c, account, requestID, usage, billingModel, upstreamModel); err != nil {
+		return nil, err
+	}
+	if scanner.Err() == nil && !clientDisconnected && !clientOutputStarted {
 		if refusalDetector.IsSilentRefusal() {
 			return nil, newOpenAISilentRefusalFailoverError(c, account, requestID)
 		}
@@ -406,17 +415,35 @@ func isOpenAIChatUsageOnlyStreamChunk(payload string) bool {
 
 // extractCCStreamUsage 从单个 CC 流式 chunk 的 payload 中提取 usage 字段。
 // CC 协议中 usage 仅出现在末尾 chunk（且仅当 include_usage 生效时），
-// 但上游可能在多个 chunk 中重复——总是用最新值。
+// 兼容上游也可能使用标准 data/response 包装，与非流式路径复用相同的解析优先级。
 func extractCCStreamUsage(payload string) *OpenAIUsage {
-	usageResult := gjson.Get(payload, "usage")
-	if !usageResult.Exists() || !usageResult.IsObject() {
-		return nil
-	}
-	u, ok := openAIUsageFromGJSON(usageResult)
+	u, ok := extractOpenAIUsageFromJSONBytes([]byte(payload))
 	if !ok {
 		return nil
 	}
 	return &u
+}
+
+// mergeOpenAIChatStreamUsage 合并累计快照，不相加重复用量，也不让空或局部快照清零已观测的桶。
+func mergeOpenAIChatStreamUsage(dst *OpenAIUsage, src OpenAIUsage) {
+	if src.InputTokens > 0 {
+		dst.InputTokens = src.InputTokens
+	}
+	if src.OutputTokens > 0 {
+		dst.OutputTokens = src.OutputTokens
+	}
+	if src.CacheReadInputTokens > 0 {
+		dst.CacheReadInputTokens = src.CacheReadInputTokens
+	}
+	if src.CacheCreationInputTokens > 0 {
+		dst.CacheCreationInputTokens = src.CacheCreationInputTokens
+	}
+	if src.ImageInputTokens > 0 {
+		dst.ImageInputTokens = src.ImageInputTokens
+	}
+	if src.ImageOutputTokens > 0 {
+		dst.ImageOutputTokens = src.ImageOutputTokens
+	}
 }
 
 type openAIChatCompletionsStreamAccumulator struct {
@@ -632,6 +659,9 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		usage = parsedUsage
 	}
 	responseModel := gjson.GetBytes(respBody, "model").String()
+	if err := validateDeepseekUsage(c, account, requestID, usage, billingModel, upstreamModel, responseModel); err != nil {
+		return nil, err
+	}
 	if requiresBillableGrokChatUsage(account, billingModel, upstreamModel, responseModel) &&
 		!hasBillableGrokChatUsage(usage) {
 		upstreamRequestID := firstNonEmpty(requestID, resp.Header.Get("xai-request-id"))

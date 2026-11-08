@@ -23,9 +23,12 @@
 
 ## 账号支持矩阵
 
+<a id="cn_adaptive_usage"></a>
 ### 国产供应商自适应协议
 
 Kimi、智谱 GLM、DeepSeek API Key 账号支持 `adaptive` 协议：同一账号可承接 Chat Completions、Anthropic Messages 与 OpenAI Responses，并可分别设置三类 Base URL。账号级 Header 覆写继续受平台白名单约束。Composite 分组可把这些平台与 OpenAI、Grok、Codex 目标共同纳入路由；Responses WebSocket 仍只允许 OpenAI/Grok 目标。
+
+自适应账号的原生 Messages 响应必须解析实际用量：非流式读取 `usage`，SSE 合并 `message_start.message.usage` 与 `message_delta.usage`，其中输出是累计值，不能累加重复事件或用末尾输出覆盖输入。Anthropic 普通输入与缓存桶互斥，进入 OpenAI 兼容结算前先把缓存读取和创建合入总输入，由统一结算再次拆桶，避免漏收普通输入费用。上游请求脱离客户端取消信号继续读取最终用量；上游请求 ID 一并保留用于对账。
 
 | 平台 | OAuth | Setup Token | API Key | Upstream | Bedrock | Service Account | Cosy |
 | --- | --- | --- | --- | --- | --- | --- | --- |

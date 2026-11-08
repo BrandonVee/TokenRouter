@@ -45,6 +45,10 @@ OpenAI 分组支持 Messages、Responses 和 Chat，新建时默认启用 Respon
 
 OpenAI 兼容非流式响应的 usage 按 `usage`、`response.usage`、`data.usage`、`data.response.usage` 的顺序解析；前两条原生路径优先于 Cline 等兼容上游使用的 `data` envelope。同层的 hosted image usage 必须随对应路径读取，不能把不同 envelope 的 token 与图片用量混合。
 
+Chat Completions SSE 也按上述路径提取用量，各 token 桶保留最新的非零累计快照：重复事件不相加，末尾空、全零或只含输出的局部快照不能清除此前的输入和缓存用量。直通 Chat 的响应体继续透传；桥接到 Responses/Messages 时，终态用量和结算使用同一份合并结果。
+
+DeepSeek 的原生 Messages 与 Chat 直通/桥接响应至少要有一个实际计费的聚合 token 桶。该校验按实际平台和最终计费/上游模型识别，也覆盖第三方 OpenAI 兼容账号承载的 DeepSeek；不依赖未映射的客户端别名。全程缺失用量时返回 `deepseek_missing_usage` 并记录账号及上游请求 ID，不输出正常完成标记、不以估算 token 扣费。尚未写出响应时可按原有策略切号；已经写出的流由 handler 禁止重放请求，按上游异常结束。
+
 `/backend-api/codex` 和无 `/v1` 别名服务特定客户端兼容，但仍经过 TokenRouter Key 鉴权、分组准入、调度和结算。Responses WebSocket 不支持 Qoder；其它平台是否可进入 OpenAI 兼容处理器由路由和平台专题共同决定，不能仅凭 URL 推断。
 
 ### Seedream 与 Seedance

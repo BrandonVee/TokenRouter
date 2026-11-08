@@ -672,6 +672,11 @@ func extractAnthropicSSEDataLine(line string) (string, bool) {
 }
 
 func (s *GatewayService) parseSSEUsagePassthrough(data string, usage *ClaudeUsage) {
+	parseClaudeUsageFromSSEEvent(data, usage)
+}
+
+// parseClaudeUsageFromSSEEvent 合并原生 Messages 事件中的累计用量，供不同平台的透传链路复用。
+func parseClaudeUsageFromSSEEvent(data string, usage *ClaudeUsage) {
 	if usage == nil || data == "" || data == "[DONE]" {
 		return
 	}

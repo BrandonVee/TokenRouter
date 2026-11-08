@@ -130,14 +130,15 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 
 	// 5. 转换上游响应。
 	if clientStream {
-		return s.streamChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+		return s.streamChatCompletionsAsAnthropic(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 	}
-	return s.bufferChatCompletionsAsAnthropic(c, resp, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
+	return s.bufferChatCompletionsAsAnthropic(c, resp, account, originalModel, billingModel, upstreamModel, reasoningEffort, serviceTier, startTime)
 }
 
 func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropic(
 	c *gin.Context,
 	resp *http.Response,
+	account *Account,
 	originalModel string,
 	billingModel string,
 	upstreamModel string,
@@ -148,6 +149,9 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropic(
 	requestID := resp.Header.Get("x-request-id")
 	ccResp, usage, err := s.readCCUpstreamJSONResponse(c, resp, writeAnthropicError)
 	if err != nil {
+		return nil, err
+	}
+	if err := validateDeepseekUsage(c, account, requestID, usage, billingModel, upstreamModel, ccResp.Model); err != nil {
 		return nil, err
 	}
 	anthropicResp := apicompat.ChatCompletionsResponseToAnthropic(ccResp, originalModel)
@@ -173,6 +177,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropic(
 func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 	c *gin.Context,
 	resp *http.Response,
+	account *Account,
 	originalModel string,
 	billingModel string,
 	upstreamModel string,
@@ -234,6 +239,10 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 			FirstTokenMs:     scan.FirstTokenMs,
 			ClientDisconnect: clientDisconnected,
 		}, fmt.Errorf("stream usage incomplete: %w", scan.Err)
+	}
+
+	if err := validateDeepseekUsage(c, account, requestID, scan.Usage, billingModel, upstreamModel); err != nil {
+		return nil, err
 	}
 
 	// 收尾时关闭未结束的内容块，并发出 message_delta/message_stop。

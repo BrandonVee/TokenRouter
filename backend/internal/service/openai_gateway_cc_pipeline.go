@@ -239,8 +239,7 @@ func (s *OpenAIGatewayService) sendCCUpstreamRequest(
 
 // ccStreamScanState 是 scanCCStream 返回的读取状态快照。
 type ccStreamScanState struct {
-	// Usage 为 include_usage chunk 中最近一次出现的用量（上游可能重复发送，
-	// 总是保留最新值）；终态事件中的用量由调用方在 finalize 阶段自行覆盖。
+	// Usage 保存各 token 桶最新的非零累计值，空或局部快照不能抹掉已观测用量。
 	Usage OpenAIUsage
 	// FirstTokenMs 为首个实际输出 chunk（排除 usage-only chunk）的到达时延。
 	FirstTokenMs *int
@@ -253,7 +252,7 @@ type ccStreamScanState struct {
 }
 
 // scanCCStream 驱动两条 CC 回退路径共享的 SSE 读循环：提取 data 行、在 [DONE]
-// 哨兵处停止、保留最新 usage、记录首 token 时延，并把每个解析成功的 chunk 交给
+// 哨兵处停止、合并累计 usage、记录首 token 时延，并把每个解析成功的 chunk 交给
 // emit 回调做各自的协议转换与写出。读错误按既有约定过滤 context 取消类噪声后
 // 记入 Warn 日志。
 func (s *OpenAIGatewayService) scanCCStream(
@@ -281,8 +280,9 @@ func (s *OpenAIGatewayService) scanCCStream(
 			break
 		}
 
-		if u := extractCCStreamUsage(payload); u != nil {
-			st.Usage = *u
+		chunkUsage := extractCCStreamUsage(payload)
+		if chunkUsage != nil {
+			mergeOpenAIChatStreamUsage(&st.Usage, *chunkUsage)
 		}
 
 		var chunk apicompat.ChatCompletionsChunk
@@ -292,6 +292,22 @@ func (s *OpenAIGatewayService) scanCCStream(
 				zap.String("request_id", requestID),
 			)
 			continue
+		}
+		if chunkUsage != nil {
+			// 协议转换和实际结算共用合并结果，避免末尾空快照让下游再次收到零用量。
+			if chunk.Usage == nil {
+				chunk.Usage = &apicompat.ChatUsage{}
+			}
+			chunk.Usage.PromptTokens = st.Usage.InputTokens
+			chunk.Usage.CompletionTokens = st.Usage.OutputTokens
+			chunk.Usage.TotalTokens = st.Usage.InputTokens + st.Usage.OutputTokens
+			if st.Usage.CacheReadInputTokens > 0 || st.Usage.CacheCreationInputTokens > 0 {
+				if chunk.Usage.PromptTokensDetails == nil {
+					chunk.Usage.PromptTokensDetails = &apicompat.ChatTokenDetails{}
+				}
+				chunk.Usage.PromptTokensDetails.CachedTokens = st.Usage.CacheReadInputTokens
+				chunk.Usage.PromptTokensDetails.CacheWriteTokens = st.Usage.CacheCreationInputTokens
+			}
 		}
 		if st.FirstTokenMs == nil && !isOpenAIChatUsageOnlyStreamChunk(payload) && chatChunkStartsResponsesOutput(&chunk) {
 			ms := int(time.Since(startTime).Milliseconds())

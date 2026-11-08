@@ -45,7 +45,10 @@ func (s *OpenAIGatewayService) forwardCNAdaptiveAnthropic(
 		}
 	}
 	apiURL := strings.TrimRight(normalized, "/") + "/v1/messages"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	// 与其它 OpenAI 兼容转发路径一致，客户端断开后仍读取上游最终用量用于结算。
+	upstreamCtx, releaseUpstreamCtx := detachUpstreamContext(ctx)
+	defer releaseUpstreamCtx()
+	req, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +75,12 @@ func (s *OpenAIGatewayService) forwardCNAdaptiveAnthropic(
 		c.Data(resp.StatusCode, "application/json", responseBody)
 		return nil, fmt.Errorf("adaptive Anthropic endpoint returned %d", resp.StatusCode)
 	}
-	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+	isStream := isEventStreamResponse(resp.Header)
+	usage := parseCNAdaptiveAnthropicUsage(responseBody, isStream)
+	if err := validateDeepseekUsage(c, account, resp.Header.Get("x-request-id"), usage, model); err != nil {
+		return nil, err
+	}
+	if isStream {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")
 		c.Writer.Header().Set("Connection", "keep-alive")
@@ -83,9 +91,34 @@ func (s *OpenAIGatewayService) forwardCNAdaptiveAnthropic(
 		c.Data(http.StatusOK, "application/json", responseBody)
 	}
 	return &OpenAIForwardResult{
+		RequestID: resp.Header.Get("x-request-id"), Usage: usage,
 		Model: model, BillingModel: model, UpstreamModel: model,
 		UpstreamEndpoint: "/v1/messages", ResponseHeaders: resp.Header,
-		ResponseBody: responseBody, Stream: strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream"),
+		ResponseBody: responseBody, Stream: isStream,
 		Duration: time.Since(startTime),
 	}, nil
+}
+
+// parseCNAdaptiveAnthropicUsage 解析 JSON 或 SSE 的原生 Messages 用量并转换为统一结算口径。
+// @project-doc docs/interfaces/upstream_account_matrix.md#cn_adaptive_usage
+func parseCNAdaptiveAnthropicUsage(body []byte, stream bool) OpenAIUsage {
+	usage := &ClaudeUsage{}
+	if stream {
+		// message_start 给出输入用量，message_delta 给出累计输出；不能用末尾事件覆盖整份用量。
+		for line := range bytes.SplitSeq(body, []byte("\n")) {
+			if payload, ok := extractAnthropicSSEDataLine(string(line)); ok {
+				parseClaudeUsageFromSSEEvent(payload, usage)
+			}
+		}
+	} else {
+		usage = parseClaudeUsageFromResponseBody(body)
+	}
+	// Anthropic 输入不包含缓存桶，而 RecordUsage 会从 OpenAI 总输入中扣除缓存桶，
+	// 因此必须先合并总输入，避免普通输入被重复扣减而少计费。
+	return OpenAIUsage{
+		InputTokens:              usage.InputTokens + usage.CacheReadInputTokens + usage.CacheCreationInputTokens,
+		OutputTokens:             usage.OutputTokens,
+		CacheReadInputTokens:     usage.CacheReadInputTokens,
+		CacheCreationInputTokens: usage.CacheCreationInputTokens,
+	}
 }
