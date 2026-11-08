@@ -53,6 +53,8 @@
 
 ### 网关兼容与 API Key 创建限额
 
+正文缓冲预算、逐次正文读取与下游写入空闲超时由 `gateway.request_body_memory_budget_bytes`、`gateway.request_body_read_timeout_seconds`、`gateway.downstream_write_timeout_seconds` 提供，环境变量按同名大写下划线映射，修改后重启；默认值、容量不足及取消/超时响应边界见[入口安全](../operations/edge_security.md#http_ingress_limits)。这些开关不改变已有单请求体积上限，也不设置整个流式响应的截止时间。
+
 `gateway.min_output_tokens` 默认 `128`，协议转换在客户端提交正数 token 上限时，将其提升到该配置下限；允许最低 `16`。直接构造配置的旧调用方使用 `0` 时按默认值回退，不把 `0` 发送给上游。`gateway.max_same_account_retries_gemini` 默认 `4`，允许 `0–10`，表示首次请求之外的同账号重试次数；`0` 表示直接结束本账号尝试。Messages、原生 Gemini 和 Chat/Responses 兼容入口共用该预算，历史签名降级保留独立的两阶段恢复预算。
 
 `api_key_create.max_active_per_user` 默认 `200`，按用户未删除 Key 总数限制创建；`max_per_user_per_hour` 默认 `60`，由 Redis 固定一小时窗口累计创建次数。两者设为 `0` 可分别关闭，不能为负数。次数在实际创建前占用，删除 Key 不返还次数；Redis 故障时频率限制沿用创建自定义 Key 的放行策略，数据库计数失败仍终止创建。个人和团队 Key 继续经过 fork 的归属、订阅和分组权限校验。

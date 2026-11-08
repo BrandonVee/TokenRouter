@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/BrandonVee/TokenRouter/internal/pkg/ctxkey"
+	pkghttputil "github.com/BrandonVee/TokenRouter/internal/pkg/httputil"
 	"github.com/BrandonVee/TokenRouter/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +21,9 @@ func applyAPIKeyModelRedirect(c *gin.Context, apiKey *service.APIKey) {
 	}
 
 	sourceModel, geminiModel, ok := apiKeyRequestModel(c)
+	if c.IsAborted() {
+		return
+	}
 	if !ok {
 		_ = rewriteAPIKeyAdditionalModels(c.Request, apiKey)
 		return
@@ -46,6 +50,16 @@ func apiKeyRequestModel(c *gin.Context) (string, bool, bool) {
 		return model, true, err == nil && strings.TrimSpace(model) != ""
 	}
 	model, err := compositeModelFromRequest(c.Request)
+	if err != nil {
+		// 模型重定向的预读不能吞掉容量/超时错误，否则后续处理器只会看到被消费的空正文。
+		if RejectRequestBodyReadError(c, "middleware.api_key_model_redirect", err) {
+			return "", false, false
+		}
+		if pkghttputil.IsRequestBodyReadTimeout(err) {
+			AbortWithRequestBodyReadFailure(c, "middleware.api_key_model_redirect", err)
+			return "", false, false
+		}
+	}
 	return model, false, err == nil && strings.TrimSpace(model) != ""
 }
 

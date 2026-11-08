@@ -293,32 +293,17 @@ func readAndRestoreRequestBody(request *http.Request) ([]byte, error) {
 	if request == nil || request.Body == nil {
 		return nil, service.ErrCompositeKeyPrefixRequired
 	}
-	rawBody, err := io.ReadAll(request.Body)
+	// 复合 Key/模型重定向会多次读取正文，共用已解码切片与实例预算，禁止重复分配。
+	decodedBody, err := pkghttputil.ReadRequestBodyWithPrealloc(request)
 	if err != nil {
 		return nil, err
 	}
-	setRequestBody(request, rawBody)
-
-	encoding := strings.ToLower(strings.TrimSpace(request.Header.Get("Content-Encoding")))
-	if encoding == "" || encoding == "identity" {
-		return rawBody, nil
-	}
-
-	// 使用临时请求解压，失败时原请求仍保留完整压缩体，便于后续处理器返回原有错误。
-	decodeRequest := request.Clone(request.Context())
-	decodeRequest.Body = io.NopCloser(bytes.NewReader(rawBody))
-	decodeRequest.ContentLength = int64(len(rawBody))
-	decodedBody, err := pkghttputil.ReadRequestBodyWithPrealloc(decodeRequest)
-	if err != nil {
-		return nil, err
-	}
-	request.Header.Del("Content-Encoding")
 	setRequestBody(request, decodedBody)
 	return decodedBody, nil
 }
 
 func setRequestBody(request *http.Request, body []byte) {
-	request.Body = io.NopCloser(bytes.NewReader(body))
+	request.Body = pkghttputil.NewPrereadBody(body)
 	request.ContentLength = int64(len(body))
 	request.Header.Set("Content-Length", fmt.Sprintf("%d", len(body)))
 }
@@ -404,6 +389,13 @@ func rewriteMultipartModel(request *http.Request, actualModel string) error {
 
 // abortCompositeKeyError 按通用网关格式输出结构化复合 Key 错误。
 func abortCompositeKeyError(c *gin.Context, err error) {
+	if RejectRequestBodyReadError(c, "middleware.composite_key", err) {
+		return
+	}
+	if pkghttputil.IsRequestBodyReadTimeout(err) {
+		AbortWithRequestBodyReadFailure(c, "middleware.composite_key", err)
+		return
+	}
 	status := infraerrors.Code(err)
 	code := infraerrors.Reason(err)
 	message := infraerrors.Message(err)
@@ -431,5 +423,12 @@ func isOpenAICompositeEndpoint(path string) bool {
 
 // abortCompositeKeyGoogleError 按 Google 协议格式输出复合 Key 错误。
 func abortCompositeKeyGoogleError(c *gin.Context, err error) {
+	if RejectRequestBodyReadError(c, "middleware.composite_key", err) {
+		return
+	}
+	if pkghttputil.IsRequestBodyReadTimeout(err) {
+		AbortWithRequestBodyReadFailure(c, "middleware.composite_key", err)
+		return
+	}
 	abortWithGoogleError(c, infraerrors.Code(err), infraerrors.Reason(err)+": "+infraerrors.Message(err))
 }

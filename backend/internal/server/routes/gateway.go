@@ -131,8 +131,10 @@ func RegisterGatewayRoutes(
 	compositeResolver *service.CompositeRouteResolver,
 	cfg *config.Config,
 ) {
-	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize)
-	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize)
+	// 所有生成协议与别名共享同一实例预算，不能按单端点各建一个预算。
+	bodyMemoryBudget := pkghttputil.NewBodyMemoryBudget(cfg.Gateway.RequestBodyMemoryBudgetBytes)
+	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize, bodyMemoryBudget)
+	textBodyLimit := middleware.RequestBodyLimit(cfg.Gateway.TextMaxBodySize, bodyMemoryBudget)
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
@@ -729,15 +731,10 @@ func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver)
 
 		body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 		if err != nil {
-			status := http.StatusBadRequest
-			message := "Failed to read request body"
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				status = http.StatusRequestEntityTooLarge
-				message = "Request body is too large"
+			if middleware.RejectRequestBodyReadError(c, "middleware.composite_route", err) {
+				return
 			}
-			c.JSON(status, gin.H{"error": gin.H{"type": "invalid_request_error", "message": message}})
-			c.Abort()
+			middleware.AbortWithRequestBodyReadFailure(c, "middleware.composite_route", err)
 			return
 		}
 
@@ -866,7 +863,7 @@ func compositeGeminiModelFromParams(c *gin.Context) string {
 }
 
 func resetRequestBody(c *gin.Context, body []byte) {
-	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	c.Request.Body = pkghttputil.NewPrereadBody(body)
 	c.Request.ContentLength = int64(len(body))
 	c.Request.Header.Set("Content-Length", strconv.Itoa(len(body)))
 }

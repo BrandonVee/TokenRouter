@@ -7,8 +7,21 @@ import (
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	pkghttputil "github.com/BrandonVee/TokenRouter/internal/pkg/httputil"
+	middleware2 "github.com/BrandonVee/TokenRouter/internal/server/middleware"
 	"github.com/BrandonVee/TokenRouter/internal/service"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
+
+// handleRequestBodyReadError 先处理取消和容量错误；读取超时必须继续按 408 分类。
+func handleRequestBodyReadError(c *gin.Context, reqLog *zap.Logger, err error) bool {
+	if err != nil && !pkghttputil.IsRequestBodyReadTimeout(err) && failoverClientGone(c) {
+		logRequestBodyReadFailure(reqLog, pkghttputil.DescribeRequestBodyReadFailure(c.Request, err))
+		c.Abort()
+		return true
+	}
+	return middleware2.RejectRequestBodyMemoryOverload(c, err)
+}
 
 func extractMaxBytesError(err error) (*http.MaxBytesError, bool) {
 	var maxErr *http.MaxBytesError

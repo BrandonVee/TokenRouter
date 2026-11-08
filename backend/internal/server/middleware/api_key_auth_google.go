@@ -167,6 +167,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			return
 		}
 		applyAPIKeyModelRedirect(c, apiKey)
+		if c.IsAborted() {
+			return
+		}
 		skipBilling := isAPIKeyUsageRequest(c.Request.Method, c.Request.URL.Path) ||
 			isBatchImageBillingBypassRequest(c.Request.Method, c.Request.URL.Path) ||
 			(apiKey.IsComposite && isGrokVideoTaskRead(c.Request.Method, c.Request.URL.Path))

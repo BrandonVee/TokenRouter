@@ -221,6 +221,11 @@ gateway:
   # Max request body size in bytes (default: 256MB)
   # 请求体最大字节数（默认 256MB）
   max_body_size: 268435456
+  # 实例级正文缓冲预算，覆盖分块、解压及规范化；0 关闭，按部署内存容量调整。
+  request_body_memory_budget_bytes: 1073741824
+  # 每次正文读取和下游写入的空闲超时（秒），0 关闭，不限制流式请求总时长。
+  request_body_read_timeout_seconds: 120
+  downstream_write_timeout_seconds: 120
   # Pure-text endpoint body limit (embeddings and alpha/search), default 32 MiB.
   # 纯文本端点请求体上限（embeddings、alpha/search），默认 32 MiB。
   text_max_body_size: 33554432

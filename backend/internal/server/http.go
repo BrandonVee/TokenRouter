@@ -10,6 +10,7 @@ import (
 
 	"github.com/BrandonVee/TokenRouter/internal/config"
 	"github.com/BrandonVee/TokenRouter/internal/handler"
+	pkghttputil "github.com/BrandonVee/TokenRouter/internal/pkg/httputil"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/websearch"
 	middleware2 "github.com/BrandonVee/TokenRouter/internal/server/middleware"
 	"github.com/BrandonVee/TokenRouter/internal/service"
@@ -159,6 +160,9 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 		}
 	}
 
+	// 只约束实际读写操作，不使用会截断长时间推理/流式响应的全请求超时。
+	httpHandler = pkghttputil.WithBodyReadTimeout(httpHandler, time.Duration(cfg.Gateway.RequestBodyReadTimeoutSeconds)*time.Second)
+	httpHandler = pkghttputil.WithWriteTimeout(httpHandler, time.Duration(cfg.Gateway.DownstreamWriteTimeoutSeconds)*time.Second)
 	server.Handler = httpHandler
 	return server
 }

@@ -213,6 +213,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		ctx = context.WithValue(ctx, ctxkey.APIKeyFastModePolicy, apiKey.FastModePolicy)
 		c.Request = c.Request.WithContext(ctx)
 		applyAPIKeyModelRedirect(c, apiKey)
+		if c.IsAborted() {
+			return
+		}
 		// 批任务管理只读取已有数据或释放冻结；即使任务耗尽额度，结果仍应可取回或取消。
 		skipBilling := isAPIKeyUsageRequest(c.Request.Method, c.Request.URL.Path) ||
 			isBatchImageBillingBypassRequest(c.Request.Method, c.Request.URL.Path) ||

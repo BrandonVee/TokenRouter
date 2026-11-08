@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	pkghttputil "github.com/BrandonVee/TokenRouter/internal/pkg/httputil"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/ip"
 	"github.com/BrandonVee/TokenRouter/internal/pkg/logger"
 	middleware2 "github.com/BrandonVee/TokenRouter/internal/server/middleware"
@@ -149,7 +149,12 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 
 	body, err := readGrokVoiceGatewayBody(c)
 	if err != nil {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		reqLog := requestLogger(c, "handler.openai_gateway.grok_voice")
+		if handleRequestBodyReadError(c, reqLog, err) {
+			return
+		}
+		status, message := requestBodyReadFailure(reqLog, c.Request, err)
+		h.errorResponse(c, status, "invalid_request_error", message)
 		return
 	}
 	if endpoint == "tts" {
@@ -305,7 +310,7 @@ func readGrokVoiceGatewayBody(c *gin.Context) ([]byte, error) {
 		}
 		return nil, errors.New("request body is required")
 	}
-	return io.ReadAll(c.Request.Body)
+	return pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 }
 
 // extractGrokTTSInputText 从 TTS JSON 请求中提取主要朗读文本。
