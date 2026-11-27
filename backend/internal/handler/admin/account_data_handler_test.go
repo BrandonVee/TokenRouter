@@ -398,11 +398,12 @@ func TestImportDataAppliesOpenAIOAuthDefaultModelWhitelistWhenMissing(t *testing
 	require.Len(t, adminSvc.createdAccounts, 1)
 	require.Equal(t, []string{
 		"gpt-5.2",
-		"gpt-5.3",
-		"gpt-5.3-spark",
+		"gpt-5.3-codex-spark",
 		"gpt-5.4",
 		"gpt-5.4-mini",
 		"gpt-5.5",
+		"gpt-6.2-sol",
+		"gpt-6.2-astra",
 	}, adminSvc.createdAccounts[0].Credentials["model_whitelist"])
 }
 

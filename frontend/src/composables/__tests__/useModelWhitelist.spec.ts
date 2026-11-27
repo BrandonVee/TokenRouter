@@ -23,23 +23,26 @@ describe('useModelWhitelist', () => {
       // GPT-6 系列（gpt-6 是 Astra 的公开别名）
       'gpt-6',
       'gpt-6-astra',
+      'gpt-6.2-sol', 'gpt-6.2-astra',
       'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna',
       'gpt-5.2',
-      'gpt-5.3',
-      'gpt-5.3-spark',
+      'gpt-5.2-2025-12-11', 'gpt-5.2-chat-latest',
+      'gpt-5.2-pro', 'gpt-5.2-pro-2025-12-11',
+      'gpt-5.3-codex-spark',
       'codex-auto-review',
       'gpt-5.6',
       'gpt-5.6-sol',
       'gpt-5.6-terra',
       'gpt-5.6-luna',
       'gpt-5.4',
-      'gpt-5.4-mini',
+      'gpt-5.4-mini', 'gpt-5.4-2026-03-05',
       'gpt-5.5',
+      'gpt-4o-audio-preview', 'gpt-4o-realtime-preview',
       'gpt-image-1',
       'gpt-image-1.5',
       'gpt-image-2',
-      'gpt-image-2.5-flare',
-      'gpt-image-2.5-sunburst'
+      'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst',
+      'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'
     ])
   })
 
@@ -50,7 +53,7 @@ describe('useModelWhitelist', () => {
     ]))
   })
 
-  it('openai 模型列表不再暴露旧快照、Codex 和音频模型', () => {
+  it('openai 模型列表移除过期快照并保留当前 Codex 与音频模型', () => {
     const models = getModelsByPlatform('openai')
 
     expect(models).not.toContain('gpt-5')
@@ -60,9 +63,9 @@ describe('useModelWhitelist', () => {
     expect(models).not.toContain('gpt-5.1-codex-mini')
     expect(models).not.toContain('gpt-5.2-codex')
     expect(models).not.toContain('gpt-5.3-codex')
-    expect(models).not.toContain('gpt-5.3-codex-spark')
-    expect(models).not.toContain('gpt-5.4-2026-03-05')
-    expect(models).not.toContain('gpt-4o-audio-preview')
+    expect(models).toContain('gpt-5.3-codex-spark')
+    expect(models).toContain('gpt-5.4-2026-03-05')
+    expect(models).toContain('gpt-4o-audio-preview')
     expect(models).toContain('gpt-image-2.5-flare')
     expect(models).toContain('gpt-image-2.5-sunburst')
   })
@@ -91,7 +94,8 @@ describe('useModelWhitelist', () => {
     expect(getModelsByPlatform('deepseek')).toEqual([
       'deepseek-v4-pro',
       'deepseek-v4-flash',
-      'deepseek-v4-flash-vision-exp'
+      'deepseek-v4-flash-vision-exp',
+      'deepseek-flash'
     ])
   })
 
@@ -254,7 +258,8 @@ describe('useModelWhitelist', () => {
     expect(models).toContain('grok-4.5')
     expect(models).toContain('grok-4.5-latest')
     expect(models).toContain('grok-build-latest')
-    expect(models).toContain('grok-imagine-video-1.5-preview')
+    expect(models).toContain('grok-imagine-video-1.5')
+    expect(models).toContain('grok-imagine-image-2.0')
   })
 
   it('combined 模式支持 Grok 4.5 官方别名映射', () => {

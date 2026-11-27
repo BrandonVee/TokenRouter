@@ -7,23 +7,26 @@ const openaiModels = [
 	// GPT-6 系列（gpt-6 是 Astra 的公开别名）
 	'gpt-6',
 	'gpt-6-astra',
-  'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna',
+	'gpt-6.2-sol', 'gpt-6.2-astra',
+	'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna',
 	'gpt-5.2',
-	'gpt-5.3',
-	'gpt-5.3-spark',
+	'gpt-5.2-2025-12-11', 'gpt-5.2-chat-latest',
+	'gpt-5.2-pro', 'gpt-5.2-pro-2025-12-11',
+	'gpt-5.3-codex-spark',
 	'codex-auto-review',
 	'gpt-5.6',
 	'gpt-5.6-sol',
 	'gpt-5.6-terra',
 	'gpt-5.6-luna',
 	'gpt-5.4',
-	'gpt-5.4-mini',
+	'gpt-5.4-mini', 'gpt-5.4-2026-03-05',
 	'gpt-5.5',
+	'gpt-4o-audio-preview', 'gpt-4o-realtime-preview',
 	'gpt-image-1',
 	'gpt-image-1.5',
 	'gpt-image-2',
-	'gpt-image-2.5-flare',
-	'gpt-image-2.5-sunburst'
+	'gpt-image-2.5-flare', 'gpt-image-2.5-sunburst',
+	'gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'
 ]
 
 // Anthropic Claude
@@ -42,7 +45,7 @@ export const claudeModels = [
   'claude-sonnet-5',
   'claude-opus-5', 'claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5',
   'claude-fable-5',
-  'claude-fable-5.1'
+  'claude-fable-5-1', 'claude-fable-5-2', 'claude-mythos-5-2'
 ]
 
 // Google Gemini
@@ -65,13 +68,15 @@ const geminiModels = [
   'gemini-3.6-flash',
   'gemini-3.7-flash',
   'gemini-3.8-flash',
-  'gemini-4-argon'
+  'gemini-4-argon',
+  'gemini-4-carbon'
 ]
 
 // Antigravity 官方支持的模型（精确匹配）
 // 基于官方 API 返回的模型列表，只支持 Claude 4.5+ 和 Gemini 2.5+
 const antigravityModels = [
   // Claude 4.5+ 系列
+  'claude-fable-5-1',
   'claude-fable-5',
   'claude-opus-4-6',
   'claude-opus-4-6-thinking',
@@ -107,7 +112,6 @@ const antigravityModels = [
   'gpt-oss-120b-medium',
   'tab_flash_lite_preview',
   // 新模型变体保持与 Antigravity 目录一致。
-  'claude-fable-5-1',
   'claude-opus-5-5-high',
   'claude-opus-5-5-medium',
   'claude-opus-5-5-low',
@@ -125,6 +129,7 @@ const antigravityModels = [
   'gemini-3.8-flash-medium',
   'gemini-3.8-flash-high',
   'gemini-3.8-flash-tiered',
+  'gemini-4-carbon',
   'gemini-4-argon-low',
   'gemini-4-argon-medium',
   'gemini-4-argon-high'
@@ -192,7 +197,8 @@ const qwenModels = [
 const deepseekModels = [
   'deepseek-v4-pro',
   'deepseek-v4-flash',
-  'deepseek-v4-flash-vision-exp'
+  'deepseek-v4-flash-vision-exp',
+  'deepseek-flash'
 ]
 
 // Mistral
@@ -215,7 +221,7 @@ const metaModels = [
 
 // xAI Grok
 const xaiModels = [
-  'grok-4.6', 'grok-4.7', 'grok-4.7-fast', 'grok-4.7-build-fast',
+  'grok-4.6', 'grok-4.7',
   'grok-4.5',
   'grok-4.3',
   'grok-build-0.1',
@@ -236,8 +242,8 @@ const xaiModels = [
   'grok-imagine',
   'grok-imagine-image-quality',
   'grok-imagine-image',
+  'grok-imagine-image-2.0',
   'grok-imagine-video',
-  'grok-imagine-video-1.5-preview',
   'grok-imagine-video-1.5'
 ]
 
@@ -260,8 +266,9 @@ const yiModels = [
 
 // Moonshot/Kimi
 const moonshotModels = [
+  'k3.1-pro', 'k3.1-pro-highspeed',
   'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k',
-  'kimi-latest'
+  'kimi-latest', 'kimi-for-coding', 'kimi-k2'
 ]
 
 // Kimi 账号使用独立模型目录，不能回落到 Claude 或通用 Moonshot 列表。
@@ -283,6 +290,9 @@ const doubaoModels = [
 
 // MiniMax
 const minimaxModels = [
+  'MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed',
+  'MiniMax-M2.5', 'MiniMax-M2.5-highspeed', 'MiniMax-M2.1',
+  'MiniMax-M2.1-highspeed', 'MiniMax-M2',
   'abab6.5-chat', 'abab6.5s-chat', 'abab6.5s-chat-pro',
   'abab6-chat',
   'abab5.5-chat', 'abab5.5s-chat'

@@ -1382,6 +1382,12 @@ function generateOpenCodeConfig(
       }
     }
   }
+  // GPT-6.2 Sol/Astra 使用同一套 OpenCode 推理档位和上下文限制。
+  const solAstraOptions = {
+    limit: { context: 1050000, output: 128000 },
+    options: { store: false },
+    variants: { low: {}, medium: {}, high: {}, xhigh: {}, max: {} }
+  }
   const openaiModels = {
     'gpt-6-luna': {
       name: 'GPT-6 Luna',
@@ -1442,6 +1448,8 @@ function generateOpenCodeConfig(
       options: { store: false },
       variants: { none: {}, low: {}, medium: {}, high: {}, xhigh: {}, max: {} }
     },
+    'gpt-6.2-sol': { name: 'GPT-6.2 Sol', ...solAstraOptions },
+    'gpt-6.2-astra': { name: 'GPT-6.2 Astra', ...solAstraOptions },
     'gpt-6': {
       name: 'GPT-6 (Astra)',
       limit: {
